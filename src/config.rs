@@ -10,9 +10,75 @@ pub struct Config {
     pub serial: SerialConfig,
     pub mqtt: MqttConfig,
     pub permit_join: bool,
-    pub homeassistant: bool,
+    pub homeassistant: HomeAssistantConfig,
     pub devices: HashMap<String, DeviceConfig>,
     pub advanced: AdvancedConfig,
+}
+
+/// Home Assistant discovery toggle. zigbee2mqtt allows either a boolean
+/// (`homeassistant: true`) or a mapping (`homeassistant: { enabled: true, ... }`),
+/// so accept both forms.
+#[derive(Debug, Clone, Default)]
+pub struct HomeAssistantConfig {
+    pub enabled: bool,
+}
+
+impl HomeAssistantConfig {
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for HomeAssistantConfig {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+        use std::fmt;
+
+        struct BoolOrMap;
+        impl<'de> Visitor<'de> for BoolOrMap {
+            type Value = HomeAssistantConfig;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "a boolean or a mapping")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(HomeAssistantConfig { enabled: v })
+            }
+
+            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut enabled = true;
+                while let Some(key) = map.next_key::<String>()? {
+                    if key == "enabled" {
+                        enabled = map.next_value()?;
+                    } else {
+                        let _: serde::de::IgnoredAny = map.next_value()?;
+                    }
+                }
+                Ok(HomeAssistantConfig { enabled })
+            }
+        }
+
+        deserializer.deserialize_any(BoolOrMap)
+    }
+}
+
+impl serde::Serialize for HomeAssistantConfig {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bool(self.enabled)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -28,6 +94,7 @@ pub struct SerialConfig {
 #[serde(rename_all = "lowercase")]
 pub enum AdapterType {
     Znp,
+    Zstack,
     Ezsp,
     Auto,
 }
@@ -159,7 +226,32 @@ impl Config {
     pub fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| Error::Config(format!("cannot read {}: {e}", path.display())))?;
-        let config: Config = serde_yml::from_str(&content)?;
+        let mut config: Config = serde_yml::from_str(&content)?;
+        // Accept zigbee2mqtt-style URLs like "mqtt://localhost:1883" in mqtt.server.
+        let raw = config.mqtt.server.trim().to_string();
+        let stripped = raw
+            .strip_prefix("mqtt://")
+            .or_else(|| raw.strip_prefix("mqtts://"))
+            .unwrap_or(&raw)
+            .trim()
+            .to_string();
+        let colon_count = stripped.matches(':').count();
+        let bracketed = stripped.starts_with('[');
+        if let Some((host, port)) = stripped.rsplit_once(':') {
+            if !host.is_empty() && (bracketed || colon_count == 1) {
+                if let Ok(p) = port.parse::<u16>() {
+                    config.mqtt.server = host.to_string();
+                    config.mqtt.port = p;
+                    // done
+                } else {
+                    config.mqtt.server = stripped;
+                }
+            } else {
+                config.mqtt.server = stripped;
+            }
+        } else {
+            config.mqtt.server = stripped;
+        }
         config.validate()?;
         Ok(config)
     }

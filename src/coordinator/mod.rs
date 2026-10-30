@@ -120,7 +120,7 @@ impl CoordinatorHandle {
 
 pub async fn open_coordinator(cfg: &Config) -> Result<CoordinatorHandle> {
     match cfg.serial.adapter {
-        AdapterType::Znp | AdapterType::Auto => {
+        AdapterType::Znp | AdapterType::Zstack | AdapterType::Auto => {
             let coord = ZnpCoordinator::open(&cfg.serial.port, cfg.serial.baudrate)?;
             coord.start(cfg).await
         }
