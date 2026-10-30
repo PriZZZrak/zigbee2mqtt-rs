@@ -1,4 +1,9 @@
 pub mod basic;
+pub mod on_off_switch_cfg;
+pub mod multistate_input;
+pub mod metering;
+pub mod electrical_measurement;
+pub mod binary_input;
 pub mod color;
 pub mod humidity;
 pub mod ias_zone;
@@ -9,6 +14,8 @@ pub mod on_off;
 pub mod power;
 pub mod scenes;
 pub mod temperature;
+pub mod user_interface_cfg;
+pub mod thermostat;
 
 use serde_json::Value;
 
@@ -36,6 +43,13 @@ pub fn handler_for(cluster_id: u16) -> Option<&'static dyn ClusterHandler> {
         0x0300 => Some(&color::ColorCluster),
         0x0400 => Some(&illuminance::IlluminanceCluster),
         0x0402 => Some(&temperature::TemperatureCluster),
+        0x0007 => Some(&on_off_switch_cfg::OnOffSwitchCfgCluster),
+        0x000F => Some(&binary_input::BinaryInputCluster),
+        0x0012 => Some(&multistate_input::MultistateInputCluster),
+        0x0702 => Some(&metering::MeteringCluster),
+        0x0B04 => Some(&electrical_measurement::ElectricalMeasurementCluster),
+        0x0201 => Some(&thermostat::ThermostatCluster),
+        0x0204 => Some(&user_interface_cfg::UserInterfaceCfgCluster),
         0x0405 => Some(&humidity::HumidityCluster),
         0x0406 => Some(&occupancy::OccupancyCluster),
         0x0500 => Some(&ias_zone::IasZoneCluster),

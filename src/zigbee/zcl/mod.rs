@@ -1,6 +1,7 @@
 pub mod attribute;
 pub mod clusters;
 pub mod frame;
+pub mod write;
 
 use serde_json::{Map, Value};
 
