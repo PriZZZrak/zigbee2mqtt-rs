@@ -30,6 +30,10 @@ pub enum MqttCommand {
     GetDevice {
         friendly_name: String,
     },
+    BridgeRequest {
+        request: String,
+        payload: serde_json::Value,
+    },
 }
 
 // ── MqttBridge ────────────────────────────────────────────────────────────────
@@ -147,6 +151,46 @@ impl MqttBridge {
             .map_err(Error::Mqtt)
     }
 
+    pub async fn publish_bridge_health(&self, health: &serde_json::Value) -> Result<()> {
+        let topic = format!("{}/bridge/health", self.base_topic);
+        let bytes = serde_json::to_vec(health)?;
+        self.client
+            .publish(&topic, QoS::AtLeastOnce, false, bytes)
+            .await
+            .map_err(Error::Mqtt)
+    }
+
+    pub async fn publish_bridge_networkmap(&self, devices: &crate::devices::DeviceRegistry) -> Result<()> {
+        let topic = format!("{}/bridge/networkmap", self.base_topic);
+        let nodes: Vec<serde_json::Value> = devices
+            .all_devices()
+            .into_iter()
+            .map(|d| json!({
+                "ieeeAddr": d.ieee_addr.as_hex(),
+                "friendlyName": d.friendly_name,
+                "nwkAddr": d.nwk_addr,
+            }))
+            .collect();
+        let payload = json!({ "nodes": nodes, "links": [] });
+        let bytes = serde_json::to_vec(&payload)?;
+        self.client
+            .publish(&topic, QoS::AtLeastOnce, false, bytes)
+            .await
+            .map_err(Error::Mqtt)
+    }
+
+    pub async fn publish_availability(&self, friendly_name: &str, online: bool) -> Result<()> {
+        let topic = format!("{}/{}/availability", self.base_topic, friendly_name);
+        let payload = if online { "online" } else { "offline" };
+        self.publish_retained(&topic, payload.as_bytes()).await
+    }
+
+    pub async fn publish_bridge_extensions(&self) -> Result<()> {
+        let topic = format!("{}/bridge/extensions", self.base_topic);
+        let bytes = serde_json::to_vec(&json!([]))?;
+        self.publish_retained(&topic, &bytes).await
+    }
+
     /// Publish a Home Assistant MQTT discovery config.
     pub async fn publish_ha_discovery(
         &self,
@@ -236,6 +280,19 @@ async fn run_event_loop(
                 } else if topic.contains("permit_join") {
                     let duration = parse_permit_join_payload(payload);
                     let _ = cmd_tx.send(MqttCommand::PermitJoin { duration }).await;
+                } else if topic.contains("bridge/request") {
+                    let request = topic
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or("")
+                        .to_string();
+                    let json_value = serde_json::from_slice::<serde_json::Value>(payload)
+                        .unwrap_or(serde_json::Value::Null);
+                    let _ = cmd_tx.send(MqttCommand::BridgeRequest {
+                        request,
+                        payload: json_value,
+                    })
+                    .await;
                 }
             }
             Ok(Event::Incoming(Packet::Disconnect)) => {

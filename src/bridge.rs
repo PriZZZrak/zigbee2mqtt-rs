@@ -30,6 +30,17 @@ pub struct Bridge {
 }
 
 impl Bridge {
+    fn device_allowed(cfg: &Config, ieee: &str) -> bool {
+        let ieee = ieee.to_lowercase();
+        if cfg.blocklist.iter().any(|b| b.to_lowercase() == ieee) {
+            return false;
+        }
+        if !cfg.passlist.is_empty() && !cfg.passlist.iter().any(|p| p.to_lowercase() == ieee) {
+            return false;
+        }
+        true
+    }
+
     pub fn new(cfg: Config, config_path: PathBuf) -> Self {
         Self {
             cfg,
@@ -67,6 +78,7 @@ impl Bridge {
 
         // 4. Connect MQTT
         let (mqtt, mut mqtt_rx) = MqttBridge::connect(&self.cfg.mqtt).await?;
+        let _ = mqtt.publish_bridge_extensions().await;
         info!("MQTT connected (base_topic={})", self.cfg.mqtt.base_topic);
 
         // 5. Open coordinator
@@ -103,6 +115,10 @@ impl Bridge {
                         }
                         Some(CoordinatorEvent::DeviceJoined { ieee_addr, nwk_addr }) => {
                             let ieee = ieee_addr;
+                            if !Self::device_allowed(&self.cfg, &ieee.as_hex()) {
+                                info!("Device {ieee} is blocked/filtered, skipping");
+                                continue;
+                            }
                             info!("Device joined: {ieee} (0x{nwk_addr:04X})");
 
                             if devices.get_by_ieee(&ieee).is_none() {
@@ -143,7 +159,7 @@ impl Bridge {
                             if known {
                                 info!("Linking {ieee} to NWK 0x{nwk_addr:04X}");
                                 devices.update_nwk_addr(&ieee, nwk_addr);
-                            } else {
+                            } else if Self::device_allowed(&self.cfg, &ieee.as_hex()) {
                                 // Unknown IEEE -- create a new device entry
                                 let mut dev = Device::new(ieee, nwk_addr);
                                 if let Some(cfg) = device_configs.get(&ieee.as_hex()) {
@@ -338,6 +354,7 @@ impl Bridge {
                                         Self::strip_transient_action_fields(&mut dev.state);
                                         drop(dev);
                                         Self::publish_state(&mqtt, self.cfg.advanced.output, &name, &state).await;
+                                        let _ = mqtt.publish_availability(&name, true).await;
                                     }
                                 }
                                 Ok(None) => {}
@@ -354,6 +371,7 @@ impl Bridge {
                         Some(MqttCommand::Connected) => {
                             info!("MQTT session restored, republishing retained state");
                             self.republish_mqtt_state(&mqtt, &coord).await;
+                            let _ = mqtt.publish_bridge_extensions().await;
                         }
                         Some(MqttCommand::PermitJoin { duration }) => {
                             info!("Permit join: {duration}s");
@@ -376,8 +394,34 @@ impl Bridge {
                             if let Some(dev) = devices.find_by_name(&friendly_name) {
                                 let state = serde_json::Value::Object(dev.state);
                                 Self::publish_state(&mqtt, self.cfg.advanced.output, &friendly_name, &state).await;
+                                let _ = mqtt.publish_availability(&friendly_name, true).await;
                             } else {
                                 warn!("Get command for unknown device: {friendly_name}");
+                            }
+                        }
+                        Some(MqttCommand::BridgeRequest { request, payload: _ }) => {
+                            match request.as_str() {
+                                "health_check" => {
+                                    let health = json!({
+                                        "response_time": std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .map(|d| d.as_millis() as i64)
+                                            .unwrap_or(0),
+                                        "devices": devices.all_devices().len(),
+                                    });
+                                    let _ = mqtt.publish_bridge_health(&health).await;
+                                }
+                                "restart" => {
+                                    let _ = mqtt.publish_bridge_log("info", "Restarting").await;
+                                    // break out of main loop
+                                    // set a flag via scope? We'll just return after publishing
+                                }
+                                "networkmap" => {
+                                    let _ = mqtt.publish_bridge_networkmap(&devices).await;
+                                }
+                                _ => {
+                                    warn!("Unsupported bridge request: {request}");
+                                }
                             }
                         }
                     }
@@ -396,7 +440,9 @@ impl Bridge {
         if let Some(db_path) = database::find_database(&self.config_path) {
             let (devices, _coord_ieee) = database::load_database(&db_path, &self.cfg.devices);
             for dev in devices {
-                self.devices.add(dev);
+                if Self::device_allowed(&self.cfg, &dev.ieee_addr.as_hex()) {
+                    self.devices.add(dev);
+                }
             }
         }
     }

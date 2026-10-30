@@ -12,6 +12,10 @@ pub struct Config {
     pub permit_join: bool,
     pub homeassistant: HomeAssistantConfig,
     pub devices: HashMap<String, DeviceConfig>,
+    #[serde(default)]
+    pub blocklist: Vec<String>,
+    #[serde(default)]
+    pub passlist: Vec<String>,
     pub advanced: AdvancedConfig,
 }
 
