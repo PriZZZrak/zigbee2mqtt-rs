@@ -440,7 +440,7 @@ impl Bridge {
                                         Self::spawn_interview_retry(Arc::clone(&devices), Arc::clone(&coord.inner), ieee, nwk);
                                         let resp = json!({
                                             "status": "ok",
-                                            "data": {},
+                                            "data": { "id": id },
                                             "transaction": transaction,
                                         });
                                         let _ = mqtt.publish_bridge_response("device/interview", &resp).await;
