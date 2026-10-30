@@ -35,6 +35,9 @@ pub struct Device {
     #[serde(default)]
     pub state: serde_json::Map<String, serde_json::Value>,
     pub interview_complete: bool,
+    /// Expected endpoints from ActiveEpRsp, used to know when interview is done.
+    #[serde(default, skip_serializing, skip_deserializing)]
+    pub interview_expected_eps: Option<Vec<u8>>,
     #[serde(default)]
     pub disabled: bool,
 }
@@ -55,6 +58,7 @@ impl Device {
             arrow_hold_direction: None,
             state: serde_json::Map::new(),
             interview_complete: false,
+            interview_expected_eps: None,
             disabled: false,
         }
     }

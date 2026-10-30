@@ -178,6 +178,9 @@ impl Bridge {
 
                         Some(CoordinatorEvent::ActiveEpRsp { nwk_addr, endpoints }) => {
                             debug!("Active EPs for 0x{nwk_addr:04X}: {endpoints:?}");
+                            if let Some(mut dev) = devices.get_mut_by_nwk(nwk_addr) {
+                                dev.interview_expected_eps = Some(endpoints.clone());
+                            }
                             for ep in endpoints {
                                 if let Err(e) = coord.request_simple_desc(nwk_addr, ep).await {
                                     warn!("Failed to request simple descriptor: {e}");
@@ -211,8 +214,14 @@ impl Bridge {
                             if let Some(mut dev) = devices.get_mut_by_nwk(nwk_addr) {
                                 dev.endpoints.retain(|e| e.endpoint != endpoint);
                                 dev.endpoints.push(ep_desc);
-                                if !dev.interview_complete && !dev.endpoints.is_empty() {
+                                let expected_done = dev
+                                    .interview_expected_eps
+                                    .as_ref()
+                                    .map(|exp| exp.iter().all(|ep| dev.endpoints.iter().any(|e| &e.endpoint == ep)))
+                                    .unwrap_or(!dev.endpoints.is_empty());
+                                if !dev.interview_complete && expected_done {
                                     dev.interview_complete = true;
+                                    dev.interview_expected_eps = None;
                                     interview_just_completed = true;
                                     info!("Interview complete for {}", dev.display_name());
                                 }
