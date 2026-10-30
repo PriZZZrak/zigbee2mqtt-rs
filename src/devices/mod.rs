@@ -39,6 +39,8 @@ pub struct Device {
     #[serde(default, skip_serializing, skip_deserializing)]
     pub interview_expected_eps: Option<Vec<u8>>,
     #[serde(default)]
+    pub manufacturer_id: Option<u16>,
+    #[serde(default)]
     pub disabled: bool,
 }
 
@@ -59,6 +61,7 @@ impl Device {
             state: serde_json::Map::new(),
             interview_complete: false,
             interview_expected_eps: None,
+            manufacturer_id: None,
             disabled: false,
         }
     }

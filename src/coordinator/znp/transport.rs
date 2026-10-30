@@ -37,6 +37,7 @@ pub enum ZnpEvent {
     AfIncomingMsg(Vec<u8>),
     ActiveEpRsp(Vec<u8>),
     SimpleDescRsp(Vec<u8>),
+    NodeDescRsp(Vec<u8>),
     IeeeAddrRsp(Vec<u8>),
     BindRsp(Vec<u8>),
     TcDevInd(Vec<u8>),
@@ -166,6 +167,7 @@ impl TransportActor {
         let event = match (frame.subsystem, frame.cmd1) {
             (Subsystem::Sys, 0x80) => ZnpEvent::ResetInd,
             (Subsystem::Zdo, 0x81) => ZnpEvent::IeeeAddrRsp(frame.data),
+            (Subsystem::Zdo, 0x82) => ZnpEvent::NodeDescRsp(frame.data),
             (Subsystem::Zdo, 0x84) => ZnpEvent::SimpleDescRsp(frame.data),
             (Subsystem::Zdo, 0x85) => ZnpEvent::ActiveEpRsp(frame.data),
             (Subsystem::Zdo, 0xA1) => ZnpEvent::BindRsp(frame.data),

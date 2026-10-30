@@ -46,6 +46,11 @@ pub enum CoordinatorEvent {
         nwk_addr: u16,
         status: u8,
     },
+    NodeDescRsp {
+        nwk_addr: u16,
+        manufacturer_code: u16,
+        logical_type: u8,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +100,10 @@ impl CoordinatorHandle {
 
     pub async fn request_ieee_addr(&self, nwk_addr: u16) -> Result<()> {
         self.inner.lock().await.request_ieee_addr(nwk_addr).await
+    }
+
+    pub async fn request_node_desc(&self, nwk_addr: u16) -> Result<()> {
+        self.inner.lock().await.request_node_desc(nwk_addr).await
     }
 
     /// Bind `cluster_id` on the device at `dst_addr`'s `src_ep` to `dst_ieee`'s

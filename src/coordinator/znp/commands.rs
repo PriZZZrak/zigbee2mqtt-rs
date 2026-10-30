@@ -205,6 +205,7 @@ impl AfIncomingMsg {
 
 mod zdo {
     pub const IEEE_ADDR_REQ: u8 = 0x01;
+    pub const NODE_DESC_REQ: u8 = 0x02;
     pub const SIMPLE_DESC_REQ: u8 = 0x04;
     pub const ACTIVE_EP_REQ: u8 = 0x05;
     pub const BIND_REQ: u8 = 0x21;
@@ -227,6 +228,13 @@ pub fn zdo_permit_join(dst_addr: u16, duration: u8) -> ZnpFrame {
     data.push(duration);
     data.push(0); // tc_significance
     ZnpFrame::sreq(Subsystem::Zdo, zdo::PERMIT_JOIN_REQ, data)
+}
+
+pub fn zdo_node_desc_req(dst_addr: u16, nwk_addr_of_interest: u16) -> ZnpFrame {
+    let mut data = Vec::new();
+    data.extend_from_slice(&dst_addr.to_le_bytes());
+    data.extend_from_slice(&nwk_addr_of_interest.to_le_bytes());
+    ZnpFrame::sreq(Subsystem::Zdo, zdo::NODE_DESC_REQ, data)
 }
 
 pub fn zdo_active_ep_req(dst_addr: u16, nwk_addr_of_interest: u16) -> ZnpFrame {
@@ -417,6 +425,35 @@ impl SimpleDescRsp {
             device_id,
             input_clusters,
             output_clusters,
+        })
+    }
+}
+
+/// ZDO_NODE_DESC_RSP (AREQ cmd1=0x82) — parsed for manufacturerCode + logicalType
+#[derive(Debug, Clone)]
+pub struct NodeDescRsp {
+    pub nwk_addr: u16,
+    pub manufacturer_code: u16,
+    pub logical_type: u8,
+}
+
+impl NodeDescRsp {
+    pub fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() < 11 {
+            return None;
+        }
+        // srcAddr(2) + status(1) + nwkAddr(2) + logicalByte(1) + apsFlags(1) + macCap(1) + manuf(2)
+        let status = data[2];
+        if status != 0 {
+            return None;
+        }
+        let nwk_addr = u16::from_le_bytes([data[3], data[4]]);
+        let logical_type = data[5] & 0x07;
+        let manufacturer_code = u16::from_le_bytes([data[8], data[9]]);
+        Some(Self {
+            nwk_addr,
+            manufacturer_code,
+            logical_type,
         })
     }
 }
@@ -669,5 +706,30 @@ mod tests {
         assert_eq!(nv::CHANLIST, 0x0084);
         assert_eq!(nv::PRECFGKEY, 0x0062);
         assert_eq!(nv::ZDO_DIRECT_CB, 0x008F);
+    }
+
+    #[test]
+    fn node_desc_req_format() {
+        let frame = zdo_node_desc_req(0x1234, 0x1234);
+        assert_eq!(frame.cmd1, 0x02);
+        assert_eq!(u16::from_le_bytes([frame.data[0], frame.data[1]]), 0x1234);
+    }
+
+    #[test]
+    fn parse_node_desc_rsp() {
+        // src(2) + status(1) + nwk(2) + logical(1) + aps(1) + mac(1) + manuf(2)
+        let data = vec![
+            0x00, 0x00, // src
+            0x00, // status
+            0x34, 0x12, // nwk
+            0x01, // logicalType=1 (Router)
+            0x00, 0x00, // aps, mac
+            0x51, 0x10, // manuf 0x1051 (LUMI)
+            0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let rsp = NodeDescRsp::parse(&data).unwrap();
+        assert_eq!(rsp.nwk_addr, 0x1234);
+        assert_eq!(rsp.manufacturer_code, 0x1051);
+        assert_eq!(rsp.logical_type, 1);
     }
 }

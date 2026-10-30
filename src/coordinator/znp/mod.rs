@@ -308,6 +308,13 @@ async fn event_pump(mut znp_rx: mpsc::Receiver<ZnpEvent>, out: mpsc::Sender<Coor
                     nwk_addr: r.nwk_addr,
                 })
             }
+            ZnpEvent::NodeDescRsp(data) => {
+                NodeDescRsp::parse(&data).map(|r| CoordinatorEvent::NodeDescRsp {
+                    nwk_addr: r.nwk_addr,
+                    manufacturer_code: r.manufacturer_code,
+                    logical_type: r.logical_type,
+                })
+            }
             ZnpEvent::BindRsp(data) => BindRsp::parse(&data).map(|r| CoordinatorEvent::BindRsp {
                 nwk_addr: r.nwk_addr,
                 status: r.status,
@@ -352,6 +359,13 @@ impl ZnpHandle {
         if rsp.data.first().copied() != Some(0) {
             warn!("PERMIT_JOIN rsp: {:?}", rsp.data);
         }
+        Ok(())
+    }
+
+    pub async fn request_node_desc(&self, nwk_addr: u16) -> Result<()> {
+        self.transport
+            .request(zdo_node_desc_req(nwk_addr, nwk_addr))
+            .await?;
         Ok(())
     }
 

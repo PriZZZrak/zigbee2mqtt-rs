@@ -176,6 +176,30 @@ impl Bridge {
                             }
                         }
 
+                        Some(CoordinatorEvent::NodeDescRsp {
+                            nwk_addr,
+                            manufacturer_code,
+                            logical_type,
+                        }) => {
+                            debug!("NodeDesc 0x{nwk_addr:04X} manuf=0x{manufacturer_code:04X} type={logical_type}");
+                            if let Some(mut dev) = devices.get_mut_by_nwk(nwk_addr) {
+                                dev.manufacturer_id = Some(manufacturer_code);
+                                // Map logicalType 0=Coord,1=Router,2=EndDevice
+                                if dev.power_source.is_none() {
+                                    dev.power_source = Some(match logical_type {
+                                        1 => "Mains (single phase)".into(),
+                                        2 => "Battery".into(),
+                                        _ => "Unknown".into(),
+                                    });
+                                }
+                                // Trigger ActiveEp after NodeDesc (upstream interview order)
+                                drop(dev);
+                                if let Err(e) = coord.request_active_eps(nwk_addr).await {
+                                    warn!("Failed to request active endpoints after NodeDesc: {e}");
+                                }
+                            }
+                        }
+
                         Some(CoordinatorEvent::ActiveEpRsp { nwk_addr, endpoints }) => {
                             debug!("Active EPs for 0x{nwk_addr:04X}: {endpoints:?}");
                             if let Some(mut dev) = devices.get_mut_by_nwk(nwk_addr) {
@@ -951,11 +975,19 @@ impl Bridge {
                 {
                     return;
                 }
-                if let Err(e) = znp.lock().await.request_active_eps(nwk_addr).await {
+                // Upstream interview starts with Node Descriptor, then ActiveEp
+                if let Err(e) = znp.lock().await.request_node_desc(nwk_addr).await {
                     warn!(
                         "Interview attempt {attempt}/{MAX_ATTEMPTS} for {ieee}: \
-                         failed to request active endpoints: {e}"
+                         failed to request node descriptor: {e}"
                     );
+                    // Fallback to ActiveEp if NodeDesc fails (quirks)
+                    if let Err(e2) = znp.lock().await.request_active_eps(nwk_addr).await {
+                        warn!(
+                            "Interview attempt {attempt}/{MAX_ATTEMPTS} for {ieee}: \
+                             failed to request active endpoints: {e2}"
+                        );
+                    }
                 }
                 tokio::time::sleep(RETRY_DELAY).await;
                 if devices
