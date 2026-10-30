@@ -5,9 +5,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     # Pull the service + package + module straight from the project's git remote.
-    # Swap for "git+ssh://git@github.com/chr4/zigbee2mqtt-rs.git" if the repo is private.
+    # Swap for "git+ssh://git@github.com/PriZZZrak/zigbee2mqtt-rs.git" if the repo is private.
     zigbee2mqtt-rs = {
-      url = "github:chr4/zigbee2mqtt-rs";
+      url = "github:PriZZZrak/zigbee2mqtt-rs";
       # Keep the Pi's nixpkgs in lockstep with the one the package was built
       # against, so you don't pull down/build a second copy of the world.
       inputs.nixpkgs.follows = "nixpkgs";

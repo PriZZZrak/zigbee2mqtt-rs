@@ -76,7 +76,7 @@ Add this repo as a flake input and import its module:
 
 ```nix
 {
-  inputs.zigbee2mqtt-rs.url = "github:chr4/zigbee2mqtt-rs";
+  inputs.zigbee2mqtt-rs.url = "github:PriZZZrak/zigbee2mqtt-rs";
   # For a private fork: "git+ssh://git@github.com/<you>/zigbee2mqtt-rs.git"
 
   outputs = { self, nixpkgs, zigbee2mqtt-rs, ... }: {

@@ -5,3 +5,8 @@
 .envrc
 /result
 /result-*
+
+# Reference sources (not part of project)
+ref/
+openwrt-sdk/
+openwrt/files/windfront/
