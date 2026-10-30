@@ -8,7 +8,7 @@ A drop-in replacement for [zigbee2mqtt](https://www.zigbee2mqtt.io/) written in 
 - **Home Assistant MQTT discovery** -- lights, switches, sensors, binary sensors, diagnostics
 - **Pure Rust** -- no C dependencies, no TLS libraries (ring/openssl), fast cross-compilation
 - **Z-Stack support** -- works with CC2531 (Z-Stack 1.2) and CC2652/CC1352 (Z-Stack 3.0)
-- **ZCL cluster support** -- On/Off, Level, Color (HS/XY/CT), Temperature, Humidity, Illuminance, Occupancy, IAS Zone, Power/Battery
+- **ZCL cluster support** -- On/Off, Level, Color (HS/XY/CT), Temperature, Humidity, Illuminance, Occupancy, IAS Zone, Power/Battery, Thermostat, Electrical Measurement, Metering, Binary/Multistate Input, On/Off Switch Config
 - **Optimistic state** -- set commands immediately publish expected state back to MQTT
 - **Small binary** -- optimized for embedded targets like Raspberry Pi 3
 
@@ -24,6 +24,20 @@ cargo build --release
 # Or specify config path
 ./target/release/zigbee2mqtt-rs -c /path/to/configuration.yaml
 ```
+
+## Web UI
+
+The original zigbee2mqtt frontend (`zigbee2mqtt-windfront`) works without changes:
+the bridge's MQTT interface is compatible. On OpenWrt the frontend is served by
+uhttpd from `/www/zigbee2mqtt/` (port 80) and connects to mosquitto over
+WebSocket on port 9001:
+
+```
+http://<router-ip>/zigbee2mqtt/
+```
+
+On other systems, serve the frontend's `dist/` with any static HTTP server and
+point it at your MQTT broker's WebSocket listener.
 
 ## Cross-Compile for ARM (aarch64)
 
@@ -147,6 +161,15 @@ cross-compilation on your dev machine rather than emulated aarch64
 compilation. Everything else in the system closure (systemd, glibc, etc.)
 substitutes from `cache.nixos.org`, since aarch64-linux is a Tier-1 nixpkgs
 platform.
+
+## OpenWrt
+
+A ready-to-use OpenWrt SDK package is provided in `openwrt/`:
+
+- Package `zigbee2mqtt-rs` installs the static binary, init script, config and
+  an optional frontend into `/www/zigbee2mqtt/`.
+- mosquitto WebSocket listener is added on port 9001.
+- Build with the SDK: `make package/zigbee2mqtt-rs/compile V=s`
 
 ## Configuration
 

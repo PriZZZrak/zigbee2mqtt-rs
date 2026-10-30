@@ -3,17 +3,18 @@
 
 # Serial port settings
 serial:
-  port: /dev/ttyACM0
+  port: /dev/ttyUSB0
   baudrate: 115200
-  # Adapter type: znp (TI CC2531/CC2652), ezsp (Silicon Labs), auto
+  # Adapter type: znp (TI CC2531/CC2652), zstack (alias for znp), ezsp (Silicon Labs), auto
   adapter: znp
   rtscts: false
 
 # MQTT broker settings
 mqtt:
-  server: 10.5.9.1
+  # server accepts a host or a URL: mqtt://localhost:1883
+  server: mqtt://localhost
   port: 1883
-  base_topic: zigbee2mqtt-rs
+  base_topic: zigbee2mqtt
   client_id: zigbee2mqtt-rs
   # Uncomment for authentication:
   # username: my_user
@@ -25,37 +26,18 @@ mqtt:
 permit_join: true
 
 # Publish Home Assistant MQTT auto-discovery messages.
+# Accepts true/false or a mapping: { enabled: true }
 homeassistant: true
 
 # Advanced Zigbee network / MQTT publishing settings. Every field defaults
-# to the same value zigbee2mqtt itself defaults to (pan_id 0x1a62, channel
-# 11, output json, etc.), so the whole `advanced:` section can be omitted
-# unless you want to override something. Uncomment and adjust as needed:
-#
-# advanced:
-#   channel: 15
-#   # output: how device state is published to MQTT --
-#   #   json               - single merged JSON message; required for Home
-#   #                        Assistant discovery (default, matches upstream
-#   #                        zigbee2mqtt)
-#   #   attribute          - each state key as its own raw-value subtopic,
-#   #                        e.g. <base_topic>/<friendly_name>/action -> "toggle"
-#   #   attribute_and_json - both of the above
-#   output: json
+# to the same value zigbee2mqtt itself defaults to, so the whole section
+# can be omitted unless you want to override something.
+advanced:
+  channel: 11
+  # output: json (default, required for HA discovery) | attribute | attribute_and_json
+  output: json
+  log_level: info
 
 devices:
   '0xec1bbdfffeaa66db':
-    friendly_name: '0xec1bbdfffeaa66db'
-  '0x680ae2fffea72838':
-    friendly_name: '0x680ae2fffea72838'
-  '0xcc86ecfffe9fd1b1':
-    friendly_name: '0xcc86ecfffe9fd1b1'
-  '0x7cb03eaa0a00c4f8':
-    friendly_name: '0x7cb03eaa0a00c4f8'
-  '0x680ae2fffe0b84d7':
-    friendly_name: '0x680ae2fffe0b84d7'
-  '0x588e81fffe3ef07c':
-    friendly_name: '0x588e81fffe3ef07c'
-  '0x54ef44100152801e':
-    friendly_name: '0x54ef44100152801e'
-
+    friendly_name: 'living_room_bulb'
