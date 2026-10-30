@@ -38,6 +38,7 @@ pub enum MqttCommand {
 
 // ── MqttBridge ────────────────────────────────────────────────────────────────
 
+#[derive(Clone)]
 pub struct MqttBridge {
     client: AsyncClient,
     base_topic: String,

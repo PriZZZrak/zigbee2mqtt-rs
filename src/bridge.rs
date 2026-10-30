@@ -381,6 +381,13 @@ impl Bridge {
                             if let Err(e) = mqtt.publish_bridge_log("info", &format!("Permit join: {duration}s")).await {
                                 warn!("Failed to publish bridge log: {e}");
                             }
+                            if duration > 0 {
+                                let mqtt_clone = mqtt.clone();
+                                tokio::spawn(async move {
+                                    tokio::time::sleep(tokio::time::Duration::from_secs(duration as u64)).await;
+                                    let _ = mqtt_clone.publish_bridge_log("info", "Permit join disabled").await;
+                                });
+                            }
                         }
                         Some(MqttCommand::SetDevice { friendly_name, payload }) => {
                             info!("MQTT set: {friendly_name} -> {payload}");
