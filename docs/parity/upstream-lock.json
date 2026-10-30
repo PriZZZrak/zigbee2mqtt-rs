@@ -8,15 +8,17 @@
     },
     "zigbee-herdsman": {
       "repo": "https://github.com/Koenkk/zigbee-herdsman.git",
-      "commit": "b560461ed2c5322c60322e1679c278d413efb0b0",
+      "commit": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
       "resolved_version": "10.10.0",
-      "lock_integrity": null
+      "lock_integrity": null,
+      "tag": "v10.10.0"
     },
     "zigbee-herdsman-converters": {
       "repo": "https://github.com/Koenkk/zigbee-herdsman-converters.git",
-      "commit": "c18c32d94c77f683fa768618d1fd32b348fdd7b9",
+      "commit": "9dabbe4e343573c5a3070605efd843a1b3a16058",
       "resolved_version": "26.115.1",
-      "lock_integrity": null
+      "lock_integrity": null,
+      "tag": "v26.115.1"
     },
     "frontend": {
       "package": "zigbee2mqtt-windfront",
