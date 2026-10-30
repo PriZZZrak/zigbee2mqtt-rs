@@ -406,7 +406,7 @@ impl Bridge {
                                 warn!("Get command for unknown device: {friendly_name}");
                             }
                         }
-                        Some(MqttCommand::BridgeRequest { request, payload: _ }) => {
+                        Some(MqttCommand::BridgeRequest { request, payload }) => {
                             match request.as_str() {
                                 "health_check" => {
                                     let health = json!({
@@ -425,6 +425,33 @@ impl Bridge {
                                 }
                                 "networkmap" => {
                                     let _ = mqtt.publish_bridge_networkmap(&devices).await;
+                                }
+                                "device/interview" => {
+                                    let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                                    let transaction = payload.get("transaction").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                    let found = if let Some(d) = devices.find_by_name(id) {
+                                        Some((d.ieee_addr, d.nwk_addr))
+                                    } else if let Some(ieee) = crate::zigbee::IeeeAddr::from_hex(id) {
+                                        devices.get_by_ieee(&ieee).map(|r| (r.ieee_addr, r.nwk_addr))
+                                    } else {
+                                        None
+                                    };
+                                    if let Some((ieee, nwk)) = found {
+                                        Self::spawn_interview_retry(Arc::clone(&devices), Arc::clone(&coord.inner), ieee, nwk);
+                                        let resp = json!({
+                                            "status": "ok",
+                                            "data": {},
+                                            "transaction": transaction,
+                                        });
+                                        let _ = mqtt.publish_bridge_response("device/interview", &resp).await;
+                                    } else {
+                                        let resp = json!({
+                                            "status": "error",
+                                            "message": "device not found",
+                                            "transaction": transaction,
+                                        });
+                                        let _ = mqtt.publish_bridge_response("device/interview", &resp).await;
+                                    }
                                 }
                                 _ => {
                                     warn!("Unsupported bridge request: {request}");

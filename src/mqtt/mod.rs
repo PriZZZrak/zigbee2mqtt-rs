@@ -161,6 +161,15 @@ impl MqttBridge {
             .map_err(Error::Mqtt)
     }
 
+    pub async fn publish_bridge_response(&self, request: &str, payload: &serde_json::Value) -> Result<()> {
+        let topic = format!("{}/bridge/response/{}", self.base_topic, request);
+        let bytes = serde_json::to_vec(payload)?;
+        self.client
+            .publish(&topic, QoS::AtLeastOnce, false, bytes)
+            .await
+            .map_err(Error::Mqtt)
+    }
+
     pub async fn publish_bridge_networkmap(&self, devices: &crate::devices::DeviceRegistry) -> Result<()> {
         let topic = format!("{}/bridge/networkmap", self.base_topic);
         let nodes: Vec<serde_json::Value> = devices
