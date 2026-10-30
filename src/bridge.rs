@@ -85,7 +85,7 @@ impl Bridge {
 
         let devices = Arc::clone(&self.devices);
         let base_topic = self.cfg.mqtt.base_topic.clone();
-        let ha_enabled = self.cfg.homeassistant;
+        let ha_enabled = self.cfg.homeassistant.enabled();
         let device_configs = self.cfg.devices.clone();
         let coordinator_ieee = coord.info.ieee_addr.map(|a| a.as_hex()).unwrap_or_default();
 
@@ -303,16 +303,28 @@ impl Bridge {
                             match zcl::parse_message(cluster_id, &data, zone_type, held_arrow_direction.as_deref()) {
                                 Ok(Some(mut zcl_msg)) => {
                                     if cluster_id == 0x0000 {
-                                        // Basic cluster attributes (manufacturer/model/
-                                        // power_source/sw_build_id) are device metadata, not
-                                        // volatile state -- z2m doesn't publish them on the
-                                        // device state topic. handle_basic_cluster_response()
-                                        // above already routed them onto dedicated Device
-                                        // fields; strip them here so they aren't also merged
-                                        // into (and published as part of) device state.
                                         for key in BASIC_CLUSTER_METADATA_KEYS {
                                             zcl_msg.values.remove(key);
                                         }
+                                    }
+                                    let suffix = devices.get_by_nwk(src_addr).map(|d| {
+                                        if d.endpoints.len() <= 1 { return None; }
+                                        match src_ep {
+                                            1 => Some("l1".to_string()),
+                                            2 => Some("l2".to_string()),
+                                            3 => Some("button".to_string()),
+                                            _ => None,
+                                        }
+                                    }).flatten();
+                                    if let Some(suf) = &suffix {
+                                        let keys: Vec<String> = zcl_msg.values.keys().cloned().collect();
+                                        let mut new_values = serde_json::Map::new();
+                                        for k in keys {
+                                            if let Some(v) = zcl_msg.values.remove(&k) {
+                                                new_values.insert(format!("{}_{}", k, suf), v);
+                                            }
+                                        }
+                                        zcl_msg.values = new_values;
                                     }
                                     if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
                                         if let Some(direction_update) = zcl_msg.arrow_hold_direction {
@@ -323,11 +335,6 @@ impl Bridge {
                                         dev.state.insert("last_seen".into(), json!(now_iso8601()));
                                         let state = serde_json::Value::Object(dev.state.clone());
                                         let name = dev.friendly_name.clone();
-                                        // `action`/`action_*` are momentary button-press events,
-                                        // not retained device state -- matching zigbee2mqtt,
-                                        // don't let them linger and pollute later unrelated
-                                        // publishes for this device (they're still included in
-                                        // `state`, built just above, for this one publish).
                                         Self::strip_transient_action_fields(&mut dev.state);
                                         drop(dev);
                                         Self::publish_state(&mqtt, self.cfg.advanced.output, &name, &state).await;
@@ -453,7 +460,7 @@ impl Bridge {
             let state = serde_json::Value::Object(dev.state.clone());
             Self::publish_state(mqtt, self.cfg.advanced.output, &dev.friendly_name, &state).await;
 
-            if self.cfg.homeassistant && dev.interview_complete {
+            if self.cfg.homeassistant.enabled() && dev.interview_complete {
                 homeassistant::publish_discovery(
                     mqtt,
                     &dev,
@@ -590,6 +597,103 @@ impl Bridge {
                     }
                     optimistic.insert("color".into(), json!({"hue": h, "saturation": s}));
                     optimistic.insert("color_mode".into(), json!("hs"));
+                }
+            }
+        }
+
+        // Handle sensor_type (Lytko thermostat, manuf 0x7777)
+        if let Some(st) = payload.get("sensor_type").and_then(|v| v.as_str()) {
+            let types = ["3.3 кОм", "5 кОм", "6.8 кОм", "10 кОм", "12 кОм", "14.8 кОм", "15 кОм", "20 кОм", "33 кОм", "47 кОм"];
+            if let Some(idx) = types.iter().position(|t| *t == st) {
+                if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
+                    let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF00, 0x30, &[idx as u8])]);
+                    *trans_id = trans_id.wrapping_add(1);
+                    if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload).await {
+                        warn!("Failed to write sensor_type: {e}");
+                    }
+                    optimistic.insert("sensor_type".into(), json!(st));
+                }
+            }
+        }
+
+        // Handle hysteresis (Lytko thermostat, manuf 0x7777)
+        if let Some(hyst) = payload.get("hysteresis").and_then(|v| v.as_f64()) {
+            let mut raw = (hyst * 10.0 / 5.0).round() as i64 * 5;
+            if raw < 5 { raw = 5; }
+            if raw > 30 { raw = 30; }
+            if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
+                let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF01, 0x20, &[raw as u8])]);
+                *trans_id = trans_id.wrapping_add(1);
+                if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload).await {
+                    warn!("Failed to write hysteresis: {e}");
+                }
+                optimistic.insert("hysteresis".into(), json!(raw as f64 / 10.0));
+            }
+        }
+
+        // Handle correction (Lytko thermostat, manuf 0x7777)
+        if let Some(corr) = payload.get("correction").and_then(|v| v.as_f64()) {
+            let mut deg = corr.round() as i64;
+            if deg > 5 { deg = 5; }
+            if deg < -5 { deg = -5; }
+            let raw = (deg * 10) as i8;
+            if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
+                let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF02, 0x28, &[raw as u8])]);
+                *trans_id = trans_id.wrapping_add(1);
+                if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload).await {
+                    warn!("Failed to write correction: {e}");
+                }
+                optimistic.insert("correction".into(), json!(deg));
+            }
+        }
+
+        // Handle switch_type (Lytko switch channel)
+        if let Some(st) = payload.get("switch_type").and_then(|v| v.as_str()) {
+            let types = ["Кнопка", "Выключатель", "Переключатель"];
+            if let Some(idx) = types.iter().position(|t| *t == st) {
+                if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0007) {
+                    let zcl_payload = zcl::write::write_attributes_payload(*trans_id, None, &[(0x0000, 0x30, &[idx as u8])]);
+                    *trans_id = trans_id.wrapping_add(1);
+                    if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0007, *trans_id, zcl_payload).await {
+                        warn!("Failed to write switch_type: {e}");
+                    }
+                    optimistic.insert("switch_type".into(), json!(st));
+                }
+            }
+        }
+
+        // Handle decoupled (Lytko switch channel, manuf 0x7777)
+        if let Some(dec) = payload.get("decoupled") {
+            let on = match dec {
+                serde_json::Value::Bool(b) => *b,
+                serde_json::Value::String(s) => s.to_uppercase() == "ON",
+                _ => false,
+            };
+            if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0007) {
+                let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF10, 0x10, &[if on { 1u8 } else { 0u8 }])]);
+                *trans_id = trans_id.wrapping_add(1);
+                if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0007, *trans_id, zcl_payload).await {
+                    warn!("Failed to write decoupled: {e}");
+                }
+                optimistic.insert("decoupled".into(), json!(if on { "ON" } else { "OFF" }));
+            }
+        }
+
+        // Handle recovery (Lytko, manuf 0x7777, EP1, hvacUserInterfaceCfg 0x0204)
+        if let Some(rec) = payload.get("recovery") {
+            let on = match rec {
+                serde_json::Value::Bool(b) => *b,
+                serde_json::Value::String(s) => s.to_uppercase() == "ON",
+                _ => false,
+            };
+            if on {
+                if let Some(ep) = endpoints.iter().map(|e| e.endpoint).min() {
+                    let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0x4901, 0x30, &[1u8])]);
+                    *trans_id = trans_id.wrapping_add(1);
+                    if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0204, *trans_id, zcl_payload).await {
+                        warn!("Failed to write recovery: {e}");
+                    }
+                    optimistic.insert("recovery".into(), json!("OFF"));
                 }
             }
         }

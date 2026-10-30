@@ -69,6 +69,130 @@ pub async fn publish_discovery(
         }
     }
 
+    // ── Climate (thermostat) ─────────────────────────────────────────────
+    if clusters.contains(&0x0201) {
+        let config = json!({
+            "availability": availability,
+            "current_temperature_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "current_temperature_template": "{{ value_json.local_temperature }}",
+            "temperature_command_topic": format!("{}/{}/set", base_topic, device.friendly_name),
+            "temperature_state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "temperature_state_template": "{{ value_json.occupied_heating_setpoint }}",
+            "mode_command_topic": format!("{}/{}/set", base_topic, device.friendly_name),
+            "mode_state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "mode_state_template": "{{ value_json.system_mode }}",
+            "modes": ["off", "heat", "auto", "cool"],
+            "action_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "action_template": "{{ value_json.running_state }}",
+            "min_temp": 5,
+            "max_temp": 40,
+            "temp_step": 0.5,
+            "temperature_unit": "C",
+            "object_id": format!("{}_climate", device.friendly_name),
+            "unique_id": format!("{ieee_hex}_climate_{base_topic}"),
+            "device": ha_device,
+        });
+        publish(mqtt, "climate", &ieee_hex, "climate", &config).await;
+    }
+
+    // ── Current sensor ───────────────────────────────────────────────────
+    if clusters.contains(&0x0B04) {
+        let config = json!({
+            "availability": availability,
+            "state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "object_id": format!("{}_current", device.friendly_name),
+            "unique_id": format!("{ieee_hex}_current_{base_topic}"),
+            "device": ha_device,
+            "device_class": "current",
+            "unit_of_measurement": "A",
+            "state_class": "measurement",
+            "value_template": "{{ value_json.current }}",
+            "enabled_by_default": true,
+        });
+        publish(mqtt, "sensor", &ieee_hex, "current", &config).await;
+    }
+
+    // ── Power sensor ─────────────────────────────────────────────────────
+    if clusters.contains(&0x0B04) {
+        let config = json!({
+            "availability": availability,
+            "state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "object_id": format!("{}_power", device.friendly_name),
+            "unique_id": format!("{ieee_hex}_power_{base_topic}"),
+            "device": ha_device,
+            "device_class": "power",
+            "unit_of_measurement": "W",
+            "state_class": "measurement",
+            "value_template": "{{ value_json.power }}",
+            "enabled_by_default": true,
+        });
+        publish(mqtt, "sensor", &ieee_hex, "power", &config).await;
+    }
+
+    // ── Energy sensor ────────────────────────────────────────────────────
+    if clusters.contains(&0x0702) {
+        let config = json!({
+            "availability": availability,
+            "state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "object_id": format!("{}_energy", device.friendly_name),
+            "unique_id": format!("{ieee_hex}_energy_{base_topic}"),
+            "device": ha_device,
+            "device_class": "energy",
+            "unit_of_measurement": "kWh",
+            "state_class": "total_increasing",
+            "value_template": "{{ value_json.energy }}",
+            "enabled_by_default": true,
+        });
+        publish(mqtt, "sensor", &ieee_hex, "energy", &config).await;
+    }
+
+    // ── Fault reason sensor ──────────────────────────────────────────────
+    if clusters.contains(&0x0201) {
+        let config = json!({
+            "availability": availability,
+            "state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "object_id": format!("{}_fault_reason", device.friendly_name),
+            "unique_id": format!("{ieee_hex}_fault_reason_{base_topic}"),
+            "device": ha_device,
+            "icon": "mdi:alert-circle",
+            "value_template": "{{ value_json.fault_reason }}",
+            "enabled_by_default": true,
+        });
+        publish(mqtt, "sensor", &ieee_hex, "fault_reason", &config).await;
+    }
+
+    // ── Contact binary sensor (genBinaryInput) ───────────────────────────
+    if clusters.contains(&0x000F) {
+        let config = json!({
+            "availability": availability,
+            "state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "object_id": format!("{}_contact", device.friendly_name),
+            "unique_id": format!("{ieee_hex}_contact_{base_topic}"),
+            "device": ha_device,
+            "device_class": "door",
+            "value_template": "{{ value_json.contact }}",
+            "payload_on": "closed",
+            "payload_off": "open",
+            "enabled_by_default": true,
+        });
+        publish(mqtt, "binary_sensor", &ieee_hex, "contact", &config).await;
+    }
+
+    // ── Action sensor (genMultistateInput) ───────────────────────────────
+    if clusters.contains(&0x0012) {
+        let config = json!({
+            "availability": availability,
+            "state_topic": format!("{}/{}", base_topic, device.friendly_name),
+            "object_id": format!("{}_action", device.friendly_name),
+            "unique_id": format!("{ieee_hex}_action_{base_topic}"),
+            "device": ha_device,
+            "icon": "mdi:gesture-double-tap",
+            "value_template": "{{ value_json.action }}",
+            "enabled_by_default": true,
+        });
+        publish(mqtt, "sensor", &ieee_hex, "action", &config).await;
+    }
+
     let sensor_ctx = SensorDiscoveryCtx {
         mqtt,
         device,
