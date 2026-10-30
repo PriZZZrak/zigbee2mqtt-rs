@@ -1,0 +1,39 @@
+id,domain,behavior,baseline_sha,upstream_refs,dependency_refs,stage,adapter_family,priority,weight,status,verified_cases,total_cases,test_refs,evidence_ref,owner,upstream_changed,notes
+RUNTIME-001,Runtime,CLI parsing and config path,c18c32d,ref/zigbee2mqtt/lib/util/settings.ts,,1,shared,P0,1,VERIFIED,2,2,src/main.rs tests,,UNVERIFIED,no
+RUNTIME-002,Runtime,Single event loop select,c18c32d,ref/zigbee2mqtt/lib/zigbee2mqtt.ts,,1,shared,P0,2,IMPLEMENTED_UNVERIFIED,0,3,src/bridge.rs,,UNVERIFIED,no
+CONFIG-001,Config,YAML config parse/validate,c18c32d,ref/zigbee2mqtt/data/configuration.example.yaml,,1,shared,P0,1,VERIFIED,8,8,src/config.rs tests,,UNVERIFIED,no
+CONFIG-002,Config,database.db NDJSON import,c18c32d,ref/zigbee2mqtt/lib/util/database.ts,,1,shared,P0,2,VERIFIED,4,4,src/database.rs tests,,UNVERIFIED,no
+MQTT-001,MQTT,Connect/reconnect/auth,c18c32d,ref/zigbee2mqtt/lib/mqtt.ts,,1,shared,P0,2,IMPLEMENTED_UNVERIFIED,0,5,src/mqtt/mod.rs,,UNVERIFIED,no
+MQTT-002,MQTT,Bridge state JSON,c18c32d,ref/zigbee2mqtt/lib/extension/bridge.ts,,1,shared,P0,1,VERIFIED,2,2,tests/z2m_compat.rs,,UNVERIFIED,no
+MQTT-003,MQTT,Device state publish,c18c32d,ref/zigbee2mqtt/lib/extension/publish.ts,,1,shared,P0,2,IMPLEMENTED_UNVERIFIED,0,4,src/bridge.rs,,UNVERIFIED,no
+MQTT-004,MQTT,Optimistic set state,c18c32d,ref/zigbee2mqtt/lib/extension/publish.ts,,1,shared,P0,2,IMPLEMENTED_UNVERIFIED,0,3,src/bridge.rs,,UNVERIFIED,no
+MQTT-005,MQTT,permit_join request,c18c32d,ref/zigbee2mqtt/lib/extension/bridge.ts,,1,shared,P1,1,IMPLEMENTED_UNVERIFIED,0,3,src/mqtt/mod.rs,,UNVERIFIED,no
+MQTT-006,MQTT,device/get and device/set,c18c32d,ref/zigbee2mqtt/lib/extension/receive.ts,,1,shared,P0,2,IMPLEMENTED_UNVERIFIED,0,4,src/mqtt/mod.rs,,UNVERIFIED,no
+MQTT-007,MQTT,bridge/health,c18c32d,ref/zigbee2mqtt/lib/extension/bridge.ts,,1,shared,P1,1,PARTIAL,0,4,src/mqtt/mod.rs,,UNVERIFIED,no
+MQTT-008,MQTT,bridge/networkmap,c18c32d,ref/zigbee2mqtt/lib/extension/bridge.ts,,1,shared,P1,1,PARTIAL,0,3,src/mqtt/mod.rs,,UNVERIFIED,no
+MQTT-009,MQTT,bridge/extensions,c18c32d,ref/zigbee2mqtt/lib/extension/bridge.ts,,1,shared,P2,1,PARTIAL,0,2,src/mqtt/mod.rs,,UNVERIFIED,no
+ADAPTER-001,Adapter,Z-Stack CC2531 init,c18c32d,ref/zigbee-herdsman/src/adapter/z-stack/adapter/zStackAdapter.ts,zigbee-herdsman,1,zstack,P0,3,IMPLEMENTED_UNVERIFIED,0,5,src/coordinator/znp/mod.rs,,UNVERIFIED,no
+ADAPTER-002,Adapter,Z-Stack CC2652P init,c18c32d,ref/zigbee-herdsman/src/adapter/z-stack/adapter/zStackAdapter.ts,zigbee-herdsman,1,zstack,P0,3,IMPLEMENTED_UNVERIFIED,0,5,src/coordinator/znp/mod.rs,,UNVERIFIED,no
+ADAPTER-003,Adapter,SREQ/SRSP transport,c18c32d,ref/zigbee-herdsman/src/adapter/z-stack/adapter/zStackAdapter.ts,zigbee-herdsman,1,zstack,P0,2,IMPLEMENTED_UNVERIFIED,0,4,src/coordinator/znp/transport.rs,,UNVERIFIED,no
+ZIGBEE-001,Zigbee,Device join/interview,c18c32d,ref/zigbee2mqtt/lib/zigbee.ts,,1,shared,P0,3,IMPLEMENTED_UNVERIFIED,0,5,src/bridge.rs,,UNVERIFIED,no
+ZIGBEE-002,Zigbee,Permit join,c18c32d,ref/zigbee2mqtt/lib/extension/bridge.ts,,1,shared,P0,2,IMPLEMENTED_UNVERIFIED,0,4,src/coordinator/znp/mod.rs,,UNVERIFIED,no
+ZIGBEE-003,Zigbee,Device leave/remove,c18c32d,ref/zigbee2mqtt/lib/extension/bridge.ts,,1,shared,P1,1,IMPLEMENTED_UNVERIFIED,0,3,src/bridge.rs,,UNVERIFIED,no
+ZCL-001,ZCL,On/Off cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P0,1,VERIFIED,3,3,src/zigbee/zcl/clusters/on_off.rs tests,,UNVERIFIED,no
+ZCL-002,ZCL,Level cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P0,1,VERIFIED,2,2,src/zigbee/zcl/clusters/level.rs tests,,UNVERIFIED,no
+ZCL-003,ZCL,Color cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P0,1,VERIFIED,2,2,src/zigbee/zcl/clusters/color.rs tests,,UNVERIFIED,no
+ZCL-004,ZCL,Temperature cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P0,1,VERIFIED,3,3,src/zigbee/zcl/clusters/temperature.rs tests,,UNVERIFIED,no
+ZCL-005,ZCL,Humidity cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P0,1,VERIFIED,1,1,src/zigbee/zcl/clusters/humidity.rs tests,,UNVERIFIED,no
+ZCL-006,ZCL,Illuminance cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P1,1,VERIFIED,1,1,src/zigbee/zcl/clusters/illuminance.rs tests,,UNVERIFIED,no
+ZCL-007,ZCL,Occupancy cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P1,1,VERIFIED,1,1,src/zigbee/zcl/clusters/occupancy.rs tests,,UNVERIFIED,no
+ZCL-008,ZCL,IAS Zone cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P0,1,VERIFIED,2,2,src/zigbee/zcl/clusters/ias_zone.rs tests,,UNVERIFIED,no
+ZCL-009,ZCL,Power cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P0,1,VERIFIED,4,4,src/zigbee/zcl/clusters/power.rs tests,,UNVERIFIED,no
+ZCL-010,ZCL,Thermostat cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P1,2,IMPLEMENTED_UNVERIFIED,0,10,src/zigbee/zcl/clusters/thermostat.rs tests,,UNVERIFIED,no
+ZCL-011,ZCL,Electrical measurement,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P1,1,IMPLEMENTED_UNVERIFIED,0,3,src/zigbee/zcl/clusters/electrical_measurement.rs tests,,UNVERIFIED,no
+ZCL-012,ZCL,Metering cluster,c18c32d,ref/zigbee-herdsman-converters/src/converters/fromZigbee.js,,1,shared,P1,1,IMPLEMENTED_UNVERIFIED,0,2,src/zigbee/zcl/clusters/metering.rs tests,,UNVERIFIED,no
+HA-001,HomeAssistant,Discovery lights/switches/sensors,c18c32d,ref/zigbee2mqtt/lib/extension/homeassistant.ts,,1,shared,P0,2,IMPLEMENTED_UNVERIFIED,0,6,src/homeassistant.rs,,UNVERIFIED,no
+HA-002,HomeAssistant,Discovery climate/contact/action,c18c32d,ref/zigbee2mqtt/lib/extension/homeassistant.ts,,1,shared,P1,2,IMPLEMENTED_UNVERIFIED,0,5,src/homeassistant.rs,,UNVERIFIED,no
+AVAIL-001,Availability,Device availability online/offline,c18c32d,ref/zigbee2mqtt/lib/extension/availability.ts,,1,shared,P1,2,PARTIAL,0,4,src/bridge.rs,,UNVERIFIED,no
+GROUPS-001,Groups,Group management,c18c32d,ref/zigbee2mqtt/lib/extension/groups.ts,,1,shared,P2,3,DISCOVERED,0,0,,,UNVERIFIED,no
+OTA-001,OTA,Firmware update,c18c32d,ref/zigbee2mqtt/lib/extension/otaUpdate.ts,,1,shared,P2,3,DISCOVERED,0,0,,,UNVERIFIED,no
+FRONTEND-001,Frontend,Web UI via uhttpd,c18c32d,ref/zigbee2mqtt/lib/extension/frontend.ts,,1,shared,P2,1,PARTIAL,0,2,openwrt/Makefile,,UNVERIFIED,no
+STORAGE-001,Storage,database.db import,c18c32d,ref/zigbee2mqtt/lib/util/database.ts,,1,shared,P0,2,VERIFIED,4,4,src/database.rs tests,,UNVERIFIED,no

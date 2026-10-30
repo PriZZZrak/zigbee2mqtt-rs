@@ -1,0 +1,37 @@
+{
+  "baseline": {
+    "zigbee2mqtt": {
+      "repo": "https://github.com/Koenkk/zigbee2mqtt.git",
+      "commit": "344b6e03b43644c97154a72ca9eae17193c553a2",
+      "version": "2.14.2",
+      "branch": "master"
+    },
+    "zigbee-herdsman": {
+      "repo": "https://github.com/Koenkk/zigbee-herdsman.git",
+      "commit": "b560461ed2c5322c60322e1679c278d413efb0b0",
+      "resolved_version": "10.10.0",
+      "lock_integrity": null
+    },
+    "zigbee-herdsman-converters": {
+      "repo": "https://github.com/Koenkk/zigbee-herdsman-converters.git",
+      "commit": "c18c32d94c77f683fa768618d1fd32b348fdd7b9",
+      "resolved_version": "26.115.1",
+      "lock_integrity": null
+    },
+    "frontend": {
+      "package": "zigbee2mqtt-windfront",
+      "resolved_version": "2.15.1",
+      "commit": null,
+      "lock_integrity": null
+    }
+  },
+  "latest_heads": {
+    "zigbee2mqtt": "344b6e03b43644c97154a72ca9eae17193c553a2",
+    "zigbee-herdsman": "b560461ed2c5322c60322e1679c278d413efb0b0",
+    "zigbee-herdsman-converters": "c18c32d94c77f683fa768618d1fd32b348fdd7b9"
+  },
+  "last_successful_fetch_utc": "2026-10-31T00:00:00Z",
+  "last_checked_utc": "2026-10-31T00:00:00Z",
+  "freshness_status": "CURRENT",
+  "baseline_approved_at_utc": null
+}
