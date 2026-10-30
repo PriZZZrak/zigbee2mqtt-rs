@@ -8,5 +8,6 @@
 
 # Reference sources (not part of project)
 ref/
+.upstream/
 openwrt-sdk/
 openwrt/files/windfront/

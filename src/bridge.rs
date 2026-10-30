@@ -323,7 +323,7 @@ impl Bridge {
                                             zcl_msg.values.remove(key);
                                         }
                                     }
-                                    let suffix = devices.get_by_nwk(src_addr).map(|d| {
+                                    let suffix = devices.get_by_nwk(src_addr).and_then(|d| {
                                         if d.endpoints.len() <= 1 { return None; }
                                         match src_ep {
                                             1 => Some("l1".to_string()),
@@ -331,7 +331,7 @@ impl Bridge {
                                             3 => Some("button".to_string()),
                                             _ => None,
                                         }
-                                    }).flatten();
+                                    });
                                     if let Some(suf) = &suffix {
                                         let keys: Vec<String> = zcl_msg.values.keys().cloned().collect();
                                         let mut new_values = serde_json::Map::new();
@@ -699,8 +699,7 @@ impl Bridge {
         // Handle hysteresis (Lytko thermostat, manuf 0x7777)
         if let Some(hyst) = payload.get("hysteresis").and_then(|v| v.as_f64()) {
             let mut raw = (hyst * 10.0 / 5.0).round() as i64 * 5;
-            if raw < 5 { raw = 5; }
-            if raw > 30 { raw = 30; }
+            raw = raw.clamp(5, 30);
             if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
                 let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF01, 0x20, &[raw as u8])]);
                 *trans_id = trans_id.wrapping_add(1);
@@ -714,8 +713,7 @@ impl Bridge {
         // Handle correction (Lytko thermostat, manuf 0x7777)
         if let Some(corr) = payload.get("correction").and_then(|v| v.as_f64()) {
             let mut deg = corr.round() as i64;
-            if deg > 5 { deg = 5; }
-            if deg < -5 { deg = -5; }
+            deg = deg.clamp(-5, 5);
             let raw = (deg * 10) as i8;
             if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
                 let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF02, 0x28, &[raw as u8])]);

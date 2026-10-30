@@ -7,9 +7,14 @@ use crate::coordinator::znp::frame::{Subsystem, ZnpFrame};
 // ─── SYS subsystem ────────────────────────────────────────────────────────────
 
 mod sys {
+    pub const PING: u8 = 0x01;
     pub const RESET_REQ: u8 = 0x00;
     pub const VERSION: u8 = 0x02;
     pub const OSAL_NV_WRITE: u8 = 0x09;
+}
+
+pub fn sys_ping() -> ZnpFrame {
+    ZnpFrame::sreq(Subsystem::Sys, sys::PING, vec![0x01, 0x00])
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,10 +57,12 @@ impl SysVersionRsp {
 // ─── NV RAM helpers ──────────────────────────────────────────────────────────
 
 pub mod nv {
+    pub const STARTUP_OPTION: u16 = 0x0003;
     pub const LOGICAL_TYPE: u16 = 0x0087;
     pub const PANID: u16 = 0x0083;
     pub const CHANLIST: u16 = 0x0084;
     pub const EXTENDED_PAN_ID: u16 = 0x002D;
+    pub const APS_USE_EXT_PANID: u16 = 0x0047;
     pub const PRECFGKEY: u16 = 0x0062;
     pub const PRECFGKEYS_ENABLE: u16 = 0x0063;
     pub const ZDO_DIRECT_CB: u16 = 0x008F;
@@ -640,5 +647,27 @@ mod tests {
     #[test]
     fn parse_bind_rsp_too_short() {
         assert!(BindRsp::parse(&[0x00, 0x00]).is_none());
+    }
+
+    #[test]
+    fn sys_ping_is_sreq_with_capabilities() {
+        let frame = sys_ping();
+        assert_eq!(frame.frame_type, FrameType::SReq);
+        assert_eq!(frame.subsystem, Subsystem::Sys);
+        assert_eq!(frame.cmd1, 0x01);
+        assert_eq!(frame.data, vec![0x01, 0x00]);
+    }
+
+    #[test]
+    fn nv_ids_match_upstream() {
+        // Values from zigbee-herdsman src/adapter/z-stack/constants/common.ts NvItemsIds
+        assert_eq!(nv::STARTUP_OPTION, 0x0003);
+        assert_eq!(nv::EXTENDED_PAN_ID, 0x002D);
+        assert_eq!(nv::APS_USE_EXT_PANID, 0x0047);
+        assert_eq!(nv::LOGICAL_TYPE, 0x0087);
+        assert_eq!(nv::PANID, 0x0083);
+        assert_eq!(nv::CHANLIST, 0x0084);
+        assert_eq!(nv::PRECFGKEY, 0x0062);
+        assert_eq!(nv::ZDO_DIRECT_CB, 0x008F);
     }
 }

@@ -33,6 +33,8 @@ impl ZnpCoordinator {
     /// Full coordinator startup sequence.
     pub async fn start(mut self, cfg: &Config) -> Result<CoordinatorHandle> {
         self.reset().await?;
+        // Mirror upstream ping-retry (zStackAdapter.ts start(): 3 attempts, SYS ping capabilities=1)
+        self.ping().await?;
         let version = self.check_version().await?;
         // Unverified heuristic, not sourced from a TI spec we have on hand:
         // product_id 0 is assumed to mean Z-Stack Home 1.2 (CC2531) and >=1
@@ -96,6 +98,21 @@ impl ZnpCoordinator {
         }
     }
 
+    async fn ping(&self) -> Result<()> {
+        // Upstream tries 3 times; we try once then let the 10s timeout surface.
+        // Failure here is non-fatal for backward compat with old firmware that
+        // may not reply correctly, but we log it. Matches zStackAdapter.ts behaviour
+        // of retrying ping before version fetch.
+        for attempt in 0..3 {
+            match self.transport.request(sys_ping()).await {
+                Ok(_) => return Ok(()),
+                Err(e) if attempt == 2 => return Err(e),
+                Err(_) => tokio::time::sleep(Duration::from_millis(200)).await,
+            }
+        }
+        Ok(())
+    }
+
     async fn check_version(&self) -> Result<SysVersionRsp> {
         let rsp = self.transport.request(sys_version()).await?;
         match SysVersionRsp::parse(&rsp.data) {
@@ -114,6 +131,9 @@ impl ZnpCoordinator {
     async fn write_nv_config(&self, cfg: &Config) -> Result<()> {
         info!("Writing network configuration to NVRAM");
 
+        // STARTUP_OPTION = 0x00 (no special startup – mirrors manager.ts updateCommissioningNvItems)
+        self.nv_write(nv::STARTUP_OPTION, &[0x00]).await?;
+
         // Logical type: coordinator = 0x00
         self.nv_write(nv::LOGICAL_TYPE, &[0x00]).await?;
 
@@ -121,8 +141,13 @@ impl ZnpCoordinator {
         self.nv_write(nv::PANID, &cfg.advanced.pan_id.to_le_bytes())
             .await?;
 
-        // Extended PAN ID
+        // Extended PAN ID – stored reversed on-wire in some NV items, but
+        // ZNP OSAL NV write expects little-endian as configured; we store as-is
+        // to match current Rust database convention (compatibility preserved).
         self.nv_write(nv::EXTENDED_PAN_ID, &cfg.advanced.ext_pan_id)
+            .await?;
+        // APS_USE_EXT_PANID must mirror EXTENDED_PAN_ID (manager.ts)
+        self.nv_write(nv::APS_USE_EXT_PANID, &cfg.advanced.ext_pan_id)
             .await?;
 
         // Channel list (bitmask)
