@@ -4,6 +4,7 @@ pub mod coordinator;
 pub mod database;
 pub mod devices;
 pub mod error;
+pub mod groups;
 pub mod homeassistant;
 pub mod mqtt;
 pub mod zigbee;

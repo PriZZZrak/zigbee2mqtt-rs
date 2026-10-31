@@ -201,6 +201,13 @@ impl MqttBridge {
         self.publish_retained(&topic, &bytes).await
     }
 
+    pub async fn publish_bridge_groups(&self, groups: &crate::groups::GroupRegistry) -> Result<()> {
+        let topic = format!("{}/bridge/groups", self.base_topic);
+        let payload = groups.to_json();
+        let bytes = serde_json::to_vec(&payload)?;
+        self.publish_retained(&topic, &bytes).await
+    }
+
     /// Publish a Home Assistant MQTT discovery config.
     pub async fn publish_ha_discovery(
         &self,

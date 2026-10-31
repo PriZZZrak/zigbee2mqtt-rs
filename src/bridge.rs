@@ -13,6 +13,7 @@ use crate::coordinator::znp::ZnpHandle;
 use crate::coordinator::{open_coordinator, CoordinatorEvent, CoordinatorHandle};
 use crate::database;
 use crate::devices::{Device, DeviceRegistry};
+use crate::groups::GroupRegistry;
 use crate::error::Result;
 use crate::homeassistant;
 use crate::mqtt::attribute_output::flatten_attribute_output;
@@ -27,6 +28,7 @@ pub struct Bridge {
     cfg: Config,
     config_path: PathBuf,
     devices: Arc<DeviceRegistry>,
+    groups: Arc<GroupRegistry>,
 }
 
 impl Bridge {
@@ -46,6 +48,7 @@ impl Bridge {
             cfg,
             config_path,
             devices: Arc::new(DeviceRegistry::new()),
+            groups: Arc::new(GroupRegistry::new()),
         }
     }
 
@@ -96,6 +99,7 @@ impl Bridge {
         info!("Startup complete, entering main loop");
 
         let devices = Arc::clone(&self.devices);
+        let groups = Arc::clone(&self.groups);
         let base_topic = self.cfg.mqtt.base_topic.clone();
         let ha_enabled = self.cfg.homeassistant.enabled();
         let device_configs = self.cfg.devices.clone();
@@ -488,25 +492,38 @@ impl Bridge {
                                         let _ = mqtt.publish_bridge_response("device/interview", &resp).await;
                                     }
                                 }
-                                "device/rename" | "group/rename" => {
+                                "device/rename" => {
                                     let from = payload.get("from").and_then(|v| v.as_str()).unwrap_or("");
                                     let to = payload.get("to").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
                                     if from.is_empty() || to.is_empty() {
                                         let resp = mk_resp("error", json!({}), Some("Invalid payload".into()));
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else if let Some(ieee) = devices.find_by_name(from).map(|d| d.ieee_addr).or_else(|| crate::zigbee::IeeeAddr::from_hex(from)) {
-                                        if let Some(ieee) = crate::zigbee::IeeeAddr::from_hex(&ieee.as_hex()).or(Some(ieee)) {
-                                            devices.rename(&ieee, to.clone());
-                                            Self::publish_device_list_static(&devices, &mqtt).await;
-                                            let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": false}), None);
-                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                        }
+                                        devices.rename(&ieee, to.clone());
+                                        Self::publish_device_list_static(&devices, &mqtt).await;
+                                        let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": false}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
                                         let resp = mk_resp("error", json!({}), Some("entity not found".into()));
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     }
                                 }
-                                "device/remove" | "group/remove" => {
+                                "group/rename" => {
+                                    let from = payload.get("from").and_then(|v| v.as_str()).unwrap_or("");
+                                    let to = payload.get("to").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+                                    if from.is_empty() || to.is_empty() {
+                                        let resp = mk_resp("error", json!({}), Some("Invalid payload".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else if groups.rename(from, to.clone()).is_some() {
+                                        let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        let resp = mk_resp("ok", json!({"from": from, "to": to}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else {
+                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
+                                }
+                                "device/remove" => {
                                     let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or(payload.as_str().unwrap_or(""));
                                     let ieee_opt = crate::zigbee::IeeeAddr::from_hex(id).or_else(|| devices.find_by_name(id).map(|d| d.ieee_addr));
                                     if let Some(ieee) = ieee_opt {
@@ -519,6 +536,18 @@ impl Bridge {
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     }
                                 }
+                                "group/remove" => {
+                                    let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or(payload.as_str().unwrap_or(""));
+                                    let gid: u16 = id.parse().unwrap_or_else(|_| groups.get_by_name(id).map(|g| g.id).unwrap_or(0));
+                                    if groups.remove_by_id(gid).is_some() || groups.get_by_name(id).and_then(|g| groups.remove_by_id(g.id)).is_some() {
+                                        let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        let resp = mk_resp("ok", json!({"id": id}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else {
+                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
+                                }
                                 "device/options" | "group/options" | "options" | "bridge/options" => {
                                     // Stub: accept options, return ok
                                     let resp = mk_resp("ok", json!({}), None);
@@ -526,12 +555,56 @@ impl Bridge {
                                 }
                                 "group/add" => {
                                     let friendly = payload.get("friendly_name").and_then(|v| v.as_str()).unwrap_or("group").to_string();
-                                    let resp = mk_resp("ok", json!({"friendly_name": friendly, "id": 1}), None);
-                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    // Check duplicate
+                                    if groups.get_by_name(&friendly).is_some() {
+                                        let resp = mk_resp("error", json!({}), Some("group already exists".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else {
+                                        let g = groups.add(friendly.clone());
+                                        let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        let resp = mk_resp("ok", json!({"friendly_name": friendly, "id": g.id}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
                                 }
-                                "group/members/add" | "group/members/remove" | "group/members/remove_all" => {
-                                    let resp = mk_resp("ok", json!({}), None);
-                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                "group/members/add" => {
+                                    let group_id = payload.get("group").and_then(|v| v.as_str()).or_else(|| payload.get("id").and_then(|v| v.as_str())).unwrap_or("");
+                                    let device = payload.get("device").and_then(|v| v.as_str()).unwrap_or("");
+                                    let endpoint: u8 = payload.get("endpoint").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+                                    let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
+                                    if groups.add_member(gid, device.to_string(), endpoint) {
+                                        let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        let resp = mk_resp("ok", json!({}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else {
+                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
+                                }
+                                "group/members/remove" => {
+                                    let group_id = payload.get("group").and_then(|v| v.as_str()).unwrap_or("");
+                                    let device = payload.get("device").and_then(|v| v.as_str()).unwrap_or("");
+                                    let endpoint: u8 = payload.get("endpoint").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+                                    let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
+                                    if groups.remove_member(gid, device, endpoint) {
+                                        let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        let resp = mk_resp("ok", json!({}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else {
+                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
+                                }
+                                "group/members/remove_all" => {
+                                    let group_id = payload.get("group").and_then(|v| v.as_str()).unwrap_or("");
+                                    let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
+                                    if groups.clear_members(gid) {
+                                        let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        let resp = mk_resp("ok", json!({}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else {
+                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
                                 }
                                 "device/bind" | "device/unbind" | "device/binds/clear" => {
                                     let resp = mk_resp("ok", json!({}), None);
@@ -663,6 +736,8 @@ impl Bridge {
         }
 
         self.publish_device_list(mqtt).await;
+        let _ = mqtt.publish_bridge_groups(&self.groups).await;
+        let _ = mqtt.publish_bridge_extensions().await;
     }
 
     async fn handle_set(
