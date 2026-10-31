@@ -138,12 +138,17 @@ impl MqttBridge {
         self.publish_retained(&topic, &payload).await
     }
 
-    /// Publish to bridge/logging (z2m format).
+    /// Publish to bridge/logging (z2m format: {message, level, namespace}).
     pub async fn publish_bridge_log(&self, level: &str, message: &str) -> Result<()> {
+        self.publish_bridge_log_with_ns(level, message, "z2m").await
+    }
+
+    pub async fn publish_bridge_log_with_ns(&self, level: &str, message: &str, namespace: &str) -> Result<()> {
         let topic = format!("{}/bridge/logging", self.base_topic);
         let payload = json!({
             "level": level,
             "message": message,
+            "namespace": namespace,
         });
         let bytes = serde_json::to_vec(&payload)?;
         self.client
