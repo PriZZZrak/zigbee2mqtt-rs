@@ -23,14 +23,17 @@
     "frontend": {
       "package": "zigbee2mqtt-windfront",
       "resolved_version": "2.15.1",
-      "commit": null,
-      "lock_integrity": null
+      "commit": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
+      "lock_integrity": null,
+      "repo": "https://github.com/Nerivec/zigbee2mqtt-windfront.git",
+      "tag": "v2.15.1"
     }
   },
   "latest_heads": {
     "zigbee2mqtt": "344b6e03b43644c97154a72ca9eae17193c553a2",
     "zigbee-herdsman": "b560461ed2c5322c60322e1679c278d413efb0b0",
-    "zigbee-herdsman-converters": "c18c32d94c77f683fa768618d1fd32b348fdd7b9"
+    "zigbee-herdsman-converters": "c18c32d94c77f683fa768618d1fd32b348fdd7b9",
+    "zigbee2mqtt-windfront": "fbe6e2d7d508e23869efef86c71b2f3669c0022d"
   },
   "last_successful_fetch_utc": "2026-10-31T00:04:00Z",
   "last_checked_utc": "2026-10-31T00:04:00Z",
