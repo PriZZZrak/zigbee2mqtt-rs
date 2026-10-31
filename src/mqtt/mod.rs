@@ -287,22 +287,32 @@ async fn run_event_loop(
                         }
                     };
                     let _ = cmd_tx.send(cmd).await;
-                } else if topic.contains("permit_join") {
-                    let duration = parse_permit_join_payload(payload);
-                    let _ = cmd_tx.send(MqttCommand::PermitJoin { duration }).await;
                 } else if topic.contains("bridge/request") {
+                    // Extract full request path after "<base_topic>/bridge/request/"
+                    let prefix = format!("{}/bridge/request/", base_topic);
                     let request = topic
-                        .rsplit('/')
-                        .next()
-                        .unwrap_or("")
+                        .strip_prefix(&prefix)
+                        .unwrap_or(topic)
                         .to_string();
                     let json_value = serde_json::from_slice::<serde_json::Value>(payload)
                         .unwrap_or(serde_json::Value::Null);
-                    let _ = cmd_tx.send(MqttCommand::BridgeRequest {
-                        request,
-                        payload: json_value,
-                    })
-                    .await;
+                    // permit_join has legacy dedicated handling but also goes via bridge/request
+                    if request == "permit_join" || request.starts_with("permit_join") {
+                        let duration = parse_permit_join_payload(payload);
+                        let _ = cmd_tx.send(MqttCommand::PermitJoin { duration }).await;
+                        // also forward as BridgeRequest for transaction response
+                        let _ = cmd_tx.send(MqttCommand::BridgeRequest {
+                            request: "permit_join".to_string(),
+                            payload: json_value.clone(),
+                        })
+                        .await;
+                    } else {
+                        let _ = cmd_tx.send(MqttCommand::BridgeRequest {
+                            request,
+                            payload: json_value,
+                        })
+                        .await;
+                    }
                 }
             }
             Ok(Event::Incoming(Packet::Disconnect)) => {
@@ -347,9 +357,9 @@ fn friendly_name_from_topic(topic: &str, base_topic: &str, suffix: &str) -> Stri
 async fn subscribe_topics(client: &AsyncClient, base_topic: &str) -> bool {
     let set_wildcard = format!("{}/+/set", base_topic);
     let get_wildcard = format!("{}/+/get", base_topic);
-    let permit_topic = format!("{}/bridge/request/permit_join", base_topic);
+    let bridge_req_wildcard = format!("{}/bridge/request/#", base_topic);
 
-    for topic in &[&set_wildcard, &get_wildcard, &permit_topic] {
+    for topic in &[&set_wildcard, &get_wildcard, &bridge_req_wildcard] {
         if let Err(e) = client.subscribe(*topic, QoS::AtLeastOnce).await {
             error!("MQTT subscribe error for {topic}: {e}");
             return false;

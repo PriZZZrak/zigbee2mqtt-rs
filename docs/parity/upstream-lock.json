@@ -31,12 +31,13 @@
   },
   "latest_heads": {
     "zigbee2mqtt": "344b6e03b43644c97154a72ca9eae17193c553a2",
-    "zigbee-herdsman": "b560461ed2c5322c60322e1679c278d413efb0b0",
+    "zigbee-herdsman": "c1a54e3d52858fa0055aeaf1cf74c3dac65e9811",
     "zigbee-herdsman-converters": "c18c32d94c77f683fa768618d1fd32b348fdd7b9",
-    "zigbee2mqtt-windfront": "fbe6e2d7d508e23869efef86c71b2f3669c0022d"
+    "zigbee2mqtt-windfront": "353c7d89f1d8bf005db435c4ec809e6c6130ce9d",
+    "zigbee2mqtt.io": "a55fd7deaca449e502fefe705b6443af6a58ed86"
   },
-  "last_successful_fetch_utc": "2026-10-31T00:04:00Z",
-  "last_checked_utc": "2026-10-31T00:04:00Z",
-  "freshness_status": "CURRENT",
+  "last_successful_fetch_utc": "2026-11-01T00:00:00Z",
+  "last_checked_utc": "2026-11-01T00:00:00Z",
+  "freshness_status": "DRIFT_DETECTED",
   "baseline_approved_at_utc": null
 }

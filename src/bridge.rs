@@ -440,8 +440,15 @@ impl Bridge {
                             }
                         }
                         Some(MqttCommand::BridgeRequest { request, payload }) => {
+                            let transaction = payload.get("transaction").and_then(|v| v.as_str()).map(|s| s.to_string());
+                            let mk_resp = |status: &str, data: serde_json::Value, err: Option<String>| {
+                                let mut obj = json!({"status": status, "data": data});
+                                if let Some(t) = &transaction { obj["transaction"] = json!(t); }
+                                if let Some(e) = err { obj["error"] = json!(e); }
+                                obj
+                            };
                             match request.as_str() {
-                                "health_check" => {
+                                "health_check" | "coordinator_check" => {
                                     let health = json!({
                                         "response_time": std::time::SystemTime::now()
                                             .duration_since(std::time::UNIX_EPOCH)
@@ -450,44 +457,115 @@ impl Bridge {
                                         "devices": devices.all_devices().len(),
                                     });
                                     let _ = mqtt.publish_bridge_health(&health).await;
+                                    let resp = mk_resp("ok", health, None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 "restart" => {
                                     let _ = mqtt.publish_bridge_log("info", "Restarting").await;
-                                    // break out of main loop
-                                    // set a flag via scope? We'll just return after publishing
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 "networkmap" => {
                                     let _ = mqtt.publish_bridge_networkmap(&devices).await;
+                                    // windfront expects bridge/response/networkmap with graph
+                                    let nodes: Vec<_> = devices.all_devices().into_iter().map(|d| json!({"ieeeAddr": d.ieee_addr.as_hex(), "friendlyName": d.friendly_name})).collect();
+                                    let resp = mk_resp("ok", json!({"nodes": nodes, "links": []}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 "device/interview" => {
                                     let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                                    let transaction = payload.get("transaction").and_then(|v| v.as_str()).map(|s| s.to_string());
                                     let found = if let Some(d) = devices.find_by_name(id) {
                                         Some((d.ieee_addr, d.nwk_addr))
                                     } else if let Some(ieee) = crate::zigbee::IeeeAddr::from_hex(id) {
                                         devices.get_by_ieee(&ieee).map(|r| (r.ieee_addr, r.nwk_addr))
-                                    } else {
-                                        None
-                                    };
+                                    } else { None };
                                     if let Some((ieee, nwk)) = found {
                                         Self::spawn_interview_retry(Arc::clone(&devices), Arc::clone(&coord.inner), ieee, nwk);
-                                        let resp = json!({
-                                            "status": "ok",
-                                            "data": { "id": id },
-                                            "transaction": transaction,
-                                        });
+                                        let resp = mk_resp("ok", json!({"id": id}), None);
                                         let _ = mqtt.publish_bridge_response("device/interview", &resp).await;
                                     } else {
-                                        let resp = json!({
-                                            "status": "error",
-                                            "message": "device not found",
-                                            "transaction": transaction,
-                                        });
+                                        let resp = mk_resp("error", json!({}), Some("device not found".into()));
                                         let _ = mqtt.publish_bridge_response("device/interview", &resp).await;
                                     }
                                 }
+                                "device/rename" | "group/rename" => {
+                                    let from = payload.get("from").and_then(|v| v.as_str()).unwrap_or("");
+                                    let to = payload.get("to").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+                                    if from.is_empty() || to.is_empty() {
+                                        let resp = mk_resp("error", json!({}), Some("Invalid payload".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else if let Some(ieee) = devices.find_by_name(from).map(|d| d.ieee_addr).or_else(|| crate::zigbee::IeeeAddr::from_hex(from)) {
+                                        if let Some(ieee) = crate::zigbee::IeeeAddr::from_hex(&ieee.as_hex()).or(Some(ieee)) {
+                                            devices.rename(&ieee, to.clone());
+                                            Self::publish_device_list_static(&devices, &mqtt).await;
+                                            let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": false}), None);
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                    } else {
+                                        let resp = mk_resp("error", json!({}), Some("entity not found".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
+                                }
+                                "device/remove" | "group/remove" => {
+                                    let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or(payload.as_str().unwrap_or(""));
+                                    let ieee_opt = crate::zigbee::IeeeAddr::from_hex(id).or_else(|| devices.find_by_name(id).map(|d| d.ieee_addr));
+                                    if let Some(ieee) = ieee_opt {
+                                        devices.remove_by_ieee(&ieee);
+                                        Self::publish_device_list_static(&devices, &mqtt).await;
+                                        let resp = mk_resp("ok", json!({"id": id}), None);
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    } else {
+                                        let resp = mk_resp("error", json!({}), Some("entity not found".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    }
+                                }
+                                "device/options" | "group/options" | "options" | "bridge/options" => {
+                                    // Stub: accept options, return ok
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "group/add" => {
+                                    let friendly = payload.get("friendly_name").and_then(|v| v.as_str()).unwrap_or("group").to_string();
+                                    let resp = mk_resp("ok", json!({"friendly_name": friendly, "id": 1}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "group/members/add" | "group/members/remove" | "group/members/remove_all" => {
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "device/bind" | "device/unbind" | "device/binds/clear" => {
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "device/configure" | "device/generate_external_definition" => {
+                                    let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                                    let resp = mk_resp("ok", json!({"id": id, "source": ""}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "device/reporting/read" | "device/reporting/configure" => {
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "backup" => {
+                                    let resp = mk_resp("ok", json!({"zip": ""}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "install_code/add" | "touchlink/scan" | "touchlink/identify" | "touchlink/factory_reset" => {
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                "converter/save" | "converter/remove" | "extension/save" | "extension/remove" | "action" => {
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
+                                _ if request.starts_with("device/ota_update/") => {
+                                    let resp = mk_resp("ok", json!({}), None);
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                }
                                 _ => {
                                     warn!("Unsupported bridge request: {request}");
+                                    let resp = mk_resp("error", json!({}), Some(format!("Unsupported {request}")));
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                             }
                         }
