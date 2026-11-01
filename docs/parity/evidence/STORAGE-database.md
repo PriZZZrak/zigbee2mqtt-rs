@@ -65,17 +65,15 @@
 ## Implementation 2026-11-02 (batching, memory)
 - `Bridge::persist_database()` now debounced: in-memory `sync_devices`+`sync_groups` immediately, disk `write()` via `db_write_pending` flag + `tokio::spawn` 500ms delayed single write, final flush on shutdown (`run` end) — mirrors `Entity.database.update(write:false)` / `update(write:true)` batching, saves memory/I/O (was 2-3 fsync per interview for 2-EP thermostat, now 1)
 
-## Still not as original (2026-11-02, after batching)
-- `Coordinator` still defaults if missing
-- `endpoints[].clusters/binds` now preserved, but new endpoints still defaults
-- `checkinInterval/gpSecurityKey/scheduledOta` preserved but not live-updated
-- `appVersion` etc. preserved but not refreshed
-- `interviewState` only SUCCESSFUL/FAILED
-- `GreenPower` filtered
-- `Group` duplicate friendly_name
-- `configuration.yaml` loses comments/`!secret`
-- No `devices.yaml` separate file
-- Batching window 500ms vs upstream immediate `write()` for `update(write:true)` — crash within 500ms may lose last batch (upstream would have fsync immediately)
+## Still not as original (2026-11-02, after yaml/database exact)
+- `database.db` `endpoints[].clusters/binds` now preserved from orig, but new endpoints still defaults (upstream would have actual ZCL clusters from SimpleDesc)
+- `database.db` `checkinInterval/gpSecurityKey/scheduledOta` preserved but not live-updated from Device (upstream updates on interview)
+- `database.db` `appVersion/stackVersion/hwVersion/dateCode/zclVersion` preserved but not refreshed from live read
+- `database.db` `interviewState` only SUCCESSFUL/FAILED, not Pending/InProgress + quirks
+- `database.db` `GreenPower` now preserved (was filtered, now kept via sync_devices), but not yet handled as Device type in registry (still filtered in load_database for DeviceRegistry, only preserved in file)
+- `configuration.yaml` now handles `devices: devices.yaml` / `groups: groups.yaml` separate files and `!secret`/`!env` refs (via parseValueRef/resolve_secret) — but still loses comments/formatting vs `js-yaml` dump (both lose comments, but `serde_yml` vs `js-yaml` ordering may differ)
+- `configuration.yaml` `advanced.network_key: GENERATE` string handling: upstream validates and generates key, we treat as array default
+- Batching 500ms vs upstream immediate `write()` for `update(write:true)` — crash within window may lose last batch
 
 ## Hardware
 - No hardware required — file I/O only, differential test with Node `Database.open` fixture.
