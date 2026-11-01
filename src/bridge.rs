@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use crate::config::{Config, OutputMode};
 use crate::coordinator::znp::ZnpHandle;
 use crate::coordinator::{open_coordinator, CoordinatorEvent, CoordinatorHandle};
-use crate::database;
+use crate::database::{self, PersistentDatabase};
 use crate::devices::{Device, DeviceRegistry};
 use crate::groups::GroupRegistry;
 use crate::error::Result;
@@ -29,6 +29,7 @@ pub struct Bridge {
     config_path: PathBuf,
     devices: Arc<DeviceRegistry>,
     groups: Arc<GroupRegistry>,
+    database: Arc<Mutex<PersistentDatabase>>,
 }
 
 impl Bridge {
@@ -44,11 +45,25 @@ impl Bridge {
     }
 
     pub fn new(cfg: Config, config_path: PathBuf) -> Self {
+        let db_path = database::find_database(&config_path)
+            .unwrap_or_else(|| config_path.parent().unwrap_or(std::path::Path::new(".")).join("database.db"));
+        let db = PersistentDatabase::open(&db_path);
         Self {
             cfg,
             config_path,
             devices: Arc::new(DeviceRegistry::new()),
             groups: Arc::new(GroupRegistry::new()),
+            database: Arc::new(Mutex::new(db)),
+        }
+    }
+
+    async fn persist_database(&self, coordinator_ieee: Option<IeeeAddr>) {
+        let devices = self.devices.all_devices();
+        let mut db = self.database.lock().await;
+        db.sync_devices(&devices, coordinator_ieee);
+        // TODO: sync_groups once GroupRegistry ↔ database mapping is full
+        if let Err(e) = db.write() {
+            warn!("Failed to write database.db: {e}");
         }
     }
 
@@ -138,6 +153,7 @@ impl Bridge {
                             } else {
                                 devices.update_nwk_addr(&ieee, nwk_addr);
                             }
+                            self.persist_database(coord.info.ieee_addr).await;
 
                             if let Err(e) = mqtt.publish_bridge_log("info", &format!("Device joined: {ieee}")).await {
                                 warn!("Failed to publish bridge log: {e}");
@@ -149,6 +165,7 @@ impl Bridge {
                             let ieee = ieee_addr;
                             info!("Device left: {ieee}");
                             devices.remove_by_ieee(&ieee);
+                            self.persist_database(coord.info.ieee_addr).await;
                             if let Err(e) = mqtt.publish_bridge_log("info", &format!("Device left: {ieee}")).await {
                                 warn!("Failed to publish bridge log: {e}");
                             }
@@ -196,8 +213,9 @@ impl Bridge {
                                         _ => "Unknown".into(),
                                     });
                                 }
-                                // Trigger ActiveEp after NodeDesc (upstream interview order)
                                 drop(dev);
+                                self.persist_database(coord.info.ieee_addr).await;
+                                // Trigger ActiveEp after NodeDesc (upstream interview order)
                                 if let Err(e) = coord.request_active_eps(nwk_addr).await {
                                     warn!("Failed to request active endpoints after NodeDesc: {e}");
                                 }
@@ -254,6 +272,9 @@ impl Bridge {
                                     info!("Interview complete for {}", dev.display_name());
                                 }
                                 src_ieee = Some(dev.ieee_addr);
+                                if interview_just_completed {
+                                    self.persist_database(coord.info.ieee_addr).await;
+                                }
                             }
 
                             // Bind this endpoint's output clusters to the coordinator so
@@ -501,6 +522,7 @@ impl Bridge {
                                     } else if let Some(ieee) = devices.find_by_name(from).map(|d| d.ieee_addr).or_else(|| crate::zigbee::IeeeAddr::from_hex(from)) {
                                         devices.rename(&ieee, to.clone());
                                         Self::publish_device_list_static(&devices, &mqtt).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": false}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -516,6 +538,7 @@ impl Bridge {
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else if groups.rename(from, to.clone()).is_some() {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({"from": from, "to": to}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -529,6 +552,7 @@ impl Bridge {
                                     if let Some(ieee) = ieee_opt {
                                         devices.remove_by_ieee(&ieee);
                                         Self::publish_device_list_static(&devices, &mqtt).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({"id": id}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -541,6 +565,7 @@ impl Bridge {
                                     let gid: u16 = id.parse().unwrap_or_else(|_| groups.get_by_name(id).map(|g| g.id).unwrap_or(0));
                                     if groups.remove_by_id(gid).is_some() || groups.get_by_name(id).and_then(|g| groups.remove_by_id(g.id)).is_some() {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({"id": id}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -562,6 +587,7 @@ impl Bridge {
                                     } else {
                                         let g = groups.add(friendly.clone());
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({"friendly_name": friendly, "id": g.id}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     }
@@ -573,6 +599,7 @@ impl Bridge {
                                     let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
                                     if groups.add_member(gid, device.to_string(), endpoint) {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -587,6 +614,7 @@ impl Bridge {
                                     let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
                                     if groups.remove_member(gid, device, endpoint) {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -599,6 +627,7 @@ impl Bridge {
                                     let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
                                     if groups.clear_members(gid) {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
+                                        self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {

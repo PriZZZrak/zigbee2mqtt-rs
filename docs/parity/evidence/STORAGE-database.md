@@ -39,13 +39,18 @@
 - `Device` now maps `interviewState`↔`interviewCompleted` both ways
 - Tests 17 (was 12): round-trip, interviewState both fields, Group preserved
 
+## Implementation 2026-11-01 (wired)
+- `Bridge` now holds `Arc<Mutex<PersistentDatabase>>` opened from `find_database(config_path)` or `database.db` next to config; `persist_database()` called after `DeviceJoined`, `DeviceLeft`, `NodeDescRsp` (manufId), `SimpleDescRsp` (interview complete), `device/rename`, `device/remove` and `group/*` (devices part)
+- `Bridge::new` + `persist_database` added, `Device.database_id` preserved across restarts
+
 ## Still not as original (2026-11-01)
-- `Bridge` not wired to `PersistentDatabase` — join/leave not auto-persisted to disk (file stays stale until manual `sync_devices`+`write`)
-- `GroupRegistry` ↔ database sync missing — `group/add|remove|members/*` in-memory only, not flushed to `database.db`
+- `GroupRegistry` ↔ database sync not implemented — `group/add|remove|members/*` in-memory only, `PersistentDatabase::sync_devices` preserves existing Group entries but does not write new groups from `GroupRegistry`
 - `Coordinator` entry recreated with defaults (`manufId 0`, `epList [1]`) not preserving original `manufId/epList/meta` from file
 - `meta`, `lastSeen`, `checkinInterval`, `gpSecurityKey`, `scheduledOta`, `appVersion/stackVersion/hwVersion/dateCode/zclVersion` reset to `{}/null/0` on write — back-port loses these fields
 - `endpoints[].clusters` always `{}`, original `clusters` with attributes not preserved
 - No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update`
+- `interviewState` mapping only `SUCCESSFUL`/`FAILED`, not `Pending`/`InProgress` + quirks
+- No handling of `GreenPower` type entries
 
 ## Hardware
 - No hardware required — file I/O only, differential test with Node `Database.open` fixture.
