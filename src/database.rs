@@ -257,9 +257,43 @@ impl PersistentDatabase {
             let hw_version = orig.and_then(|v| v.get("hwVersion")).cloned().unwrap_or(serde_json::Value::Null);
             let date_code = orig.and_then(|v| v.get("dateCode")).cloned().unwrap_or(serde_json::Value::Null);
             let zcl_version = orig.and_then(|v| v.get("zclVersion")).cloned().unwrap_or(serde_json::Value::Null);
+            let checkin_interval = orig.and_then(|v| v.get("checkinInterval")).cloned().unwrap_or(serde_json::Value::Null);
+            let gp_security_key = orig.and_then(|v| v.get("gpSecurityKey")).cloned().unwrap_or(serde_json::Value::Null);
+            let scheduled_ota = orig.and_then(|v| v.get("scheduledOta")).cloned().unwrap_or(serde_json::Value::Null);
+            // Preserve original type if exists (Coordinator/Router/EndDevice/Unknown/GreenPower)
+            let orig_type = orig.and_then(|v| v.get("type").and_then(|x| x.as_str()).map(|s| s.to_string())).unwrap_or_else(|| if dev.power_source.as_deref() == Some("Battery") { "EndDevice".to_string() } else { "Router".to_string() });
+            // Preserve original endpoints' clusters/binds if exists for that endpoint
+            let mut endpoints_preserved = serde_json::Map::new();
+            for ep in &dev.endpoints {
+                let ep_key = ep.endpoint.to_string();
+                let orig_ep = orig.and_then(|v| v.get("endpoints").and_then(|e| e.get(&ep_key)));
+                let clusters = orig_ep.and_then(|e| e.get("clusters")).cloned().unwrap_or(json!({}));
+                let binds = orig_ep.and_then(|e| e.get("binds")).cloned().unwrap_or(json!([]));
+                let configured = orig_ep.and_then(|e| e.get("configuredReportings")).cloned().unwrap_or(json!([]));
+                let ep_meta = orig_ep.and_then(|e| e.get("meta")).cloned().unwrap_or(json!({}));
+                endpoints_preserved.insert(ep_key, json!({
+                    "profId": ep.profile_id,
+                    "epId": ep.endpoint,
+                    "devId": ep.device_id,
+                    "inClusterList": ep.input_clusters,
+                    "outClusterList": ep.output_clusters,
+                    "clusters": clusters,
+                    "binds": binds,
+                    "configuredReportings": configured,
+                    "meta": ep_meta
+                }));
+            }
+            // If orig had endpoints not in current Device.endpoints (e.g., 242), preserve them
+            if let Some(orig_eps) = orig.and_then(|v| v.get("endpoints").and_then(|e| e.as_object())) {
+                for (k, v) in orig_eps {
+                    if !endpoints_preserved.contains_key(k) {
+                        endpoints_preserved.insert(k.clone(), v.clone());
+                    }
+                }
+            }
             let mut entry = serde_json::json!({
                 "id": id,
-                "type": if dev.power_source.as_deref() == Some("Battery") { "EndDevice" } else { "Router" },
+                "type": orig_type,
                 "ieeeAddr": dev.ieee_addr.as_hex(),
                 "nwkAddr": dev.nwk_addr,
                 "manufId": dev.manufacturer_id.unwrap_or_else(|| orig.and_then(|v| v.get("manufId").and_then(|x| x.as_u64()).map(|x| x as u16)).unwrap_or(0)),
@@ -267,7 +301,7 @@ impl PersistentDatabase {
                 "powerSource": dev.power_source.clone().or_else(|| orig.and_then(|v| v.get("powerSource").and_then(|x| x.as_str()).map(|s| s.to_string()))),
                 "modelId": dev.model.clone().or_else(|| orig.and_then(|v| v.get("modelId").and_then(|x| x.as_str()).map(|s| s.to_string()))),
                 "epList": ep_list,
-                "endpoints": endpoints,
+                "endpoints": endpoints_preserved,
                 "interviewCompleted": dev.interview_complete,
                 "interviewState": if dev.interview_complete { "SUCCESSFUL" } else { "FAILED" },
                 "meta": meta,
@@ -279,6 +313,9 @@ impl PersistentDatabase {
             if !hw_version.is_null() { entry["hwVersion"] = hw_version; }
             if !date_code.is_null() { entry["dateCode"] = date_code; }
             if !zcl_version.is_null() { entry["zclVersion"] = zcl_version; }
+            if !checkin_interval.is_null() { entry["checkinInterval"] = checkin_interval; }
+            if !gp_security_key.is_null() { entry["gpSecurityKey"] = gp_security_key; }
+            if !scheduled_ota.is_null() { entry["scheduledOta"] = scheduled_ota; }
             // Preserve any other extra fields not explicitly handled
             if let Some(orig) = orig {
                 for (k, v) in orig.as_object().unwrap() {
