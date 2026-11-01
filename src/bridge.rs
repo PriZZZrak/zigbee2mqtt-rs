@@ -48,20 +48,33 @@ impl Bridge {
         let db_path = database::find_database(&config_path)
             .unwrap_or_else(|| config_path.parent().unwrap_or(std::path::Path::new(".")).join("database.db"));
         let db = PersistentDatabase::open(&db_path);
+        let groups = GroupRegistry::new();
+        // Load groups from database into registry
+        for g in db.load_groups() {
+            // Preserve friendly_name if stored, otherwise keep as is
+            groups.inner.insert(g.id, g.clone());
+            groups.by_name.insert(g.friendly_name.clone(), g.id);
+            // Ensure next_id is beyond max group id
+            let cur = groups.next_id.load(std::sync::atomic::Ordering::Relaxed);
+            if g.id >= cur {
+                groups.next_id.store(g.id + 1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
         Self {
             cfg,
             config_path,
             devices: Arc::new(DeviceRegistry::new()),
-            groups: Arc::new(GroupRegistry::new()),
+            groups: Arc::new(groups),
             database: Arc::new(Mutex::new(db)),
         }
     }
 
     async fn persist_database(&self, coordinator_ieee: Option<IeeeAddr>) {
         let devices = self.devices.all_devices();
+        let groups = self.groups.all();
         let mut db = self.database.lock().await;
         db.sync_devices(&devices, coordinator_ieee);
-        // TODO: sync_groups once GroupRegistry ↔ database mapping is full
+        db.sync_groups(&groups);
         if let Err(e) = db.write() {
             warn!("Failed to write database.db: {e}");
         }

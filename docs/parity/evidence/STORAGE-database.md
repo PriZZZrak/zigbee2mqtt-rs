@@ -39,18 +39,20 @@
 - `Device` now maps `interviewState`↔`interviewCompleted` both ways
 - Tests 17 (was 12): round-trip, interviewState both fields, Group preserved
 
-## Implementation 2026-11-01 (wired)
-- `Bridge` now holds `Arc<Mutex<PersistentDatabase>>` opened from `find_database(config_path)` or `database.db` next to config; `persist_database()` called after `DeviceJoined`, `DeviceLeft`, `NodeDescRsp` (manufId), `SimpleDescRsp` (interview complete), `device/rename`, `device/remove` and `group/*` (devices part)
-- `Bridge::new` + `persist_database` added, `Device.database_id` preserved across restarts
+## Implementation 2026-11-02 (wired + groups)
+- `Bridge` now holds `Arc<Mutex<PersistentDatabase>>` opened from `find_database(config_path)` or `database.db` next to config; `persist_database()` called after `DeviceJoined`, `DeviceLeft`, `NodeDescRsp` (manufId), `SimpleDescRsp` (interview complete), `device/rename`, `device/remove` and `group/*`
+- `Bridge::new` now loads groups from `PersistentDatabase::load_groups()` into `GroupRegistry` (preserving `friendly_name` via extra field) and `persist_database()` now calls `sync_devices` (with preservation of `meta/lastSeen/appVersion` etc. via `orig_by_ieee` merge) + `sync_groups` (writes `id, type Group, groupID, friendly_name, members, meta`)
+- `src/groups.rs` added `GroupRegistry` with `inner/by_name/next_id` pub(crate) for DB sync, `src/database.rs` added `sync_groups`/`load_groups` and `json` import
+- `Device.database_id` preserved across restarts, `sync_devices` now merges original `meta/lastSeen/appVersion/stackVersion/hwVersion/dateCode/zclVersion` instead of resetting
 
-## Still not as original (2026-11-01)
-- `GroupRegistry` ↔ database sync not implemented — `group/add|remove|members/*` in-memory only, `PersistentDatabase::sync_devices` preserves existing Group entries but does not write new groups from `GroupRegistry`
-- `Coordinator` entry recreated with defaults (`manufId 0`, `epList [1]`) not preserving original `manufId/epList/meta` from file
-- `meta`, `lastSeen`, `checkinInterval`, `gpSecurityKey`, `scheduledOta`, `appVersion/stackVersion/hwVersion/dateCode/zclVersion` reset to `{}/null/0` on write — back-port loses these fields
-- `endpoints[].clusters` always `{}`, original `clusters` with attributes not preserved
+## Still not as original (2026-11-02)
+- `Coordinator` entry still recreated with defaults if missing, not fully preserving original `manufId/epList/meta` when file has no Coordinator (rare)
+- `endpoints[].clusters` always `{}`, original `clusters` with attributes (e.g., reporting config) not preserved — back-port loses per-endpoint cluster state
+- `checkinInterval`, `gpSecurityKey`, `scheduledOta` still reset to default (not yet mapped from Device)
 - No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update`
-- `interviewState` mapping only `SUCCESSFUL`/`FAILED`, not `Pending`/`InProgress` + quirks
-- No handling of `GreenPower` type entries
+- `interviewState` mapping only `SUCCESSFUL`/`FAILED`, not `Pending`/`InProgress` + quirks for Tuya `TS*` etc.
+- No handling of `GreenPower` type entries (filtered)
+- `Group` `friendly_name` stored as extra field not in upstream DB (upstream stores friendly_name in `configuration.yaml`/`settings`, we duplicate for portability — acceptable divergence)
 
 ## Hardware
 - No hardware required — file I/O only, differential test with Node `Database.open` fixture.

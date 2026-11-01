@@ -16,9 +16,9 @@ pub struct GroupMember {
 }
 
 pub struct GroupRegistry {
-    inner: DashMap<u16, Group>,
-    by_name: DashMap<String, u16>,
-    next_id: std::sync::atomic::AtomicU16,
+    pub(crate) inner: DashMap<u16, Group>,
+    pub(crate) by_name: DashMap<String, u16>,
+    pub(crate) next_id: std::sync::atomic::AtomicU16,
 }
 
 impl GroupRegistry {

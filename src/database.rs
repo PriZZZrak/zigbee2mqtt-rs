@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tracing::{debug, info, warn};
 use crate::config::DeviceConfig;
 use crate::devices::Device;
+use crate::groups::Group;
 use crate::zigbee::{EndpointDesc, IeeeAddr};
 
 #[derive(Debug, Deserialize)]
@@ -202,6 +204,10 @@ impl PersistentDatabase {
     }
 
     pub fn sync_devices(&mut self, devices: &[Device], coordinator_ieee: Option<IeeeAddr>) {
+        self.sync_devices_inner(devices, coordinator_ieee, true);
+    }
+
+    fn sync_devices_inner(&mut self, devices: &[Device], coordinator_ieee: Option<IeeeAddr>, preserve_extra: bool) {
         // Preserve Coordinator and Group entries, update/insert devices
         let mut to_keep: HashMap<u32, serde_json::Value> = HashMap::new();
         for (id, v) in &self.entries {
@@ -209,8 +215,15 @@ impl PersistentDatabase {
                 if t == "Coordinator" || t == "Group" { to_keep.insert(*id, v.clone()); }
             }
         }
-        // Rebuild device entries from Device objects, preserving ids
+        // Rebuild device entries from Device objects, preserving ids and extra fields
         let mut used_ids = std::collections::HashSet::new();
+        // Build ieee -> original entry map for preservation
+        let mut orig_by_ieee: HashMap<String, serde_json::Value> = HashMap::new();
+        for v in self.entries.values() {
+            if let Some(ieee) = v.get("ieeeAddr").and_then(|x| x.as_str()) {
+                orig_by_ieee.insert(ieee.to_lowercase(), v.clone());
+            }
+        }
         for dev in devices {
             let id = dev.database_id.unwrap_or_else(|| {
                 // find unused id
@@ -235,22 +248,45 @@ impl PersistentDatabase {
                     "meta": {}
                 }));
             }
-            let entry = serde_json::json!({
+            // Preserve extra fields from original if exists
+            let orig = orig_by_ieee.get(&dev.ieee_addr.as_hex());
+            let meta = orig.and_then(|v| v.get("meta")).cloned().unwrap_or(json!({}));
+            let last_seen = orig.and_then(|v| v.get("lastSeen")).cloned().unwrap_or(serde_json::Value::Null);
+            let app_version = orig.and_then(|v| v.get("appVersion")).cloned().unwrap_or(serde_json::Value::Null);
+            let stack_version = orig.and_then(|v| v.get("stackVersion")).cloned().unwrap_or(serde_json::Value::Null);
+            let hw_version = orig.and_then(|v| v.get("hwVersion")).cloned().unwrap_or(serde_json::Value::Null);
+            let date_code = orig.and_then(|v| v.get("dateCode")).cloned().unwrap_or(serde_json::Value::Null);
+            let zcl_version = orig.and_then(|v| v.get("zclVersion")).cloned().unwrap_or(serde_json::Value::Null);
+            let mut entry = serde_json::json!({
                 "id": id,
                 "type": if dev.power_source.as_deref() == Some("Battery") { "EndDevice" } else { "Router" },
                 "ieeeAddr": dev.ieee_addr.as_hex(),
                 "nwkAddr": dev.nwk_addr,
-                "manufId": dev.manufacturer_id.unwrap_or(0),
-                "manufName": dev.manufacturer,
-                "powerSource": dev.power_source,
-                "modelId": dev.model,
+                "manufId": dev.manufacturer_id.unwrap_or_else(|| orig.and_then(|v| v.get("manufId").and_then(|x| x.as_u64()).map(|x| x as u16)).unwrap_or(0)),
+                "manufName": dev.manufacturer.clone().or_else(|| orig.and_then(|v| v.get("manufName").and_then(|x| x.as_str()).map(|s| s.to_string()))),
+                "powerSource": dev.power_source.clone().or_else(|| orig.and_then(|v| v.get("powerSource").and_then(|x| x.as_str()).map(|s| s.to_string()))),
+                "modelId": dev.model.clone().or_else(|| orig.and_then(|v| v.get("modelId").and_then(|x| x.as_str()).map(|s| s.to_string()))),
                 "epList": ep_list,
                 "endpoints": endpoints,
                 "interviewCompleted": dev.interview_complete,
                 "interviewState": if dev.interview_complete { "SUCCESSFUL" } else { "FAILED" },
-                "meta": {},
-                "lastSeen": null
+                "meta": meta,
+                "lastSeen": last_seen
             });
+            // Preserve version fields if orig has them
+            if !app_version.is_null() { entry["appVersion"] = app_version; }
+            if !stack_version.is_null() { entry["stackVersion"] = stack_version; }
+            if !hw_version.is_null() { entry["hwVersion"] = hw_version; }
+            if !date_code.is_null() { entry["dateCode"] = date_code; }
+            if !zcl_version.is_null() { entry["zclVersion"] = zcl_version; }
+            // Preserve any other extra fields not explicitly handled
+            if let Some(orig) = orig {
+                for (k, v) in orig.as_object().unwrap() {
+                    if !entry.as_object().unwrap().contains_key(k) {
+                        entry[k] = v.clone();
+                    }
+                }
+            }
             to_keep.insert(id, entry);
         }
         // Ensure Coordinator exists if we have one
@@ -276,6 +312,55 @@ impl PersistentDatabase {
             }
         }
         self.entries = to_keep;
+    }
+
+    pub fn sync_groups(&mut self, groups: &[Group]) {
+        // Remove old Group entries and re-add from registry
+        self.entries.retain(|_, v| v.get("type").and_then(|x| x.as_str()) != Some("Group"));
+        for g in groups {
+            // Find existing entry by groupID or create new id
+            let existing_id = self.entries.iter().find(|(_, v)| v.get("groupID").and_then(|x| x.as_u64()).map(|x| x as u16) == Some(g.id)).map(|(k,_)| *k);
+            let id = existing_id.unwrap_or_else(|| {
+                let mut nid = self.max_id + 1;
+                while self.entries.contains_key(&nid) { nid += 1; }
+                nid
+            });
+            if id > self.max_id { self.max_id = id; }
+            let members: Vec<_> = g.members.iter().map(|m| serde_json::json!({"ieeeAddr": m.ieee_address, "endpoint": m.endpoint})).collect();
+            let entry = serde_json::json!({
+                "id": id,
+                "type": "Group",
+                "groupID": g.id,
+                "friendly_name": g.friendly_name,
+                "members": members,
+                "meta": {}
+            });
+            self.entries.insert(id, entry);
+        }
+    }
+
+    pub fn load_groups(&self) -> Vec<Group> {
+        let mut groups = Vec::new();
+        for v in self.entries.values() {
+            if v.get("type").and_then(|x| x.as_str()) != Some("Group") { continue; }
+            if let Some(gid) = v.get("groupID").and_then(|x| x.as_u64()).map(|x| x as u16) {
+                let members = v.get("members").and_then(|x| x.as_array()).map(|arr| {
+                    arr.iter().filter_map(|m| {
+                        let ieee = m.get("ieeeAddr").and_then(|x| x.as_str())?.to_string();
+                        let ep = m.get("endpoint").and_then(|x| x.as_u64()).unwrap_or(1) as u8;
+                        Some(crate::groups::GroupMember{ ieee_address: ieee, endpoint: ep })
+                    }).collect()
+                }).unwrap_or(Vec::new());
+                // Try to find friendly_name from members? For now use groupID as name
+                let fname = v.get("friendly_name").and_then(|x| x.as_str()).unwrap_or(&format!("group_{}", gid)).to_string();
+                // Need to reconstruct Group with id and members, but we don't have friendly_name in DB, so use groupID
+                // We'll create group and then set friendly_name if needed via separate storage
+                let mut g = Group { id: gid, friendly_name: fname, members: Vec::new() };
+                g.members = members;
+                groups.push(g);
+            }
+        }
+        groups
     }
 }
 
