@@ -40,6 +40,9 @@ pub struct Device {
     pub interview_expected_eps: Option<Vec<u8>>,
     #[serde(default)]
     pub manufacturer_id: Option<u16>,
+    /// Database ID from database.db (preserved for round-trip)
+    #[serde(default, skip_serializing, skip_deserializing)]
+    pub database_id: Option<u32>,
     #[serde(default)]
     pub disabled: bool,
 }
@@ -62,6 +65,7 @@ impl Device {
             interview_complete: false,
             interview_expected_eps: None,
             manufacturer_id: None,
+            database_id: None,
             disabled: false,
         }
     }

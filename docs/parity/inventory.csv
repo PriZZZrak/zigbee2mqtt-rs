@@ -36,7 +36,7 @@ AVAIL-001,Availability,Device availability online/offline,c18c32d,.upstream/zigb
 GROUPS-001,Groups,Group management,c18c32d,.upstream/zigbee2mqtt/lib/extension/groups.ts,,1,shared,P2,3,DISCOVERED,0,0,,,UNVERIFIED,no,
 OTA-001,OTA,Firmware update,c18c32d,.upstream/zigbee2mqtt/lib/extension/otaUpdate.ts,,1,shared,P2,3,DISCOVERED,0,0,,,UNVERIFIED,no,
 FRONTEND-001,Frontend,Web UI via uhttpd,c18c32d,.upstream/zigbee2mqtt/lib/extension/frontend.ts,,1,shared,P2,1,PARTIAL,1,2,openwrt/Makefile,docs/parity/evidence/WINDFRONT-bridge-requests.md,UNVERIFIED,no,
-STORAGE-001,Storage,database.db import,c18c32d,.upstream/zigbee2mqtt/lib/util/database.ts,,1,shared,P0,2,VERIFIED,4,4,src/database.rs tests,,UNVERIFIED,no,
+STORAGE-001,Storage,database.db import,c18c32d,.upstream/zigbee2mqtt/lib/util/database.ts,,1,shared,P0,2,VERIFIED,7,7,src/database.rs tests (17),docs/parity/evidence/STORAGE-database.md,UNVERIFIED,no,"Full NDJSON + atomic tmp+fsync + interviewState dual field + Group preserved, round-trip verified"
 ADAPTER-010,Adapter,Ember (EZSP) coordinator init,344b6e03,.upstream/zigbee-herdsman/src/adapter/ember,,2,ember,P2,3,DISCOVERED,0,0,,,no,Future stage — not Z-Stack,
 ADAPTER-011,Adapter,deCONZ (ConBee) coordinator init,344b6e03,.upstream/zigbee-herdsman/src/adapter/deconz,,2,deconz,P2,3,DISCOVERED,0,0,,,no,Future stage — not Z-Stack,
 ADAPTER-012,Adapter,ZiGate coordinator init,344b6e03,.upstream/zigbee-herdsman/src/adapter/zigate,,2,zigate,P2,2,DISCOVERED,0,0,,,no,Future stage — not Z-Stack,

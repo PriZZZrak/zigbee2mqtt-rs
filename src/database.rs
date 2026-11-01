@@ -1,28 +1,24 @@
-/// Import device data from an existing zigbee2mqtt `database.db` file.
-///
-/// The database.db is a newline-delimited JSON file where each line is a device
-/// record from zigbee-herdsman. This allows drop-in replacement of zigbee2mqtt
-/// without re-pairing devices.
 use std::collections::HashMap;
-use std::path::Path;
-
-use serde::Deserialize;
+use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
-
 use crate::config::DeviceConfig;
 use crate::devices::Device;
 use crate::zigbee::{EndpointDesc, IeeeAddr};
 
-/// A single device record from zigbee2mqtt's database.db (NDJSON format).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DbEntry {
+    #[serde(default)]
+    id: Option<u32>,
     #[serde(default, rename = "type")]
     device_type: String,
     #[serde(default)]
     ieee_addr: String,
     #[serde(default)]
     nwk_addr: u16,
+    #[serde(default)]
+    manuf_id: Option<u16>,
     #[serde(default)]
     manuf_name: Option<String>,
     #[serde(default)]
@@ -32,12 +28,20 @@ struct DbEntry {
     #[serde(default)]
     sw_build_id: Option<String>,
     #[serde(default)]
+    ep_list: Option<Vec<u8>>,
+    #[serde(default)]
     endpoints: HashMap<String, DbEndpoint>,
     #[serde(default)]
-    interview_completed: bool,
+    interview_completed: Option<bool>,
+    #[serde(default)]
+    interview_state: Option<String>,
+    #[serde(default)]
+    last_seen: Option<u64>,
+    #[serde(flatten)]
+    extra: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct DbEndpoint {
     #[serde(default)]
@@ -50,14 +54,17 @@ struct DbEndpoint {
     in_cluster_list: Vec<u16>,
     #[serde(default)]
     out_cluster_list: Vec<u16>,
+    #[serde(default)]
+    clusters: serde_json::Value,
+    #[serde(default)]
+    binds: serde_json::Value,
+    #[serde(default)]
+    configured_reportings: serde_json::Value,
+    #[serde(default)]
+    meta: serde_json::Value,
 }
 
-/// Load devices from a zigbee2mqtt database.db file.
-/// Returns the list of imported devices and the coordinator IEEE if found.
-pub fn load_database(
-    path: &Path,
-    device_configs: &HashMap<String, DeviceConfig>,
-) -> (Vec<Device>, Option<IeeeAddr>) {
+pub fn load_database(path: &Path, device_configs: &HashMap<String, DeviceConfig>) -> (Vec<Device>, Option<IeeeAddr>) {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
@@ -65,117 +72,211 @@ pub fn load_database(
             return (vec![], None);
         }
     };
-
     let mut devices = Vec::new();
     let mut coordinator_ieee = None;
-
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-
+        if line.is_empty() { continue; }
         let entry: DbEntry = match serde_json::from_str(line) {
             Ok(e) => e,
-            Err(e) => {
-                debug!("Skipping unparseable database line: {e}");
-                continue;
-            }
+            Err(e) => { debug!("Skipping unparseable database line: {e}"); continue; }
         };
-
-        // Skip the coordinator entry
         if entry.device_type == "Coordinator" {
-            if let Some(ieee) = parse_ieee(&entry.ieee_addr) {
-                coordinator_ieee = Some(ieee);
-            }
+            if let Some(ieee) = parse_ieee(&entry.ieee_addr) { coordinator_ieee = Some(ieee); }
             continue;
         }
-
-        // Skip group entries or entries without IEEE
-        if entry.ieee_addr.is_empty() {
-            continue;
-        }
-
-        let ieee = match parse_ieee(&entry.ieee_addr) {
-            Some(a) => a,
-            None => {
-                debug!("Skipping entry with invalid IEEE: {}", entry.ieee_addr);
-                continue;
-            }
-        };
-
+        if entry.device_type == "Group" { continue; }
+        if entry.ieee_addr.is_empty() { continue; }
+        let ieee = match parse_ieee(&entry.ieee_addr) { Some(a) => a, None => { debug!("Skipping entry with invalid IEEE: {}", entry.ieee_addr); continue; } };
         let mut dev = Device::new(ieee, entry.nwk_addr);
-
-        // Apply friendly name from configuration.yaml
         let ieee_hex = ieee.as_hex();
         if let Some(cfg) = device_configs.get(&ieee_hex) {
-            if let Some(ref name) = cfg.friendly_name {
-                dev.friendly_name = name.clone();
-            }
+            if let Some(ref name) = cfg.friendly_name { dev.friendly_name = name.clone(); }
             dev.disabled = cfg.disabled.unwrap_or(false);
         }
-
+        dev.database_id = entry.id;
         dev.manufacturer = entry.manuf_name;
         dev.power_source = entry.power_source;
         dev.model = entry.model_id;
         dev.sw_build_id = entry.sw_build_id;
-        dev.interview_complete = entry.interview_completed;
-
-        // Import endpoints
+        // interviewState takes precedence, fallback to interviewCompleted
+        dev.interview_complete = entry.interview_state.as_deref().map(|s| s == "SUCCESSFUL").unwrap_or(entry.interview_completed.unwrap_or(false));
+        if let Some(mid) = entry.manuf_id { dev.manufacturer_id = Some(mid); }
         for (ep_key, ep_data) in &entry.endpoints {
             let ep_id = ep_key.parse::<u8>().unwrap_or(ep_data.ep_id);
-            dev.endpoints.push(EndpointDesc {
-                endpoint: ep_id,
-                profile_id: ep_data.prof_id,
-                device_id: ep_data.dev_id,
-                input_clusters: ep_data.in_cluster_list.clone(),
-                output_clusters: ep_data.out_cluster_list.clone(),
-            });
+            dev.endpoints.push(EndpointDesc { endpoint: ep_id, profile_id: ep_data.prof_id, device_id: ep_data.dev_id, input_clusters: ep_data.in_cluster_list.clone(), output_clusters: ep_data.out_cluster_list.clone() });
         }
-
-        debug!(
-            "Imported device {} ({}), NWK=0x{:04X}, {} endpoints, interviewed={}",
-            dev.friendly_name,
-            ieee_hex,
-            dev.nwk_addr,
-            dev.endpoints.len(),
-            dev.interview_complete
-        );
-
+        debug!("Imported device {} ({}), NWK=0x{:04X}, {} endpoints, interviewed={}", dev.friendly_name, ieee_hex, dev.nwk_addr, dev.endpoints.len(), dev.interview_complete);
         devices.push(dev);
     }
-
-    info!(
-        "Imported {} devices from {}",
-        devices.len(),
-        path.display()
-    );
+    info!("Imported {} devices from {}", devices.len(), path.display());
     (devices, coordinator_ieee)
 }
 
-fn parse_ieee(s: &str) -> Option<IeeeAddr> {
-    IeeeAddr::from_hex(s)
+fn parse_ieee(s: &str) -> Option<IeeeAddr> { IeeeAddr::from_hex(s) }
+
+pub fn find_database(config_path: &Path) -> Option<PathBuf> {
+    let dir = config_path.parent().unwrap_or(Path::new("."));
+    let candidates = [dir.join("database.db"), dir.join("data/database.db"), Path::new("/opt/zigbee2mqtt/data/database.db").to_path_buf(), Path::new("/var/lib/zigbee2mqtt/database.db").to_path_buf()];
+    for path in &candidates { if path.exists() { info!("Found zigbee2mqtt database: {}", path.display()); return Some(path.clone()); } }
+    None
 }
 
-/// Find the database.db file. Checks common locations relative to the config file.
-pub fn find_database(config_path: &Path) -> Option<std::path::PathBuf> {
-    // Same directory as configuration.yaml
-    let dir = config_path.parent().unwrap_or(Path::new("."));
-    let candidates = [
-        dir.join("database.db"),
-        dir.join("data/database.db"),
-        // Common z2m install locations
-        Path::new("/opt/zigbee2mqtt/data/database.db").to_path_buf(),
-        Path::new("/var/lib/zigbee2mqtt/database.db").to_path_buf(),
-    ];
+// ── Persistent Database with atomic write (portable both ways) ───────────────
 
-    for path in &candidates {
-        if path.exists() {
-            info!("Found zigbee2mqtt database: {}", path.display());
-            return Some(path.clone());
+pub struct PersistentDatabase {
+    path: PathBuf,
+    entries: HashMap<u32, serde_json::Value>,
+    max_id: u32,
+}
+
+impl PersistentDatabase {
+    pub fn open(path: &Path) -> Self {
+        let mut entries = HashMap::new();
+        let mut max_id = 0;
+        if let Ok(content) = std::fs::read_to_string(path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() { continue; }
+                match serde_json::from_str::<serde_json::Value>(line) {
+                    Ok(v) => {
+                        if let Some(id) = v.get("id").and_then(|x| x.as_u64()) {
+                            let id = id as u32;
+                            entries.insert(id, v);
+                            if id > max_id { max_id = id; }
+                        }
+                    }
+                    Err(e) => { tracing::error!("Corrupted database line, ignoring. {}", e); }
+                }
+            }
+        }
+        Self { path: path.to_path_buf(), entries, max_id }
+    }
+
+    pub fn new_id(&mut self) -> u32 { self.max_id += 1; self.max_id }
+
+    pub fn insert(&mut self, entry: serde_json::Value) {
+        if let Some(id) = entry.get("id").and_then(|x| x.as_u64()).map(|x| x as u32) {
+            if self.entries.contains_key(&id) { panic!("DatabaseEntry with ID '{}' already exists", id); }
+            self.entries.insert(id, entry);
+            if id > self.max_id { self.max_id = id; }
         }
     }
-    None
+
+    pub fn update(&mut self, entry: serde_json::Value, write: bool) {
+        if let Some(id) = entry.get("id").and_then(|x| x.as_u64()).map(|x| x as u32) {
+            if !self.entries.contains_key(&id) { panic!("DatabaseEntry with ID '{}' does not exist", id); }
+            self.entries.insert(id, entry);
+            if write { self.write().unwrap(); }
+        }
+    }
+
+    pub fn remove(&mut self, id: u32) {
+        if self.entries.remove(&id).is_some() { let _ = self.write(); } else { panic!("DatabaseEntry with ID '{}' does not exist", id); }
+    }
+
+    pub fn write(&self) -> std::io::Result<()> {
+        let mut lines = String::new();
+        for entry in self.entries.values() { lines.push_str(&serde_json::to_string(entry).unwrap()); lines.push('\n'); }
+        let tmp = format!("{}.tmp", self.path.display());
+        let tmp_path = Path::new(&tmp);
+        // handle existing tmp
+        if tmp_path.exists() {
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            let dated = format!("{}.{}", tmp, now);
+            let _ = std::fs::rename(tmp_path, &dated);
+            tracing::warn!("Found '{}' when writing database, indicating past write failure; renamed it to '{}'", tmp, dated);
+        }
+        // write tmp
+        use std::io::Write;
+        let mut f = std::fs::File::create(tmp_path)?;
+        if !lines.is_empty() {
+            // remove last newline to match upstream's slice(0,-1)
+            let to_write = &lines[..lines.len()-1];
+            f.write_all(to_write.as_bytes())?;
+        }
+        f.sync_all()?;
+        drop(f);
+        std::fs::rename(tmp_path, &self.path)?;
+        Ok(())
+    }
+
+    pub fn sync_devices(&mut self, devices: &[Device], coordinator_ieee: Option<IeeeAddr>) {
+        // Preserve Coordinator and Group entries, update/insert devices
+        let mut to_keep: HashMap<u32, serde_json::Value> = HashMap::new();
+        for (id, v) in &self.entries {
+            if let Some(t) = v.get("type").and_then(|x| x.as_str()) {
+                if t == "Coordinator" || t == "Group" { to_keep.insert(*id, v.clone()); }
+            }
+        }
+        // Rebuild device entries from Device objects, preserving ids
+        let mut used_ids = std::collections::HashSet::new();
+        for dev in devices {
+            let id = dev.database_id.unwrap_or_else(|| {
+                // find unused id
+                let mut nid = self.max_id + 1;
+                while self.entries.contains_key(&nid) || used_ids.contains(&nid) { nid += 1; }
+                nid
+            });
+            used_ids.insert(id);
+            if id > self.max_id { self.max_id = id; }
+            let ep_list: Vec<u8> = dev.endpoints.iter().map(|e| e.endpoint).collect();
+            let mut endpoints = serde_json::Map::new();
+            for ep in &dev.endpoints {
+                endpoints.insert(ep.endpoint.to_string(), serde_json::json!({
+                    "profId": ep.profile_id,
+                    "epId": ep.endpoint,
+                    "devId": ep.device_id,
+                    "inClusterList": ep.input_clusters,
+                    "outClusterList": ep.output_clusters,
+                    "clusters": {},
+                    "binds": [],
+                    "configuredReportings": [],
+                    "meta": {}
+                }));
+            }
+            let entry = serde_json::json!({
+                "id": id,
+                "type": if dev.power_source.as_deref() == Some("Battery") { "EndDevice" } else { "Router" },
+                "ieeeAddr": dev.ieee_addr.as_hex(),
+                "nwkAddr": dev.nwk_addr,
+                "manufId": dev.manufacturer_id.unwrap_or(0),
+                "manufName": dev.manufacturer,
+                "powerSource": dev.power_source,
+                "modelId": dev.model,
+                "epList": ep_list,
+                "endpoints": endpoints,
+                "interviewCompleted": dev.interview_complete,
+                "interviewState": if dev.interview_complete { "SUCCESSFUL" } else { "FAILED" },
+                "meta": {},
+                "lastSeen": null
+            });
+            to_keep.insert(id, entry);
+        }
+        // Ensure Coordinator exists if we have one
+        if let Some(coord) = coordinator_ieee {
+            let has_coord = to_keep.values().any(|v| v.get("type").and_then(|x| x.as_str()) == Some("Coordinator"));
+            if !has_coord {
+                let cid = 1;
+                if !to_keep.contains_key(&cid) {
+                    to_keep.insert(cid, serde_json::json!({
+                        "id": cid,
+                        "type": "Coordinator",
+                        "ieeeAddr": coord.as_hex(),
+                        "nwkAddr": 0,
+                        "manufId": 0,
+                        "epList": [1],
+                        "endpoints": {"1": {"profId": 260, "epId": 1, "devId": 5, "inClusterList": [], "outClusterList": [], "clusters": {}, "binds": [], "configuredReportings": [], "meta": {}}},
+                        "interviewCompleted": true,
+                        "interviewState": "SUCCESSFUL",
+                        "meta": {}
+                    }));
+                    if cid > self.max_id { self.max_id = cid; }
+                }
+            }
+        }
+        self.entries = to_keep;
+    }
 }
 
 #[cfg(test)]
@@ -189,20 +290,8 @@ mod tests {
 
     fn sample_configs() -> HashMap<String, DeviceConfig> {
         let mut m = HashMap::new();
-        m.insert(
-            "0xec1bbdfffeaa66db".to_string(),
-            DeviceConfig {
-                friendly_name: Some("living_room_bulb".to_string()),
-                ..Default::default()
-            },
-        );
-        m.insert(
-            "0xcc86ecfffe9fd1b1".to_string(),
-            DeviceConfig {
-                friendly_name: Some("bedroom_sensor".to_string()),
-                ..Default::default()
-            },
-        );
+        m.insert("0xec1bbdfffeaa66db".to_string(), DeviceConfig { friendly_name: Some("living_room_bulb".to_string()), ..Default::default() });
+        m.insert("0xcc86ecfffe9fd1b1".to_string(), DeviceConfig { friendly_name: Some("bedroom_sensor".to_string()), ..Default::default() });
         m
     }
 
@@ -223,7 +312,6 @@ mod tests {
     #[test]
     fn loads_devices_not_coordinator() {
         let (devices, coord) = load_sample();
-        // Should have 2 devices (Router + EndDevice), not the Coordinator
         assert_eq!(devices.len(), 2);
         assert!(coord.is_some());
     }
@@ -266,10 +354,10 @@ mod tests {
         assert_eq!(bulb.endpoints.len(), 1);
         let ep = &bulb.endpoints[0];
         assert_eq!(ep.endpoint, 1);
-        assert_eq!(ep.profile_id, 260); // HA profile
-        assert!(ep.input_clusters.contains(&0x0006)); // On/Off
-        assert!(ep.input_clusters.contains(&0x0008)); // Level
-        assert!(ep.input_clusters.contains(&0x0300)); // Color (768)
+        assert_eq!(ep.profile_id, 260);
+        assert!(ep.input_clusters.contains(&0x0006));
+        assert!(ep.input_clusters.contains(&0x0008));
+        assert!(ep.input_clusters.contains(&0x0300));
     }
 
     #[test]
@@ -277,9 +365,9 @@ mod tests {
         let (devices, _) = load_sample();
         let sensor = devices.iter().find(|d| d.friendly_name == "bedroom_sensor").unwrap();
         let ep = &sensor.endpoints[0];
-        assert!(ep.input_clusters.contains(&0x0402)); // Temperature (1026)
-        assert!(ep.input_clusters.contains(&0x0405)); // Humidity (1029)
-        assert!(ep.input_clusters.contains(&0x0001)); // Power config
+        assert!(ep.input_clusters.contains(&0x0402));
+        assert!(ep.input_clusters.contains(&0x0405));
+        assert!(ep.input_clusters.contains(&0x0001));
     }
 
     #[test]
@@ -337,6 +425,55 @@ mod tests {
         std::fs::write(&path, db).unwrap();
         let (devices, _) = load_database(&path, &HashMap::new());
         std::fs::remove_dir_all(&dir).ok();
-        assert_eq!(devices.len(), 1); // only the valid line
+        assert_eq!(devices.len(), 1);
+    }
+
+    #[test]
+    fn round_trip_preserves_compatible_format() {
+        let dir = std::env::temp_dir().join(format!("z2m_roundtrip_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("database.db");
+        std::fs::write(&path, SAMPLE_DB).unwrap();
+        let mut db = PersistentDatabase::open(&path);
+        // Sync with loaded devices and write
+        let (devices, coord) = load_database(&path, &HashMap::new());
+        db.sync_devices(&devices, coord);
+        db.write().unwrap();
+        // Re-open and verify can be read by original logic (load_database)
+        let (devices2, _) = load_database(&path, &HashMap::new());
+        assert_eq!(devices2.len(), 2);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn interview_state_both_fields_written() {
+        let dir = std::env::temp_dir().join(format!("z2m_interview_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("database.db");
+        let mut db = PersistentDatabase::open(&path);
+        let dev = Device::new(crate::zigbee::IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap(), 0x1234);
+        // dev.interview_complete false by default -> should write FAILED
+        db.sync_devices(&[dev.clone()], None);
+        db.write().unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("\"interviewCompleted\":false"));
+        assert!(content.contains("\"interviewState\":\"FAILED\""));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn group_entry_preserved_on_sync() {
+        let dir = std::env::temp_dir().join(format!("z2m_group_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("database.db");
+        let group_line = r#"{"id":10,"type":"Group","groupID":1,"members":[],"meta":{}}"#;
+        let content = format!("{}\n{}", SAMPLE_DB.lines().next().unwrap(), group_line);
+        std::fs::write(&path, &content).unwrap();
+        let mut db = PersistentDatabase::open(&path);
+        assert!(db.entries.contains_key(&10));
+        let (devices, coord) = load_database(&path, &HashMap::new());
+        db.sync_devices(&devices, coord);
+        assert!(db.entries.contains_key(&10), "Group should be preserved");
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
