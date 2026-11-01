@@ -58,7 +58,7 @@
 - No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update` — we write immediately on every join/leave/rename
 - `interviewState` mapping only `SUCCESSFUL`/`FAILED`, not `Pending`/`InProgress` + quirks for Tuya `TS*` etc.
 - No handling of `GreenPower` type entries (filtered, upstream stores with `type GreenPower`)
-- `Group` `friendly_name` duplicated in DB extra field for portability — upstream stores only in yaml, we store in both (acceptable, but file diff vs upstream when round-tripping pure DB)
+- `Group` `friendly_name` now correctly only in `configuration.yaml` (via `Config.groups` + `persist_groups_config`), not in `database.db` — matches `settings.groups` + `Group` DB `groupID/members` split as upstream (fixed 2026-11-02)
 - `configuration.yaml` groups now written via `Config.save()` with `serde_yml` dump — loses comments/formatting and `!secret`/`!env` handling vs `yaml.writeIfChanged` with `js-yaml` (upstream preserves `!secret` refs via `updateIfChanged`)
 - No `yaml` handling for `devices` separate file (`devices.yaml` via `actual[type]` string) as in `settings.write()`
 

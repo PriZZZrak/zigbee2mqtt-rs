@@ -368,7 +368,6 @@ impl PersistentDatabase {
                 "id": id,
                 "type": "Group",
                 "groupID": g.id,
-                "friendly_name": g.friendly_name,
                 "members": members,
                 "meta": {}
             });
@@ -388,10 +387,8 @@ impl PersistentDatabase {
                         Some(crate::groups::GroupMember{ ieee_address: ieee, endpoint: ep })
                     }).collect()
                 }).unwrap_or(Vec::new());
-                // Try to find friendly_name from members? For now use groupID as name
-                let fname = v.get("friendly_name").and_then(|x| x.as_str()).unwrap_or(&format!("group_{}", gid)).to_string();
-                // Need to reconstruct Group with id and members, but we don't have friendly_name in DB, so use groupID
-                // We'll create group and then set friendly_name if needed via separate storage
+                // Upstream stores friendly_name only in configuration.yaml, not in DB — use placeholder, Bridge will overlay from Config
+                let fname = format!("group_{}", gid);
                 let mut g = Group { id: gid, friendly_name: fname, members: Vec::new() };
                 g.members = members;
                 groups.push(g);
