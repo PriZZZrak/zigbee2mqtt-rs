@@ -60,6 +60,31 @@ impl Bridge {
                 groups.next_id.store(g.id + 1, std::sync::atomic::Ordering::Relaxed);
             }
         }
+        // Overlay groups from configuration.yaml (friendly_name authoritative)
+        for (id_str, gcfg) in &cfg.groups {
+            if let Ok(gid) = id_str.parse::<u16>() {
+                if let Some(mut g) = groups.inner.get_mut(&gid) {
+                    if let Some(fname) = &gcfg.friendly_name {
+                        // Update friendly_name from config if different
+                        let old = g.friendly_name.clone();
+                        if &old != fname {
+                            groups.by_name.remove(&old);
+                            g.friendly_name = fname.clone();
+                            groups.by_name.insert(fname.clone(), gid);
+                        }
+                    }
+                } else if let Some(fname) = &gcfg.friendly_name {
+                    // Group in config but not in DB — create it
+                    let g = crate::groups::Group { id: gid, friendly_name: fname.clone(), members: Vec::new() };
+                    groups.by_name.insert(fname.clone(), gid);
+                    groups.inner.insert(gid, g);
+                    let cur = groups.next_id.load(std::sync::atomic::Ordering::Relaxed);
+                    if gid >= cur {
+                        groups.next_id.store(gid + 1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+            }
+        }
         Self {
             cfg,
             config_path,
@@ -77,6 +102,32 @@ impl Bridge {
         db.sync_groups(&groups);
         if let Err(e) = db.write() {
             warn!("Failed to write database.db: {e}");
+        }
+    }
+
+    async fn persist_groups_config(&self) {
+        // Read current config file, update groups section, write back
+        let path = &self.config_path;
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Cannot read config for groups persist {}: {e}", path.display());
+                return;
+            }
+        };
+        let mut cfg: crate::config::Config = match serde_yml::from_str(&content) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Cannot parse config for groups persist: {e}");
+                return;
+            }
+        };
+        cfg.groups.clear();
+        for g in self.groups.all() {
+            cfg.groups.insert(g.id.to_string(), crate::config::GroupConfig { friendly_name: Some(g.friendly_name.clone()) });
+        }
+        if let Err(e) = cfg.save(path) {
+            warn!("Failed to save groups to config {}: {e}", path.display());
         }
     }
 
@@ -552,6 +603,7 @@ impl Bridge {
                                     } else if groups.rename(from, to.clone()).is_some() {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
                                         self.persist_database(coord.info.ieee_addr).await;
+                                        self.persist_groups_config().await;
                                         let resp = mk_resp("ok", json!({"from": from, "to": to}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -579,6 +631,7 @@ impl Bridge {
                                     if groups.remove_by_id(gid).is_some() || groups.get_by_name(id).and_then(|g| groups.remove_by_id(g.id)).is_some() {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
                                         self.persist_database(coord.info.ieee_addr).await;
+                                        self.persist_groups_config().await;
                                         let resp = mk_resp("ok", json!({"id": id}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -601,6 +654,7 @@ impl Bridge {
                                         let g = groups.add(friendly.clone());
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
                                         self.persist_database(coord.info.ieee_addr).await;
+                                        self.persist_groups_config().await;
                                         let resp = mk_resp("ok", json!({"friendly_name": friendly, "id": g.id}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     }
@@ -613,6 +667,7 @@ impl Bridge {
                                     if groups.add_member(gid, device.to_string(), endpoint) {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
                                         self.persist_database(coord.info.ieee_addr).await;
+                                        self.persist_groups_config().await;
                                         let resp = mk_resp("ok", json!({}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -628,6 +683,7 @@ impl Bridge {
                                     if groups.remove_member(gid, device, endpoint) {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
                                         self.persist_database(coord.info.ieee_addr).await;
+                                        self.persist_groups_config().await;
                                         let resp = mk_resp("ok", json!({}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
@@ -641,6 +697,7 @@ impl Bridge {
                                     if groups.clear_members(gid) {
                                         let _ = mqtt.publish_bridge_groups(&groups).await;
                                         self.persist_database(coord.info.ieee_addr).await;
+                                        self.persist_groups_config().await;
                                         let resp = mk_resp("ok", json!({}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {

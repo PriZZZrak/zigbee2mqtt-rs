@@ -12,6 +12,7 @@ pub struct Config {
     pub permit_join: bool,
     pub homeassistant: HomeAssistantConfig,
     pub devices: HashMap<String, DeviceConfig>,
+    pub groups: HashMap<String, GroupConfig>,
     #[serde(default)]
     pub blocklist: Vec<String>,
     #[serde(default)]
@@ -137,6 +138,11 @@ pub struct DeviceConfig {
     pub retain: Option<bool>,
     pub qos: Option<u8>,
     pub disabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct GroupConfig {
+    pub friendly_name: Option<String>,
 }
 
 /// How device state is published to MQTT (z2m: `advanced.output`).
@@ -276,6 +282,15 @@ impl Config {
         if self.mqtt.base_topic.trim().is_empty() {
             return Err(Error::Config("mqtt.base_topic must not be empty".to_string()));
         }
+        Ok(())
+    }
+
+    pub fn save(&self, path: &Path) -> Result<()> {
+        let yaml = serde_yml::to_string(self).map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
+        // Atomic write via tmp
+        let tmp = path.with_extension("yaml.tmp");
+        std::fs::write(&tmp, yaml).map_err(|e| Error::Config(format!("cannot write {}: {e}", tmp.display())))?;
+        std::fs::rename(&tmp, path).map_err(|e| Error::Config(format!("cannot rename {}: {e}", path.display())))?;
         Ok(())
     }
 }

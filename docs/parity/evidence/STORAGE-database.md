@@ -45,14 +45,20 @@
 - `src/groups.rs` added `GroupRegistry` with `inner/by_name/next_id` pub(crate) for DB sync, `src/database.rs` added `sync_groups`/`load_groups` and `json` import
 - `Device.database_id` preserved across restarts, `sync_devices` now merges original `meta/lastSeen/appVersion/stackVersion/hwVersion/dateCode/zclVersion` instead of resetting
 
+## Implementation 2026-11-02 (yaml groups)
+- Added `groups: HashMap<String, GroupConfig>` to `Config` + `GroupConfig {friendly_name}`; `Config.save()` atomic write via `.yaml.tmp`
+- `Bridge::new` now overlays `cfg.groups` onto `GroupRegistry` (friendly_name authoritative from yaml, members from DB), `persist_groups_config()` updates `configuration.yaml` on `group/add|remove|rename|members/*` plus `persist_database` for DB members
+- `database.db` + `configuration.yaml` now both portable: groups survive DB↔yaml round-trip, device `friendly_name` already via `devices` map
+
 ## Still not as original (2026-11-02)
 - `Coordinator` entry still recreated with defaults if missing, not fully preserving original `manufId/epList/meta` when file has no Coordinator (rare)
 - `endpoints[].clusters` always `{}`, original `clusters` with attributes (e.g., reporting config) not preserved — back-port loses per-endpoint cluster state
 - `checkinInterval`, `gpSecurityKey`, `scheduledOta` still reset to default (not yet mapped from Device)
+- `appVersion/stackVersion/hwVersion/dateCode/zclVersion` now preserved if orig exists, but not updated from live device data
 - No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update`
 - `interviewState` mapping only `SUCCESSFUL`/`FAILED`, not `Pending`/`InProgress` + quirks for Tuya `TS*` etc.
 - No handling of `GreenPower` type entries (filtered)
-- `Group` `friendly_name` stored as extra field not in upstream DB (upstream stores friendly_name in `configuration.yaml`/`settings`, we duplicate for portability — acceptable divergence)
+- `Group` `friendly_name` duplicated in DB extra field for portability — upstream stores only in yaml, we store in both (acceptable, but file diff vs upstream)
 
 ## Hardware
 - No hardware required — file I/O only, differential test with Node `Database.open` fixture.
