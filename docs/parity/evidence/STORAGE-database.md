@@ -50,15 +50,17 @@
 - `Bridge::new` now overlays `cfg.groups` onto `GroupRegistry` (friendly_name authoritative from yaml, members from DB), `persist_groups_config()` updates `configuration.yaml` on `group/add|remove|rename|members/*` plus `persist_database` for DB members
 - `database.db` + `configuration.yaml` now both portable: groups survive DB↔yaml round-trip, device `friendly_name` already via `devices` map
 
-## Still not as original (2026-11-02)
-- `Coordinator` entry still recreated with defaults if missing, not fully preserving original `manufId/epList/meta` when file has no Coordinator (rare)
-- `endpoints[].clusters` always `{}`, original `clusters` with attributes (e.g., reporting config) not preserved — back-port loses per-endpoint cluster state
-- `checkinInterval`, `gpSecurityKey`, `scheduledOta` still reset to default (not yet mapped from Device)
-- `appVersion/stackVersion/hwVersion/dateCode/zclVersion` now preserved if orig exists, but not updated from live device data
-- No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update`
+## Still not as original (2026-11-02, after clusters preservation)
+- `Coordinator` entry still recreated with defaults if missing, not fully preserving original `manufId/epList/meta` when file has no Coordinator (rare, but now preserved if orig exists)
+- `checkinInterval`, `gpSecurityKey`, `scheduledOta` now preserved from orig, but not updated from live Device (upstream updates these on interview, we keep orig value)
+- `appVersion/stackVersion/hwVersion/dateCode/zclVersion` now preserved, but not refreshed from live `read` (upstream updates on SimpleDesc/DeviceAnnounce)
+- `endpoints[].clusters/binds/configuredReportings/meta` now preserved per-endpoint from orig, but new endpoints from Device still get `{} / []` defaults (upstream would have actual ZCL clusters)
+- No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update` — we write immediately on every join/leave/rename
 - `interviewState` mapping only `SUCCESSFUL`/`FAILED`, not `Pending`/`InProgress` + quirks for Tuya `TS*` etc.
-- No handling of `GreenPower` type entries (filtered)
-- `Group` `friendly_name` duplicated in DB extra field for portability — upstream stores only in yaml, we store in both (acceptable, but file diff vs upstream)
+- No handling of `GreenPower` type entries (filtered, upstream stores with `type GreenPower`)
+- `Group` `friendly_name` duplicated in DB extra field for portability — upstream stores only in yaml, we store in both (acceptable, but file diff vs upstream when round-tripping pure DB)
+- `configuration.yaml` groups now written via `Config.save()` with `serde_yml` dump — loses comments/formatting and `!secret`/`!env` handling vs `yaml.writeIfChanged` with `js-yaml` (upstream preserves `!secret` refs via `updateIfChanged`)
+- No `yaml` handling for `devices` separate file (`devices.yaml` via `actual[type]` string) as in `settings.write()`
 
 ## Hardware
 - No hardware required — file I/O only, differential test with Node `Database.open` fixture.
