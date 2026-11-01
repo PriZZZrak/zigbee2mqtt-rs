@@ -1,8 +1,57 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::Path;
 
 use crate::error::{Error, Result};
+
+fn deserialize_device_map<'de, D>(deserializer: D) -> std::result::Result<HashMap<String, DeviceConfig>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct Visitor;
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = HashMap<String, DeviceConfig>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "a map or string") }
+        fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
+        where A: serde::de::MapAccess<'de> {
+            let mut hm = HashMap::new();
+            while let Some((k, v)) = map.next_entry::<String, DeviceConfig>()? { hm.insert(k, v); }
+            Ok(hm)
+        }
+        fn visit_str<E>(self, _: &str) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
+        fn visit_string<E>(self, _: String) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
+        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error> where A: serde::de::SeqAccess<'de> {
+            while let Some::<String>(_) = seq.next_element()? {}
+            Ok(HashMap::new())
+        }
+    }
+    deserializer.deserialize_any(Visitor)
+}
+
+fn deserialize_group_map<'de, D>(deserializer: D) -> std::result::Result<HashMap<String, GroupConfig>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct Visitor;
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = HashMap<String, GroupConfig>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "a map or string") }
+        fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
+        where A: serde::de::MapAccess<'de> {
+            let mut hm = HashMap::new();
+            while let Some((k, v)) = map.next_entry::<String, GroupConfig>()? { hm.insert(k, v); }
+            Ok(hm)
+        }
+        fn visit_str<E>(self, _: &str) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
+        fn visit_string<E>(self, _: String) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
+        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error> where A: serde::de::SeqAccess<'de> {
+            while let Some::<String>(_) = seq.next_element()? {}
+            Ok(HashMap::new())
+        }
+    }
+    deserializer.deserialize_any(Visitor)
+}
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
@@ -11,7 +60,9 @@ pub struct Config {
     pub mqtt: MqttConfig,
     pub permit_join: bool,
     pub homeassistant: HomeAssistantConfig,
+    #[serde(deserialize_with = "deserialize_device_map", default)]
     pub devices: HashMap<String, DeviceConfig>,
+    #[serde(deserialize_with = "deserialize_group_map", default)]
     pub groups: HashMap<String, GroupConfig>,
     #[serde(default)]
     pub blocklist: Vec<String>,
@@ -232,11 +283,100 @@ impl Default for AdvancedConfig {
     }
 }
 
+fn parse_value_ref(text: &str) -> Option<(String, String)> {
+    let t = text.trim();
+    if !t.starts_with('!') { return None; }
+    // "!secret key" or "!env VAR"
+    let rest = t[1..].trim();
+    let mut parts = rest.splitn(2, |c: char| c.is_whitespace());
+    let filename = parts.next()?.trim();
+    let key = parts.next()?.trim();
+    if filename.is_empty() || key.is_empty() { return None; }
+    let mut fname = filename.to_string();
+    if !fname.ends_with(".yaml") && !fname.ends_with(".yml") {
+        fname.push_str(".yaml");
+    }
+    Some((fname, key.to_string()))
+}
+
+fn resolve_secret(value: &mut String, config_dir: &Path) {
+    if let Some((fname, key)) = parse_value_ref(value) {
+        let secret_path = config_dir.join(&fname);
+        if let Ok(content) = std::fs::read_to_string(&secret_path) {
+            if let Ok(v) = serde_yml::from_str::<serde_json::Value>(&content) {
+                if let Some(val) = v.get(&key).and_then(|x| x.as_str()) {
+                    *value = val.to_string();
+                }
+            }
+        }
+    }
+}
+
 impl Config {
     pub fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| Error::Config(format!("cannot read {}: {e}", path.display())))?;
         let mut config: Config = serde_yml::from_str(&content)?;
+        // Handle devices/groups separate files as in settings.ts readDevicesOrGroups
+        let raw: serde_json::Value = serde_yml::from_str(&content).unwrap_or(serde_json::Value::Null);
+        let config_dir = path.parent().unwrap_or(Path::new("."));
+        let load_map = |key: &str| -> HashMap<String, serde_json::Value> {
+            let mut map = HashMap::new();
+            if let Some(v) = raw.get(key) {
+                if let Some(s) = v.as_str() {
+                    // Single file reference
+                    let p = config_dir.join(s);
+                    if let Ok(c) = std::fs::read_to_string(&p) {
+                        if let Ok(m) = serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c) {
+                            map.extend(m);
+                        }
+                    }
+                } else if let Some(arr) = v.as_array() {
+                    for (i, elem) in arr.iter().enumerate() {
+                        if let Some(s) = elem.as_str() {
+                            let p = config_dir.join(s);
+                            if let Ok(c) = std::fs::read_to_string(&p) {
+                                if let Ok(m) = serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c) {
+                                    // For array, second files override? Upstream deletes keys from first file that exist in later files
+                                    // For simplicity, just extend, later files override
+                                    if i == 0 {
+                                        map.extend(m);
+                                    } else {
+                                        for (k, v) in m { map.insert(k, v); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            map
+        };
+        // If devices/groups were specified as string/array, they were deserialized as empty, now fill from files
+        if config.devices.is_empty() {
+            let m = load_map("devices");
+            if !m.is_empty() {
+                for (k, v) in m {
+                    if let Ok(dc) = serde_json::from_value::<DeviceConfig>(v) {
+                        config.devices.insert(k, dc);
+                    }
+                }
+            }
+        }
+        if config.groups.is_empty() {
+            let m = load_map("groups");
+            if !m.is_empty() {
+                for (k, v) in m {
+                    if let Ok(gc) = serde_json::from_value::<GroupConfig>(v) {
+                        config.groups.insert(k, gc);
+                    }
+                }
+            }
+        }
+        // Resolve !secret / !env refs as in settings.ts interpretValue
+        resolve_secret(&mut config.mqtt.server, config_dir);
+        if let Some(ref mut u) = config.mqtt.username { resolve_secret(u, config_dir); }
+        if let Some(ref mut p) = config.mqtt.password { resolve_secret(p, config_dir); }
         // Accept zigbee2mqtt-style URLs like "mqtt://localhost:1883" in mqtt.server.
         let raw = config.mqtt.server.trim().to_string();
         let stripped = raw
@@ -286,7 +426,78 @@ impl Config {
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
-        let yaml = serde_yml::to_string(self).map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
+        // Read original file to detect !secret and separate files as in settings.ts write()
+        let actual_content = std::fs::read_to_string(path).unwrap_or_default();
+        let actual: serde_json::Value = serde_yml::from_str(&actual_content).unwrap_or(serde_json::Value::Null);
+        let config_dir = path.parent().unwrap_or(Path::new("."));
+        let mut to_write = serde_json::to_value(self).map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
+
+        // Handle !secret refs for mqtt/server, mqtt/user, mqtt/password, advanced/network_key, frontend/auth_token
+        for (ns, key) in [("mqtt", "server"), ("mqtt", "user"), ("mqtt", "password"), ("advanced", "network_key"), ("frontend", "auth_token")] {
+            if let Some(actual_ns) = actual.get(ns).and_then(|v| v.get(key).and_then(|x| x.as_str())) {
+                if let Some((fname, ref_key)) = parse_value_ref(actual_ns) {
+                    if let Some(new_val) = to_write.get(ns).and_then(|v| v.get(key)).cloned() {
+                        // Write the actual value to the referenced file
+                        let secret_path = config_dir.join(&fname);
+                        let mut secret_content: serde_json::Value = std::fs::read_to_string(&secret_path)
+                            .ok()
+                            .and_then(|c| serde_yml::from_str(&c).ok())
+                            .unwrap_or(json!({}));
+                        if let Some(obj) = secret_content.as_object_mut() {
+                            obj.insert(ref_key, new_val);
+                        }
+                        if let Ok(yaml) = serde_yml::to_string(&secret_content) {
+                            let _ = std::fs::write(&secret_path, yaml);
+                        }
+                        // Keep the !secret ref in main file
+                        if let Some(obj) = to_write.get_mut(ns).and_then(|v| v.as_object_mut()) {
+                            obj.insert(key.to_string(), serde_json::Value::String(actual_ns.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle devices/groups separate files
+        for key in ["devices", "groups"] {
+            if let Some(actual_val) = actual.get(key) {
+                if let Some(s) = actual_val.as_str() {
+                    // Single file
+                    let p = config_dir.join(s);
+                    if let Some(map) = to_write.get(key).and_then(|v| v.as_object()) {
+                        let _ = std::fs::write(&p, serde_yml::to_string(map).unwrap_or_default());
+                    }
+                    // Keep the string reference in main file
+                    if let Some(obj) = to_write.as_object_mut() {
+                        obj.insert(key.to_string(), serde_json::Value::String(s.to_string()));
+                    }
+                } else if let Some(arr) = actual_val.as_array() {
+                    if let Some(first) = arr.first().and_then(|x| x.as_str()) {
+                        let p = config_dir.join(first);
+                        if let Some(map) = to_write.get(key).and_then(|v| v.as_object()) {
+                            // For array, only write to first file, excluding keys from other files
+                            let mut to_write_map = map.clone();
+                            for elem in arr.iter().skip(1) {
+                                if let Some(s) = elem.as_str() {
+                                    let pp = config_dir.join(s);
+                                    if let Ok(c) = std::fs::read_to_string(&pp) {
+                                        if let Ok(m) = serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c) {
+                                            for k in m.keys() { to_write_map.remove(k); }
+                                        }
+                                    }
+                                }
+                            }
+                            let _ = std::fs::write(&p, serde_yml::to_string(&to_write_map).unwrap_or_default());
+                        }
+                        if let Some(obj) = to_write.as_object_mut() {
+                            obj.insert(key.to_string(), actual_val.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        let yaml = serde_yml::to_string(&to_write).map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
         // Atomic write via tmp
         let tmp = path.with_extension("yaml.tmp");
         std::fs::write(&tmp, yaml).map_err(|e| Error::Config(format!("cannot write {}: {e}", tmp.display())))?;

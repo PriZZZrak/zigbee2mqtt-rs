@@ -208,11 +208,11 @@ impl PersistentDatabase {
     }
 
     fn sync_devices_inner(&mut self, devices: &[Device], coordinator_ieee: Option<IeeeAddr>, preserve_extra: bool) {
-        // Preserve Coordinator and Group entries, update/insert devices
+        // Preserve Coordinator, Group and GreenPower entries, update/insert devices
         let mut to_keep: HashMap<u32, serde_json::Value> = HashMap::new();
         for (id, v) in &self.entries {
             if let Some(t) = v.get("type").and_then(|x| x.as_str()) {
-                if t == "Coordinator" || t == "Group" { to_keep.insert(*id, v.clone()); }
+                if t == "Coordinator" || t == "Group" || t == "GreenPower" { to_keep.insert(*id, v.clone()); }
             }
         }
         // Rebuild device entries from Device objects, preserving ids and extra fields
