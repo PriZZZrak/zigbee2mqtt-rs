@@ -62,5 +62,20 @@
 - `configuration.yaml` groups now written via `Config.save()` with `serde_yml` dump — loses comments/formatting and `!secret`/`!env` handling vs `yaml.writeIfChanged` with `js-yaml` (upstream preserves `!secret` refs via `updateIfChanged`)
 - No `yaml` handling for `devices` separate file (`devices.yaml` via `actual[type]` string) as in `settings.write()`
 
+## Implementation 2026-11-02 (batching, memory)
+- `Bridge::persist_database()` now debounced: in-memory `sync_devices`+`sync_groups` immediately, disk `write()` via `db_write_pending` flag + `tokio::spawn` 500ms delayed single write, final flush on shutdown (`run` end) — mirrors `Entity.database.update(write:false)` / `update(write:true)` batching, saves memory/I/O (was 2-3 fsync per interview for 2-EP thermostat, now 1)
+
+## Still not as original (2026-11-02, after batching)
+- `Coordinator` still defaults if missing
+- `endpoints[].clusters/binds` now preserved, but new endpoints still defaults
+- `checkinInterval/gpSecurityKey/scheduledOta` preserved but not live-updated
+- `appVersion` etc. preserved but not refreshed
+- `interviewState` only SUCCESSFUL/FAILED
+- `GreenPower` filtered
+- `Group` duplicate friendly_name
+- `configuration.yaml` loses comments/`!secret`
+- No `devices.yaml` separate file
+- Batching window 500ms vs upstream immediate `write()` for `update(write:true)` — crash within 500ms may lose last batch (upstream would have fsync immediately)
+
 ## Hardware
 - No hardware required — file I/O only, differential test with Node `Database.open` fixture.

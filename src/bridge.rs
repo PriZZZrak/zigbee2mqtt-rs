@@ -30,6 +30,7 @@ pub struct Bridge {
     devices: Arc<DeviceRegistry>,
     groups: Arc<GroupRegistry>,
     database: Arc<Mutex<PersistentDatabase>>,
+    db_write_pending: Arc<Mutex<bool>>,
 }
 
 impl Bridge {
@@ -91,18 +92,38 @@ impl Bridge {
             devices: Arc::new(DeviceRegistry::new()),
             groups: Arc::new(groups),
             database: Arc::new(Mutex::new(db)),
+            db_write_pending: Arc::new(Mutex::new(false)),
         }
     }
 
     async fn persist_database(&self, coordinator_ieee: Option<IeeeAddr>) {
-        let devices = self.devices.all_devices();
-        let groups = self.groups.all();
-        let mut db = self.database.lock().await;
-        db.sync_devices(&devices, coordinator_ieee);
-        db.sync_groups(&groups);
-        if let Err(e) = db.write() {
-            warn!("Failed to write database.db: {e}");
+        // Batching: update in-memory immediately, debounce disk write to save memory/I/O (upstream Entity.database.update(write:false))
+        {
+            let devices = self.devices.all_devices();
+            let groups = self.groups.all();
+            let mut db = self.database.lock().await;
+            db.sync_devices(&devices, coordinator_ieee);
+            db.sync_groups(&groups);
         }
+        let mut pending = self.db_write_pending.lock().await;
+        if *pending {
+            return;
+        }
+        *pending = true;
+        drop(pending);
+        let db_clone = Arc::clone(&self.database);
+        let pending_clone = Arc::clone(&self.db_write_pending);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            {
+                let mut p = pending_clone.lock().await;
+                *p = false;
+            }
+            let db = db_clone.lock().await;
+            if let Err(e) = db.write() {
+                warn!("Failed to write database.db (batched): {e}");
+            }
+        });
     }
 
     async fn persist_groups_config(&self) {
@@ -748,6 +769,11 @@ impl Bridge {
 
         if let Err(e) = mqtt.publish_bridge_state(false).await {
             warn!("Failed to publish offline state: {e}");
+        }
+        // Flush any pending batched database write
+        {
+            let db = self.database.lock().await;
+            let _ = db.write();
         }
         Ok(())
     }
