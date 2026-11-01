@@ -33,12 +33,19 @@
 - No handling of `interviewCompleted` ↔ `interviewState` migration (upstream keeps both for downgrade)
 - No preservation of unknown extra fields (`[s:string]:any`)
 
-## Plan
-- Rust `Database` struct mirroring upstream: `Map<u32, Value> + path + maxId`, `open`, `getEntriesIterator`, `insert/update/remove/newID/write` with tmp+fsync+rename, corrupted line handling via tracing::error
-- `DbEntry` with `#[serde(flatten)] extra: HashMap<String, Value>` to preserve unknown fields, plus explicit `id, type, ieeeAddr, nwkAddr, manufId, manufName, powerSource, modelId, epList, endpoints, appVersion, stackVersion, hwVersion, dateCode, swBuildId, zclVersion, interviewCompleted, interviewState, meta, lastSeen`
-- Device ↔ DatabaseEntry conversion preserving all, mapping `interview_complete` ↔ `interviewState`/`interviewCompleted` both
-- Group ↔ DatabaseEntry similarly, `GroupRegistry` ↔ database
-- Tests: golden fixtures from upstream `test/controller.test.ts` database examples, corrupted line test, round-trip `open→insert→write→open` and `load_database` vs original file, NDJSON no trailing newline case
+## Implementation 2026-11-01 (c79faa8)
+- Added `PersistentDatabase` with `Map<u32, Value>` + `open`/`newID`/`insert`/`update`/`remove`/`write` (tmp+fsync+rename, dated .tmp on collision) and `sync_devices` preserving Coordinator/Group
+- Extended `DbEntry` to `id, manufId, epList, interviewState, lastSeen, flatten extra` and `Device.database_id`
+- `Device` now maps `interviewState`↔`interviewCompleted` both ways
+- Tests 17 (was 12): round-trip, interviewState both fields, Group preserved
+
+## Still not as original (2026-11-01)
+- `Bridge` not wired to `PersistentDatabase` — join/leave not auto-persisted to disk (file stays stale until manual `sync_devices`+`write`)
+- `GroupRegistry` ↔ database sync missing — `group/add|remove|members/*` in-memory only, not flushed to `database.db`
+- `Coordinator` entry recreated with defaults (`manufId 0`, `epList [1]`) not preserving original `manufId/epList/meta` from file
+- `meta`, `lastSeen`, `checkinInterval`, `gpSecurityKey`, `scheduledOta`, `appVersion/stackVersion/hwVersion/dateCode/zclVersion` reset to `{}/null/0` on write — back-port loses these fields
+- `endpoints[].clusters` always `{}`, original `clusters` with attributes not preserved
+- No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update`
 
 ## Hardware
 - No hardware required — file I/O only, differential test with Node `Database.open` fixture.
