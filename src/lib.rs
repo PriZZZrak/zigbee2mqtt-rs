@@ -1,4 +1,5 @@
 pub mod bridge;
+pub mod converters;
 pub mod config;
 pub mod coordinator;
 pub mod database;
