@@ -21,6 +21,30 @@ impl ExternalConverter {
         std::fs::read_to_string(&file).ok()
     }
 
+    pub async fn fetch_js(&self, vendor_model: &str) -> Option<String> {
+        if let Some(cached) = self.load_js(vendor_model) { return Some(cached); }
+        // Try to fetch from registry URL
+        let file_name = format!("{}.js", vendor_model.replace('/', "_").replace(' ', "_"));
+        let url = format!("{}/{}", self.registry_url.trim_end_matches('/'), file_name);
+        for prog in ["curl", "wget", "uclient-fetch"] {
+            let out = match prog {
+                "curl" => tokio::process::Command::new("curl").arg("-fsSL").arg(&url).output().await.ok(),
+                "wget" => tokio::process::Command::new("wget").arg("-qO-").arg(&url).output().await.ok(),
+                _ => tokio::process::Command::new("uclient-fetch").arg("-qO-").arg(&url).output().await.ok(),
+            };
+            if let Some(o) = out {
+                if o.status.success() {
+                    if let Ok(text) = String::from_utf8(o.stdout) {
+                        let path = self.dir.join(&file_name);
+                        let _ = std::fs::write(&path, &text);
+                        return Some(text);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub async fn fetch_registry(&self) -> Option<serde_json::Value> {
         let path = self.registry_path();
         // Try local cache first (24h)

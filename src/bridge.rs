@@ -205,6 +205,8 @@ impl Bridge {
             info!("Permit join enabled (254 s)");
         }
         info!("Startup complete, entering main loop");
+        // Warm registry cache (gh-pages, 24h)
+        let _ = self.external.fetch_registry().await;
 
         let devices = Arc::clone(&self.devices);
         let groups = Arc::clone(&self.groups);
@@ -514,7 +516,9 @@ impl Bridge {
                                     if let Some(dev) = devices.get_by_nwk(src_addr) {
                                         let key = dev.model.clone().unwrap_or_else(|| dev.manufacturer.clone().unwrap_or_default());
                                         if !key.is_empty() {
-                                            if let Some(js) = external.load_js(&key) {
+                                            let js_opt = external.load_js(&key).or_else(|| None);
+                                            let js = if js_opt.is_some() { js_opt } else { external.fetch_js(&key).await };
+                                            if let Some(js) = js {
                                                 if let Some(val) = external.eval(&js, &data) {
                                                     if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
                                                         if let Some(obj) = val.as_object() {
