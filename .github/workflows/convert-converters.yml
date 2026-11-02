@@ -53,10 +53,20 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./herdsman-converters
           destination_dir: herdsman-converters/${{ steps.ref.outputs.ref }}
-      - name: Update latest symlink
+      - name: Update latest pointer
         run: |
-          git checkout gh-pages
-          ln -sfn ${{ steps.ref.outputs.ref }} herdsman-converters/latest
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . || true
+            mkdir -p herdsman-converters
+          fi
+          mkdir -p herdsman-converters
+          rm -rf herdsman-converters/latest
+          cp -r herdsman-converters/${{ steps.ref.outputs.ref }} herdsman-converters/latest
+          echo "${{ steps.ref.outputs.ref }}" > herdsman-converters/latest/VERSION
           git add herdsman-converters/latest
           git commit -m "Update latest -> ${{ steps.ref.outputs.ref }}" || true
           git push origin gh-pages
