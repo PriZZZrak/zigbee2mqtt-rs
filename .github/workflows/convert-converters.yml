@@ -5,14 +5,19 @@ on:
   workflow_dispatch:
     inputs:
       converters_ref:
-        description: 'herdsman-converters tag/commit (e.g. v26.115.1)'
+        description: 'herdsman-converters tag/commit (e.g. v26.115.1). Empty = latest upstream release.'
         required: false
-        default: 'v26.115.1'
+        default: ''
   release:
     types: [published]
   push:
     tags:
       - 'converters-v*'
+
+# Guard parallel publications: two runs must never interleave gh-pages writes.
+concurrency:
+  group: converters-gh-pages
+  cancel-in-progress: false
 
 jobs:
   convert:
@@ -25,11 +30,30 @@ jobs:
           fetch-depth: 0
       - name: Resolve converters ref
         id: ref
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_REF: ${{ inputs.converters_ref }}
         run: |
-          REF="${{ inputs.converters_ref }}"
-          if [ -z "$REF" ]; then REF="v26.115.1"; fi
-          echo "ref=$REF" >> $GITHUB_OUTPUT
-          echo "Resolved $REF"
+          set -euo pipefail
+          REF="$INPUT_REF"
+          if [ -z "$REF" ]; then
+            # Auto-detect: latest upstream release (P0 item 4).
+            REF=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              https://api.github.com/repos/Koenkk/zigbee-herdsman-converters/releases/latest \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).tag_name))")
+          fi
+          if [ -z "$REF" ]; then
+            echo "::error::Could not resolve converters ref" && exit 1
+          fi
+          # Validate: tag must exist upstream, or be a full commit SHA.
+          if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "Resolved $REF (commit SHA, checkout will verify it)"
+          elif git ls-remote --tags --exit-code https://github.com/Koenkk/zigbee-herdsman-converters.git "refs/tags/$REF" > /dev/null; then
+            echo "Resolved $REF (upstream tag exists)"
+          else
+            echo "::error::converters ref $REF is neither a valid upstream tag nor a commit SHA" && exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           repository: Koenkk/zigbee-herdsman-converters
@@ -45,91 +69,54 @@ jobs:
           cache-dependency-path: hc/pnpm-lock.yaml
       - run: pnpm --dir hc install --frozen-lockfile
       - run: pnpm --dir hc run build
-      - name: Generate registry
-        run: node scripts/gen-registry.mjs hc/dist ${{ steps.ref.outputs.ref }}
-
-      - name: Verify built JavaScript
+      - name: Verify built JavaScript (JS only, no TS fallback)
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-
           files=(hc/dist/devices/*.js)
           count=${#files[@]}
-
           echo "Built JS files: $count"
-
           if (( count < 300 )); then
-            echo "::error::Expected at least 300 JS files, got $count"
+            echo "::error::Expected at least 300 JS files, got $count — build failed"
             exit 1
           fi
-
+          # P0: TypeScript must never be published as .js (import type / interfaces).
+          if grep -l "import type\|: DefinitionWithExtend\|: Fz\|: Tz\|interface " hc/dist/devices/*.js | head -5; then
+            echo "::error::Built JS still contains TypeScript syntax"
+            exit 1
+          fi
           for file in "${files[@]}"; do
             if ! node --check "$file" > /dev/null; then
               echo "::error file=$file::Invalid JavaScript syntax"
               exit 1
             fi
           done
-
           echo "Syntax OK: $count files"
-
-      - name: Copy device JS files (JS only, no TS fallback)
+      - name: Generate registry (upstream models-index is primary)
+        # Exits non-zero on any validation/smoke failure -> publish below never runs.
+        run: node scripts/gen-registry.mjs hc/dist ${{ steps.ref.outputs.ref }}
+      - name: Stage version + latest in one operation
         run: |
-          mkdir -p herdsman-converters/${{ steps.ref.outputs.ref }}
-          cp hc/dist/devices/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/
-          # Also copy converters lib JS for fromZigbee/toZigbee
-          mkdir -p herdsman-converters/${{ steps.ref.outputs.ref }}/lib
-          cp hc/dist/converters/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/lib/ 2>/dev/null || true
-          cp hc/dist/lib/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/lib/ 2>/dev/null || true
-          ls herdsman-converters/${{ steps.ref.outputs.ref }}/ | wc -l
-          cat herdsman-converters/registry.json | head -5
-          mv herdsman-converters/registry.json herdsman-converters/${{ steps.ref.outputs.ref }}/registry.json
-      - name: Publish to gh-pages
+          set -euo pipefail
+          REF="${{ steps.ref.outputs.ref }}"
+          mkdir -p "herdsman-converters/$REF"
+          # registry.json is already written there by gen-registry.mjs (validated)
+          test -f "herdsman-converters/$REF/registry.json"
+          cp hc/dist/devices/*.js "herdsman-converters/$REF/"
+          mkdir -p "herdsman-converters/$REF/lib"
+          cp hc/dist/converters/*.js "herdsman-converters/$REF/lib/" 2>/dev/null || true
+          cp hc/dist/lib/*.js "herdsman-converters/$REF/lib/" 2>/dev/null || true
+          rm -rf herdsman-converters/latest
+          cp -r "herdsman-converters/$REF" herdsman-converters/latest
+          echo "$REF" > herdsman-converters/latest/VERSION
+          echo "Files in $REF: $(ls "herdsman-converters/$REF" | wc -l)"
+          test -f herdsman-converters/latest/registry.json
+          test -f herdsman-converters/latest/VERSION
+      - name: Publish to gh-pages (single operation)
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./herdsman-converters
           destination_dir: herdsman-converters
           keep_files: true
-
-      - name: Update latest pointer
-        shell: bash
-        env:
-          REF: ${{ steps.ref.outputs.ref }}
-        run: |
-          set -euo pipefail
-
-          # Fetch the branch after the publish action
-          git fetch origin gh-pages
-
-          # Create an isolated worktree
-          PAGES_DIR="$(mktemp -d "$RUNNER_TEMP/gh-pages.XXXXXX")"
-          git worktree add --detach "$PAGES_DIR" origin/gh-pages
-
-          # Replace only the latest directory
-          LATEST="$PAGES_DIR/herdsman-converters/latest"
-          SOURCE="herdsman-converters/$REF"
-
-          test -d "$SOURCE"
-
-          rm -rf "$LATEST"
-          mkdir -p "$LATEST"
-          cp -a "$SOURCE/." "$LATEST/"
-
-          printf '%s\n' "$REF" > "$LATEST/VERSION"
-
-          # Configure Git
-          git -C "$PAGES_DIR" config user.name "github-actions[bot]"
-          git -C "$PAGES_DIR" config user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git -C "$PAGES_DIR" add -A herdsman-converters/latest
-
-          if git -C "$PAGES_DIR" diff --cached --quiet; then
-            echo "Latest already up to date"
-            exit 0
-          fi
-
-          git -C "$PAGES_DIR" commit -m "Update latest -> $REF"
-          git -C "$PAGES_DIR" push origin HEAD:gh-pages
-
