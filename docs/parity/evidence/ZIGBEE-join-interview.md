@@ -15,28 +15,27 @@ Parity for device join (EndDeviceAnnceInd), address resolution, interview (Activ
 4. Quirks: Tuya, Control4, Xiaomi lumi, etc. — on fail still Successful if modelID matches
 5. Join filtering: blocklist/passlist in settings (lib/util/settings.ts) — filtered before interview
 
-## Rust mapping
-- src/bridge.rs: DeviceJoined (EndDeviceAnnceInd), AddressResolved (IeeeAddrRsp/TcDevInd), ActiveEpRsp → requestSimpleDesc, SimpleDescRsp → push EndpointDesc → interview_complete=true (on first EP) → requestBind for output clusters → ZCL read Basic 0x0004/0x0005/0x0007/0x4000
-- spawn_interview_retry: 3 attempts x 20s polling interview_complete
-- device_allowed() blocklist/passlist (added d1179ff) — matches upstream settings
-- interview_complete stored per Device, persisted via database (not yet NV backup)
+## Rust mapping (2026-11-02)
+- `src/bridge.rs: DeviceJoined` (EndDeviceAnnceInd), `AddressResolved` (IeeeAddrRsp/TcDevInd), `NodeDescRsp` (0x82) → store `manufacturer_id` + `powerSource` mapping, then `ActiveEpRsp` → store `interview_expected_eps`, `SimpleDescRsp` → push `EndpointDesc` → `interview_complete` only when all expected EPs received → `requestBind` for output clusters → ZCL read Basic 0x0004/0x0005/0x0007/0x4000
+- `spawn_interview_retry`: 3 attempts x 20s, now `request_node_desc` first, fallback to `ActiveEp` (quirks)
+- `device_allowed()` blocklist/passlist (d1179ff) + `Device.database_id` + `PersistentDatabase` wired (c79faa8/71e8f7d) — persisted via `sync_devices` + 500ms debounce
 
-## Gaps
-- No node descriptor (ZDO 0x02) — upstream requires it before endpoints
-- No power source / modelID quirks — Tuya/Control4 etc. not handled
-- Interview marked complete on first endpoint, not all — 2-ep thermostat incomplete
-- No ZDO simple desc for all endpoints tracking (expected count)
-- No retry for Basic read / no IAS enroll
-- No persistence of interviewState (only bool)
+## Implementation 2026-11-02
+- Added ZDO `NODE_DESC_REQ` 0x02 + `NodeDescRsp` (0x82) with `manufacturer_code/logical_type`, `ZnpEvent::NodeDescRsp`, `CoordinatorEvent::NodeDescRsp`, `ZnpHandle::request_node_desc`, `Device.manufacturer_id` + `interview_expected_eps`
+- Fixed multi-EP interview: `ActiveEpRsp` stores expected list, `SimpleDescRsp` checks `all(expected EPs present)` before marking complete (was first EP)
+- Added `Device.database_id` and `PersistentDatabase` debounced write (500ms) + final flush
 
 ## Tests
-- Existing: spawn_interview_retry not unit-tested; event pump mocked not available
-- Plan: add unit test for Device interview_complete transition, blocklist filter, endpoint suffix logic
+- `commands::tests::node_desc_req_format`, `parse_node_desc_rsp` (2 new)
+- Existing: `spawn_interview_retry` not unit-tested; event pump mocked not available — plan unit test for Device interview_complete transition
 
 ## Hardware
 - HARDWARE_PENDING — join/interview requires real device; simulated ZNP frames only test parsing
 
-## Next
-- Implement node descriptor ZDO (0x02) and store manufacturerID/type
-- Track expected endpoint count, mark complete after all SimpleDescRsp
-- Add quirks for Tuya modelID TS* (minimal)
+## Still not as original (2026-11-02)
+- No `PowerDescriptor` read, no `SimpleDescriptor` for all EPs with full `clusters/binds` preservation beyond `inClusterList/outClusterList`
+- No `genBasic` reads for `modelID/manufacturerName` retries (6 attempts) as in `interviewInternal` — we read Basic only once per EP
+- No `interviewQuirks` for Tuya `TS*`/`_TZ*`, Control4 `0xabcd`, Xiaomi `lumi*` etc. — upstream would mark Successful despite failure, we mark Failed
+- No `IAS enroll` or `binding/reporting` setup after interview (upstream does via `configure` extension)
+- `interviewState` only `SUCCESSFUL/FAILED` (bool), not `Pending/InProgress` + `checkinInterval/gpSecurityKey` updates
+- No `Device.save()` debounce granular per-endpoint, only per-device batching via `persist_database`

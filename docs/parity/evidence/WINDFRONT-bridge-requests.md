@@ -48,11 +48,25 @@ Phase C2: reporting read/configure, OTA stubs, touchlink/install_code stubs, con
 - Topics are "<base_topic>/bridge/response/<request>" with same subpath
 - All requests are MQTT retained false, QoS 1
 
+## Implementation 2026-11-01/02
+- Fixed `bridge/request` parsing: `rsplit('/')` → full path after `base_topic/bridge/request/`, wildcard `bridge/request/#` subscription (was 25% → now all 34)
+- Added 26 handlers with `status/data/transaction/error` shape (utils.getResponse parity): `device/rename|remove|options|configure|generate_external_definition|interview|bind|unbind|binds/clear|reporting/*`, `group/add|remove|rename|options|members/*`, `options`, `backup`, `touchlink/*`, `install_code`, `converter/*`, `extension/*`, `action`, `ota_update/*`, `health_check|coordinator_check|networkmap`
+- `src/groups.rs` GroupRegistry (DashMap, `publish_bridge_groups` on `bridge/groups`), `Bridge` holds `Arc<GroupRegistry>`, `Config.groups` + `Config.save()` with `!secret`/separate-file handling, `PersistentDatabase` now syncs groups (members) + yaml friendly_name
+- `bridge/logging` fixed to `{level,message,namespace:"z2m"}` as in `bridge.ts:bridgeLogging`
+
 ## Tests
-- Unit: parse request path, subscribe wildcard, response shape
-- Integration: mock MQTT, send windfront-like JSON, assert bridge/response published
+- `cargo test` 211 lib +30 compat pass, `cargo check` pass, `cargo clippy` 0; manual `mosquitto_pub/sub` smoke for `device/rename|remove` and `group/add`
+- Unit: parse request path, subscribe wildcard, response shape — still need integration mock for each of 34 requests
+
+## Still not as original (2026-11-02)
+- `group/*` and `device/*` handlers are stubs returning `{status:ok, data:{}}` without real Zigbee action (no `herdsman` `addToGroup`, `configure`, `OTA`); UI shows success but device not actually configured/bound — acceptable for 90% UI, not for functional parity
+- `bridge/info` minimal (version/coordinator/log_level/permit_join) vs upstream full `network`/`config`/`coordinator` details — windfront BridgeInfo may show missing fields
+- `bridge/networkmap` returns nodes only, no `links` LQI graph (upstream LQI scan)
+- `bridge/logging` only on `DeviceJoined/Left` and `permit_join`, not all `zh:zstack`/`z2m` namespaces as in `bridge.ts:bridgeLogging` + `EventTransport`
+- `converter/extension` save/remove only stub `ok`, no file I/O as in `externalConverters.ts`
+- No `touchlink` real Zigbee scan/identify (requires hardware, stub ok)
+- OTA `check/update` stub, no `zigbee-herdsman-converters` OTA integration
 
 ## Open questions
-- OTA and touchlink require hardware — stub ok for UI at 90%?
-- Groups persistence — zigbee2mqtt stores groups in configuration.yaml + state.json; Rust currently no groups inventory → need GroupRegistry
-- External converters/extensions — file-based, not yet implemented → stub error response acceptable for 90% if UI shows error gracefully
+- OTA and touchlink require hardware — stub ok for UI at 90% as above, but need `HARDWARE_PENDING` for real OTA
+- External converters/extensions — file-based, stub error response acceptable for 90% if UI shows error gracefully, but need file persistence for 100%

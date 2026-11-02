@@ -47,21 +47,28 @@ Verify Z-Stack init parity for CC2531 (HA 1.2, product_id 0) and CC2652P (Dongle
 | Timeout 10s | VERIFIED | matches AGENTS.md |
 | Subsystem 0x00 fallback | VERIFIED | transport dispatch |
 
+## Implementation 2026-11-01/02
+- Added `sys_ping` (3 attempts) before version, `STARTUP_OPTION` + `APS_USE_EXT_PANID` NV writes, `sys_ping` and NV ID tests
+- Transport already had 10s timeout and 0x00 fallback (VERIFIED), FCS resync 1 byte (VERIFIED)
+
 ## Tests covering
-- frame::tests:: unknown_subsystem_not_discarded
-- frame::tests:: fcs_mismatch_resyncs_on_next_byte
-- commands::tests:: nv_write_format, bdb_set_channel, etc. (6 tests)
-- New: sys_ping builder (added), NV STARTUP_OPTION/APS_USE_EXT_PANID serialization
+- frame::tests:: unknown_subsystem_not_discarded, fcs_mismatch_resyncs_on_next_byte (VERIFIED)
+- commands::tests:: nv_write_format, bdb_set_channel (6 tests) + new sys_ping, NV IDs (2)
+- Total 8 ZNP tests passing
 
 ## Hardware-in-loop
-- HADWARE_PENDING — CC2531 and CC2652P not available in CI. Protocol verification via codec/transport unit tests only.
+- HARDWARE_PENDING — CC2531 and CC2652P not available in CI. Protocol verification via codec/transport unit tests only.
 
-## Open questions / divergences
-- NIB/backup strategy divergence is largest gap; fixing requires NV read path and database/backup integration.
-- bdbStartCommissioning vs startupFromApp for Z-Stack 3.x commissioning needs ZDO stateChangeInd waiter.
-- Version fallback to 1.2 on SYS version failure not implemented (Rust currently errors).
+## Still not as original (2026-11-02)
+- NIB/backup `determineStrategy` not implemented — Rust always rewrites NV and does `startupFromApp`, no NIB read, no backup restore, no `hasConfigured` check (upstream decides `startup` vs `restoreBackup` vs `startCommissioning`)
+- `bdbStartCommissioning` (0x04, wait 100s) not implemented — Rust uses `startupFromApp` for both 1.2 and 3.x; 3.x new network commissioning will not match upstream
+- NIB settle (3s poll x10) + `extNwkInfo` PAN ID collision check not implemented
+- `hasConfigured` flag and `clearAdapter` (STARTUP_OPTION 0x03 → reset) not implemented — only soft reset
+- Endpoint registration: single EP1 vs upstream `Endpoints` list + `activeEp` query + `addToGroup(242)`
+- `startupFromApp` no `stateChangeInd` waiter (60s/100s) — only SRSP check + 1s sleep
+- Version fallback to 1.2 on `SYS version` failure not implemented — Rust errors instead of assuming 1.2
+- `ZDO_DIRECT_CB` etc. written, but `STARTUP_OPTION` 0x00 only, not handling commissioning vs startup distinction
 
-## Next steps
-- Add NIB read + strategy decision (requires NV read commands).
-- Add startupFromApp stateChangeInd waiter (60s/100s).
-- Expand endpoint registration to upstream Endpoints list.
+## Open questions
+- NIB read requires `SYS_OSAL_NV_READ` (not yet implemented) — need to add NV read path
+- Endpoint list for CC2652P may differ from CC2531 — need hardware to verify
