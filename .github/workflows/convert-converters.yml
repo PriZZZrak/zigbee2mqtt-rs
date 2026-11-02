@@ -91,20 +91,45 @@ jobs:
           publish_dir: ./herdsman-converters
           destination_dir: herdsman-converters
           keep_files: true
+
       - name: Update latest pointer
+        shell: bash
+        env:
+          REF: ${{ steps.ref.outputs.ref }}
         run: |
-          git fetch origin gh-pages || true
-          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
-            git checkout gh-pages
-          else
-            git checkout --orphan gh-pages
-            git rm -rf . || true
-            mkdir -p herdsman-converters
+          set -euo pipefail
+
+          # Fetch the branch after the publish action
+          git fetch origin gh-pages
+
+          # Create an isolated worktree
+          PAGES_DIR="$(mktemp -d "$RUNNER_TEMP/gh-pages.XXXXXX")"
+          git worktree add --detach "$PAGES_DIR" origin/gh-pages
+
+          # Replace only the latest directory
+          LATEST="$PAGES_DIR/herdsman-converters/latest"
+          SOURCE="herdsman-converters/$REF"
+
+          test -d "$SOURCE"
+
+          rm -rf "$LATEST"
+          mkdir -p "$LATEST"
+          cp -a "$SOURCE/." "$LATEST/"
+
+          printf '%s\n' "$REF" > "$LATEST/VERSION"
+
+          # Configure Git
+          git -C "$PAGES_DIR" config user.name "github-actions[bot]"
+          git -C "$PAGES_DIR" config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git -C "$PAGES_DIR" add -A herdsman-converters/latest
+
+          if git -C "$PAGES_DIR" diff --cached --quiet; then
+            echo "Latest already up to date"
+            exit 0
           fi
-          mkdir -p herdsman-converters
-          rm -rf herdsman-converters/latest
-          cp -r herdsman-converters/${{ steps.ref.outputs.ref }} herdsman-converters/latest
-          echo "${{ steps.ref.outputs.ref }}" > herdsman-converters/latest/VERSION
-          git add herdsman-converters/latest
-          git commit -m "Update latest -> ${{ steps.ref.outputs.ref }}" || true
-          git push origin gh-pages
+
+          git -C "$PAGES_DIR" commit -m "Update latest -> $REF"
+          git -C "$PAGES_DIR" push origin HEAD:gh-pages
+
