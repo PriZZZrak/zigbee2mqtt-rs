@@ -35,11 +35,16 @@ jobs:
           repository: Koenkk/zigbee-herdsman-converters
           ref: ${{ steps.ref.outputs.ref }}
           path: hc
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --prefix hc
-      - run: npm run build --prefix hc
+          cache: pnpm
+          cache-dependency-path: hc/pnpm-lock.yaml
+      - run: pnpm --dir hc install --frozen-lockfile
+      - run: pnpm --dir hc run build
       - name: Generate registry
         run: node scripts/gen-registry.mjs hc/dist ${{ steps.ref.outputs.ref }}
       - name: Publish to gh-pages
