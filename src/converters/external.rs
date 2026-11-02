@@ -21,6 +21,39 @@ impl ExternalConverter {
         std::fs::read_to_string(&file).ok()
     }
 
+    pub async fn fetch_registry(&self) -> Option<serde_json::Value> {
+        let path = self.registry_path();
+        // Try local cache first (24h)
+        if let Ok(meta) = std::fs::metadata(&path) {
+            if let Ok(mtime) = meta.modified() {
+                if mtime.elapsed().map(|d| d.as_secs() < 86400).unwrap_or(false) {
+                    if let Ok(c) = std::fs::read_to_string(&path) {
+                        if let Ok(v) = serde_json::from_str(&c) { return Some(v); }
+                    }
+                }
+            }
+        }
+        let url = format!("{}/registry.json", self.registry_url.trim_end_matches('/'));
+        // Try curl/wget/uclient-fetch without extra Rust deps (pure Rust, no ring)
+        for prog in ["curl", "wget", "uclient-fetch"] {
+            let out = match prog {
+                "curl" => tokio::process::Command::new("curl").arg("-fsSL").arg(&url).output().await.ok(),
+                "wget" => tokio::process::Command::new("wget").arg("-qO-").arg(&url).output().await.ok(),
+                _ => tokio::process::Command::new("uclient-fetch").arg("-qO-").arg(&url).output().await.ok(),
+            };
+            if let Some(o) = out {
+                if o.status.success() {
+                    if let Ok(text) = String::from_utf8(o.stdout) {
+                        let _ = std::fs::write(&path, &text);
+                        if let Ok(v) = serde_json::from_str(&text) { return Some(v); }
+                    }
+                }
+            }
+        }
+        warn!("registry fetch failed for {}", url);
+        None
+    }
+
     pub fn eval(&self, js: &str, data: &[u8]) -> Option<serde_json::Value> {
         let mut ctx = Context::default();
         let src = Source::from_bytes(js.as_bytes());
