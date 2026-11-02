@@ -1,0 +1,57 @@
+name: Convert herdsman-converters
+on:
+  schedule:
+    - cron: '0 3 * * 1' # weekly Monday 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      converters_ref:
+        description: 'herdsman-converters tag/commit (e.g. v26.115.1)'
+        required: false
+        default: 'v26.115.1'
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'converters-v*'
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve converters ref
+        id: ref
+        run: |
+          REF="${{ inputs.converters_ref }}"
+          if [ -z "$REF" ]; then REF="v26.115.1"; fi
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "Resolved $REF"
+      - uses: actions/checkout@v4
+        with:
+          repository: Koenkk/zigbee-herdsman-converters
+          ref: ${{ steps.ref.outputs.ref }}
+          path: /tmp/hc
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix /tmp/hc
+      - run: npm run build --prefix /tmp/hc
+      - name: Generate registry
+        run: node scripts/gen-registry.mjs /tmp/hc/dist ${{ steps.ref.outputs.ref }}
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./herdsman-converters
+          destination_dir: herdsman-converters/${{ steps.ref.outputs.ref }}
+      - name: Update latest symlink
+        run: |
+          git checkout gh-pages
+          ln -sfn ${{ steps.ref.outputs.ref }} herdsman-converters/latest
+          git add herdsman-converters/latest
+          git commit -m "Update latest -> ${{ steps.ref.outputs.ref }}" || true
+          git push origin gh-pages

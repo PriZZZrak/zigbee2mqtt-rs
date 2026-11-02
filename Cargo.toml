@@ -26,6 +26,7 @@ serde_yml = "0.0.12"
 
 # MQTT — disable default TLS feature (uses ring/C); we connect over plain TCP
 rumqttc = { version = "0.24", default-features = false }
+boa_engine = { version = "0.19", default-features = false }
 
 # Byte buffers
 bytes = "1"
