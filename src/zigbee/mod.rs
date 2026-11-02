@@ -1,3 +1,4 @@
+pub mod reporting;
 pub mod zcl;
 
 use serde::{Deserialize, Serialize};
