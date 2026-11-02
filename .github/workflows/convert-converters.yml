@@ -47,12 +47,31 @@ jobs:
       - run: pnpm --dir hc run build
       - name: Generate registry
         run: node scripts/gen-registry.mjs hc/dist ${{ steps.ref.outputs.ref }}
+      - name: Copy device JS files
+        run: |
+          mkdir -p herdsman-converters/${{ steps.ref.outputs.ref }}
+          # Copy built JS if dist exists, otherwise TS as JS fallback
+          if [ -d hc/dist/devices ]; then
+            cp hc/dist/devices/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/ 2>/dev/null || true
+          fi
+          # Also ensure .ts as .js fallback for boa (TS is close to JS)
+          for f in hc/src/devices/*.ts; do
+            base=$(basename "$f" .ts)
+            if [ ! -f herdsman-converters/${{ steps.ref.outputs.ref }}/$base.js ]; then
+              cp "$f" herdsman-converters/${{ steps.ref.outputs.ref }}/$base.js
+            fi
+            cp "$f" herdsman-converters/${{ steps.ref.outputs.ref }}/$base.ts 2>/dev/null || true
+          done
+          ls herdsman-converters/${{ steps.ref.outputs.ref }}/ | wc -l
+          cat herdsman-converters/registry.json | head -5
+          mv herdsman-converters/registry.json herdsman-converters/${{ steps.ref.outputs.ref }}/registry.json
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./herdsman-converters
-          destination_dir: herdsman-converters/${{ steps.ref.outputs.ref }}
+          destination_dir: herdsman-converters
+          keep_files: true
       - name: Update latest pointer
         run: |
           git fetch origin gh-pages || true
