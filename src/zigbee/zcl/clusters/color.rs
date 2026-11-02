@@ -138,7 +138,7 @@ pub fn move_to_color_xy_payload(sequence: u8, x: f64, y: f64, transition: u16) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::zigbee::zcl::attribute::{AttributeValue, AttributeReport};
+    use crate::zigbee::zcl::attribute::{AttributeReport, AttributeValue};
 
     #[test]
     fn color_temp_report() {
@@ -147,7 +147,9 @@ mod tests {
             value: AttributeValue::U16(370),
         }];
         let result = ColorCluster.process_reports(&reports);
-        assert!(result.iter().any(|(k, v)| k == "color_temp" && v == &json!(370)));
+        assert!(result
+            .iter()
+            .any(|(k, v)| k == "color_temp" && v == &json!(370)));
     }
 
     #[test]
@@ -198,7 +200,9 @@ mod tests {
             value: AttributeValue::U8(2),
         }];
         let result = ColorCluster.process_reports(&reports);
-        assert!(result.iter().any(|(k, v)| k == "color_mode" && v == &json!("color_temp")));
+        assert!(result
+            .iter()
+            .any(|(k, v)| k == "color_mode" && v == &json!("color_temp")));
     }
 
     #[test]

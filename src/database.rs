@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use tracing::{debug, info, warn};
 use crate::config::DeviceConfig;
 use crate::devices::Device;
 use crate::groups::Group;
 use crate::zigbee::{EndpointDesc, IeeeAddr};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,7 +66,10 @@ struct DbEndpoint {
     meta: serde_json::Value,
 }
 
-pub fn load_database(path: &Path, device_configs: &HashMap<String, DeviceConfig>) -> (Vec<Device>, Option<IeeeAddr>) {
+pub fn load_database(
+    path: &Path,
+    device_configs: &HashMap<String, DeviceConfig>,
+) -> (Vec<Device>, Option<IeeeAddr>) {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
@@ -78,22 +81,41 @@ pub fn load_database(path: &Path, device_configs: &HashMap<String, DeviceConfig>
     let mut coordinator_ieee = None;
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() { continue; }
-        let entry: DbEntry = match serde_json::from_str(line) {
-            Ok(e) => e,
-            Err(e) => { debug!("Skipping unparseable database line: {e}"); continue; }
-        };
-        if entry.device_type == "Coordinator" {
-            if let Some(ieee) = parse_ieee(&entry.ieee_addr) { coordinator_ieee = Some(ieee); }
+        if line.is_empty() {
             continue;
         }
-        if entry.device_type == "Group" { continue; }
-        if entry.ieee_addr.is_empty() { continue; }
-        let ieee = match parse_ieee(&entry.ieee_addr) { Some(a) => a, None => { debug!("Skipping entry with invalid IEEE: {}", entry.ieee_addr); continue; } };
+        let entry: DbEntry = match serde_json::from_str(line) {
+            Ok(e) => e,
+            Err(e) => {
+                debug!("Skipping unparseable database line: {e}");
+                continue;
+            }
+        };
+        if entry.device_type == "Coordinator" {
+            if let Some(ieee) = parse_ieee(&entry.ieee_addr) {
+                coordinator_ieee = Some(ieee);
+            }
+            continue;
+        }
+        if entry.device_type == "Group" {
+            continue;
+        }
+        if entry.ieee_addr.is_empty() {
+            continue;
+        }
+        let ieee = match parse_ieee(&entry.ieee_addr) {
+            Some(a) => a,
+            None => {
+                debug!("Skipping entry with invalid IEEE: {}", entry.ieee_addr);
+                continue;
+            }
+        };
         let mut dev = Device::new(ieee, entry.nwk_addr);
         let ieee_hex = ieee.as_hex();
         if let Some(cfg) = device_configs.get(&ieee_hex) {
-            if let Some(ref name) = cfg.friendly_name { dev.friendly_name = name.clone(); }
+            if let Some(ref name) = cfg.friendly_name {
+                dev.friendly_name = name.clone();
+            }
             dev.disabled = cfg.disabled.unwrap_or(false);
         }
         dev.database_id = entry.id;
@@ -102,25 +124,56 @@ pub fn load_database(path: &Path, device_configs: &HashMap<String, DeviceConfig>
         dev.model = entry.model_id;
         dev.sw_build_id = entry.sw_build_id;
         // interviewState takes precedence, fallback to interviewCompleted
-        dev.interview_complete = entry.interview_state.as_deref().map(|s| s == "SUCCESSFUL").unwrap_or(entry.interview_completed.unwrap_or(false));
-        if let Some(mid) = entry.manuf_id { dev.manufacturer_id = Some(mid); }
+        dev.interview_complete = entry
+            .interview_state
+            .as_deref()
+            .map(|s| s == "SUCCESSFUL")
+            .unwrap_or(entry.interview_completed.unwrap_or(false));
+        if let Some(mid) = entry.manuf_id {
+            dev.manufacturer_id = Some(mid);
+        }
         for (ep_key, ep_data) in &entry.endpoints {
             let ep_id = ep_key.parse::<u8>().unwrap_or(ep_data.ep_id);
-            dev.endpoints.push(EndpointDesc { endpoint: ep_id, profile_id: ep_data.prof_id, device_id: ep_data.dev_id, input_clusters: ep_data.in_cluster_list.clone(), output_clusters: ep_data.out_cluster_list.clone() });
+            dev.endpoints.push(EndpointDesc {
+                endpoint: ep_id,
+                profile_id: ep_data.prof_id,
+                device_id: ep_data.dev_id,
+                input_clusters: ep_data.in_cluster_list.clone(),
+                output_clusters: ep_data.out_cluster_list.clone(),
+            });
         }
-        debug!("Imported device {} ({}), NWK=0x{:04X}, {} endpoints, interviewed={}", dev.friendly_name, ieee_hex, dev.nwk_addr, dev.endpoints.len(), dev.interview_complete);
+        debug!(
+            "Imported device {} ({}), NWK=0x{:04X}, {} endpoints, interviewed={}",
+            dev.friendly_name,
+            ieee_hex,
+            dev.nwk_addr,
+            dev.endpoints.len(),
+            dev.interview_complete
+        );
         devices.push(dev);
     }
     info!("Imported {} devices from {}", devices.len(), path.display());
     (devices, coordinator_ieee)
 }
 
-fn parse_ieee(s: &str) -> Option<IeeeAddr> { IeeeAddr::from_hex(s) }
+fn parse_ieee(s: &str) -> Option<IeeeAddr> {
+    IeeeAddr::from_hex(s)
+}
 
 pub fn find_database(config_path: &Path) -> Option<PathBuf> {
     let dir = config_path.parent().unwrap_or(Path::new("."));
-    let candidates = [dir.join("database.db"), dir.join("data/database.db"), Path::new("/opt/zigbee2mqtt/data/database.db").to_path_buf(), Path::new("/var/lib/zigbee2mqtt/database.db").to_path_buf()];
-    for path in &candidates { if path.exists() { info!("Found zigbee2mqtt database: {}", path.display()); return Some(path.clone()); } }
+    let candidates = [
+        dir.join("database.db"),
+        dir.join("data/database.db"),
+        Path::new("/opt/zigbee2mqtt/data/database.db").to_path_buf(),
+        Path::new("/var/lib/zigbee2mqtt/database.db").to_path_buf(),
+    ];
+    for path in &candidates {
+        if path.exists() {
+            info!("Found zigbee2mqtt database: {}", path.display());
+            return Some(path.clone());
+        }
+    }
     None
 }
 
@@ -139,52 +192,83 @@ impl PersistentDatabase {
         if let Ok(content) = std::fs::read_to_string(path) {
             for line in content.lines() {
                 let line = line.trim();
-                if line.is_empty() { continue; }
+                if line.is_empty() {
+                    continue;
+                }
                 match serde_json::from_str::<serde_json::Value>(line) {
                     Ok(v) => {
                         if let Some(id) = v.get("id").and_then(|x| x.as_u64()) {
                             let id = id as u32;
                             entries.insert(id, v);
-                            if id > max_id { max_id = id; }
+                            if id > max_id {
+                                max_id = id;
+                            }
                         }
                     }
-                    Err(e) => { tracing::error!("Corrupted database line, ignoring. {}", e); }
+                    Err(e) => {
+                        tracing::error!("Corrupted database line, ignoring. {}", e);
+                    }
                 }
             }
         }
-        Self { path: path.to_path_buf(), entries, max_id }
+        Self {
+            path: path.to_path_buf(),
+            entries,
+            max_id,
+        }
     }
 
-    pub fn new_id(&mut self) -> u32 { self.max_id += 1; self.max_id }
+    pub fn new_id(&mut self) -> u32 {
+        self.max_id += 1;
+        self.max_id
+    }
 
     pub fn insert(&mut self, entry: serde_json::Value) {
         if let Some(id) = entry.get("id").and_then(|x| x.as_u64()).map(|x| x as u32) {
-            if self.entries.contains_key(&id) { panic!("DatabaseEntry with ID '{}' already exists", id); }
+            if self.entries.contains_key(&id) {
+                panic!("DatabaseEntry with ID '{}' already exists", id);
+            }
             self.entries.insert(id, entry);
-            if id > self.max_id { self.max_id = id; }
+            if id > self.max_id {
+                self.max_id = id;
+            }
         }
     }
 
     pub fn update(&mut self, entry: serde_json::Value, write: bool) {
         if let Some(id) = entry.get("id").and_then(|x| x.as_u64()).map(|x| x as u32) {
-            if !self.entries.contains_key(&id) { panic!("DatabaseEntry with ID '{}' does not exist", id); }
+            if !self.entries.contains_key(&id) {
+                panic!("DatabaseEntry with ID '{}' does not exist", id);
+            }
             self.entries.insert(id, entry);
-            if write { self.write().unwrap(); }
+            if write {
+                self.write().unwrap();
+            }
         }
     }
 
     pub fn remove(&mut self, id: u32) {
-        if self.entries.remove(&id).is_some() { let _ = self.write(); } else { panic!("DatabaseEntry with ID '{}' does not exist", id); }
+        if self.entries.remove(&id).is_some() {
+            let _ = self.write();
+        } else {
+            panic!("DatabaseEntry with ID '{}' does not exist", id);
+        }
     }
 
     pub fn write(&self) -> std::io::Result<()> {
         let mut lines = String::new();
-        for entry in self.entries.values() { lines.push_str(&serde_json::to_string(entry).unwrap()); lines.push('\n'); }
+        for entry in self.entries.values() {
+            lines.push_str(&serde_json::to_string(entry).unwrap());
+            lines.push('\n');
+        }
         let tmp = format!("{}.tmp", self.path.display());
         let tmp_path = Path::new(&tmp);
         // handle existing tmp
         if tmp_path.exists() {
-            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
             let dated = format!("{}.{}", tmp, now);
             let _ = std::fs::rename(tmp_path, &dated);
             tracing::warn!("Found '{}' when writing database, indicating past write failure; renamed it to '{}'", tmp, dated);
@@ -194,7 +278,7 @@ impl PersistentDatabase {
         let mut f = std::fs::File::create(tmp_path)?;
         if !lines.is_empty() {
             // remove last newline to match upstream's slice(0,-1)
-            let to_write = &lines[..lines.len()-1];
+            let to_write = &lines[..lines.len() - 1];
             f.write_all(to_write.as_bytes())?;
         }
         f.sync_all()?;
@@ -207,12 +291,19 @@ impl PersistentDatabase {
         self.sync_devices_inner(devices, coordinator_ieee, true);
     }
 
-    fn sync_devices_inner(&mut self, devices: &[Device], coordinator_ieee: Option<IeeeAddr>, preserve_extra: bool) {
+    fn sync_devices_inner(
+        &mut self,
+        devices: &[Device],
+        coordinator_ieee: Option<IeeeAddr>,
+        preserve_extra: bool,
+    ) {
         // Preserve Coordinator, Group and GreenPower entries, update/insert devices
         let mut to_keep: HashMap<u32, serde_json::Value> = HashMap::new();
         for (id, v) in &self.entries {
             if let Some(t) = v.get("type").and_then(|x| x.as_str()) {
-                if t == "Coordinator" || t == "Group" || t == "GreenPower" { to_keep.insert(*id, v.clone()); }
+                if t == "Coordinator" || t == "Group" || t == "GreenPower" {
+                    to_keep.insert(*id, v.clone());
+                }
             }
         }
         // Rebuild device entries from Device objects, preserving ids and extra fields
@@ -228,63 +319,129 @@ impl PersistentDatabase {
             let id = dev.database_id.unwrap_or_else(|| {
                 // find unused id
                 let mut nid = self.max_id + 1;
-                while self.entries.contains_key(&nid) || used_ids.contains(&nid) { nid += 1; }
+                while self.entries.contains_key(&nid) || used_ids.contains(&nid) {
+                    nid += 1;
+                }
                 nid
             });
             used_ids.insert(id);
-            if id > self.max_id { self.max_id = id; }
+            if id > self.max_id {
+                self.max_id = id;
+            }
             let ep_list: Vec<u8> = dev.endpoints.iter().map(|e| e.endpoint).collect();
             let mut endpoints = serde_json::Map::new();
             for ep in &dev.endpoints {
-                endpoints.insert(ep.endpoint.to_string(), serde_json::json!({
-                    "profId": ep.profile_id,
-                    "epId": ep.endpoint,
-                    "devId": ep.device_id,
-                    "inClusterList": ep.input_clusters,
-                    "outClusterList": ep.output_clusters,
-                    "clusters": {},
-                    "binds": [],
-                    "configuredReportings": [],
-                    "meta": {}
-                }));
+                endpoints.insert(
+                    ep.endpoint.to_string(),
+                    serde_json::json!({
+                        "profId": ep.profile_id,
+                        "epId": ep.endpoint,
+                        "devId": ep.device_id,
+                        "inClusterList": ep.input_clusters,
+                        "outClusterList": ep.output_clusters,
+                        "clusters": {},
+                        "binds": [],
+                        "configuredReportings": [],
+                        "meta": {}
+                    }),
+                );
             }
             // Preserve extra fields from original if exists
             let orig = orig_by_ieee.get(&dev.ieee_addr.as_hex());
-            let meta = orig.and_then(|v| v.get("meta")).cloned().unwrap_or(json!({}));
-            let last_seen = orig.and_then(|v| v.get("lastSeen")).cloned().unwrap_or(serde_json::Value::Null);
-            let app_version = orig.and_then(|v| v.get("appVersion")).cloned().unwrap_or(serde_json::Value::Null);
-            let stack_version = orig.and_then(|v| v.get("stackVersion")).cloned().unwrap_or(serde_json::Value::Null);
-            let hw_version = orig.and_then(|v| v.get("hwVersion")).cloned().unwrap_or(serde_json::Value::Null);
-            let date_code = orig.and_then(|v| v.get("dateCode")).cloned().unwrap_or(serde_json::Value::Null);
-            let zcl_version = orig.and_then(|v| v.get("zclVersion")).cloned().unwrap_or(serde_json::Value::Null);
-            let checkin_interval = orig.and_then(|v| v.get("checkinInterval")).cloned().unwrap_or(serde_json::Value::Null);
-            let gp_security_key = orig.and_then(|v| v.get("gpSecurityKey")).cloned().unwrap_or(serde_json::Value::Null);
-            let scheduled_ota = orig.and_then(|v| v.get("scheduledOta")).cloned().unwrap_or(serde_json::Value::Null);
+            let meta = orig
+                .and_then(|v| v.get("meta"))
+                .cloned()
+                .unwrap_or(json!({}));
+            let last_seen = orig
+                .and_then(|v| v.get("lastSeen"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let app_version = orig
+                .and_then(|v| v.get("appVersion"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let stack_version = orig
+                .and_then(|v| v.get("stackVersion"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let hw_version = orig
+                .and_then(|v| v.get("hwVersion"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let date_code = orig
+                .and_then(|v| v.get("dateCode"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let zcl_version = orig
+                .and_then(|v| v.get("zclVersion"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let checkin_interval = orig
+                .and_then(|v| v.get("checkinInterval"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let gp_security_key = orig
+                .and_then(|v| v.get("gpSecurityKey"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let scheduled_ota = orig
+                .and_then(|v| v.get("scheduledOta"))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
             // Preserve original type if exists (Coordinator/Router/EndDevice/Unknown/GreenPower)
-            let orig_type = orig.and_then(|v| v.get("type").and_then(|x| x.as_str()).map(|s| s.to_string())).unwrap_or_else(|| if dev.power_source.as_deref() == Some("Battery") { "EndDevice".to_string() } else { "Router".to_string() });
+            let orig_type = orig
+                .and_then(|v| {
+                    v.get("type")
+                        .and_then(|x| x.as_str())
+                        .map(|s| s.to_string())
+                })
+                .unwrap_or_else(|| {
+                    if dev.power_source.as_deref() == Some("Battery") {
+                        "EndDevice".to_string()
+                    } else {
+                        "Router".to_string()
+                    }
+                });
             // Preserve original endpoints' clusters/binds if exists for that endpoint
             let mut endpoints_preserved = serde_json::Map::new();
             for ep in &dev.endpoints {
                 let ep_key = ep.endpoint.to_string();
                 let orig_ep = orig.and_then(|v| v.get("endpoints").and_then(|e| e.get(&ep_key)));
-                let clusters = orig_ep.and_then(|e| e.get("clusters")).cloned().unwrap_or(json!({}));
-                let binds = orig_ep.and_then(|e| e.get("binds")).cloned().unwrap_or(json!([]));
-                let configured = orig_ep.and_then(|e| e.get("configuredReportings")).cloned().unwrap_or(json!([]));
-                let ep_meta = orig_ep.and_then(|e| e.get("meta")).cloned().unwrap_or(json!({}));
-                endpoints_preserved.insert(ep_key, json!({
-                    "profId": ep.profile_id,
-                    "epId": ep.endpoint,
-                    "devId": ep.device_id,
-                    "inClusterList": ep.input_clusters,
-                    "outClusterList": ep.output_clusters,
-                    "clusters": clusters,
-                    "binds": binds,
-                    "configuredReportings": configured,
-                    "meta": ep_meta
-                }));
+                let clusters = orig_ep
+                    .and_then(|e| e.get("clusters"))
+                    .cloned()
+                    .unwrap_or(json!({}));
+                let binds = orig_ep
+                    .and_then(|e| e.get("binds"))
+                    .cloned()
+                    .unwrap_or(json!([]));
+                let configured = orig_ep
+                    .and_then(|e| e.get("configuredReportings"))
+                    .cloned()
+                    .unwrap_or(json!([]));
+                let ep_meta = orig_ep
+                    .and_then(|e| e.get("meta"))
+                    .cloned()
+                    .unwrap_or(json!({}));
+                endpoints_preserved.insert(
+                    ep_key,
+                    json!({
+                        "profId": ep.profile_id,
+                        "epId": ep.endpoint,
+                        "devId": ep.device_id,
+                        "inClusterList": ep.input_clusters,
+                        "outClusterList": ep.output_clusters,
+                        "clusters": clusters,
+                        "binds": binds,
+                        "configuredReportings": configured,
+                        "meta": ep_meta
+                    }),
+                );
             }
             // If orig had endpoints not in current Device.endpoints (e.g., 242), preserve them
-            if let Some(orig_eps) = orig.and_then(|v| v.get("endpoints").and_then(|e| e.as_object())) {
+            if let Some(orig_eps) =
+                orig.and_then(|v| v.get("endpoints").and_then(|e| e.as_object()))
+            {
                 for (k, v) in orig_eps {
                     if !endpoints_preserved.contains_key(k) {
                         endpoints_preserved.insert(k.clone(), v.clone());
@@ -308,14 +465,30 @@ impl PersistentDatabase {
                 "lastSeen": last_seen
             });
             // Preserve version fields if orig has them
-            if !app_version.is_null() { entry["appVersion"] = app_version; }
-            if !stack_version.is_null() { entry["stackVersion"] = stack_version; }
-            if !hw_version.is_null() { entry["hwVersion"] = hw_version; }
-            if !date_code.is_null() { entry["dateCode"] = date_code; }
-            if !zcl_version.is_null() { entry["zclVersion"] = zcl_version; }
-            if !checkin_interval.is_null() { entry["checkinInterval"] = checkin_interval; }
-            if !gp_security_key.is_null() { entry["gpSecurityKey"] = gp_security_key; }
-            if !scheduled_ota.is_null() { entry["scheduledOta"] = scheduled_ota; }
+            if !app_version.is_null() {
+                entry["appVersion"] = app_version;
+            }
+            if !stack_version.is_null() {
+                entry["stackVersion"] = stack_version;
+            }
+            if !hw_version.is_null() {
+                entry["hwVersion"] = hw_version;
+            }
+            if !date_code.is_null() {
+                entry["dateCode"] = date_code;
+            }
+            if !zcl_version.is_null() {
+                entry["zclVersion"] = zcl_version;
+            }
+            if !checkin_interval.is_null() {
+                entry["checkinInterval"] = checkin_interval;
+            }
+            if !gp_security_key.is_null() {
+                entry["gpSecurityKey"] = gp_security_key;
+            }
+            if !scheduled_ota.is_null() {
+                entry["scheduledOta"] = scheduled_ota;
+            }
             // Preserve any other extra fields not explicitly handled
             if let Some(orig) = orig {
                 for (k, v) in orig.as_object().unwrap() {
@@ -328,7 +501,9 @@ impl PersistentDatabase {
         }
         // Ensure Coordinator exists if we have one
         if let Some(coord) = coordinator_ieee {
-            let has_coord = to_keep.values().any(|v| v.get("type").and_then(|x| x.as_str()) == Some("Coordinator"));
+            let has_coord = to_keep
+                .values()
+                .any(|v| v.get("type").and_then(|x| x.as_str()) == Some("Coordinator"));
             if !has_coord {
                 let cid = 1;
                 if !to_keep.contains_key(&cid) {
@@ -344,7 +519,9 @@ impl PersistentDatabase {
                         "interviewState": "SUCCESSFUL",
                         "meta": {}
                     }));
-                    if cid > self.max_id { self.max_id = cid; }
+                    if cid > self.max_id {
+                        self.max_id = cid;
+                    }
                 }
             }
         }
@@ -353,17 +530,32 @@ impl PersistentDatabase {
 
     pub fn sync_groups(&mut self, groups: &[Group]) {
         // Remove old Group entries and re-add from registry
-        self.entries.retain(|_, v| v.get("type").and_then(|x| x.as_str()) != Some("Group"));
+        self.entries
+            .retain(|_, v| v.get("type").and_then(|x| x.as_str()) != Some("Group"));
         for g in groups {
             // Find existing entry by groupID or create new id
-            let existing_id = self.entries.iter().find(|(_, v)| v.get("groupID").and_then(|x| x.as_u64()).map(|x| x as u16) == Some(g.id)).map(|(k,_)| *k);
+            let existing_id = self
+                .entries
+                .iter()
+                .find(|(_, v)| {
+                    v.get("groupID").and_then(|x| x.as_u64()).map(|x| x as u16) == Some(g.id)
+                })
+                .map(|(k, _)| *k);
             let id = existing_id.unwrap_or_else(|| {
                 let mut nid = self.max_id + 1;
-                while self.entries.contains_key(&nid) { nid += 1; }
+                while self.entries.contains_key(&nid) {
+                    nid += 1;
+                }
                 nid
             });
-            if id > self.max_id { self.max_id = id; }
-            let members: Vec<_> = g.members.iter().map(|m| serde_json::json!({"ieeeAddr": m.ieee_address, "endpoint": m.endpoint})).collect();
+            if id > self.max_id {
+                self.max_id = id;
+            }
+            let members: Vec<_> = g
+                .members
+                .iter()
+                .map(|m| serde_json::json!({"ieeeAddr": m.ieee_address, "endpoint": m.endpoint}))
+                .collect();
             let entry = serde_json::json!({
                 "id": id,
                 "type": "Group",
@@ -378,18 +570,34 @@ impl PersistentDatabase {
     pub fn load_groups(&self) -> Vec<Group> {
         let mut groups = Vec::new();
         for v in self.entries.values() {
-            if v.get("type").and_then(|x| x.as_str()) != Some("Group") { continue; }
+            if v.get("type").and_then(|x| x.as_str()) != Some("Group") {
+                continue;
+            }
             if let Some(gid) = v.get("groupID").and_then(|x| x.as_u64()).map(|x| x as u16) {
-                let members = v.get("members").and_then(|x| x.as_array()).map(|arr| {
-                    arr.iter().filter_map(|m| {
-                        let ieee = m.get("ieeeAddr").and_then(|x| x.as_str())?.to_string();
-                        let ep = m.get("endpoint").and_then(|x| x.as_u64()).unwrap_or(1) as u8;
-                        Some(crate::groups::GroupMember{ ieee_address: ieee, endpoint: ep })
-                    }).collect()
-                }).unwrap_or(Vec::new());
+                let members = v
+                    .get("members")
+                    .and_then(|x| x.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|m| {
+                                let ieee = m.get("ieeeAddr").and_then(|x| x.as_str())?.to_string();
+                                let ep =
+                                    m.get("endpoint").and_then(|x| x.as_u64()).unwrap_or(1) as u8;
+                                Some(crate::groups::GroupMember {
+                                    ieee_address: ieee,
+                                    endpoint: ep,
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or(Vec::new());
                 // Upstream stores friendly_name only in configuration.yaml, not in DB — use placeholder, Bridge will overlay from Config
                 let fname = format!("group_{}", gid);
-                let mut g = Group { id: gid, friendly_name: fname, members: Vec::new() };
+                let mut g = Group {
+                    id: gid,
+                    friendly_name: fname,
+                    members: Vec::new(),
+                };
                 g.members = members;
                 groups.push(g);
             }
@@ -409,8 +617,20 @@ mod tests {
 
     fn sample_configs() -> HashMap<String, DeviceConfig> {
         let mut m = HashMap::new();
-        m.insert("0xec1bbdfffeaa66db".to_string(), DeviceConfig { friendly_name: Some("living_room_bulb".to_string()), ..Default::default() });
-        m.insert("0xcc86ecfffe9fd1b1".to_string(), DeviceConfig { friendly_name: Some("bedroom_sensor".to_string()), ..Default::default() });
+        m.insert(
+            "0xec1bbdfffeaa66db".to_string(),
+            DeviceConfig {
+                friendly_name: Some("living_room_bulb".to_string()),
+                ..Default::default()
+            },
+        );
+        m.insert(
+            "0xcc86ecfffe9fd1b1".to_string(),
+            DeviceConfig {
+                friendly_name: Some("bedroom_sensor".to_string()),
+                ..Default::default()
+            },
+        );
         m
     }
 
@@ -444,7 +664,10 @@ mod tests {
     #[test]
     fn device_ieee_and_nwk() {
         let (devices, _) = load_sample();
-        let bulb = devices.iter().find(|d| d.friendly_name == "living_room_bulb").unwrap();
+        let bulb = devices
+            .iter()
+            .find(|d| d.friendly_name == "living_room_bulb")
+            .unwrap();
         assert_eq!(bulb.ieee_addr.as_hex(), "0xec1bbdfffeaa66db");
         assert_eq!(bulb.nwk_addr, 44718);
     }
@@ -460,7 +683,10 @@ mod tests {
     #[test]
     fn manufacturer_and_model_imported() {
         let (devices, _) = load_sample();
-        let bulb = devices.iter().find(|d| d.friendly_name == "living_room_bulb").unwrap();
+        let bulb = devices
+            .iter()
+            .find(|d| d.friendly_name == "living_room_bulb")
+            .unwrap();
         assert_eq!(bulb.manufacturer.as_deref(), Some("IKEA of Sweden"));
         assert_eq!(bulb.model.as_deref(), Some("TRADFRI bulb E27 CWS 806lm"));
         assert_eq!(bulb.sw_build_id.as_deref(), Some("2.3.093"));
@@ -469,7 +695,10 @@ mod tests {
     #[test]
     fn endpoints_imported() {
         let (devices, _) = load_sample();
-        let bulb = devices.iter().find(|d| d.friendly_name == "living_room_bulb").unwrap();
+        let bulb = devices
+            .iter()
+            .find(|d| d.friendly_name == "living_room_bulb")
+            .unwrap();
         assert_eq!(bulb.endpoints.len(), 1);
         let ep = &bulb.endpoints[0];
         assert_eq!(ep.endpoint, 1);
@@ -482,7 +711,10 @@ mod tests {
     #[test]
     fn sensor_endpoints() {
         let (devices, _) = load_sample();
-        let sensor = devices.iter().find(|d| d.friendly_name == "bedroom_sensor").unwrap();
+        let sensor = devices
+            .iter()
+            .find(|d| d.friendly_name == "bedroom_sensor")
+            .unwrap();
         let ep = &sensor.endpoints[0];
         assert!(ep.input_clusters.contains(&0x0402));
         assert!(ep.input_clusters.contains(&0x0405));
@@ -498,7 +730,10 @@ mod tests {
     #[test]
     fn power_source_imported() {
         let (devices, _) = load_sample();
-        let sensor = devices.iter().find(|d| d.friendly_name == "bedroom_sensor").unwrap();
+        let sensor = devices
+            .iter()
+            .find(|d| d.friendly_name == "bedroom_sensor")
+            .unwrap();
         assert_eq!(sensor.power_source.as_deref(), Some("Battery"));
         assert_eq!(sensor.device_type(), "EndDevice");
     }
@@ -506,7 +741,10 @@ mod tests {
     #[test]
     fn device_type_from_power_source() {
         let (devices, _) = load_sample();
-        let bulb = devices.iter().find(|d| d.friendly_name == "living_room_bulb").unwrap();
+        let bulb = devices
+            .iter()
+            .find(|d| d.friendly_name == "living_room_bulb")
+            .unwrap();
         assert_eq!(bulb.power_source.as_deref(), Some("Mains (single phase)"));
         assert_eq!(bulb.device_type(), "Router");
     }
@@ -570,7 +808,10 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("database.db");
         let mut db = PersistentDatabase::open(&path);
-        let dev = Device::new(crate::zigbee::IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap(), 0x1234);
+        let dev = Device::new(
+            crate::zigbee::IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap(),
+            0x1234,
+        );
         // dev.interview_complete false by default -> should write FAILED
         db.sync_devices(&[dev.clone()], None);
         db.write().unwrap();

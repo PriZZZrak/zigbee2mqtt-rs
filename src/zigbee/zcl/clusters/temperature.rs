@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use super::super::attribute::AttributeReport;
 use super::ClusterHandler;
+use serde_json::{json, Value};
 
 pub struct TemperatureCluster;
 

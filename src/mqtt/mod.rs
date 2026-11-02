@@ -143,7 +143,12 @@ impl MqttBridge {
         self.publish_bridge_log_with_ns(level, message, "z2m").await
     }
 
-    pub async fn publish_bridge_log_with_ns(&self, level: &str, message: &str, namespace: &str) -> Result<()> {
+    pub async fn publish_bridge_log_with_ns(
+        &self,
+        level: &str,
+        message: &str,
+        namespace: &str,
+    ) -> Result<()> {
         let topic = format!("{}/bridge/logging", self.base_topic);
         let payload = json!({
             "level": level,
@@ -166,7 +171,11 @@ impl MqttBridge {
             .map_err(Error::Mqtt)
     }
 
-    pub async fn publish_bridge_response(&self, request: &str, payload: &serde_json::Value) -> Result<()> {
+    pub async fn publish_bridge_response(
+        &self,
+        request: &str,
+        payload: &serde_json::Value,
+    ) -> Result<()> {
         let topic = format!("{}/bridge/response/{}", self.base_topic, request);
         let bytes = serde_json::to_vec(payload)?;
         self.client
@@ -175,16 +184,21 @@ impl MqttBridge {
             .map_err(Error::Mqtt)
     }
 
-    pub async fn publish_bridge_networkmap(&self, devices: &crate::devices::DeviceRegistry) -> Result<()> {
+    pub async fn publish_bridge_networkmap(
+        &self,
+        devices: &crate::devices::DeviceRegistry,
+    ) -> Result<()> {
         let topic = format!("{}/bridge/networkmap", self.base_topic);
         let nodes: Vec<serde_json::Value> = devices
             .all_devices()
             .into_iter()
-            .map(|d| json!({
-                "ieeeAddr": d.ieee_addr.as_hex(),
-                "friendlyName": d.friendly_name,
-                "nwkAddr": d.nwk_addr,
-            }))
+            .map(|d| {
+                json!({
+                    "ieeeAddr": d.ieee_addr.as_hex(),
+                    "friendlyName": d.friendly_name,
+                    "nwkAddr": d.nwk_addr,
+                })
+            })
             .collect();
         let payload = json!({ "nodes": nodes, "links": [] });
         let bytes = serde_json::to_vec(&payload)?;
@@ -302,10 +316,7 @@ async fn run_event_loop(
                 } else if topic.contains("bridge/request") {
                     // Extract full request path after "<base_topic>/bridge/request/"
                     let prefix = format!("{}/bridge/request/", base_topic);
-                    let request = topic
-                        .strip_prefix(&prefix)
-                        .unwrap_or(topic)
-                        .to_string();
+                    let request = topic.strip_prefix(&prefix).unwrap_or(topic).to_string();
                     let json_value = serde_json::from_slice::<serde_json::Value>(payload)
                         .unwrap_or(serde_json::Value::Null);
                     // permit_join has legacy dedicated handling but also goes via bridge/request
@@ -313,17 +324,19 @@ async fn run_event_loop(
                         let duration = parse_permit_join_payload(payload);
                         let _ = cmd_tx.send(MqttCommand::PermitJoin { duration }).await;
                         // also forward as BridgeRequest for transaction response
-                        let _ = cmd_tx.send(MqttCommand::BridgeRequest {
-                            request: "permit_join".to_string(),
-                            payload: json_value.clone(),
-                        })
-                        .await;
+                        let _ = cmd_tx
+                            .send(MqttCommand::BridgeRequest {
+                                request: "permit_join".to_string(),
+                                payload: json_value.clone(),
+                            })
+                            .await;
                     } else {
-                        let _ = cmd_tx.send(MqttCommand::BridgeRequest {
-                            request,
-                            payload: json_value,
-                        })
-                        .await;
+                        let _ = cmd_tx
+                            .send(MqttCommand::BridgeRequest {
+                                request,
+                                payload: json_value,
+                            })
+                            .await;
                     }
                 }
             }

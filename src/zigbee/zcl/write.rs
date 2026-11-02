@@ -1,4 +1,3 @@
-
 pub fn write_attributes_payload(
     sequence: u8,
     mfr_code: Option<u16>,

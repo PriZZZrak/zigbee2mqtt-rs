@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use super::super::attribute::AttributeReport;
 use super::ClusterHandler;
+use serde_json::{json, Value};
 
 pub struct OnOffSwitchCfgCluster;
 
@@ -17,12 +17,22 @@ impl ClusterHandler for OnOffSwitchCfgCluster {
                 SWITCH_TYPE => {
                     if let Some(v) = r.value.as_f64() {
                         let name = CONTACT_TYPES.get(v as usize).copied().unwrap_or("");
-                        out.push(("switch_type".into(), json!(if name.is_empty() { v.to_string() } else { name.to_string() })));
+                        out.push((
+                            "switch_type".into(),
+                            json!(if name.is_empty() {
+                                v.to_string()
+                            } else {
+                                name.to_string()
+                            }),
+                        ));
                     }
                 }
                 DECOUPLED => {
                     if let Some(v) = r.value.as_f64() {
-                        out.push(("decoupled".into(), json!(if v != 0.0 { "ON" } else { "OFF" })));
+                        out.push((
+                            "decoupled".into(),
+                            json!(if v != 0.0 { "ON" } else { "OFF" }),
+                        ));
                     }
                 }
                 _ => {}

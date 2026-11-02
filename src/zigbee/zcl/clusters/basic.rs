@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use super::super::attribute::AttributeReport;
 use super::ClusterHandler;
+use serde_json::{json, Value};
 
 pub struct BasicCluster;
 
@@ -11,9 +11,9 @@ pub struct BasicCluster;
 //   0x4000 – SW build ID        (CharStr)
 
 const MANUFACTURER_NAME: u16 = 0x0004;
-const MODEL_IDENTIFIER:  u16 = 0x0005;
-const POWER_SOURCE:      u16 = 0x0007;
-const SW_BUILD_ID:       u16 = 0x4000;
+const MODEL_IDENTIFIER: u16 = 0x0005;
+const POWER_SOURCE: u16 = 0x0007;
+const SW_BUILD_ID: u16 = 0x4000;
 
 impl ClusterHandler for BasicCluster {
     fn process_reports(&self, reports: &[AttributeReport]) -> Vec<(String, Value)> {
@@ -36,7 +36,7 @@ impl ClusterHandler for BasicCluster {
                             0x01 => "mains",
                             0x03 => "battery",
                             0x04 => "dc_source",
-                            _    => "unknown",
+                            _ => "unknown",
                         };
                         out.push(("power_source".into(), json!(source)));
                     }

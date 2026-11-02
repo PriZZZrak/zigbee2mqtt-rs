@@ -8,7 +8,10 @@ use crate::devices::Device;
 use crate::mqtt::MqttBridge;
 
 async fn publish(mqtt: &MqttBridge, component: &str, ieee: &str, object_id: &str, config: &Value) {
-    if let Err(e) = mqtt.publish_ha_discovery(component, ieee, object_id, config).await {
+    if let Err(e) = mqtt
+        .publish_ha_discovery(component, ieee, object_id, config)
+        .await
+    {
         warn!("HA discovery error for {component}/{ieee}/{object_id}: {e}");
     }
 }
@@ -314,7 +317,14 @@ struct SensorDiscoveryCtx<'a> {
 }
 
 async fn publish_sensor(ctx: &SensorDiscoveryCtx<'_>, device_class: &str, unit: &str) {
-    let SensorDiscoveryCtx { mqtt, device, base_topic, ieee_hex, ha_device, availability } = *ctx;
+    let SensorDiscoveryCtx {
+        mqtt,
+        device,
+        base_topic,
+        ieee_hex,
+        ha_device,
+        availability,
+    } = *ctx;
     let config = json!({
         "availability": availability,
         "state_topic": format!("{}/{}", base_topic, device.friendly_name),
@@ -387,9 +397,7 @@ mod tests {
 
     fn make_color_light() -> Device {
         let mut dev = make_light();
-        dev.endpoints[0]
-            .input_clusters
-            .extend_from_slice(&[0x0300]);
+        dev.endpoints[0].input_clusters.extend_from_slice(&[0x0300]);
         dev
     }
 
@@ -593,10 +601,7 @@ mod tests {
         config["supported_color_modes"] = json!(["color_temp", "xy"]);
 
         assert!(config.get("color_mode").is_none());
-        assert_eq!(
-            config["supported_color_modes"],
-            json!(["color_temp", "xy"])
-        );
+        assert_eq!(config["supported_color_modes"], json!(["color_temp", "xy"]));
     }
 
     #[test]

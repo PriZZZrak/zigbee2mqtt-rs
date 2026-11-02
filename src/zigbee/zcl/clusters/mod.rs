@@ -1,21 +1,21 @@
 pub mod basic;
-pub mod on_off_switch_cfg;
-pub mod multistate_input;
-pub mod metering;
-pub mod electrical_measurement;
 pub mod binary_input;
 pub mod color;
+pub mod electrical_measurement;
 pub mod humidity;
 pub mod ias_zone;
 pub mod illuminance;
 pub mod level;
+pub mod metering;
+pub mod multistate_input;
 pub mod occupancy;
 pub mod on_off;
+pub mod on_off_switch_cfg;
 pub mod power;
 pub mod scenes;
 pub mod temperature;
-pub mod user_interface_cfg;
 pub mod thermostat;
+pub mod user_interface_cfg;
 
 use serde_json::Value;
 

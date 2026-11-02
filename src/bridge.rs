@@ -14,8 +14,8 @@ use crate::coordinator::znp::ZnpHandle;
 use crate::coordinator::{open_coordinator, CoordinatorEvent, CoordinatorHandle};
 use crate::database::{self, PersistentDatabase};
 use crate::devices::{Device, DeviceRegistry};
-use crate::groups::GroupRegistry;
 use crate::error::Result;
+use crate::groups::GroupRegistry;
 use crate::homeassistant;
 use crate::mqtt::attribute_output::flatten_attribute_output;
 use crate::mqtt::{MqttBridge, MqttCommand};
@@ -48,8 +48,12 @@ impl Bridge {
     }
 
     pub fn new(cfg: Config, config_path: PathBuf) -> Self {
-        let db_path = database::find_database(&config_path)
-            .unwrap_or_else(|| config_path.parent().unwrap_or(std::path::Path::new(".")).join("database.db"));
+        let db_path = database::find_database(&config_path).unwrap_or_else(|| {
+            config_path
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .join("database.db")
+        });
         let db = PersistentDatabase::open(&db_path);
         let groups = GroupRegistry::new();
         // Load groups from database into registry
@@ -60,7 +64,9 @@ impl Bridge {
             // Ensure next_id is beyond max group id
             let cur = groups.next_id.load(std::sync::atomic::Ordering::Relaxed);
             if g.id >= cur {
-                groups.next_id.store(g.id + 1, std::sync::atomic::Ordering::Relaxed);
+                groups
+                    .next_id
+                    .store(g.id + 1, std::sync::atomic::Ordering::Relaxed);
             }
         }
         // Overlay groups from configuration.yaml (friendly_name authoritative)
@@ -78,12 +84,18 @@ impl Bridge {
                     }
                 } else if let Some(fname) = &gcfg.friendly_name {
                     // Group in config but not in DB — create it
-                    let g = crate::groups::Group { id: gid, friendly_name: fname.clone(), members: Vec::new() };
+                    let g = crate::groups::Group {
+                        id: gid,
+                        friendly_name: fname.clone(),
+                        members: Vec::new(),
+                    };
                     groups.by_name.insert(fname.clone(), gid);
                     groups.inner.insert(gid, g);
                     let cur = groups.next_id.load(std::sync::atomic::Ordering::Relaxed);
                     if gid >= cur {
-                        groups.next_id.store(gid + 1, std::sync::atomic::Ordering::Relaxed);
+                        groups
+                            .next_id
+                            .store(gid + 1, std::sync::atomic::Ordering::Relaxed);
                     }
                 }
             }
@@ -140,7 +152,10 @@ impl Bridge {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
-                warn!("Cannot read config for groups persist {}: {e}", path.display());
+                warn!(
+                    "Cannot read config for groups persist {}: {e}",
+                    path.display()
+                );
                 return;
             }
         };
@@ -153,7 +168,12 @@ impl Bridge {
         };
         cfg.groups.clear();
         for g in self.groups.all() {
-            cfg.groups.insert(g.id.to_string(), crate::config::GroupConfig { friendly_name: Some(g.friendly_name.clone()) });
+            cfg.groups.insert(
+                g.id.to_string(),
+                crate::config::GroupConfig {
+                    friendly_name: Some(g.friendly_name.clone()),
+                },
+            );
         }
         if let Err(e) = cfg.save(path) {
             warn!("Failed to save groups to config {}: {e}", path.display());
@@ -1031,12 +1051,30 @@ impl Bridge {
 
         // Handle sensor_type (Lytko thermostat, manuf 0x7777)
         if let Some(st) = payload.get("sensor_type").and_then(|v| v.as_str()) {
-            let types = ["3.3 кОм", "5 кОм", "6.8 кОм", "10 кОм", "12 кОм", "14.8 кОм", "15 кОм", "20 кОм", "33 кОм", "47 кОм"];
+            let types = [
+                "3.3 кОм",
+                "5 кОм",
+                "6.8 кОм",
+                "10 кОм",
+                "12 кОм",
+                "14.8 кОм",
+                "15 кОм",
+                "20 кОм",
+                "33 кОм",
+                "47 кОм",
+            ];
             if let Some(idx) = types.iter().position(|t| *t == st) {
                 if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
-                    let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF00, 0x30, &[idx as u8])]);
+                    let zcl_payload = zcl::write::write_attributes_payload(
+                        *trans_id,
+                        Some(0x7777),
+                        &[(0xFF00, 0x30, &[idx as u8])],
+                    );
                     *trans_id = trans_id.wrapping_add(1);
-                    if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload).await {
+                    if let Err(e) = coord
+                        .send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload)
+                        .await
+                    {
                         warn!("Failed to write sensor_type: {e}");
                     }
                     optimistic.insert("sensor_type".into(), json!(st));
@@ -1049,9 +1087,16 @@ impl Bridge {
             let mut raw = (hyst * 10.0 / 5.0).round() as i64 * 5;
             raw = raw.clamp(5, 30);
             if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
-                let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF01, 0x20, &[raw as u8])]);
+                let zcl_payload = zcl::write::write_attributes_payload(
+                    *trans_id,
+                    Some(0x7777),
+                    &[(0xFF01, 0x20, &[raw as u8])],
+                );
                 *trans_id = trans_id.wrapping_add(1);
-                if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload).await {
+                if let Err(e) = coord
+                    .send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload)
+                    .await
+                {
                     warn!("Failed to write hysteresis: {e}");
                 }
                 optimistic.insert("hysteresis".into(), json!(raw as f64 / 10.0));
@@ -1064,9 +1109,16 @@ impl Bridge {
             deg = deg.clamp(-5, 5);
             let raw = (deg * 10) as i8;
             if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0201) {
-                let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF02, 0x28, &[raw as u8])]);
+                let zcl_payload = zcl::write::write_attributes_payload(
+                    *trans_id,
+                    Some(0x7777),
+                    &[(0xFF02, 0x28, &[raw as u8])],
+                );
                 *trans_id = trans_id.wrapping_add(1);
-                if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload).await {
+                if let Err(e) = coord
+                    .send_zcl(nwk_addr, ep, 0x0201, *trans_id, zcl_payload)
+                    .await
+                {
                     warn!("Failed to write correction: {e}");
                 }
                 optimistic.insert("correction".into(), json!(deg));
@@ -1078,9 +1130,16 @@ impl Bridge {
             let types = ["Кнопка", "Выключатель", "Переключатель"];
             if let Some(idx) = types.iter().position(|t| *t == st) {
                 if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0007) {
-                    let zcl_payload = zcl::write::write_attributes_payload(*trans_id, None, &[(0x0000, 0x30, &[idx as u8])]);
+                    let zcl_payload = zcl::write::write_attributes_payload(
+                        *trans_id,
+                        None,
+                        &[(0x0000, 0x30, &[idx as u8])],
+                    );
                     *trans_id = trans_id.wrapping_add(1);
-                    if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0007, *trans_id, zcl_payload).await {
+                    if let Err(e) = coord
+                        .send_zcl(nwk_addr, ep, 0x0007, *trans_id, zcl_payload)
+                        .await
+                    {
                         warn!("Failed to write switch_type: {e}");
                     }
                     optimistic.insert("switch_type".into(), json!(st));
@@ -1096,9 +1155,16 @@ impl Bridge {
                 _ => false,
             };
             if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0007) {
-                let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0xFF10, 0x10, &[if on { 1u8 } else { 0u8 }])]);
+                let zcl_payload = zcl::write::write_attributes_payload(
+                    *trans_id,
+                    Some(0x7777),
+                    &[(0xFF10, 0x10, &[if on { 1u8 } else { 0u8 }])],
+                );
                 *trans_id = trans_id.wrapping_add(1);
-                if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0007, *trans_id, zcl_payload).await {
+                if let Err(e) = coord
+                    .send_zcl(nwk_addr, ep, 0x0007, *trans_id, zcl_payload)
+                    .await
+                {
                     warn!("Failed to write decoupled: {e}");
                 }
                 optimistic.insert("decoupled".into(), json!(if on { "ON" } else { "OFF" }));
@@ -1114,9 +1180,16 @@ impl Bridge {
             };
             if on {
                 if let Some(ep) = endpoints.iter().map(|e| e.endpoint).min() {
-                    let zcl_payload = zcl::write::write_attributes_payload(*trans_id, Some(0x7777), &[(0x4901, 0x30, &[1u8])]);
+                    let zcl_payload = zcl::write::write_attributes_payload(
+                        *trans_id,
+                        Some(0x7777),
+                        &[(0x4901, 0x30, &[1u8])],
+                    );
                     *trans_id = trans_id.wrapping_add(1);
-                    if let Err(e) = coord.send_zcl(nwk_addr, ep, 0x0204, *trans_id, zcl_payload).await {
+                    if let Err(e) = coord
+                        .send_zcl(nwk_addr, ep, 0x0204, *trans_id, zcl_payload)
+                        .await
+                    {
                         warn!("Failed to write recovery: {e}");
                     }
                     optimistic.insert("recovery".into(), json!("OFF"));

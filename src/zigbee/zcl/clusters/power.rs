@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use super::super::attribute::AttributeReport;
 use super::ClusterHandler;
+use serde_json::{json, Value};
 
 pub struct PowerCluster;
 
@@ -9,7 +9,7 @@ pub struct PowerCluster;
 //   0x0021 – Battery percentage remaining (Uint8, unit: 0.5%)
 //   0x0034 – Battery alarm mask  (Bitmap8)
 
-const BATTERY_VOLTAGE:    u16 = 0x0020;
+const BATTERY_VOLTAGE: u16 = 0x0020;
 const BATTERY_PERCENTAGE: u16 = 0x0021;
 
 /// ZCL sentinel for "invalid/not reported" on these Uint8 attributes.
@@ -60,10 +60,13 @@ mod tests {
             value: AttributeValue::U8(160), // 80%
         }];
         let out = PowerCluster.process_reports(&reports);
-        assert_eq!(out, vec![
-            ("battery".into(), json!(80)),
-            ("battery_low".into(), json!(false)),
-        ]);
+        assert_eq!(
+            out,
+            vec![
+                ("battery".into(), json!(80)),
+                ("battery_low".into(), json!(false)),
+            ]
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use super::super::attribute::AttributeReport;
 use super::ClusterHandler;
+use serde_json::{json, Value};
 
 pub struct OccupancyCluster;
 
@@ -8,7 +8,7 @@ pub struct OccupancyCluster;
 //   0x0000 – Occupancy (Bitmap8, bit 0 = occupied)
 //   0x0001 – OccupancySensorType (Enum8)
 
-const OCCUPANCY:             u16 = 0x0000;
+const OCCUPANCY: u16 = 0x0000;
 const OCCUPANCY_SENSOR_TYPE: u16 = 0x0001;
 
 impl ClusterHandler for OccupancyCluster {

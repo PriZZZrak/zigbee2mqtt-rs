@@ -5,23 +5,44 @@ use std::path::Path;
 
 use crate::error::{Error, Result};
 
-fn deserialize_device_map<'de, D>(deserializer: D) -> std::result::Result<HashMap<String, DeviceConfig>, D::Error>
+fn deserialize_device_map<'de, D>(
+    deserializer: D,
+) -> std::result::Result<HashMap<String, DeviceConfig>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     struct Visitor;
     impl<'de> serde::de::Visitor<'de> for Visitor {
         type Value = HashMap<String, DeviceConfig>;
-        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "a map or string") }
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "a map or string")
+        }
         fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-        where A: serde::de::MapAccess<'de> {
+        where
+            A: serde::de::MapAccess<'de>,
+        {
             let mut hm = HashMap::new();
-            while let Some((k, v)) = map.next_entry::<String, DeviceConfig>()? { hm.insert(k, v); }
+            while let Some((k, v)) = map.next_entry::<String, DeviceConfig>()? {
+                hm.insert(k, v);
+            }
             Ok(hm)
         }
-        fn visit_str<E>(self, _: &str) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
-        fn visit_string<E>(self, _: String) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
-        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error> where A: serde::de::SeqAccess<'de> {
+        fn visit_str<E>(self, _: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(HashMap::new())
+        }
+        fn visit_string<E>(self, _: String) -> std::result::Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(HashMap::new())
+        }
+        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
             while let Some::<String>(_) = seq.next_element()? {}
             Ok(HashMap::new())
         }
@@ -29,23 +50,44 @@ where
     deserializer.deserialize_any(Visitor)
 }
 
-fn deserialize_group_map<'de, D>(deserializer: D) -> std::result::Result<HashMap<String, GroupConfig>, D::Error>
+fn deserialize_group_map<'de, D>(
+    deserializer: D,
+) -> std::result::Result<HashMap<String, GroupConfig>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     struct Visitor;
     impl<'de> serde::de::Visitor<'de> for Visitor {
         type Value = HashMap<String, GroupConfig>;
-        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "a map or string") }
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "a map or string")
+        }
         fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-        where A: serde::de::MapAccess<'de> {
+        where
+            A: serde::de::MapAccess<'de>,
+        {
             let mut hm = HashMap::new();
-            while let Some((k, v)) = map.next_entry::<String, GroupConfig>()? { hm.insert(k, v); }
+            while let Some((k, v)) = map.next_entry::<String, GroupConfig>()? {
+                hm.insert(k, v);
+            }
             Ok(hm)
         }
-        fn visit_str<E>(self, _: &str) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
-        fn visit_string<E>(self, _: String) -> std::result::Result<Self::Value, E> where E: serde::de::Error { Ok(HashMap::new()) }
-        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error> where A: serde::de::SeqAccess<'de> {
+        fn visit_str<E>(self, _: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(HashMap::new())
+        }
+        fn visit_string<E>(self, _: String) -> std::result::Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(HashMap::new())
+        }
+        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
             while let Some::<String>(_) = seq.next_element()? {}
             Ok(HashMap::new())
         }
@@ -285,13 +327,17 @@ impl Default for AdvancedConfig {
 
 fn parse_value_ref(text: &str) -> Option<(String, String)> {
     let t = text.trim();
-    if !t.starts_with('!') { return None; }
+    if !t.starts_with('!') {
+        return None;
+    }
     // "!secret key" or "!env VAR"
     let rest = t[1..].trim();
     let mut parts = rest.splitn(2, |c: char| c.is_whitespace());
     let filename = parts.next()?.trim();
     let key = parts.next()?.trim();
-    if filename.is_empty() || key.is_empty() { return None; }
+    if filename.is_empty() || key.is_empty() {
+        return None;
+    }
     let mut fname = filename.to_string();
     if !fname.ends_with(".yaml") && !fname.ends_with(".yml") {
         fname.push_str(".yaml");
@@ -318,7 +364,8 @@ impl Config {
             .map_err(|e| Error::Config(format!("cannot read {}: {e}", path.display())))?;
         let mut config: Config = serde_yml::from_str(&content)?;
         // Handle devices/groups separate files as in settings.ts readDevicesOrGroups
-        let raw: serde_json::Value = serde_yml::from_str(&content).unwrap_or(serde_json::Value::Null);
+        let raw: serde_json::Value =
+            serde_yml::from_str(&content).unwrap_or(serde_json::Value::Null);
         let config_dir = path.parent().unwrap_or(Path::new("."));
         let load_map = |key: &str| -> HashMap<String, serde_json::Value> {
             let mut map = HashMap::new();
@@ -327,7 +374,8 @@ impl Config {
                     // Single file reference
                     let p = config_dir.join(s);
                     if let Ok(c) = std::fs::read_to_string(&p) {
-                        if let Ok(m) = serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c) {
+                        if let Ok(m) = serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c)
+                        {
                             map.extend(m);
                         }
                     }
@@ -336,13 +384,17 @@ impl Config {
                         if let Some(s) = elem.as_str() {
                             let p = config_dir.join(s);
                             if let Ok(c) = std::fs::read_to_string(&p) {
-                                if let Ok(m) = serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c) {
+                                if let Ok(m) =
+                                    serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c)
+                                {
                                     // For array, second files override? Upstream deletes keys from first file that exist in later files
                                     // For simplicity, just extend, later files override
                                     if i == 0 {
                                         map.extend(m);
                                     } else {
-                                        for (k, v) in m { map.insert(k, v); }
+                                        for (k, v) in m {
+                                            map.insert(k, v);
+                                        }
                                     }
                                 }
                             }
@@ -375,8 +427,12 @@ impl Config {
         }
         // Resolve !secret / !env refs as in settings.ts interpretValue
         resolve_secret(&mut config.mqtt.server, config_dir);
-        if let Some(ref mut u) = config.mqtt.username { resolve_secret(u, config_dir); }
-        if let Some(ref mut p) = config.mqtt.password { resolve_secret(p, config_dir); }
+        if let Some(ref mut u) = config.mqtt.username {
+            resolve_secret(u, config_dir);
+        }
+        if let Some(ref mut p) = config.mqtt.password {
+            resolve_secret(p, config_dir);
+        }
         // Accept zigbee2mqtt-style URLs like "mqtt://localhost:1883" in mqtt.server.
         let raw = config.mqtt.server.trim().to_string();
         let stripped = raw
@@ -420,7 +476,9 @@ impl Config {
             return Err(Error::Config("mqtt.server must not be empty".to_string()));
         }
         if self.mqtt.base_topic.trim().is_empty() {
-            return Err(Error::Config("mqtt.base_topic must not be empty".to_string()));
+            return Err(Error::Config(
+                "mqtt.base_topic must not be empty".to_string(),
+            ));
         }
         Ok(())
     }
@@ -428,21 +486,33 @@ impl Config {
     pub fn save(&self, path: &Path) -> Result<()> {
         // Read original file to detect !secret and separate files as in settings.ts write()
         let actual_content = std::fs::read_to_string(path).unwrap_or_default();
-        let actual: serde_json::Value = serde_yml::from_str(&actual_content).unwrap_or(serde_json::Value::Null);
+        let actual: serde_json::Value =
+            serde_yml::from_str(&actual_content).unwrap_or(serde_json::Value::Null);
         let config_dir = path.parent().unwrap_or(Path::new("."));
-        let mut to_write = serde_json::to_value(self).map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
+        let mut to_write = serde_json::to_value(self)
+            .map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
 
         // Handle !secret refs for mqtt/server, mqtt/user, mqtt/password, advanced/network_key, frontend/auth_token
-        for (ns, key) in [("mqtt", "server"), ("mqtt", "user"), ("mqtt", "password"), ("advanced", "network_key"), ("frontend", "auth_token")] {
-            if let Some(actual_ns) = actual.get(ns).and_then(|v| v.get(key).and_then(|x| x.as_str())) {
+        for (ns, key) in [
+            ("mqtt", "server"),
+            ("mqtt", "user"),
+            ("mqtt", "password"),
+            ("advanced", "network_key"),
+            ("frontend", "auth_token"),
+        ] {
+            if let Some(actual_ns) = actual
+                .get(ns)
+                .and_then(|v| v.get(key).and_then(|x| x.as_str()))
+            {
                 if let Some((fname, ref_key)) = parse_value_ref(actual_ns) {
                     if let Some(new_val) = to_write.get(ns).and_then(|v| v.get(key)).cloned() {
                         // Write the actual value to the referenced file
                         let secret_path = config_dir.join(&fname);
-                        let mut secret_content: serde_json::Value = std::fs::read_to_string(&secret_path)
-                            .ok()
-                            .and_then(|c| serde_yml::from_str(&c).ok())
-                            .unwrap_or(json!({}));
+                        let mut secret_content: serde_json::Value =
+                            std::fs::read_to_string(&secret_path)
+                                .ok()
+                                .and_then(|c| serde_yml::from_str(&c).ok())
+                                .unwrap_or(json!({}));
                         if let Some(obj) = secret_content.as_object_mut() {
                             obj.insert(ref_key, new_val);
                         }
@@ -451,7 +521,10 @@ impl Config {
                         }
                         // Keep the !secret ref in main file
                         if let Some(obj) = to_write.get_mut(ns).and_then(|v| v.as_object_mut()) {
-                            obj.insert(key.to_string(), serde_json::Value::String(actual_ns.to_string()));
+                            obj.insert(
+                                key.to_string(),
+                                serde_json::Value::String(actual_ns.to_string()),
+                            );
                         }
                     }
                 }
@@ -481,13 +554,21 @@ impl Config {
                                 if let Some(s) = elem.as_str() {
                                     let pp = config_dir.join(s);
                                     if let Ok(c) = std::fs::read_to_string(&pp) {
-                                        if let Ok(m) = serde_yml::from_str::<HashMap<String, serde_json::Value>>(&c) {
-                                            for k in m.keys() { to_write_map.remove(k); }
+                                        if let Ok(m) = serde_yml::from_str::<
+                                            HashMap<String, serde_json::Value>,
+                                        >(&c)
+                                        {
+                                            for k in m.keys() {
+                                                to_write_map.remove(k);
+                                            }
                                         }
                                     }
                                 }
                             }
-                            let _ = std::fs::write(&p, serde_yml::to_string(&to_write_map).unwrap_or_default());
+                            let _ = std::fs::write(
+                                &p,
+                                serde_yml::to_string(&to_write_map).unwrap_or_default(),
+                            );
                         }
                         if let Some(obj) = to_write.as_object_mut() {
                             obj.insert(key.to_string(), actual_val.clone());
@@ -497,11 +578,14 @@ impl Config {
             }
         }
 
-        let yaml = serde_yml::to_string(&to_write).map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
+        let yaml = serde_yml::to_string(&to_write)
+            .map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
         // Atomic write via tmp
         let tmp = path.with_extension("yaml.tmp");
-        std::fs::write(&tmp, yaml).map_err(|e| Error::Config(format!("cannot write {}: {e}", tmp.display())))?;
-        std::fs::rename(&tmp, path).map_err(|e| Error::Config(format!("cannot rename {}: {e}", path.display())))?;
+        std::fs::write(&tmp, yaml)
+            .map_err(|e| Error::Config(format!("cannot write {}: {e}", tmp.display())))?;
+        std::fs::rename(&tmp, path)
+            .map_err(|e| Error::Config(format!("cannot rename {}: {e}", path.display())))?;
         Ok(())
     }
 }

@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use super::super::attribute::AttributeReport;
 use super::ClusterHandler;
+use serde_json::{json, Value};
 
 pub struct ElectricalMeasurementCluster;
 
@@ -38,7 +38,10 @@ impl ClusterHandler for ElectricalMeasurementCluster {
                         let mask = v as u64;
                         out.push(("fault_mask".into(), json!(mask)));
                         for (name, bit) in FAULT_BITS.iter() {
-                            out.push((name.to_string(), json!(if mask & bit != 0 { "ON" } else { "OFF" })));
+                            out.push((
+                                name.to_string(),
+                                json!(if mask & bit != 0 { "ON" } else { "OFF" }),
+                            ));
                         }
                     }
                 }

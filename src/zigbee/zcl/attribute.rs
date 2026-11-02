@@ -4,33 +4,33 @@ use crate::error::{Error, Result};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum DataType {
-    NoData    = 0x00,
-    Data8     = 0x08,
-    Data16    = 0x09,
-    Data24    = 0x0A,
-    Data32    = 0x0B,
-    Boolean   = 0x10,
-    Bitmap8   = 0x18,
-    Bitmap16  = 0x19,
-    Uint8     = 0x20,
-    Uint16    = 0x21,
-    Uint24    = 0x22,
-    Uint32    = 0x23,
-    Int8      = 0x28,
-    Int16     = 0x29,
-    Int24     = 0x2A,
-    Int32     = 0x2B,
-    Enum8     = 0x30,
-    Enum16    = 0x31,
+    NoData = 0x00,
+    Data8 = 0x08,
+    Data16 = 0x09,
+    Data24 = 0x0A,
+    Data32 = 0x0B,
+    Boolean = 0x10,
+    Bitmap8 = 0x18,
+    Bitmap16 = 0x19,
+    Uint8 = 0x20,
+    Uint16 = 0x21,
+    Uint24 = 0x22,
+    Uint32 = 0x23,
+    Int8 = 0x28,
+    Int16 = 0x29,
+    Int24 = 0x2A,
+    Int32 = 0x2B,
+    Enum8 = 0x30,
+    Enum16 = 0x31,
     SemiFloat = 0x38,
-    Float     = 0x39,
-    Double    = 0x3A,
-    OctetStr  = 0x41,
-    CharStr   = 0x42,
+    Float = 0x39,
+    Double = 0x3A,
+    OctetStr = 0x41,
+    CharStr = 0x42,
     LongOctetStr = 0x43,
-    LongCharStr  = 0x44,
-    Array        = 0x48,
-    Invalid      = 0xFF,
+    LongCharStr = 0x44,
+    Array = 0x48,
+    Invalid = 0xFF,
 }
 
 impl DataType {
@@ -62,16 +62,26 @@ impl DataType {
             0x43 => Self::LongOctetStr,
             0x44 => Self::LongCharStr,
             0x48 => Self::Array,
-            _    => Self::Invalid,
+            _ => Self::Invalid,
         }
     }
 
     /// Returns the fixed byte-length for types with known size, or None for variable.
     pub fn fixed_len(self) -> Option<usize> {
         match self {
-            Self::NoData                => Some(0),
-            Self::Boolean | Self::Bitmap8 | Self::Uint8 | Self::Int8 | Self::Enum8 | Self::Data8 => Some(1),
-            Self::Bitmap16 | Self::Uint16 | Self::Int16 | Self::Enum16 | Self::Data16 | Self::SemiFloat => Some(2),
+            Self::NoData => Some(0),
+            Self::Boolean
+            | Self::Bitmap8
+            | Self::Uint8
+            | Self::Int8
+            | Self::Enum8
+            | Self::Data8 => Some(1),
+            Self::Bitmap16
+            | Self::Uint16
+            | Self::Int16
+            | Self::Enum16
+            | Self::Data16
+            | Self::SemiFloat => Some(2),
             Self::Uint24 | Self::Int24 | Self::Data24 => Some(3),
             Self::Uint32 | Self::Int32 | Self::Data32 | Self::Float => Some(4),
             Self::Double => Some(8),
@@ -102,75 +112,125 @@ impl AttributeValue {
     /// Returns (value, bytes_consumed).
     pub fn parse(data_type: DataType, buf: &[u8]) -> Result<(Self, usize)> {
         match data_type {
-            DataType::Boolean | DataType::Bitmap8 | DataType::Uint8
-            | DataType::Int8   | DataType::Enum8  | DataType::Data8 => {
-                if buf.is_empty() { return Err(Error::Zcl("truncated attribute value".into())); }
+            DataType::Boolean
+            | DataType::Bitmap8
+            | DataType::Uint8
+            | DataType::Int8
+            | DataType::Enum8
+            | DataType::Data8 => {
+                if buf.is_empty() {
+                    return Err(Error::Zcl("truncated attribute value".into()));
+                }
                 let val = match data_type {
                     DataType::Boolean => Self::Bool(buf[0] != 0),
-                    DataType::Int8    => Self::I8(buf[0] as i8),
-                    _                 => Self::U8(buf[0]),
+                    DataType::Int8 => Self::I8(buf[0] as i8),
+                    _ => Self::U8(buf[0]),
                 };
                 Ok((val, 1))
             }
-            DataType::Bitmap16 | DataType::Uint16 | DataType::Enum16 | DataType::Data16 | DataType::SemiFloat => {
-                if buf.len() < 2 { return Err(Error::Zcl("truncated u16".into())); }
+            DataType::Bitmap16
+            | DataType::Uint16
+            | DataType::Enum16
+            | DataType::Data16
+            | DataType::SemiFloat => {
+                if buf.len() < 2 {
+                    return Err(Error::Zcl("truncated u16".into()));
+                }
                 Ok((Self::U16(u16::from_le_bytes([buf[0], buf[1]])), 2))
             }
             DataType::Uint24 | DataType::Data24 => {
-                if buf.len() < 3 { return Err(Error::Zcl("truncated u24".into())); }
+                if buf.len() < 3 {
+                    return Err(Error::Zcl("truncated u24".into()));
+                }
                 let v = u32::from_le_bytes([buf[0], buf[1], buf[2], 0]);
                 Ok((Self::U24(v), 3))
             }
             DataType::Int24 => {
-                if buf.len() < 3 { return Err(Error::Zcl("truncated i24".into())); }
+                if buf.len() < 3 {
+                    return Err(Error::Zcl("truncated i24".into()));
+                }
                 // Sign-extend the 24-bit value from its high bit before widening to i32.
                 let sign_ext = if buf[2] & 0x80 != 0 { 0xFF } else { 0x00 };
                 let v = i32::from_le_bytes([buf[0], buf[1], buf[2], sign_ext]);
                 Ok((Self::I24(v), 3))
             }
             DataType::Uint32 | DataType::Data32 => {
-                if buf.len() < 4 { return Err(Error::Zcl("truncated u32".into())); }
-                Ok((Self::U32(u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]])), 4))
+                if buf.len() < 4 {
+                    return Err(Error::Zcl("truncated u32".into()));
+                }
+                Ok((
+                    Self::U32(u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]])),
+                    4,
+                ))
             }
             DataType::Int16 => {
-                if buf.len() < 2 { return Err(Error::Zcl("truncated i16".into())); }
+                if buf.len() < 2 {
+                    return Err(Error::Zcl("truncated i16".into()));
+                }
                 Ok((Self::I16(i16::from_le_bytes([buf[0], buf[1]])), 2))
             }
             DataType::Int32 => {
-                if buf.len() < 4 { return Err(Error::Zcl("truncated i32".into())); }
-                Ok((Self::I32(i32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]])), 4))
+                if buf.len() < 4 {
+                    return Err(Error::Zcl("truncated i32".into()));
+                }
+                Ok((
+                    Self::I32(i32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]])),
+                    4,
+                ))
             }
             DataType::Float => {
-                if buf.len() < 4 { return Err(Error::Zcl("truncated float".into())); }
+                if buf.len() < 4 {
+                    return Err(Error::Zcl("truncated float".into()));
+                }
                 let bits = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
                 Ok((Self::Float(f32::from_bits(bits)), 4))
             }
             DataType::CharStr => {
-                if buf.is_empty() { return Err(Error::Zcl("missing string length".into())); }
+                if buf.is_empty() {
+                    return Err(Error::Zcl("missing string length".into()));
+                }
                 let len = buf[0] as usize;
-                if len == 0xFF { return Ok((Self::Invalid, 1)); } // invalid value
-                if buf.len() < 1 + len { return Err(Error::Zcl("truncated string".into())); }
+                if len == 0xFF {
+                    return Ok((Self::Invalid, 1));
+                } // invalid value
+                if buf.len() < 1 + len {
+                    return Err(Error::Zcl("truncated string".into()));
+                }
                 let s = String::from_utf8_lossy(&buf[1..1 + len]).into_owned();
                 Ok((Self::Str(s), 1 + len))
             }
             DataType::OctetStr => {
-                if buf.is_empty() { return Err(Error::Zcl("missing octet-string length".into())); }
+                if buf.is_empty() {
+                    return Err(Error::Zcl("missing octet-string length".into()));
+                }
                 let len = buf[0] as usize;
-                if buf.len() < 1 + len { return Err(Error::Zcl("truncated octet string".into())); }
+                if buf.len() < 1 + len {
+                    return Err(Error::Zcl("truncated octet string".into()));
+                }
                 Ok((Self::Bytes, 1 + len))
             }
             DataType::LongCharStr => {
-                if buf.len() < 2 { return Err(Error::Zcl("missing long string length".into())); }
+                if buf.len() < 2 {
+                    return Err(Error::Zcl("missing long string length".into()));
+                }
                 let len = u16::from_le_bytes([buf[0], buf[1]]) as usize;
-                if len == 0xFFFF { return Ok((Self::Invalid, 2)); } // invalid value
-                if buf.len() < 2 + len { return Err(Error::Zcl("truncated long string".into())); }
+                if len == 0xFFFF {
+                    return Ok((Self::Invalid, 2));
+                } // invalid value
+                if buf.len() < 2 + len {
+                    return Err(Error::Zcl("truncated long string".into()));
+                }
                 let s = String::from_utf8_lossy(&buf[2..2 + len]).into_owned();
                 Ok((Self::Str(s), 2 + len))
             }
             DataType::LongOctetStr => {
-                if buf.len() < 2 { return Err(Error::Zcl("missing long octet-string length".into())); }
+                if buf.len() < 2 {
+                    return Err(Error::Zcl("missing long octet-string length".into()));
+                }
                 let len = u16::from_le_bytes([buf[0], buf[1]]) as usize;
-                if buf.len() < 2 + len { return Err(Error::Zcl("truncated long octet string".into())); }
+                if buf.len() < 2 + len {
+                    return Err(Error::Zcl("truncated long octet string".into()));
+                }
                 Ok((Self::Bytes, 2 + len))
             }
             DataType::NoData => Ok((Self::Invalid, 0)),
@@ -179,7 +239,10 @@ impl AttributeValue {
                 if let Some(len) = data_type.fixed_len() {
                     Ok((Self::Bytes, len.min(buf.len())))
                 } else {
-                    Err(Error::Zcl(format!("unsupported attribute type {:?}", data_type)))
+                    Err(Error::Zcl(format!(
+                        "unsupported attribute type {:?}",
+                        data_type
+                    )))
                 }
             }
         }
@@ -187,16 +250,16 @@ impl AttributeValue {
 
     pub fn as_f64(&self) -> Option<f64> {
         match self {
-            Self::U8(v)  => Some(*v as f64),
+            Self::U8(v) => Some(*v as f64),
             Self::U16(v) => Some(*v as f64),
             Self::U24(v) => Some(*v as f64),
             Self::U32(v) => Some(*v as f64),
-            Self::I8(v)  => Some(*v as f64),
+            Self::I8(v) => Some(*v as f64),
             Self::I16(v) => Some(*v as f64),
             Self::I24(v) => Some(*v as f64),
             Self::I32(v) => Some(*v as f64),
             Self::Float(v) => Some(*v as f64),
-            Self::Bool(v)  => Some(if *v { 1.0 } else { 0.0 }),
+            Self::Bool(v) => Some(if *v { 1.0 } else { 0.0 }),
             _ => None,
         }
     }
@@ -204,7 +267,7 @@ impl AttributeValue {
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Bool(v) => Some(*v),
-            Self::U8(v)   => Some(*v != 0),
+            Self::U8(v) => Some(*v != 0),
             _ => None,
         }
     }
@@ -213,7 +276,7 @@ impl AttributeValue {
 #[derive(Debug, Clone)]
 pub struct AttributeReport {
     pub attr_id: u16,
-    pub value:   AttributeValue,
+    pub value: AttributeValue,
 }
 
 impl AttributeReport {
@@ -222,7 +285,7 @@ impl AttributeReport {
         let mut reports = Vec::new();
         let mut pos = 0;
         while pos + 3 <= buf.len() {
-            let attr_id   = u16::from_le_bytes([buf[pos], buf[pos + 1]]);
+            let attr_id = u16::from_le_bytes([buf[pos], buf[pos + 1]]);
             let data_type = DataType::from_u8(buf[pos + 2]);
             pos += 3;
             match AttributeValue::parse(data_type, &buf[pos..]) {

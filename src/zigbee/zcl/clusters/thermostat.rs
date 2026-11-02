@@ -1,6 +1,6 @@
-use serde_json::{json, Value};
 use super::super::attribute::AttributeReport;
 use super::ClusterHandler;
+use serde_json::{json, Value};
 
 pub struct ThermostatCluster;
 
@@ -42,8 +42,16 @@ const CORRECTION: u16 = 0xFF02;
 const FAULT_CODE: u16 = 0xFF05;
 
 const SENSOR_TYPES: [&str; 10] = [
-    "3.3 кОм", "5 кОм", "6.8 кОм", "10 кОм", "12 кОм",
-    "14.8 кОм", "15 кОм", "20 кОм", "33 кОм", "47 кОм",
+    "3.3 кОм",
+    "5 кОм",
+    "6.8 кОм",
+    "10 кОм",
+    "12 кОм",
+    "14.8 кОм",
+    "15 кОм",
+    "20 кОм",
+    "33 кОм",
+    "47 кОм",
 ];
 
 const FAULT_CODES: [&str; 8] = [
@@ -58,23 +66,51 @@ const FAULT_CODES: [&str; 8] = [
 ];
 
 const SYSTEM_MODES: [&str; 10] = [
-    "off", "auto", "", "cool", "heat", "emergency_heating",
-    "precooling", "fan_only", "dry", "sleep",
+    "off",
+    "auto",
+    "",
+    "cool",
+    "heat",
+    "emergency_heating",
+    "precooling",
+    "fan_only",
+    "dry",
+    "sleep",
 ];
 
 const RUNNING_MODES: [&str; 5] = ["off", "cool", "heat", "", "fan_only"];
 
-const RUNNING_STATES: [&str; 7] = ["idle", "heat", "cool", "fan_only", "pending_heat", "pending_cool", "vent"];
+const RUNNING_STATES: [&str; 7] = [
+    "idle",
+    "heat",
+    "cool",
+    "fan_only",
+    "pending_heat",
+    "pending_cool",
+    "vent",
+];
 
 const CTRL_SEQS: [&str; 8] = [
-    "cooling_only", "cooling_with_reheat", "heating_only", "heating_with_reheat",
-    "cooling_and_heating_4_pipes", "cooling_and_heating_4_pipes_with_reheat", "", "",
+    "cooling_only",
+    "cooling_with_reheat",
+    "heating_only",
+    "heating_with_reheat",
+    "cooling_and_heating_4_pipes",
+    "cooling_and_heating_4_pipes_with_reheat",
+    "",
+    "",
 ];
 
 const PROG_MODES: [&str; 4] = ["simple", "schedule", "economy", "away"];
 
 const AC_LOUVER: [&str; 7] = [
-    "fully_open", "quarter", "half", "three_quarters", "fully_closed", "", "",
+    "fully_open",
+    "quarter",
+    "half",
+    "three_quarters",
+    "fully_closed",
+    "",
+    "",
 ];
 
 fn round2(v: f64) -> f64 {
@@ -163,7 +199,10 @@ impl ClusterHandler for ThermostatCluster {
                 }
                 LOCAL_TEMP_CALIBRATION => {
                     if let Some(v) = r.value.as_f64() {
-                        out.push(("local_temperature_calibration".into(), json!(round2(v / 10.0))));
+                        out.push((
+                            "local_temperature_calibration".into(),
+                            json!(round2(v / 10.0)),
+                        ));
                     }
                 }
                 SYSTEM_MODE => {
@@ -316,7 +355,14 @@ impl ClusterHandler for ThermostatCluster {
                 SENSOR_TYPE => {
                     if let Some(v) = r.value.as_f64() {
                         let name = SENSOR_TYPES.get(v as usize).copied().unwrap_or("");
-                        out.push(("sensor_type".into(), json!(if name.is_empty() { v.to_string() } else { name.to_string() })));
+                        out.push((
+                            "sensor_type".into(),
+                            json!(if name.is_empty() {
+                                v.to_string()
+                            } else {
+                                name.to_string()
+                            }),
+                        ));
                     }
                 }
                 HYSTERESIS => {
@@ -333,7 +379,14 @@ impl ClusterHandler for ThermostatCluster {
                 FAULT_CODE => {
                     if let Some(v) = r.value.as_f64() {
                         let name = FAULT_CODES.get(v as usize).copied().unwrap_or("");
-                        out.push(("fault_reason".into(), json!(if name.is_empty() { v.to_string() } else { name.to_string() })));
+                        out.push((
+                            "fault_reason".into(),
+                            json!(if name.is_empty() {
+                                v.to_string()
+                            } else {
+                                name.to_string()
+                            }),
+                        ));
                     }
                 }
                 _ => {}
