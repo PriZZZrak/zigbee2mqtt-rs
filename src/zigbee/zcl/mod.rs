@@ -149,7 +149,7 @@ pub fn extract_ias_zone_type(raw: &[u8]) -> Result<Option<u16>> {
 
 /// Parse a Read Attributes Response payload into AttributeReports.
 /// Format per record: attr_id (u16) | status (u8) | [data_type (u8) | value]
-fn parse_read_attr_rsp(buf: &[u8]) -> Vec<AttributeReport> {
+pub(crate) fn parse_read_attr_rsp(buf: &[u8]) -> Vec<AttributeReport> {
     let mut reports = Vec::new();
     let mut pos = 0;
     while pos + 3 <= buf.len() {

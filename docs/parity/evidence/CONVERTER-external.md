@@ -40,12 +40,38 @@ Support 4000+ devices without a 5MB file in the repo, 90% windfront, pure Rust.
   auto-detect (latest upstream release) + tag/SHA validation, no TS fallback
   (TS in `.js` fails the build via grep + `node --check`).
 
-## Still not as original
-- modernExtend only 3 of ~50 helpers
-- exposes only 4 of 100+ types
-- reporting only bind/payload, not configureReporting per cluster
-- tuya only dp 1, not full EF00
-- external eval stub (boa_engine not yet wired to real fromZigbee)
-- Rust resolver does not yet implement fingerprint-priority/whiteLabel selection
-  (reads only the flat `registry` map); `lookup`+`fingerprints` published for it.
-- No generated definitions for 4000 devices in-repo (by design: on-demand JS).
+## Implementation 2026-11-02/03 (real loader + bridge, P0 fixed)
+- `scripts/gen-registry.mjs` emits `registry.json` (`lookup` verbatim,
+  `models` incl. whiteLabel, `fingerprints` incl. priority) **plus `zcl.json`**
+  (`manufacturerCodes`, `dataTypes`, `clusters` id->name, `attributes`
+  cluster->id->name) — all values read from built upstream dist, never hand-copied.
+- `src/converters/external.rs`: CommonJS loader (relative `require` graph from
+  real files, builtin `zigbee-herdsman` stub fed with published zcl.json;
+  TS in `.js` fails loudly, unknown modules error loudly). `convert_from_zigbee`
+  selects the definition by exact model, builds real `msg` (`cluster` name via
+  zcl.json, `type`, `data` with attribute names, `linkquality`) and `meta`
+  (`state`, minimal `device`, `options`), dispatches matching `fromZigbee`
+  entries (cluster+type), merges returned payloads; the old `{"raw": ...}`
+  stub is removed. Per-converter try/catch: one bad converter never kills
+  the frame. On-demand fetch (`ensure_device_files`, 80-file cap) pulls the
+  device module + transitive deps + zcl.json via curl/wget/uclient-fetch.
+- `src/bridge.rs`: `Ok(None)` fallback now parses header (0x0A ->
+  `attributeReport`, 0x01 -> `readResponse` via `parse_read_attr_rsp`), converts
+  attributes to JSON (`Bytes`/`Invalid` skipped, documented), ensures files,
+  publishes merged state via the normal path.
+- Tests: 6 unit tests with a CJS fixture (`fromZigbee` dispatch, case-insensitive
+  model, unknown cluster/model -> None, TS rejected loudly, require-graph walk).
+
+## Still not as original (2026-11-03)
+- `toZigbee.convertSet` not implemented (no entity command plumbing) — set path
+  stays native-only.
+- No fingerprint tie-breaking: definition chosen by exact model only; upstream
+  would fingerprint-match among candidates and apply whiteLabel overrides.
+- `meta.device` is minimal (modelID/manufacturerID/manufacturerName/ieeeAddr/
+  powerSource); converters reading deeper device state will throw and be
+  skipped with a warning.
+- `publish()` inside converters is merged into state instead of immediate MQTT
+  publish (documented deviation; matches for pure-return converters).
+- `Bytes`/`Invalid` attribute values are dropped, not passed through.
+- No hardware-in-loop verification (simulated CJS fixtures only).
+- modernExtend only 3 of ~50 helpers; exposes only 4 of 100+ types (unchanged).

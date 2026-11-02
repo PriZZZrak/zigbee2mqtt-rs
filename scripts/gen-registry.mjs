@@ -184,3 +184,38 @@ console.log(
         `${Object.keys(models).length} models, ${fingerprints.length} fingerprints, ` +
         `${Object.keys(registry).length} legacy keys, ${totalDefinitions} definitions from ${files.length} files`,
 );
+
+// --- 6. ZCL enums for the Rust bridge (real values, never hand-copied) ---
+// Converters reference Zcl.ManufacturerCode.* and cluster/attribute IDs at
+// load time; the Rust CJS stub serves these exact values.
+const {Clusters} = requireFromDist("../zspec/zcl/definition/cluster.js");
+const {ManufacturerCode} = requireFromDist("../zspec/zcl/definition/manufacturerCode.js");
+const {DataType} = requireFromDist("../zspec/zcl/definition/enums.js");
+const manufacturerCodes = {};
+for (const [k, v] of Object.entries(ManufacturerCode)) {
+    if (typeof v === "number") manufacturerCodes[k] = v;
+}
+if (Object.keys(manufacturerCodes).length < 100) fail(`smoke: expected 100+ manufacturer codes`);
+if (manufacturerCodes.TEXAS_INSTRUMENTS !== 0x0007) fail("smoke: TEXAS_INSTRUMENTS != 0x0007");
+const dataTypes = {};
+for (const [k, v] of Object.entries(DataType)) {
+    if (typeof v === "number") dataTypes[k] = v;
+}
+if (Object.keys(dataTypes).length < 20) fail(`smoke: expected 20+ data types`);
+const clustersById = {};
+const attributesByCluster = {};
+for (const [name, cl] of Object.entries(Clusters)) {
+    clustersById[String(cl.ID)] = name;
+    const attrs = {};
+    for (const [attrName, attr] of Object.entries(cl.attributes ?? {})) {
+        attrs[String(attr.ID)] = attrName;
+    }
+    attributesByCluster[name] = attrs;
+}
+if (Object.keys(clustersById).length < 50) fail(`smoke: expected 50+ clusters`);
+if (clustersById["513"] !== "hvacThermostat") fail("smoke: cluster 513 != hvacThermostat");
+fs.writeFileSync(
+    path.join(outDir, ref, "zcl.json"),
+    JSON.stringify({ref, manufacturerCodes, dataTypes, clusters: clustersById, attributes: attributesByCluster}, null, 2),
+);
+console.log(`zcl ${ref}: ${Object.keys(clustersById).length} clusters, ${Object.keys(manufacturerCodes).length} manufacturer codes`);
