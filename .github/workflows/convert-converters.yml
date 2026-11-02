@@ -34,14 +34,14 @@ jobs:
         with:
           repository: Koenkk/zigbee-herdsman-converters
           ref: ${{ steps.ref.outputs.ref }}
-          path: /tmp/hc
+          path: hc
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --prefix /tmp/hc
-      - run: npm run build --prefix /tmp/hc
+      - run: npm ci --prefix hc
+      - run: npm run build --prefix hc
       - name: Generate registry
-        run: node scripts/gen-registry.mjs /tmp/hc/dist ${{ steps.ref.outputs.ref }}
+        run: node scripts/gen-registry.mjs hc/dist ${{ steps.ref.outputs.ref }}
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
