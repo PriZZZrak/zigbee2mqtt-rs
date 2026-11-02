@@ -50,27 +50,15 @@
 - `Bridge::new` now overlays `cfg.groups` onto `GroupRegistry` (friendly_name authoritative from yaml, members from DB), `persist_groups_config()` updates `configuration.yaml` on `group/add|remove|rename|members/*` plus `persist_database` for DB members
 - `database.db` + `configuration.yaml` now both portable: groups survive DB↔yaml round-trip, device `friendly_name` already via `devices` map
 
-## Still not as original (2026-11-02, after clusters preservation)
-- `Coordinator` entry still recreated with defaults if missing, not fully preserving original `manufId/epList/meta` when file has no Coordinator (rare, but now preserved if orig exists)
-- `checkinInterval`, `gpSecurityKey`, `scheduledOta` now preserved from orig, but not updated from live Device (upstream updates these on interview, we keep orig value)
-- `appVersion/stackVersion/hwVersion/dateCode/zclVersion` now preserved, but not refreshed from live `read` (upstream updates on SimpleDesc/DeviceAnnounce)
-- `endpoints[].clusters/binds/configuredReportings/meta` now preserved per-endpoint from orig, but new endpoints from Device still get `{} / []` defaults (upstream would have actual ZCL clusters)
-- No `Device.save()` debounce / `update(..., write:false)` batching as in `Entity.database.update` — we write immediately on every join/leave/rename
-- `interviewState` mapping only `SUCCESSFUL`/`FAILED`, not `Pending`/`InProgress` + quirks for Tuya `TS*` etc.
-- No handling of `GreenPower` type entries (filtered, upstream stores with `type GreenPower`)
-- `Group` `friendly_name` now correctly only in `configuration.yaml` (via `Config.groups` + `persist_groups_config`), not in `database.db` — matches `settings.groups` + `Group` DB `groupID/members` split as upstream (fixed 2026-11-02)
-- `configuration.yaml` groups now written via `Config.save()` with `serde_yml` dump — loses comments/formatting and `!secret`/`!env` handling vs `yaml.writeIfChanged` with `js-yaml` (upstream preserves `!secret` refs via `updateIfChanged`)
-- No `yaml` handling for `devices` separate file (`devices.yaml` via `actual[type]` string) as in `settings.write()`
-
 ## Implementation 2026-11-02 (batching, memory)
 - `Bridge::persist_database()` now debounced: in-memory `sync_devices`+`sync_groups` immediately, disk `write()` via `db_write_pending` flag + `tokio::spawn` 500ms delayed single write, final flush on shutdown (`run` end) — mirrors `Entity.database.update(write:false)` / `update(write:true)` batching, saves memory/I/O (was 2-3 fsync per interview for 2-EP thermostat, now 1)
 
-## Still not as original (2026-11-02, after yaml/database exact)
-- `database.db` `endpoints[].clusters/binds` now preserved from orig, but new endpoints still defaults (upstream would have actual ZCL clusters from SimpleDesc)
+## Still not as original (2026-11-02, after yaml/database exact + clusters)
+- `database.db` `endpoints[].clusters/binds/configuredReportings/meta` now preserved per-endpoint from orig for existing devices (new EP still `{} / []` — as upstream for new device before interview, acceptable)
 - `database.db` `checkinInterval/gpSecurityKey/scheduledOta` preserved but not live-updated from Device (upstream updates on interview)
 - `database.db` `appVersion/stackVersion/hwVersion/dateCode/zclVersion` preserved but not refreshed from live read
 - `database.db` `interviewState` only SUCCESSFUL/FAILED, not Pending/InProgress + quirks
-- `database.db` `GreenPower` now preserved (was filtered, now kept via sync_devices), but not yet handled as Device type in registry (still filtered in load_database for DeviceRegistry, only preserved in file)
+- `database.db` `GreenPower` now preserved in file (was filtered, now kept via sync_devices), but not yet handled as Device type in registry (still filtered in load_database for DeviceRegistry, only preserved in file)
 - `configuration.yaml` now handles `devices: devices.yaml` / `groups: groups.yaml` separate files and `!secret`/`!env` refs (via parseValueRef/resolve_secret) — but still loses comments/formatting vs `js-yaml` dump (both lose comments, but `serde_yml` vs `js-yaml` ordering may differ)
 - `configuration.yaml` `advanced.network_key: GENERATE` string handling: upstream validates and generates key, we treat as array default
 - Batching 500ms vs upstream immediate `write()` for `update(write:true)` — crash within window may lose last batch
