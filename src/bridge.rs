@@ -9,6 +9,7 @@ use tracing::{debug, error, info, warn};
 use std::path::PathBuf;
 
 use crate::config::{Config, OutputMode};
+use crate::converters::external::ExternalConverter;
 use crate::coordinator::znp::ZnpHandle;
 use crate::coordinator::{open_coordinator, CoordinatorEvent, CoordinatorHandle};
 use crate::database::{self, PersistentDatabase};
@@ -31,6 +32,7 @@ pub struct Bridge {
     groups: Arc<GroupRegistry>,
     database: Arc<Mutex<PersistentDatabase>>,
     db_write_pending: Arc<Mutex<bool>>,
+    external: Arc<ExternalConverter>,
 }
 
 impl Bridge {
@@ -86,6 +88,11 @@ impl Bridge {
                 }
             }
         }
+        let external = ExternalConverter::new(
+            "/etc/zigbee2mqtt-rs/herdsman-converters",
+            "https://prizzzrak.github.io/zigbee2mqtt-rs/herdsman-converters/latest/registry.json",
+        );
+        let _ = external.ensure_dir();
         Self {
             cfg,
             config_path,
@@ -93,6 +100,7 @@ impl Bridge {
             groups: Arc::new(groups),
             database: Arc::new(Mutex::new(db)),
             db_write_pending: Arc::new(Mutex::new(false)),
+            external: Arc::new(external),
         }
     }
 
@@ -200,6 +208,7 @@ impl Bridge {
 
         let devices = Arc::clone(&self.devices);
         let groups = Arc::clone(&self.groups);
+        let external = Arc::clone(&self.external);
         let base_topic = self.cfg.mqtt.base_topic.clone();
         let ha_enabled = self.cfg.homeassistant.enabled();
         let device_configs = self.cfg.devices.clone();
@@ -500,7 +509,31 @@ impl Bridge {
                                         let _ = mqtt.publish_availability(&name, true).await;
                                     }
                                 }
-                                Ok(None) => {}
+                                Ok(None) => {
+                                    // Fallback to external converter (on-demand JS) for unknown clusters/models
+                                    if let Some(dev) = devices.get_by_nwk(src_addr) {
+                                        let key = dev.model.clone().unwrap_or_else(|| dev.manufacturer.clone().unwrap_or_default());
+                                        if !key.is_empty() {
+                                            if let Some(js) = external.load_js(&key) {
+                                                if let Some(val) = external.eval(&js, &data) {
+                                                    if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
+                                                        if let Some(obj) = val.as_object() {
+                                                            for (k, v) in obj { dev.state.insert(k.clone(), v.clone()); }
+                                                        }
+                                                        dev.state.insert("linkquality".into(), json!(link_quality));
+                                                        dev.state.insert("last_seen".into(), json!(now_iso8601()));
+                                                        let state = serde_json::Value::Object(dev.state.clone());
+                                                        let name = dev.friendly_name.clone();
+                                                        Self::strip_transient_action_fields(&mut dev.state);
+                                                        drop(dev);
+                                                        Self::publish_state(&mqtt, self.cfg.advanced.output, &name, &state).await;
+                                                        let _ = mqtt.publish_availability(&name, true).await;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 Err(e) => warn!("ZCL parse error: {e}"),
                             }
                         }
