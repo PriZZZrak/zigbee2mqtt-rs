@@ -47,21 +47,28 @@ jobs:
       - run: pnpm --dir hc run build
       - name: Generate registry
         run: node scripts/gen-registry.mjs hc/dist ${{ steps.ref.outputs.ref }}
-      - name: Copy device JS files
+      - name: Verify build output (fail if no JS)
+        run: |
+          ls hc/dist/devices/*.js | head -5
+          COUNT=$(ls hc/dist/devices/*.js 2>/dev/null | wc -l)
+          echo "Built JS files: $COUNT"
+          if [ "$COUNT" -lt 100 ]; then
+            echo "ERROR: expected 300+ device JS files, got $COUNT — build failed"
+            exit 1
+          fi
+          # Fail if any .js still contains TypeScript syntax
+          if grep -l "import type\|: DefinitionWithExtend\|: Fz\|: Tz" hc/dist/devices/*.js | head -5; then
+            echo "ERROR: built JS still contains TypeScript syntax"
+            exit 1
+          fi
+      - name: Copy device JS files (JS only, no TS fallback)
         run: |
           mkdir -p herdsman-converters/${{ steps.ref.outputs.ref }}
-          # Copy built JS if dist exists, otherwise TS as JS fallback
-          if [ -d hc/dist/devices ]; then
-            cp hc/dist/devices/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/ 2>/dev/null || true
-          fi
-          # Also ensure .ts as .js fallback for boa (TS is close to JS)
-          for f in hc/src/devices/*.ts; do
-            base=$(basename "$f" .ts)
-            if [ ! -f herdsman-converters/${{ steps.ref.outputs.ref }}/$base.js ]; then
-              cp "$f" herdsman-converters/${{ steps.ref.outputs.ref }}/$base.js
-            fi
-            cp "$f" herdsman-converters/${{ steps.ref.outputs.ref }}/$base.ts 2>/dev/null || true
-          done
+          cp hc/dist/devices/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/
+          # Also copy converters lib JS for fromZigbee/toZigbee
+          mkdir -p herdsman-converters/${{ steps.ref.outputs.ref }}/lib
+          cp hc/dist/converters/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/lib/ 2>/dev/null || true
+          cp hc/dist/lib/*.js herdsman-converters/${{ steps.ref.outputs.ref }}/lib/ 2>/dev/null || true
           ls herdsman-converters/${{ steps.ref.outputs.ref }}/ | wc -l
           cat herdsman-converters/registry.json | head -5
           mv herdsman-converters/registry.json herdsman-converters/${{ steps.ref.outputs.ref }}/registry.json
