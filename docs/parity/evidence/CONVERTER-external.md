@@ -43,6 +43,9 @@ Support 4000+ devices without a 5MB file in the repo, 90% windfront, pure Rust.
 ## Implementation 2026-11-02/03 (real loader + bridge, P0 fixed)
 - `scripts/gen-registry.mjs` emits `registry.json` (`lookup` verbatim,
   `models` incl. whiteLabel, `fingerprints` incl. priority) **plus `zcl.json`**
+  (ManufacturerCode/DataType/cluster+attribute IDs read from the built
+  `zigbee-herdsman` package in hc/node_modules — zspec lives there, NOT in
+  converters dist; see 2026-11-03 CI fix for `../zspec/...` MODULE_NOT_FOUND)
   (`manufacturerCodes`, `dataTypes`, `clusters` id->name, `attributes`
   cluster->id->name) — all values read from built upstream dist, never hand-copied.
 - `src/converters/external.rs`: CommonJS loader (relative `require` graph from

@@ -188,9 +188,12 @@ console.log(
 // --- 6. ZCL enums for the Rust bridge (real values, never hand-copied) ---
 // Converters reference Zcl.ManufacturerCode.* and cluster/attribute IDs at
 // load time; the Rust CJS stub serves these exact values.
-const {Clusters} = requireFromDist("../zspec/zcl/definition/cluster.js");
-const {ManufacturerCode} = requireFromDist("../zspec/zcl/definition/manufacturerCode.js");
-const {DataType} = requireFromDist("../zspec/zcl/definition/enums.js");
+// NOTE: zspec lives in the zigbee-herdsman package (a converters dependency),
+// NOT in converters dist — requiring ../zspec from dist/devices fails.
+const requireHc = createRequire(path.join(path.resolve(dist, ".."), "package.json"));
+const {Clusters} = requireHc("zigbee-herdsman/dist/zspec/zcl/definition/cluster.js");
+const {ManufacturerCode} = requireHc("zigbee-herdsman/dist/zspec/zcl/definition/manufacturerCode.js");
+const {DataType} = requireHc("zigbee-herdsman/dist/zspec/zcl/definition/enums.js");
 const manufacturerCodes = {};
 for (const [k, v] of Object.entries(ManufacturerCode)) {
     if (typeof v === "number") manufacturerCodes[k] = v;
