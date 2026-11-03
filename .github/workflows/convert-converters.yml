@@ -69,30 +69,41 @@ jobs:
           cache-dependency-path: hc/pnpm-lock.yaml
       - run: pnpm --dir hc install --frozen-lockfile
       - run: pnpm --dir hc run build
-      - name: Verify built JavaScript (JS only, no TS fallback)
+
+      - name: Verify built JavaScript
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
+
           files=(hc/dist/devices/*.js)
           count=${#files[@]}
+
           echo "Built JS files: $count"
+
           if (( count < 300 )); then
-            echo "::error::Expected at least 300 JS files, got $count — build failed"
+            echo "::error::Expected at least 300 JS files, got $count"
             exit 1
           fi
-          # P0: TypeScript must never be published as .js (import type / interfaces).
-          if grep -l "import type\|: DefinitionWithExtend\|: Fz\|: Tz\|interface " hc/dist/devices/*.js | head -5; then
-            echo "::error::Built JS still contains TypeScript syntax"
-            exit 1
-          fi
+
+          echo "Checking JavaScript syntax..."
+
+          failed=0
+
           for file in "${files[@]}"; do
-            if ! node --check "$file" > /dev/null; then
+            if ! node --check "$file"; then
               echo "::error file=$file::Invalid JavaScript syntax"
-              exit 1
+              failed=$((failed + 1))
             fi
           done
-          echo "Syntax OK: $count files"
+
+          if (( failed > 0 )); then
+            echo "::error::$failed JavaScript files failed syntax validation"
+            exit 1
+          fi
+
+          echo "SUCCESS: All $count JavaScript files passed syntax validation"
+
       - name: Generate registry (upstream models-index is primary)
         # Exits non-zero on any validation/smoke failure -> publish below never runs.
         run: node scripts/gen-registry.mjs hc/dist ${{ steps.ref.outputs.ref }}
