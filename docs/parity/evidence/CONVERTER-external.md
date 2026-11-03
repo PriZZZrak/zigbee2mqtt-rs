@@ -39,6 +39,10 @@ Support 4000+ devices without a 5MB file in the repo, 90% windfront, pure Rust.
   `concurrency: converters-gh-pages` (no parallel interleaving), ref
   auto-detect (latest upstream release) + tag/SHA validation, no TS fallback
   (TS in `.js` fails the build via grep + `node --check`).
+  Verified end-to-end 2026-11-03: workflow published v26.125.0 (real CJS,
+  registry.json with lookup/models/fingerprints, zcl.json, latest/ copy +
+  VERSION). NOTE: https site returned 404 at check time — GitHub Pages
+  source not enabled for gh-pages; enable in repo Settings → Pages.
 
 ## Implementation 2026-11-02/03 (real loader + bridge, P0 fixed)
 - `scripts/gen-registry.mjs` emits `registry.json` (`lookup` verbatim,
