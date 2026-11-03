@@ -411,6 +411,7 @@ exports.definitions = [
         model: "CoZB_dha",
         vendor: "Eurotronic",
         description: "Comet Zero Zigbee Zigbee wireless heater thermostat",
+        extend: [exports.eurotronicExtend.addEurotronicHvacThermostatCluster()],
         fromZigbee: [exports.fzLocal.eurotronic_thermostat, fz.battery],
         toZigbee: [
             tz.thermostat_occupied_heating_setpoint,

@@ -883,6 +883,17 @@ const schneiderElectricExtend = {
         lookup: { None: 0, Radiator: 1, "Fan Assisted Radiator": 2, "Radiant Panel": 3, Floor: 4, "Not specified": 0xff },
         zigbeeCommandOptions: { manufacturerCode: zigbee_herdsman_1.Zcl.ManufacturerCode.SCHNEIDER_ELECTRIC },
     }),
+    openWindowDetectionStatus: () => m.binary({
+        name: "window_open",
+        valueOn: [true, 1],
+        valueOff: [false, 0],
+        cluster: "hvacThermostat",
+        attribute: "wiserSmartOpenWindowDetectionStatus",
+        description: "Indicates if the built-in open window detection is active (heating is suspended)",
+        access: "STATE_GET",
+        entityCategory: "diagnostic",
+        zigbeeCommandOptions: { manufacturerCode: zigbee_herdsman_1.Zcl.ManufacturerCode.SCHNEIDER_ELECTRIC },
+    }),
     addWiserDeviceInfoCluster: () => m.deviceAddCustomCluster("wiserDeviceInfo", {
         name: "wiserDeviceInfo",
         ID: 0xfe03,
@@ -1368,8 +1379,8 @@ const fzLocal = {
                 const result = { action: utils.toSnakeCase(data[1]) };
                 let screenAwake = globalStore.getValue(msg.endpoint, "screenAwake");
                 screenAwake = screenAwake !== undefined ? screenAwake : false;
-                const keypadLockedNumber = Number(msg.endpoint.getClusterAttributeValue("hvacUserInterfaceCfg", "keypadLockout"));
-                const keypadLocked = keypadLockedNumber !== undefined ? keypadLockedNumber !== 0 : false;
+                const keypadLockout = msg.endpoint.getClusterAttributeValue("hvacUserInterfaceCfg", "keypadLockout");
+                const keypadLocked = keypadLockout != null && Number(keypadLockout) !== 0;
                 // While the boost selection UI is open (center press seen,
                 // clock icon shown), +/- presses adjust the device's local
                 // boost target, not the setpoint. Emulating them against the
@@ -1812,6 +1823,7 @@ exports.definitions = [
         model: "CCT5015-0001",
         vendor: "Schneider Electric",
         description: "Roller shutter module",
+        ota: true,
         fromZigbee: [fz.cover_position_tilt],
         toZigbee: [tz.cover_position_tilt, tz.cover_state, tzLocal.lift_duration],
         exposes: [
@@ -1830,6 +1842,7 @@ exports.definitions = [
         model: "S520567",
         vendor: "Schneider Electric",
         description: "Wiser Odace roller shutter switch (S520567W)",
+        ota: true,
         onEvent: async (event) => {
             if (event.type !== "deviceOptionsChanged")
                 return;
@@ -2039,6 +2052,7 @@ exports.definitions = [
         model: "WV704R0A0902",
         vendor: "Schneider Electric",
         description: "Wiser radiator thermostat",
+        ota: true,
         extend: [schneiderElectricExtend.addWiserDeviceInfoCluster()],
         fromZigbee: [fz.ignore_haDiagnostic, fz.thermostat, fz.battery, fz.hvac_user_interface, fzLocal.wiser_device_info],
         toZigbee: [tz.thermostat_occupied_heating_setpoint, tz.thermostat_keypad_lockout],
@@ -2056,8 +2070,18 @@ exports.definitions = [
         ],
         configure: async (device, coordinatorEndpoint) => {
             const endpoint = device.getEndpoint(1);
-            const binds = ["genBasic", "genPowerCfg", "hvacThermostat", "haDiagnostic"];
-            await reporting.bind(endpoint, coordinatorEndpoint, binds);
+            // The binding table has 5 entries and the valve fills most of them itself on joining (poll control,
+            // hvacThermostat on endpoints 1 and 2). Binding genBasic/haDiagnostic (unused) took the last slot and
+            // the genPowerCfg bind then failed with TABLE_FULL, aborting configure before any reporting was set
+            // up (no pi_heating_demand/setpoint/temperature reports). Bind only what is reported, one at a time.
+            for (const cluster of ["hvacThermostat", "genPowerCfg"]) {
+                try {
+                    await reporting.bind(endpoint, coordinatorEndpoint, [cluster]);
+                }
+                catch (error) {
+                    logger_1.logger.warning(`WV704R0A0902 bind of ${cluster} failed for '${device.ieeeAddr}': ${error}`, NS);
+                }
+            }
             await reporting.batteryVoltage(endpoint);
             await reporting.thermostatTemperature(endpoint);
             await reporting.thermostatOccupiedHeatingSetpoint(endpoint);
@@ -2158,6 +2182,7 @@ exports.definitions = [
         model: "CCTFR6730",
         vendor: "Schneider Electric",
         description: "Wiser power micromodule",
+        ota: true,
         whiteLabel: [{ vendor: "ELKO", model: "EKO20004" }],
         extend: [m.onOff({ powerOnBehavior: true }), m.electricityMeter({ cluster: "metering" }), m.identify()],
     },
@@ -2166,6 +2191,7 @@ exports.definitions = [
         model: "WDE002334",
         vendor: "Schneider Electric",
         description: "Rotary dimmer",
+        ota: true,
         extend: [schneiderElectricExtend.addSchneiderLightingBallastCfgCluster()],
         fromZigbee: [fz.on_off, fz.brightness, fz.level_config, fzLocal.wiser_lighting_ballast_configuration],
         toZigbee: [tz.light_onoff_brightness, tz.level_config, tz.ballast_config, tzLocal.wiser_dimmer_mode],
@@ -2197,6 +2223,7 @@ exports.definitions = [
         model: "NH3516A",
         vendor: "Schneider Electric",
         description: "Rotary dimmer",
+        ota: true,
         extend: [
             m.light({
                 effect: false,
@@ -2225,6 +2252,7 @@ exports.definitions = [
         model: "WDE002960",
         vendor: "Schneider Electric",
         description: "Push button dimmer",
+        ota: true,
         extend: [schneiderElectricExtend.addSchneiderLightingBallastCfgCluster()],
         fromZigbee: [fz.on_off, fz.brightness, fz.level_config, fzLocal.wiser_lighting_ballast_configuration],
         toZigbee: [tz.light_onoff_brightness, tz.level_config, tz.ballast_config, tzLocal.wiser_dimmer_mode],
@@ -2256,6 +2284,7 @@ exports.definitions = [
         model: "550B1024",
         vendor: "Schneider Electric",
         description: "Temperature & humidity sensor",
+        ota: true,
         fromZigbee: [fz.humidity, fz.temperature, fz.battery],
         toZigbee: [],
         exposes: [e.battery(), e.temperature(), e.humidity()],
@@ -2273,6 +2302,7 @@ exports.definitions = [
         model: "WDE002386",
         vendor: "Schneider Electric",
         description: "Push button dimmer",
+        ota: true,
         extend: [
             schneiderElectricExtend.addSchneiderLightSwitchConfigurationCluster(),
             m.light({
@@ -2448,6 +2478,7 @@ exports.definitions = [
         model: "S520530W",
         vendor: "Schneider Electric",
         description: "Odace connectable relay switch 10A",
+        ota: true,
         extend: [m.onOff({ powerOnBehavior: false }), m.commandsOnOff()],
     },
     {
@@ -2462,6 +2493,7 @@ exports.definitions = [
         model: "MEG5113-0300/MEG5165-0000",
         vendor: "Schneider Electric",
         description: "Merten MEG5165 PlusLink Shutter insert with Merten Wiser System M Push Button (1fold)",
+        ota: true,
         fromZigbee: [fz.cover_position_tilt, fz.command_cover_close, fz.command_cover_open, fz.command_cover_stop],
         toZigbee: [tz.cover_position_tilt, tz.cover_state, tzLocal.lift_duration],
         exposes: [
@@ -2480,6 +2512,7 @@ exports.definitions = [
         model: "MEG5116-0300/MEG5171-0000",
         vendor: "Schneider Electric",
         description: "Merten MEG5171 PlusLink Dimmer insert with Merten Wiser System M Push Button (1fold)",
+        ota: true,
         fromZigbee: [fz.on_off, fz.brightness, fz.level_config, fzLocal.wiser_lighting_ballast_configuration],
         toZigbee: [tz.light_onoff_brightness, tz.level_config, tz.ballast_config, tzLocal.wiser_dimmer_mode],
         exposes: [
@@ -2516,6 +2549,7 @@ exports.definitions = [
         model: "MEG5126-0300/MEG5171-0000",
         vendor: "Schneider Electric",
         description: "Merten MEG5171 PlusLink Dimmer insert with Merten Wiser System M Push Button (2fold)",
+        ota: true,
         fromZigbee: [fz.on_off, fz.brightness, fz.level_config, fzLocal.wiser_lighting_ballast_configuration],
         toZigbee: [tz.light_onoff_brightness, tz.level_config, tz.ballast_config, tzLocal.wiser_dimmer_mode],
         exposes: [
@@ -2558,6 +2592,7 @@ exports.definitions = [
         model: "MEG5126-0300/MEG5172-0000",
         vendor: "Schneider Electric",
         description: "Merten MEG5172 PlusLink Dimmer insert with Merten Wiser System M Push Button (2fold)",
+        ota: true,
         fromZigbee: [fzLocal.wiser_lighting_ballast_configuration],
         toZigbee: [tz.ballast_config, tzLocal.wiser_dimmer_mode],
         exposes: [
@@ -2590,6 +2625,7 @@ exports.definitions = [
         model: "MEG5161-0000",
         vendor: "Schneider Electric",
         description: "Merten PlusLink relay insert with Merten Wiser system M push button (1fold)",
+        ota: true,
         extend: [m.onOff({ powerOnBehavior: false })],
     },
     {
@@ -2708,6 +2744,7 @@ exports.definitions = [
         model: "550D6001",
         vendor: "Schneider Electric",
         description: "LK FUGA wiser wireless battery 4 button switch",
+        ota: true,
         fromZigbee: [fz.command_on, fz.command_off, fz.command_move, fz.command_stop, fz.battery],
         toZigbee: [],
         endpoint: (device) => {
@@ -2749,6 +2786,7 @@ exports.definitions = [
         model: "CCTFR6700",
         vendor: "Schneider Electric",
         description: "Heating thermostat",
+        ota: true,
         whiteLabel: [{ model: "CCTFR6710", fingerprint: [{ modelID: "CCTFR6710" }] }],
         fromZigbee: [fz.thermostat, fz.metering],
         toZigbee: [
@@ -2786,6 +2824,7 @@ exports.definitions = [
         model: "CCTFR6400",
         vendor: "Schneider Electric",
         description: "Temperature/Humidity measurement with thermostat interface",
+        ota: true,
         extend: [schneiderElectricExtend.customThermostatCluster(), schneiderElectricExtend.addWiserDeviceInfoCluster()],
         fromZigbee: [
             fz.battery,
@@ -2846,13 +2885,14 @@ exports.definitions = [
         },
         configure: async (device, coordinatorEndpoint) => {
             const endpoint1 = device.getEndpoint(1);
+            // Seed before binding: binds often fail (TABLE_FULL) on devices taken over from a Wiser hub
+            endpoint1.saveClusterAttributeKeyValue("genBasic", { zclVersion: 3 });
+            endpoint1.saveClusterAttributeKeyValue("hvacThermostat", { schneiderWiserSpecific: 1, systemMode: 4, ctrlSeqeOfOper: 2 });
+            endpoint1.saveClusterAttributeKeyValue("hvacUserInterfaceCfg", { keypadLockout: 0 });
             await reporting.bind(endpoint1, coordinatorEndpoint, ["genPowerCfg", "hvacThermostat", "msTemperatureMeasurement", "msRelativeHumidity"]);
             await reporting.temperature(endpoint1);
             await reporting.humidity(endpoint1);
             await reporting.batteryPercentageRemaining(endpoint1);
-            endpoint1.saveClusterAttributeKeyValue("genBasic", { zclVersion: 3 });
-            endpoint1.saveClusterAttributeKeyValue("hvacThermostat", { schneiderWiserSpecific: 1, systemMode: 4, ctrlSeqeOfOper: 2 });
-            endpoint1.saveClusterAttributeKeyValue("hvacUserInterfaceCfg", { keypadLockout: 0 });
         },
     },
     {
@@ -2894,6 +2934,7 @@ exports.definitions = [
         model: "MEG5126-0300",
         vendor: "Schneider Electric",
         description: "Merten MEG5165 PlusLink relais insert with Merten Wiser System M push button (2fold)",
+        ota: true,
         extend: [m.deviceEndpoints({ endpoints: { l1: 1, l2: 2 } }), m.onOff({ endpointNames: ["l1", "l2"], powerOnBehavior: false })],
     },
     {
@@ -3048,6 +3089,7 @@ exports.definitions = [
         model: "WDE002906/MEG5001-0300",
         vendor: "Schneider Electric",
         description: "Wiser wireless switch 1-gang or 2-gang",
+        ota: true,
         extend: [
             m.battery(),
             m.deviceEndpoints({ endpoints: { right: 21, left: 22 } }),
@@ -3063,6 +3105,7 @@ exports.definitions = [
         model: "EKO09738",
         vendor: "Schneider Electric",
         description: "Zigbee smart socket with power meter",
+        ota: true,
         fromZigbee: [fz.on_off, fz.electrical_measurement, fzLocal.EKO09738_metering, fz.power_on_behavior],
         toZigbee: [tz.on_off, tz.power_on_behavior],
         exposes: [
@@ -3088,6 +3131,7 @@ exports.definitions = [
         model: "EKO09716",
         vendor: "Schneider Electric",
         description: "Zigbee smart socket with power meter",
+        ota: true,
         fromZigbee: [fz.on_off, fz.electrical_measurement, fzLocal.EKO09738_metering, fz.power_on_behavior],
         toZigbee: [tz.on_off, tz.power_on_behavior],
         exposes: [
@@ -3139,6 +3183,7 @@ exports.definitions = [
         model: "MUR36014",
         vendor: "Schneider Electric",
         description: "Mureva EVlink Smart socket outlet",
+        ota: true,
         extend: [
             schneiderElectricExtend.addSchneiderFanSwitchConfigurationCluster(),
             m.onOff(),
@@ -3156,6 +3201,7 @@ exports.definitions = [
         model: "NH3526",
         vendor: "Schneider Electric",
         description: "Motion sensor with switch",
+        ota: true,
         extend: [
             m.onOff({
                 powerOnBehavior: false,
@@ -3181,6 +3227,7 @@ exports.definitions = [
         model: "CCT595011",
         vendor: "Schneider Electric",
         description: "Wiser motion sensor",
+        ota: true,
         version: "0.0.1",
         extend: [
             m.battery(),
@@ -3209,6 +3256,7 @@ exports.definitions = [
         model: "CCT592011",
         vendor: "Schneider Electric",
         description: "Wiser water leakage sensor",
+        ota: true,
         fromZigbee: [fz.ias_water_leak_alarm_1],
         toZigbee: [],
         exposes: [e.battery_low(), e.water_leak(), e.tamper()],
@@ -3248,6 +3296,7 @@ exports.definitions = [
         model: "W599001",
         vendor: "Schneider Electric",
         description: "Wiser smoke alarm",
+        ota: true,
         extend: [
             m.battery({ voltage: true, voltageReporting: true }),
             m.temperature(),
@@ -3284,6 +3333,7 @@ exports.definitions = [
         model: "CCT591011_AS",
         vendor: "Schneider Electric",
         description: "Wiser window/door sensor",
+        ota: true,
         fromZigbee: [fz.ias_contact_alarm_1, fz.ias_contact_alarm_1_report],
         toZigbee: [],
         exposes: [e.battery_low(), e.contact(), e.tamper()],
@@ -3293,6 +3343,7 @@ exports.definitions = [
         model: "EKO07259",
         vendor: "Schneider Electric",
         description: "Smart thermostat",
+        ota: true,
         extend: [
             m.thermostat({
                 localTemperature: {
@@ -3331,6 +3382,19 @@ exports.definitions = [
             schneiderElectricExtend.customThermostatCluster(),
             schneiderElectricExtend.localTemperatureSourceSelect(),
             schneiderElectricExtend.controlType(),
+            schneiderElectricExtend.addCycleTimeCluster(),
+            m.numeric({
+                name: "regulator_level",
+                cluster: "schneiderCycleTime",
+                attribute: "demandPercentage",
+                access: "ALL",
+                unit: "%",
+                valueMin: 0,
+                valueMax: 100,
+                valueStep: 10,
+                description: "Heating output percentage when the thermostat is configured in regulator mode (P9 / NoControl).",
+                zigbeeCommandOptions: { manufacturerCode: zigbee_herdsman_1.Zcl.ManufacturerCode.SCHNEIDER_ELECTRIC },
+            }),
             schneiderElectricExtend.controlStatus(),
             schneiderElectricExtend.thermostatApplication(),
             schneiderElectricExtend.heatingEmitter(),
@@ -3375,6 +3439,7 @@ exports.definitions = [
         model: "WDE002497",
         vendor: "Schneider Electric",
         description: "Smart thermostat",
+        ota: true,
         extend: [
             m.thermostat({
                 localTemperature: {
@@ -3457,6 +3522,7 @@ exports.definitions = [
         model: "WDE011680",
         vendor: "Schneider Electric",
         description: "Smart thermostat",
+        ota: true,
         fromZigbee: [fzLocal.thermostat_running_state_from_piheat, fz.metering, fzLocal.wiser_device_info, fz.hvac_user_interface, fz.temperature],
         toZigbee: [
             tz.thermostat_occupied_heating_setpoint,
@@ -3502,6 +3568,7 @@ exports.definitions = [
         model: "MEG5126-0300_MEG5152-0000",
         vendor: "Schneider Electric",
         description: "Merten MEG5152 switch insert (2fold) with Merten System M push button (2fold)",
+        ota: true,
         extend: [
             m.deviceEndpoints({ endpoints: { left: 1, right: 2, left_sw: 21, right_sw: 22 } }),
             m.identify(),
@@ -3514,6 +3581,7 @@ exports.definitions = [
         model: "MEG5116-0300_MEG5162-0000",
         vendor: "Schneider Electric",
         description: "Merten MEG5162 switch insert (2fold) with Merten System M push button (1fold)",
+        ota: true,
         extend: [
             m.deviceEndpoints({ endpoints: { left: 1, right: 2, left_sw: 21 } }),
             m.identify(),
@@ -3526,6 +3594,7 @@ exports.definitions = [
         model: "MEG5116-0300_MEG5151-0000",
         vendor: "Schneider Electric",
         description: "Merten MEG5151 switch insert with Merten System M push button (1fold)",
+        ota: true,
         extend: [
             m.deviceEndpoints({ endpoints: { switch: 1, switch_sw: 21 } }),
             m.identify(),
@@ -3538,6 +3607,7 @@ exports.definitions = [
         model: "MEG5779",
         vendor: "Schneider Electric",
         description: "Merten Connected Room Temperature Controller",
+        ota: true,
         fromZigbee: [
             {
                 cluster: "hvacThermostat",
@@ -3573,7 +3643,8 @@ exports.definitions = [
                 },
                 runningState: {
                     values: ["idle", "heat", "cool"],
-                    configure: { reporting: false },
+                    toZigbee: { skip: true },
+                    configure: { skip: true },
                 },
                 piHeatingDemand: {
                     values: ea.ALL,
@@ -3602,6 +3673,7 @@ exports.definitions = [
             schneiderElectricExtend.heatingFuel(),
             schneiderElectricExtend.heatTransferMedium(),
             schneiderElectricExtend.heatingEmitter(),
+            schneiderElectricExtend.openWindowDetectionStatus(),
         ],
     },
     {
@@ -3754,6 +3826,7 @@ exports.definitions = [
         model: "NH3527A",
         vendor: "Schneider Electric",
         description: "Motion sensor with dimmer",
+        ota: true,
         extend: [
             m.light({
                 effect: false,
@@ -3787,6 +3860,7 @@ exports.definitions = [
         model: "NHMOTION/UNIDIM/1",
         vendor: "Schneider Electric",
         description: "Motion sensor with dimmer",
+        ota: true,
         extend: [
             m.light({
                 effect: false,
@@ -3818,6 +3892,7 @@ exports.definitions = [
         model: "S520619",
         vendor: "Schneider Electric",
         description: "Wiser Odace Smart thermostat",
+        ota: true,
         fromZigbee: [
             fzLocal.thermostat_running_state_from_piheat,
             fz.metering,
@@ -3939,6 +4014,7 @@ exports.definitions = [
         model: "CCTFR6000",
         vendor: "Schneider Electric",
         description: "Wiser underfloor heating controller",
+        ota: true,
         whiteLabel: [
             { vendor: "Schneider Electric", model: "CCTFR6600" },
             { vendor: "Schneider Electric", model: "CCTFR6610" },

@@ -198,12 +198,12 @@ const fzLocal = {
             }
             if (msg.data.localTemp !== undefined) {
                 result.local_temperature = (0, utils_1.precisionRound)(msg.data.localTemp, 2) / 100;
-                if (model.model === "TH1300ZB") {
+                if (model.model === "TH1300ZB" || model.model === "TH1400ZB") {
                     // floorTemperature and roomTemperature do not support configureReporting;
                     // piggyback on local_temperature reports to keep values in sync.
                     msg.endpoint
                         .read("manuSpecificSinope", ["floorTemperature", "roomTemperature"], manuSinope)
-                        .catch((e) => logger_1.logger.debug(`TH1300ZB: failed to read floor/room temperature: ${e}`, "sinope"));
+                        .catch((e) => logger_1.logger.debug(`${model.model}: failed to read floor/room temperature: ${e}`, "sinope"));
                 }
             }
             if (msg.data.localTemperatureCalibration !== undefined) {
@@ -926,7 +926,11 @@ exports.definitions = [
         model: "TH1123ZB",
         vendor: "Sinopé",
         description: "Zigbee line volt thermostat",
-        extend: [sinopeExtend.addManuSpecificSinopeCluster(), sinopeExtend.addSinopeHvacThermostatCluster(), m.electricityMeter()],
+        extend: [
+            sinopeExtend.addManuSpecificSinopeCluster(),
+            sinopeExtend.addSinopeHvacThermostatCluster(),
+            m.electricityMeter({ configureReporting: false }),
+        ],
         fromZigbee: [fzLocal.thermostat, fzLocal.sinope, fz.hvac_user_interface, fz.ignore_temperature_report],
         toZigbee: [
             tz.thermostat_local_temperature,
@@ -1019,6 +1023,15 @@ exports.definitions = [
                     reportableChange: 1,
                 },
             ]);
+            await reporting.bind(endpoint, coordinatorEndpoint, ["seMetering", "haElectricalMeasurement"]);
+            await reporting.readMeteringMultiplierDivisor(endpoint);
+            await reporting.currentSummDelivered(endpoint, { min: 60, max: 300, change: 10 });
+            await reporting.readEletricalMeasurementMultiplierDivisors(endpoint);
+            // Some firmwares (e.g. TH1123ZB-C4) don't support reporting these attributes
+            // https://github.com/Koenkk/zigbee2mqtt/issues/32734
+            await utils.ignoreUnsupportedAttribute(async () => await reporting.activePower(endpoint, { min: 10, change: 5 }), "activePower");
+            await utils.ignoreUnsupportedAttribute(async () => await reporting.rmsCurrent(endpoint, { min: 10, change: 50 }), "rmsCurrent");
+            await utils.ignoreUnsupportedAttribute(async () => await reporting.rmsVoltage(endpoint, { min: 10, change: 50 }), "rmsVoltage");
             try {
                 await reporting.thermostatSystemMode(endpoint);
             }
@@ -1740,6 +1753,9 @@ exports.definitions = [
                 "temperatureSensor",
                 "pumpProtection",
             ]);
+            // floorTemperature (0x0107) and roomTemperature (0x010D) do not support configureReporting.
+            // Perform an initial read on pairing; ongoing sync is handled in fzLocal.thermostat.
+            await endpoint.read("manuSpecificSinope", ["floorTemperature", "roomTemperature"], manuSinope);
             await reporting.temperature(endpoint, { min: 1, max: 0xffff }); // disable reporting
         },
     },
@@ -1748,7 +1764,7 @@ exports.definitions = [
         model: "TH1500ZB",
         vendor: "Sinopé",
         description: "Zigbee dual pole line volt thermostat",
-        extend: [sinopeExtend.addManuSpecificSinopeCluster(), sinopeExtend.addSinopeHvacThermostatCluster()],
+        extend: [sinopeExtend.addManuSpecificSinopeCluster(), sinopeExtend.addSinopeHvacThermostatCluster(), m.electricityMeter()],
         fromZigbee: [
             fzLocal.thermostat,
             fzLocal.sinope,

@@ -137,7 +137,7 @@ exports.definitions = [
         whiteLabel: [{ vendor: "Zemismart", model: "SPM01-1Z2", fingerprint: [{ modelID: "SPM01-1Z2" }] }],
     },
     {
-        zigbeeModel: ["SDM01W", "SDM01-3Z1"],
+        zigbeeModel: ["SDM01W", "SDM01-3Z1", "SDM01G2W"],
         model: "SDM01W-U01",
         vendor: "BITUO TECHNIK",
         description: "Smart energy monitor for 3P+N system",
@@ -180,7 +180,10 @@ exports.definitions = [
             e.numeric("energy_phase_c", ea.STATE_GET).withUnit("kWh").withDescription("Energy phase C"),
             e.numeric("produced_energy_phase_c", ea.STATE_GET).withUnit("kWh").withDescription("Produced energy phase C"),
         ],
-        whiteLabel: [{ vendor: "Zemismart", model: "SDM01-3Z1", fingerprint: [{ modelID: "SDM01-3Z1" }] }],
+        whiteLabel: [
+            { vendor: "Zemismart", model: "SDM01-3Z1", fingerprint: [{ modelID: "SDM01-3Z1" }] },
+            { vendor: "BITUO TECHNIK", model: "SDM01G2W-U01", fingerprint: [{ modelID: "SDM01G2W" }] },
+        ],
     },
     {
         zigbeeModel: ["SDM01B"],

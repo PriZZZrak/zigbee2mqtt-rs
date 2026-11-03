@@ -497,10 +497,12 @@ const ubisys = {
                 const attributeInputActions = customCluster.attributes.inputActions;
                 (0, node_assert_1.default)(attributeInputConfigurations && attributeInputActions);
                 // ubisys switched to writeStructure a while ago, change log only goes back to 1.9.x
-                // and it happened before that but to be safe we will only use writeStrucutre on 1.9.0 and up
-                if (!meta.device.softwareBuildID ||
-                    !(0, semver_1.valid)(meta.device.softwareBuildID, true) ||
-                    !(0, semver_1.gte)(meta.device.softwareBuildID, "1.9.0", true)) {
+                // and it happened before that but to be safe we will only use writeStrucutre on 1.9.0 and up.
+                // The LD6 numbers its firmware separately (1.7.x) and supports writeStructure.
+                if (meta.device.modelID !== "LD6" &&
+                    (!meta.device.softwareBuildID ||
+                        !(0, semver_1.valid)(meta.device.softwareBuildID, true) ||
+                        !(0, semver_1.gte)(meta.device.softwareBuildID, "1.9.0", true))) {
                     logger_1.logger.warning(`ubisys: update firmware of '${meta.options.friendly_name}' before writing configure_device_setup!`, NS);
                     return;
                 }
@@ -639,7 +641,7 @@ const ubisys = {
                         // first client endpoint - depends on actual device
                         throw new Error("Not supported for groups");
                     }
-                    let endpoint = { S1: 2, S2: 3, D1: 2, J1: 2, C4: 1 }[meta.mapped.model];
+                    let endpoint = { S1: 2, S2: 3, D1: 2, J1: 2, C4: 1, LD6: 2 }[meta.mapped.model];
                     // default group id
                     let groupId = 0;
                     const templates = Array.isArray(value.input_action_templates) ? value.input_action_templates : [value.input_action_templates];
@@ -743,7 +745,10 @@ const ubisys = {
                 const devMgmtEp = meta.device.getEndpoint(232);
                 const customCluster = meta.device.customClusters["manuSpecificUbisysDeviceSetup"];
                 (0, node_assert_1.default)(customCluster);
-                await devMgmtEp.read("manuSpecificUbisysDeviceSetup", [customCluster.attributes.inputConfigurations.ID, customCluster.attributes.inputActions.ID], manufacturerOptions.ubisysNull);
+                // One attribute per request: with a longer InputActions table both together exceed a single
+                // frame, which the device rejects with INSUFFICIENT_SPACE.
+                await devMgmtEp.read("manuSpecificUbisysDeviceSetup", [customCluster.attributes.inputConfigurations.ID], manufacturerOptions.ubisysNull);
+                await devMgmtEp.read("manuSpecificUbisysDeviceSetup", [customCluster.attributes.inputActions.ID], manufacturerOptions.ubisysNull);
             },
         },
         output_configuration: {
@@ -771,9 +776,9 @@ const ubisys = {
                         },
                     },
                 ], manufacturerOptions.ubisysNull);
-                // The device re-enumerates its application endpoints after this write, so a
-                // re-interview is required before the new light endpoints appear.
-                logger_1.logger.info(`ubisys: LD6 output configuration written, re-interview '${meta.options.friendly_name}' to pick up the new endpoints`, NS);
+                // The device re-enumerates its application endpoints after this write. A re-interview
+                // picks up the new endpoints and a reconfigure then reads their colour capabilities.
+                logger_1.logger.info(`ubisys: LD6 output configuration written, re-interview and then reconfigure '${meta.options.friendly_name}' to pick up the new lights`, NS);
             },
             convertGet: async (entity, key, meta) => {
                 const devMgmtEp = meta.device.getEndpoint(232);
@@ -1208,8 +1213,12 @@ exports.definitions = [
                 await reporting.bind(endpoint, coordinatorEndpoint, ["genOnOff", "genLevelCtrl"]);
                 await reporting.onOff(endpoint);
                 await reporting.brightness(endpoint);
-                // Populate the ballast exposes; these attributes are read, not reported.
+                // Populate the ballast and start-up exposes; these attributes are read, not reported.
                 await endpoint.read("lightingBallastCfg", ["minLevel", "maxLevel"]);
+                await endpoint.read("genOnOff", ["startUpOnOff"]);
+                if (ubisysLd6ColorCapabilities(device, id) & UBISYS_LD6_CAPABILITY_COLOR_TEMP) {
+                    await endpoint.read("lightingColorCtrl", ["startUpColorTemperature"]);
+                }
             }
         },
         ota: true,

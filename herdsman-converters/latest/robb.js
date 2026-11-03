@@ -161,6 +161,13 @@ exports.definitions = [
         extend: [m.light({ configureReporting: true }), m.electricityMeter({ current: { divisor: 1000 }, voltage: { divisor: 10 }, power: { divisor: 10 } })],
     },
     {
+        zigbeeModel: ["ROB_200-012-0"],
+        model: "ROB_200-012-0",
+        vendor: "ROBB",
+        description: "Dual Zigbee AC phase-cut dimmer",
+        extend: [m.deviceEndpoints({ endpoints: { l1: 1, l2: 2 } }), m.light({ endpointNames: ["l1", "l2"], configureReporting: true })],
+    },
+    {
         zigbeeModel: ["ROB_200-003-0"],
         model: "ROB_200-003-0",
         vendor: "ROBB",

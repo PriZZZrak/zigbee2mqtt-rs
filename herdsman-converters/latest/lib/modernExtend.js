@@ -87,6 +87,7 @@ exports.text = text;
 exports.actionEnumLookup = actionEnumLookup;
 exports.quirkAddEndpointCluster = quirkAddEndpointCluster;
 exports.quirkCheckinInterval = quirkCheckinInterval;
+exports.pollControl = pollControl;
 exports.reconfigureReportingsOnDeviceAnnounce = reconfigureReportingsOnDeviceAnnounce;
 exports.skipDefaultResponse = skipDefaultResponse;
 exports.deviceEndpoints = deviceEndpoints;
@@ -801,10 +802,10 @@ function pressure(args = {}) {
         name: "pressure",
         cluster: "msPressureMeasurement",
         attribute: "measuredValue",
-        reporting: { min: "10_SECONDS", max: "1_HOUR", change: 50 }, // 5 kPa
+        reporting: { min: "10_SECONDS", max: "1_HOUR", change: 5 }, // 5 hPa
         description: "The measured atmospheric pressure",
-        unit: "kPa",
-        scale: 10,
+        unit: "hPa",
+        scale: 1,
         access: "STATE_GET",
         ...args,
     });
@@ -1036,7 +1037,7 @@ function pm25(args = {}) {
     });
 }
 function light(args = {}) {
-    const { effect = true, powerOnBehavior = true, configureReporting = false, ota = false, color = undefined, levelConfig = undefined, turnsOffAtBrightness1 = false, endpointNames = undefined, levelReportingConfig = undefined, moveToLevelWithOnOffDisable = false, } = args;
+    const { effect = true, powerOnBehavior = true, configureReporting = false, ota = false, color = undefined, levelConfig = undefined, turnsOffAtBrightness1 = false, endpointNames = undefined, levelReportingConfig = undefined, moveToLevelWithOnOffDisable = false, homeassistant = undefined, } = args;
     let { colorTemp = undefined } = args;
     if (colorTemp) {
         colorTemp = { startup: true, ...colorTemp };
@@ -1049,7 +1050,10 @@ function light(args = {}) {
             ...((0, utils_1.isObject)(color) ? color : {}),
         }
         : false;
-    const lightExpose = (0, utils_1.exposeEndpoints)(exposes_1.presets.light().withBrightness(), endpointNames);
+    const baseLightExpose = exposes_1.presets.light().withBrightness();
+    if (homeassistant)
+        baseLightExpose.withHomeAssistant(homeassistant);
+    const lightExpose = (0, utils_1.exposeEndpoints)(baseLightExpose, endpointNames);
     const fromZigbee = [fz.on_off, fz.brightness, fz.level_config];
     const toZigbee = [
         endpointNames ? { ...tz.light_onoff_brightness, endpoints: endpointNames } : tz.light_onoff_brightness,
@@ -1428,6 +1432,8 @@ function iasZoneAlarm(args) {
                 ]
                 : [],
             convert: (model, msg, publish, options, meta) => {
+                if (args.endpointId !== undefined && msg.endpoint.ID !== args.endpointId)
+                    return;
                 if (args.alarmTimeout) {
                     const timeout = options?.[timeoutProperty] != null ? Number(options[timeoutProperty]) : 90;
                     clearTimeout(globalStore.getValue(msg.endpoint, "timer"));
@@ -1569,15 +1575,19 @@ function iasWarning(args = {}) {
         {
             key: ["warning"],
             convertSet: async (entity, key, value, meta) => {
+                // @ts-expect-error ignore
+                const mode = value.mode || "emergency";
+                // When stopping the warning, don't let the "emergency" defaults (strobe on, duration 10s, etc.)
+                // cause the device to (re)start sounding/flashing instead of actually stopping.
+                const isStop = mode === "stop";
                 const values = {
+                    mode,
                     // @ts-expect-error ignore
-                    mode: value.mode || "emergency",
+                    level: value.level || (isStop ? "low" : "medium"),
                     // @ts-expect-error ignore
-                    level: value.level || "medium",
+                    strobe: value.strobe != null ? value.strobe : !isStop,
                     // @ts-expect-error ignore
-                    strobe: value.strobe != null ? value.strobe : true,
-                    // @ts-expect-error ignore
-                    duration: value.duration != null ? value.duration : 10,
+                    duration: value.duration != null ? value.duration : isStop ? 0 : 10,
                     // @ts-expect-error ignore
                     strobeDutyCycle: value.strobe_duty_cycle != null ? value.strobe_duty_cycle * 10 : 0,
                     // @ts-expect-error ignore
@@ -2366,7 +2376,7 @@ function numeric(args) {
     }
     else {
         for (const [i, endpoint] of endpoints.entries()) {
-            exposes.push(createExpose(nameArray[i] ?? nameArray[0], descriptionArray[i] ?? descriptionArray[0], endpoint, unitArray[i] ?? unitArray[0], valueMinArray[i] ?? valueMinArray[0], valueMaxArray[i] ?? valueMaxArray[0], valueStepArray[i] ?? valueStepArray[0], labelArray[i] ?? labelArray[0], homeassistantArray[i] ?? homeassistantArray[0]));
+            exposes.push(createExpose(nameArray.length === 1 ? nameArray[0] : nameArray[i], descriptionArray.length === 1 ? descriptionArray[0] : descriptionArray[i], endpoint, unitArray.length === 1 ? unitArray[0] : unitArray[i], valueMinArray.length === 1 ? valueMinArray[0] : valueMinArray[i], valueMaxArray.length === 1 ? valueMaxArray[0] : valueMaxArray[i], valueStepArray.length === 1 ? valueStepArray[0] : valueStepArray[i], labelArray.length === 1 ? labelArray[0] : labelArray[i], homeassistantArray.length === 1 ? homeassistantArray[0] : homeassistantArray[i]));
         }
     }
     const fromZigbee = [
@@ -2389,7 +2399,7 @@ function numeric(args) {
                             value = typeof scale === "number" ? value / scale : scale(value, "from");
                         }
                         (0, utils_1.assertNumber)(value);
-                        const precision = precisionArray[endpointIndex] ?? precisionArray[0];
+                        const precision = precisionArray.length === 1 ? precisionArray[0] : precisionArray[endpointIndex];
                         if (precision != null)
                             value = (0, utils_1.precisionRound)(value, precision);
                         const expose = exposes.length === 1 ? exposes[0] : exposes.find((e) => e.endpoint === endpoint);
@@ -2422,7 +2432,7 @@ function numeric(args) {
                     }
                     (0, utils_1.assertNumber)(payloadValue);
                     const endpointIndex = groupEndpointNames?.indexOf(meta.endpoint_name ?? groupEndpointNames[0]) ?? 0;
-                    const precision = groupPrecition[endpointIndex] ?? groupPrecition[0];
+                    const precision = groupPrecition.length === 1 ? groupPrecition[0] : groupPrecition[endpointIndex];
                     if (precision != null)
                         payloadValue = (0, utils_1.precisionRound)(payloadValue, precision);
                     const payload = (0, utils_1.isString)(attribute)
@@ -2486,7 +2496,7 @@ function binary(args) {
     }
     else {
         for (const [i, endpoint] of endpoints.entries()) {
-            exposes.push(createExpose(descriptionArray[i] ?? descriptionArray[0], endpoint, labelArray[i] ?? labelArray[0], homeassistantArray[i] ?? homeassistantArray[0]));
+            exposes.push(createExpose(descriptionArray.length === 1 ? descriptionArray[0] : descriptionArray[i], endpoint, labelArray.length === 1 ? labelArray[0] : labelArray[i], homeassistantArray.length === 1 ? homeassistantArray[0] : homeassistantArray[i]));
         }
     }
     const fromZigbee = [
@@ -2651,6 +2661,35 @@ function quirkCheckinInterval(timeout) {
         },
     ];
     return { configure, isModernExtend: true };
+}
+// longPollInterval is read-only, so it takes the setLongPollInterval command. Some sleepy devices reset it
+// to a very short factory value on power-up (battery swap), so it is reapplied on every announce.
+function pollControl(args) {
+    const { longPollInterval, checkinInterval, endpointId = 1 } = args;
+    const apply = async (device) => {
+        const endpoint = device.getEndpoint(endpointId);
+        if (!endpoint)
+            return;
+        try {
+            await endpoint.command("genPollCtrl", "setLongPollInterval", { newLongPollInterval: longPollInterval });
+            if (checkinInterval !== undefined) {
+                await endpoint.write("genPollCtrl", { checkinInterval });
+            }
+        }
+        catch (error) {
+            // Sleepy device may go back to sleep before acking; retried on the next announce.
+            logger_1.logger.debug(`Failed to set poll control intervals of '${device.ieeeAddr}': ${error}`, NS);
+        }
+    };
+    const configure = [async (device) => await apply(device)];
+    const onEvent = [
+        async (event) => {
+            if (event.type === "deviceAnnounce") {
+                await apply(event.data.device);
+            }
+        },
+    ];
+    return { configure, onEvent, isModernExtend: true };
 }
 function reconfigureReportingsOnDeviceAnnounce() {
     const onEvent = [

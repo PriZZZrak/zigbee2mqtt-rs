@@ -222,18 +222,14 @@ exports.definitions = [
         vendor: "Aqara",
         description: "Door and window sensor P1",
         fromZigbee: [lumi.fromZigbee.lumi_contact, fz.ias_contact_alarm_1, lumi.fromZigbee.lumi_specific],
-        toZigbee: [lumi.toZigbee.lumi_detection_distance],
-        meta: { battery: { voltageToPercentage: { min: 2850, max: 3000 } } },
-        exposes: [
-            e.contact(),
-            e.battery(),
-            e.battery_voltage(),
-            e.tamper(),
-            e
-                .enum("detection_distance", ea.ALL, ["10mm", "20mm", "30mm"])
-                .withDescription('The sensor will be considered "off" within the set distance. Please press the device button before setting'),
+        exposes: [e.contact(), e.tamper()],
+        extend: [
+            lumi.modernExtend.addManuSpecificLumiCluster(),
+            m.quirkCheckinInterval("1_HOUR"),
+            lumi.modernExtend.lumiP1Battery(),
+            lumi.modernExtend.lumiP1DetectionDistance(),
+            lumi.modernExtend.lumiP1Action(),
         ],
-        extend: [lumi.modernExtend.addManuSpecificLumiCluster(), m.quirkCheckinInterval("1_HOUR")],
     },
     {
         zigbeeModel: ["lumi.dimmer.rcbac1"],
@@ -1663,9 +1659,9 @@ exports.definitions = [
             m.temperature(),
             m.humidity(),
             m.pressure({
-                unit: "hPa",
-                scale: 1,
                 reporting: { min: "10_SECONDS", max: "1_HOUR", change: 5 },
+                // Use the more precise scaledValue when the device reports it
+                fzConvert: lumi.fromZigbee.lumi_pressure.convert,
             }),
             m.battery({
                 voltage: true,
@@ -2788,7 +2784,12 @@ exports.definitions = [
         description: "Roller shade driver E1",
         vendor: "Aqara",
         whiteLabel: [{ vendor: "Aqara", model: "RSD-M01" }],
-        fromZigbee: [lumi.fromZigbee.lumi_curtain_position, lumi.fromZigbee.lumi_curtain_status, lumi.fromZigbee.lumi_specific],
+        fromZigbee: [
+            lumi.fromZigbee.lumi_curtain_position,
+            lumi.fromZigbee.lumi_curtain_status,
+            lumi.fromZigbee.lumi_curtain_options,
+            lumi.fromZigbee.lumi_specific,
+        ],
         ota: true,
         toZigbee: [
             lumi.toZigbee.lumi_curtain_position_state,
@@ -3638,7 +3639,7 @@ exports.definitions = [
         fromZigbee: [fz.battery, lumi.fromZigbee.lumi_action_multistate, lumi.fromZigbee.lumi_specific, fz.command_toggle],
         toZigbee: [lumi.toZigbee.lumi_switch_click_mode, lumi.toZigbee.lumi_operation_mode_opple],
         meta: { battery: { voltageToPercentage: { min: 2850, max: 3000 } }, multiEndpoint: true },
-        extend: [lumi.modernExtend.addManuSpecificLumiCluster(), m.quirkCheckinInterval("1_HOUR"), m.identify({ isSleepy: true })],
+        extend: [lumi.modernExtend.addManuSpecificLumiCluster(), lumiZigbeeOTA(), m.quirkCheckinInterval("1_HOUR"), m.identify({ isSleepy: true })],
         exposes: [
             e.battery(),
             e.battery_voltage(),
@@ -4904,6 +4905,34 @@ exports.definitions = [
         ],
     },
     {
+        zigbeeModel: ["lumi.plug.aeu006"],
+        model: "SP-P06E",
+        vendor: "Aqara",
+        description: "Outdoor plug H2 EU",
+        extend: [
+            lumi.modernExtend.addManuSpecificLumiCluster(),
+            lumiZigbeeOTA(),
+            lumiOnOff({ powerOutageMemory: "enum", deviceTemperature: false }),
+            m.electricityMeter({ cluster: "electrical", power: { divisor: 1, multiplier: 1 }, voltage: false, current: false }),
+            lumiElectricityMeter({ voltage: false }),
+            lumiOverloadProtection(),
+            lumiLedIndicator(),
+            lumiFlipIndicatorLight(),
+            lumiChildLock(),
+            m.binary({
+                name: "charging_protection",
+                cluster: "manuSpecificLumi",
+                attribute: { ID: 0x0202, type: 0x10 },
+                valueOn: ["ON", 1],
+                valueOff: ["OFF", 0],
+                description: "Turn off the plug if the power is below 3W for half an hour",
+                access: "ALL",
+                zigbeeCommandOptions: { manufacturerCode },
+            }),
+            m.identify(),
+        ],
+    },
+    {
         zigbeeModel: ["lumi.light.acn032", "lumi.light.acn031"],
         model: "CL-L02D",
         vendor: "Aqara",
@@ -5170,13 +5199,23 @@ exports.definitions = [
             m.light({
                 powerOnBehavior: false,
                 levelConfig: {
-                    features: ["execute_if_off", "on_transition_time", "off_transition_time", "on_level"],
+                    features: ["execute_if_off", "on_transition_time", "off_transition_time"],
                 },
             }),
-            lumiKnobRotation({ withButtonState: false }),
+            lumiKnobRotation({ withButtonState: true, pressedEndpoint: 72 }),
             lumiOperationMode({ description: "Decoupled mode for knob" }),
             lumiAction({ actionLookup: { hold: 0, single: 1, double: 2, release: 255 } }),
             lumiMultiClick(),
+            lumiSwitchMode(),
+            m.enumLookup({
+                name: "event_mode",
+                lookup: { command: 0, event: 1 },
+                cluster: "manuSpecificLumi",
+                attribute: { ID: 0x0009, type: 0x20 },
+                description: "Aqara command/event mode",
+                entityCategory: "config",
+                zigbeeCommandOptions: { manufacturerCode },
+            }),
             m.enumLookup({
                 name: "sensitivity",
                 lookup: { low: 720, medium: 360, high: 180 },
@@ -6154,6 +6193,7 @@ exports.definitions = [
         vendor: "Aqara",
         description: "Presence sensor FP310",
         fromZigbee: [lumi.fromZigbee.lumi_specific],
+        version: "0.0.1",
         configure: async (device, coordinatorEndpoint) => {
             const endpoint = device.getEndpoint(1);
             await endpoint.read("manuSpecificLumi", [0x00ee], { manufacturerCode: manufacturerCode }); // Read OTA data; makes the device expose more attributes related to OTA
@@ -6161,6 +6201,10 @@ exports.definitions = [
             await endpoint.read("manuSpecificLumi", [0x0142], { manufacturerCode: manufacturerCode }); // Read current presence
             await endpoint.read("manuSpecificLumi", [0x0197], { manufacturerCode: manufacturerCode }); // Read current absence delay timer value
             await endpoint.read("manuSpecificLumi", [0x019a], { manufacturerCode: manufacturerCode }); // Read detection range
+            // Configure reporting so presence (0x0142) updates autonomously. Without this the CN firmware can stop
+            // sending 0x0142 after idle while temp/humidity keep reporting (same class of bug as PS-S04D / #12383).
+            await reporting.bind(endpoint, coordinatorEndpoint, ["manuSpecificLumi"]);
+            await endpoint.configureReporting("manuSpecificLumi", [{ attribute: { ID: 0x0142, type: zigbee_herdsman_1.Zcl.DataType.UINT8 }, minimumReportInterval: 0, maximumReportInterval: 3600, reportableChange: 1 }], { manufacturerCode: manufacturerCode });
         },
         extend: [
             lumi.modernExtend.addManuSpecificLumiCluster(),

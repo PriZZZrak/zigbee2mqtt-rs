@@ -37,7 +37,7 @@ exports.definitions = void 0;
 const m = __importStar(require("../lib/modernExtend"));
 exports.definitions = [
     {
-        zigbeeModel: ["Panel gen4", "Mill Wi-Fi Panel Heater Gen4\u0000\u0000\u0000\u0018Mill Int"],
+        zigbeeModel: ["Panel gen4", "Mill Wi-Fi Panel Heater Gen4", "Mill Wi-Fi Panel Heater Gen4\u0000\u0000\u0000\u0018Mill Int"],
         model: "Mill-gen-4",
         vendor: "Mill",
         description: "WiFi heating panel gen4",

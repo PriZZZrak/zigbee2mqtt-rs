@@ -49,6 +49,15 @@ const fzZosung = zosung.fzZosung;
 const tzZosung = zosung.tzZosung;
 const ez = zosung.presetsZosung;
 const te = tuya.exposes;
+// Device reports the temperature in the selected temperature_unit instead of always in Celsius. Convert it back
+// so `temperature` (exposed with a fixed °C unit) stays consistent.
+// https://github.com/Koenkk/zigbee2mqtt/issues/32984
+const temperatureInSelectedUnit = {
+    from: (value, meta) => {
+        const raw = value / 10;
+        return (0, utils_1.precisionRound)(meta.state.temperature_unit === "fahrenheit" ? ((raw - 32) * 5) / 9 : raw, 2);
+    },
+};
 // Convert HA raw IR timings (microseconds) to a Broadlink IR packet.
 // HOBEIAN ZG-IR01 only accepts Broadlink-encoded strings via ir_code_to_send,
 // but HA's native infrared.* platform sends raw {timings: [...]} through
@@ -228,21 +237,7 @@ exports.definitions = [
                 [4, "switch4", tuya.valueConverter.onOff],
                 [5, "switch5", tuya.valueConverter.onOff],
                 [6, "switch6", tuya.valueConverter.onOff],
-                [
-                    109,
-                    "temperature",
-                    {
-                        // Device reports the raw value already scaled in the currently selected
-                        // display unit (DP 111), instead of always reporting Celsius. Convert
-                        // back to Celsius here so `temperature` (exposed with a fixed °C unit)
-                        // stays consistent regardless of the device's temperature_unit setting.
-                        // https://github.com/Koenkk/zigbee2mqtt/issues/32984
-                        from: (value, meta) => {
-                            const raw = value / 10;
-                            return meta.state.temperature_unit === "fahrenheit" ? ((raw - 32) * 5) / 9 : raw;
-                        },
-                    },
-                ],
+                [109, "temperature", temperatureInSelectedUnit],
                 [110, "humidity", tuya.valueConverter.raw],
                 [112, "battery", tuya.valueConverter.raw],
                 [111, "temperature_unit", tuya.valueConverter.temperatureUnit],
@@ -553,7 +548,7 @@ exports.definitions = [
                 [123, "motion_detection_sensitivity", tuya.valueConverter.raw],
                 [108, "indicator", tuya.valueConverter.onOff],
                 [110, "battery", tuya.valueConverter.raw],
-                [111, "temperature", tuya.valueConverter.divideBy10],
+                [111, "temperature", temperatureInSelectedUnit],
                 [101, "humidity", tuya.valueConverter.raw],
                 [109, "temperature_unit", tuya.valueConverter.temperatureUnit],
                 [105, "temperature_calibration", tuya.valueConverter.divideBy10],
@@ -1263,9 +1258,27 @@ exports.definitions = [
         exposes: [
             e.vibration(),
             e.tilt(),
-            e.numeric("x", ea.STATE).withValueMin(0).withValueMax(256).withValueStep(1).withDescription("X coordinate"),
-            e.numeric("y", ea.STATE).withValueMin(0).withValueMax(256).withValueStep(1).withDescription("Y coordinate"),
-            e.numeric("z", ea.STATE).withValueMin(0).withValueMax(256).withValueStep(1).withDescription("Z coordinate"),
+            e
+                .numeric("x", ea.STATE)
+                .withLabel("Accel. X Component")
+                .withValueMin(-128)
+                .withValueMax(127)
+                .withValueStep(1)
+                .withDescription("Gravitational acceleration component along the X-axis"),
+            e
+                .numeric("y", ea.STATE)
+                .withLabel("Accel. Y Component")
+                .withValueMin(-128)
+                .withValueMax(127)
+                .withValueStep(1)
+                .withDescription("Gravitational acceleration component along the Y-axis"),
+            e
+                .numeric("z", ea.STATE)
+                .withLabel("Accel. Z Component")
+                .withValueMin(-128)
+                .withValueMax(127)
+                .withValueStep(1)
+                .withDescription("Gravitational acceleration component along the Z-axis"),
             e.battery(),
             e.enum("sensitivity", ea.STATE_SET, ["low", "middle", "high"]).withDescription("Vibration detection sensitivity"),
         ],
@@ -1273,9 +1286,9 @@ exports.definitions = [
             tuyaDatapoints: [
                 [1, "vibration", tuya.valueConverter.trueFalseEnum1],
                 [7, "tilt", tuya.valueConverter.trueFalseEnum1],
-                [101, "x", tuya.valueConverter.raw],
-                [102, "y", tuya.valueConverter.raw],
-                [103, "z", tuya.valueConverter.raw],
+                [101, "x", tuya.valueConverter.twosComplement8Bit],
+                [102, "y", tuya.valueConverter.twosComplement8Bit],
+                [103, "z", tuya.valueConverter.twosComplement8Bit],
                 [
                     104,
                     "sensitivity",
@@ -1484,12 +1497,12 @@ exports.definitions = [
                 model: "AY204T",
                 vendor: "AOYAN",
                 description: "Millimeter wave motion detection",
-                fingerprint: [{ modelID: "AY204T", manufacturerName: "AOYAN  " }],
+                fingerprint: [{ modelID: "AY204T", manufacturerName: "AOYAN" }],
             },
         ],
     },
     {
-        zigbeeModel: ["ZG-223Z", "HS118Z"],
+        zigbeeModel: ["ZG-223Z", "HS118Z", "AY-223Z"],
         fingerprint: tuya.fingerprint("TS0601", ["_TZE200_jsaqgakf", "_TZE200_u6x1zyv2", "_TZE200_2pddnnrk", "_TZE200_gt1gge3x"]),
         model: "ZG-223Z",
         vendor: "HOBEIAN",
@@ -1519,6 +1532,12 @@ exports.definitions = [
                 vendor: "HYSYIOT",
                 description: "Rainwater detection sensor",
                 fingerprint: [{ modelID: "HS118Z", manufacturerName: "HYSYIOT" }],
+            },
+            {
+                model: "AY-223Z",
+                vendor: "AOYAN",
+                description: "Rainwater detection sensor",
+                fingerprint: [{ modelID: "AY-223Z", manufacturerName: "AOYAN" }],
             },
         ],
         meta: {
@@ -1766,7 +1785,7 @@ exports.definitions = [
         fromZigbee: [fz.ias_contact_alarm_1, fz.battery, fz.ias_contact_alarm_1_report],
         toZigbee: [],
         exposes: (device, options) => {
-            const exps = [e.contact(), e.battery(), e.battery_voltage()];
+            const exps = [e.contact(), e.battery_low(), e.tamper(), e.battery(), e.battery_voltage()];
             return exps;
         },
         meta: {

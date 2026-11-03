@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.definitions = void 0;
 const exposes = __importStar(require("../lib/exposes"));
 const m = __importStar(require("../lib/modernExtend"));
+const utils_1 = require("../lib/utils");
 const e = exposes.presets;
 const ea = exposes.access;
 /*
@@ -79,13 +80,6 @@ const ROCKER_ACTIONS = {
     release_down: 13,
     hold_down: 14,
 };
-/** The doorbell push button is a single button, so only the "up" codes occur. */
-const DOORBELL_BUTTON_ACTIONS = {
-    single: 1,
-    double: 2,
-    release: 3,
-    hold: 4,
-};
 /** Decodes the rockers on the given endpoint names into per-rocker actions. */
 function rockerButtons(endpointNames) {
     return m.actionEnumLookup({
@@ -128,7 +122,10 @@ const tzLocal = {
         key: ["doorbell"],
         convertSet: async (entity, key, value, meta) => {
             const endpoint = meta.device.getEndpoint(6);
-            await endpoint.command("genOnOff", "on", {});
+            // getOptions applies the definition's meta to the command, the same
+            // way tz.on_off does for the relays, so options such as
+            // disableDefaultResponse take effect for the buzzer too.
+            await endpoint.command("genOnOff", "on", {}, (0, utils_1.getOptions)(meta.mapped, endpoint));
             return {};
         },
     },
@@ -241,14 +238,16 @@ exports.definitions = [
             }),
             m.onOff({ endpointNames: ["socket", "light"], powerOnBehavior: false }),
             indicatorLeds(["led"]),
-            rockerButtons(["button_1", "button_2"]),
-            // The external doorbell push button, on its own endpoint.
-            m.actionEnumLookup({
-                cluster: "genMultistateInput",
-                attribute: "presentValue",
-                actionLookup: DOORBELL_BUTTON_ACTIONS,
-                endpointNames: ["doorbell_button"],
-            }),
+            // The external doorbell push button reports on endpoint 8 with the
+            // same codes as a rocker's upper half, so it shares the rocker
+            // lookup and publishes single_up_doorbell_button and so on.
+            //
+            // It must not get a lookup of its own: actionEnumLookup's
+            // endpointNames only sets the action postfix, not which endpoints
+            // the converter listens to. A second lookup on the same attribute
+            // runs on every button press and overwrites the rocker result for
+            // any value both lookups share.
+            rockerButtons(["button_1", "button_2", "doorbell_button"]),
         ],
         toZigbee: [tzLocal.doorbell],
         exposes: [e.enum("doorbell", ea.SET, ["ring"]).withDescription("Sounds the doorbell buzzer")],

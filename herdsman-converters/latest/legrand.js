@@ -860,7 +860,7 @@ exports.definitions = [
         },
     },
     {
-        zigbeeModel: ["Hospitality on off plug\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"],
+        zigbeeModel: ["Hospitality on off plug", "Hospitality on off plug\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"],
         model: "WNP10",
         vendor: "Legrand",
         description: "Smart plug-in switch with Netatmo",
@@ -870,7 +870,9 @@ exports.definitions = [
         extend: [legrand_1.legrandExtend.addLegrandDevicesCluster(), m.identify(), m.commandsOnOff()],
         exposes: [e.switch(), legrand_1.eLegrand.ledInDark(), legrand_1.eLegrand.ledIfOn()],
         configure: async (device, coordinatorEndpoint) => {
-            /* binds + genBinaryInput reporting */
+            const endpoint = device.getEndpoint(1);
+            await reporting.bind(endpoint, coordinatorEndpoint, ["genIdentify", "genOnOff", "genBinaryInput"]);
+            await reporting.onOff(endpoint);
         },
     },
 ];

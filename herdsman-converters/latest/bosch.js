@@ -634,6 +634,7 @@ exports.definitions = [
             bosch_1.boschThermostatExtend.valveAdaptation(),
             bosch_1.boschThermostatExtend.errorState({ enableReporting: true }),
             bosch_1.boschGeneralExtend.batteryWithPercentageAndLowStatus(),
+            bosch_1.boschThermostatExtend.raWeeklySchedule(),
         ],
         ota: true,
     },

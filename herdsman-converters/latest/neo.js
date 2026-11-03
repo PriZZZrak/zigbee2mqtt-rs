@@ -181,6 +181,7 @@ exports.definitions = [
         ]),
         model: "NAS-WV03B",
         vendor: "NEO",
+        ota: true,
         extend: [
             tuya.modernExtend.tuyaBase({
                 dp: true,

@@ -40,6 +40,7 @@ exports.definitions = [
         zigbeeModel: ["SC0002"],
         model: "SC0002",
         vendor: "Selena",
+        version: "0.0.1",
         description: "Desktop environmental monitoring station",
         extend: [m.temperature(), m.pressure(), m.humidity(), m.illuminance(), m.co2()],
     },

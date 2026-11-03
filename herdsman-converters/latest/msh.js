@@ -78,6 +78,7 @@ exports.definitions = [
     {
         zigbeeModel: ["msh.bme280psm"],
         model: "msh.bme280psm",
+        version: "0.0.1",
         vendor: "MySmartHouse",
         description: "MSH outdoor thermometer with BME280",
         extend: [m.battery(), m.temperature(), m.humidity(), m.pressure()],

@@ -749,12 +749,16 @@ exports.definitions = [
         model: "EMIZB-132",
         vendor: "Develco",
         description: "Wattle AMS HAN power-meter sensor",
-        version: "0.0.1",
+        version: "0.0.2",
         ota: true,
         extend: [
             develco_1.develcoModernExtend.addCustomDevelcoSeMeteringCluster(),
             develco_1.develcoModernExtend.addCustomClusterManuSpecificDevelcoGenBasic(),
             develco_1.develcoModernExtend.readGenBasicPrimaryVersions(),
+            m.quirkAddEndpointCluster({
+                endpointID: 2,
+                inputClusters: ["haElectricalMeasurement"],
+            }),
             m.numeric({
                 name: "power",
                 cluster: "haElectricalMeasurement",
@@ -827,7 +831,6 @@ exports.definitions = [
             m.iasZoneAlarm({
                 zoneType: "smoke",
                 zoneAttributes: ["alarm_1", "battery_low", "supervision_reports", "restore_reports", "test"],
-                zoneStatusReporting: true,
             }),
             m.iasWarning({ reversePayload: true, maxDuration: { min: 0, max: 600 } }),
         ],
@@ -1294,7 +1297,7 @@ exports.definitions = [
             develco_1.develcoModernExtend.addCustomClusterManuSpecificDevelcoGenBasic(),
             develco_1.develcoModernExtend.addCustomClusterManuSpecificDevelcoAirQuality(),
             develco_1.develcoModernExtend.readGenBasicPrimaryVersions(),
-            develco_1.develcoModernExtend.voc(),
+            develco_1.develcoModernExtend.voc({ maxPpb: 60000 }),
             develco_1.develcoModernExtend.airQuality(),
             develco_1.develcoModernExtend.temperature(),
             m.humidity(),

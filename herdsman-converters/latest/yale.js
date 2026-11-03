@@ -688,7 +688,7 @@ exports.definitions = [
         extend: [lockExtend()],
     },
     {
-        zigbeeModel: ["YRD410 TS", "YRD410 PB"],
+        zigbeeModel: ["YRD410 TS", "YRD410 PB", "YRD410-PB"],
         model: "YRD410-BLE",
         vendor: "Yale",
         description: "Assure lock 2",
@@ -771,6 +771,7 @@ exports.definitions = [
         model: "YRD430-BLE",
         vendor: "Yale",
         description: "Assure lock 2",
+        fromZigbee: [fz.lock_set_pin_code_response],
         extend: [lockExtend()],
     },
     {

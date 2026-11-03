@@ -35,8 +35,58 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.definitions = void 0;
 const zigbee_herdsman_1 = require("zigbee-herdsman");
+const exposes = __importStar(require("../lib/exposes"));
 const m = __importStar(require("../lib/modernExtend"));
+const e = exposes.presets;
+const ea = exposes.access;
 const extend = {
+    ternaryOccupancy: () => ({
+        exposes: [
+            e.occupancy().withAccess(ea.STATE_GET),
+            e.binary("motion", ea.STATE, true, false).withDescription("Indicates whether PIR motion is detected"),
+            e.binary("presence", ea.STATE, true, false).withDescription("Indicates whether mmWave radar presence is detected"),
+            e.enum("presence_state", ea.STATE, ["clear", "motion", "presence", "motion_and_presence"]).withDescription("Current presence state"),
+        ],
+        fromZigbee: [
+            {
+                cluster: "msOccupancySensing",
+                type: ["attributeReport", "readResponse"],
+                convert: (model, msg, publish, options, meta) => {
+                    if (msg.data.occupancy !== undefined) {
+                        const raw = Number(msg.data.occupancy);
+                        const pir = (raw & 0x02) > 0;
+                        const radar = (raw & 0x04) > 0;
+                        const occupied = (raw & 0x01) > 0;
+                        let state = "clear";
+                        if (pir && radar) {
+                            state = "motion_and_presence";
+                        }
+                        else if (pir) {
+                            state = "motion";
+                        }
+                        else if (radar) {
+                            state = "presence";
+                        }
+                        return {
+                            occupancy: occupied,
+                            motion: pir,
+                            presence: radar,
+                            presence_state: state,
+                        };
+                    }
+                },
+            },
+        ],
+        toZigbee: [
+            {
+                key: ["occupancy"],
+                convertGet: async (entity, key, meta) => {
+                    await entity.read("msOccupancySensing", ["occupancy"]);
+                },
+            },
+        ],
+        isModernExtend: true,
+    }),
     enableDisplay: m.binary({
         name: "enable_display",
         valueOn: [true, 0],
@@ -134,6 +184,170 @@ const extend = {
         valueMax: 255,
     }),
 };
+// HOBEIAN ZG-204ZV with pvvx/ZigbeeTLc (motion + illuminance + remote On/Off).
+// https://pvvx.github.io/ZG-204ZV/
+// Boards 51 and 56 include WHT20 T/H. Boards 55 and 57 do not.
+// ZCL manufacturer name is "Sonoff"; catalog vendor remains HOBEIAN.
+// Do not use m.thermostatUi(): USE_DISPLAY=0, no keypadLockout.
+const zg204zvMotion = [
+    m.battery({ voltage: true }),
+    m.illuminance(),
+    m.occupancy(),
+    m.onOff({
+        powerOnBehavior: false,
+        description: 'Enable remote On/Off binding. ON: occupancy occupied sends action "on", clear sends action "off". OFF: no occupancy actions.',
+    }),
+    m.enumLookup({
+        name: "power_on_behavior",
+        cluster: "genOnOff",
+        attribute: "startUpOnOff",
+        lookup: {
+            off: 0,
+            on: 1,
+            toggle: 2,
+            previous: 255,
+        },
+        description: "Power-on behavior for state (remote On/Off enable)",
+    }),
+    m.numeric({
+        name: "fading_time",
+        label: "Fading time",
+        cluster: "msOccupancySensing",
+        attribute: "pirOToUDelay",
+        unit: "s",
+        valueMin: 0,
+        valueMax: 524,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Occupancy hold time in seconds. Firmware default 35 s. 0 is valid and selects a hardware hold of about 2 s. Values above 524 s are clipped to 524 by the firmware.",
+    }),
+    m.numeric({
+        name: "motion_detection_sensitivity",
+        label: "Motion detection sensitivity",
+        cluster: "msOccupancySensing",
+        attribute: "pirUToOThreshold",
+        valueMin: 1,
+        valueMax: 254,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Motion sensitivity. A lower value is more sensitive. A higher value needs a stronger or closer signal. Firmware default 125.",
+    }),
+    m.commandsOnOff(),
+];
+// HOBEIAN ZG-204ZS and ZG-204ZM with pvvx/ZigbeeTLc (dual PIR + Skyrelay RC2417 24GHz mmWave radar + illuminance + remote On/Off).
+// Board 60 / image type 0x023C.
+// ZCL manufacturer name is "Sonoff"; catalog vendor remains HOBEIAN.
+const zg204zsMotion = [
+    m.battery({ voltage: true }),
+    m.illuminance(),
+    extend.ternaryOccupancy(),
+    m.onOff({
+        powerOnBehavior: false,
+        description: 'Enable remote On/Off binding. ON: occupancy occupied sends action "on", clear sends action "off". OFF: no occupancy actions.',
+    }),
+    m.enumLookup({
+        name: "power_on_behavior",
+        cluster: "genOnOff",
+        attribute: "startUpOnOff",
+        lookup: {
+            off: 0,
+            on: 1,
+            toggle: 2,
+            previous: 255,
+        },
+        description: "Power-on behavior for state (remote On/Off enable)",
+    }),
+    m.numeric({
+        name: "fading_time",
+        label: "Fading time",
+        cluster: "msOccupancySensing",
+        attribute: "pirOToUDelay",
+        unit: "s",
+        valueMin: 0,
+        valueMax: 524,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Occupancy hold time in seconds. Firmware default 35 s.",
+    }),
+    m.numeric({
+        name: "zone1_motion_threshold",
+        label: "Zone 1 motion threshold",
+        cluster: "msOccupancySensing",
+        attribute: { ID: 0x5101, type: zigbee_herdsman_1.Zcl.DataType.UINT8 },
+        valueMin: 0,
+        valueMax: 99,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Zone 1 (0-2m) motion sensitivity threshold (higher = less sensitive, 99 = disabled). Firmware default 14.",
+    }),
+    m.numeric({
+        name: "zone1_still_threshold",
+        label: "Zone 1 still threshold",
+        cluster: "msOccupancySensing",
+        attribute: { ID: 0x5102, type: zigbee_herdsman_1.Zcl.DataType.UINT8 },
+        valueMin: 0,
+        valueMax: 99,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Zone 1 (0-2m) still presence threshold (higher = less sensitive, 99 = disabled). Firmware default 2.",
+    }),
+    m.numeric({
+        name: "zone2_motion_threshold",
+        label: "Zone 2 motion threshold",
+        cluster: "msOccupancySensing",
+        attribute: { ID: 0x5103, type: zigbee_herdsman_1.Zcl.DataType.UINT8 },
+        valueMin: 0,
+        valueMax: 99,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Zone 2 (2-5m) motion sensitivity threshold (higher = less sensitive, 99 = disabled). Firmware default 10.",
+    }),
+    m.numeric({
+        name: "zone2_still_threshold",
+        label: "Zone 2 still threshold",
+        cluster: "msOccupancySensing",
+        attribute: { ID: 0x5104, type: zigbee_herdsman_1.Zcl.DataType.UINT8 },
+        valueMin: 0,
+        valueMax: 99,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Zone 2 (2-5m) still presence threshold (higher = less sensitive, 99 = disabled). Firmware default 4.",
+    }),
+    m.numeric({
+        name: "zone3_motion_threshold",
+        label: "Zone 3 motion threshold",
+        cluster: "msOccupancySensing",
+        attribute: { ID: 0x5105, type: zigbee_herdsman_1.Zcl.DataType.UINT8 },
+        valueMin: 0,
+        valueMax: 99,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Zone 3 (5-10m) motion sensitivity threshold (higher = less sensitive, 99 = disabled). Firmware default 10.",
+    }),
+    m.numeric({
+        name: "zone3_still_threshold",
+        label: "Zone 3 still threshold",
+        cluster: "msOccupancySensing",
+        attribute: { ID: 0x5106, type: zigbee_herdsman_1.Zcl.DataType.UINT8 },
+        valueMin: 0,
+        valueMax: 99,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Zone 3 (5-10m) still presence threshold (higher = less sensitive, 99 = disabled). Firmware default 4.",
+    }),
+    m.numeric({
+        name: "radar_trigger_scans",
+        label: "Radar trigger scans",
+        cluster: "msOccupancySensing",
+        attribute: { ID: 0x5107, type: zigbee_herdsman_1.Zcl.DataType.UINT8 },
+        valueMin: 1,
+        valueMax: 10,
+        access: "ALL",
+        entityCategory: "config",
+        description: "Number of consecutive radar scans needed to trigger presence (1 = instant). Firmware default 1.",
+    }),
+    m.commandsOnOff(),
+];
 /*
     ZigbeeTLc devices with the full supported option set:
     - Temperature (+calibration)
@@ -147,7 +361,7 @@ exports.definitions = [
         // LYWSD03MMC or similar with ZigbeeTLc firmware (alternative is devbis firmware)
         model: "LYWSD03MMC-z",
         vendor: "Xiaomi",
-        description: "Temperature and Humidity Monitor (pvxx/ZigbeeTLc)",
+        description: "Temperature and Humidity Monitor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -172,7 +386,7 @@ exports.definitions = [
         // MJWSD06MMC with ZigbeeTLc firmware, normal device is Bluetooth only
         model: "MJWSD06MMC",
         vendor: "Xiaomi",
-        description: "Temperature and Humidity Monitor 3 Mini (pvxx/ZigbeeTLc)",
+        description: "Temperature and Humidity Monitor 3 Mini (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -197,7 +411,7 @@ exports.definitions = [
         // MHO-C122 with ZigbeeTLc firmware, normal device is Bluetooth only
         model: "MHO-C122",
         vendor: "MiaoMiaoCe",
-        description: "Temperature and Humidity Monitor (pvxx/ZigbeeTLc)",
+        description: "Temperature and Humidity Monitor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -222,7 +436,7 @@ exports.definitions = [
         // MHO-C401 with ZigbeeTLc firmware, normal device is Bluetooth only
         model: "MHO-C401",
         vendor: "MiaoMiaoCe",
-        description: "Temperature and Humidity Monitor (pvxx/ZigbeeTLc)",
+        description: "Temperature and Humidity Monitor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -247,7 +461,7 @@ exports.definitions = [
         // CGG1 with ZigbeeTLc firmware, normal device is Bluetooth only
         model: "CGG1",
         vendor: "Qingping",
-        description: "Temp & RH Monitor (pvxx/ZigbeeTLc)",
+        description: "Temp & RH Monitor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -278,7 +492,7 @@ exports.definitions = [
         // CGDK2 with ZigbeeTLc firmware, normal device is Bluetooth only
         model: "CGDK2",
         vendor: "Qingping",
-        description: "Temp & RH Monitor Lite (pvxx/ZigbeeTLc)",
+        description: "Temp & RH Monitor Lite (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -298,7 +512,7 @@ exports.definitions = [
         // LKTMZL02 with ZigbeeTLc firmware
         model: "LKTMZL02-z",
         vendor: "Tuya",
-        description: "Temperature & Humidity Sensor (pvxx/ZigbeeTLc)",
+        description: "Temperature & Humidity Sensor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -349,7 +563,7 @@ exports.definitions = [
         // TS0201 with ZigbeeTLc firmware
         model: "TS0201-z",
         vendor: "Tuya",
-        description: "Temperature & Humidity Sensor (pvxx/ZigbeeTLc)",
+        description: "Temperature & Humidity Sensor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity(),
@@ -366,7 +580,7 @@ exports.definitions = [
         zigbeeModel: ["ZG-227Z-z"],
         model: "ZG-227Z-z",
         vendor: "Tuya",
-        description: "Temperature & humidity sensor (pvxx/ZigbeeTLc)",
+        description: "Temperature & humidity sensor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature(),
             m.humidity(),
@@ -383,7 +597,7 @@ exports.definitions = [
         zigbeeModel: ["MC-z", "TH01-z", "TH01-2-z"],
         model: "MC-z",
         vendor: "Zbeacon",
-        description: "Temperature & Humidity Sensor (pvxx/ZigbeeTLc)",
+        description: "Temperature & Humidity Sensor (pvvx/ZigbeeTLc)",
         extend: [
             m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }),
             m.humidity({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 50 } }),
@@ -489,6 +703,51 @@ exports.definitions = [
             }),
             m.commandsOnOff(),
         ],
+    },
+    {
+        // Board 51 / image type 0x0233 - with WHT20
+        zigbeeModel: ["ZG-204ZV-z"],
+        model: "ZG-204ZV-z",
+        vendor: "HOBEIAN",
+        description: "Millimeter wave motion sensor with temperature and humidity (pvvx/ZigbeeTLc)",
+        ota: true,
+        extend: [...zg204zvMotion, m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }), m.humidity()],
+    },
+    {
+        // Board 55 / image type 0x0237 - without WHT20
+        zigbeeModel: ["ZG-204ZV1-z"],
+        model: "ZG-204ZV1-z",
+        vendor: "HOBEIAN",
+        description: "Millimeter wave motion sensor (pvvx/ZigbeeTLc)",
+        ota: true,
+        extend: [...zg204zvMotion],
+    },
+    {
+        // Board 56 / image type 0x0238 - with WHT20
+        zigbeeModel: ["ZG-204ZV2-TH-z"],
+        model: "ZG-204ZV2-TH-z",
+        vendor: "HOBEIAN",
+        description: "Millimeter wave motion sensor v2 with temperature and humidity (pvvx/ZigbeeTLc)",
+        ota: true,
+        extend: [...zg204zvMotion, m.temperature({ reporting: { min: "10_SECONDS", max: "1_HOUR", change: 10 } }), m.humidity()],
+    },
+    {
+        // Board 57 / image type 0x0239 - without WHT20
+        zigbeeModel: ["ZG-204ZV2-z"],
+        model: "ZG-204ZV2-z",
+        vendor: "HOBEIAN",
+        description: "Millimeter wave motion sensor v2 (pvvx/ZigbeeTLc)",
+        ota: true,
+        extend: [...zg204zvMotion],
+    },
+    {
+        // Board 60 / image type 0x023C - Dual PIR + Skyrelay RC2417 24GHz mmWave radar
+        zigbeeModel: ["ZG-204ZS-z", "ZG-204ZM-z"],
+        model: "ZG-204ZS-z",
+        vendor: "HOBEIAN",
+        description: "Dual PIR and mmWave radar presence and luminance sensor (pvvx/ZigbeeTLc)",
+        ota: true,
+        extend: [...zg204zsMotion],
     },
 ];
 //# sourceMappingURL=zigbeetlc.js.map

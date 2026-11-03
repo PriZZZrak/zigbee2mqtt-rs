@@ -456,6 +456,7 @@ exports.definitions = [
         model: "eMotion Air",
         vendor: "LinknLink",
         description: "Battery-powered mmWave presence multi-sensor",
+        version: "0.0.1",
         fromZigbee: [
             fzLocal.legacy_button_toggle,
             fzLocal.legacy_button_on,
@@ -570,6 +571,7 @@ exports.definitions = [
             m.illuminance(),
             m.occupancy(),
             m.battery(),
+            m.forcePowerSource({ powerSource: "Battery" }),
         ],
         configure: async (device) => {
             const ep = device.getEndpoint(1);

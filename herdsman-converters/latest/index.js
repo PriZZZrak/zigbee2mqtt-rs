@@ -15,6 +15,7 @@ const alecto_1 = require("./alecto");
 const allesin_1 = require("./allesin");
 const amina_1 = require("./amina");
 const anchor_1 = require("./anchor");
+const ariston_1 = require("./ariston");
 const atlantic_1 = require("./atlantic");
 const atsmart_1 = require("./atsmart");
 const aurora_lighting_1 = require("./aurora_lighting");
@@ -27,6 +28,7 @@ const bankamp_1 = require("./bankamp");
 const beca_1 = require("./beca");
 const bega_1 = require("./bega");
 const belkin_1 = require("./belkin");
+const besisglas_1 = require("./besisglas");
 const bitron_1 = require("./bitron");
 const bituo_technik_1 = require("./bituo_technik");
 const blaupunkt_1 = require("./blaupunkt");
@@ -347,6 +349,7 @@ const tci_1 = require("./tci");
 const tcl_1 = require("./tcl");
 const tech_1 = require("./tech");
 const technicolor_1 = require("./technicolor");
+const teelicht_1 = require("./teelicht");
 const teploluxe_1 = require("./teploluxe");
 const terncy_1 = require("./terncy");
 const the_light_group_1 = require("./the_light_group");
@@ -413,6 +416,7 @@ const definitions = [
     ...allesin_1.definitions,
     ...amina_1.definitions,
     ...anchor_1.definitions,
+    ...ariston_1.definitions,
     ...atlantic_1.definitions,
     ...atsmart_1.definitions,
     ...aurora_lighting_1.definitions,
@@ -425,6 +429,7 @@ const definitions = [
     ...beca_1.definitions,
     ...bega_1.definitions,
     ...belkin_1.definitions,
+    ...besisglas_1.definitions,
     ...bitron_1.definitions,
     ...bituo_technik_1.definitions,
     ...blaupunkt_1.definitions,
@@ -742,6 +747,7 @@ const definitions = [
     ...tcl_1.definitions,
     ...tech_1.definitions,
     ...technicolor_1.definitions,
+    ...teelicht_1.definitions,
     ...teploluxe_1.definitions,
     ...terncy_1.definitions,
     ...the_light_group_1.definitions,

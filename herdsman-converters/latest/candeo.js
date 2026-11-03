@@ -121,7 +121,7 @@ const luxScale = (value, type) => {
         else if (result > 2500) {
             result = 78029.21628 - 61.73575 * result + 0.01223567 * result ** 2;
         }
-        result = result < 1 ? 1 : result;
+        result = Math.max(result, 1);
     }
     return result;
 };

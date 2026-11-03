@@ -179,10 +179,6 @@ function dpValueFromRaw(dp, rawBuffer) {
 function dpValueFromBitmap(dp, bitmapBuffer) {
     return { dp, datatype: dataTypes.bitmap, data: bitmapBuffer };
 }
-// Return `seq` - transaction ID for handling concrete response
-async function sendDataPoint(entity, dpValue, cmd, seq = undefined) {
-    return await sendDataPoints(entity, [dpValue], cmd, seq);
-}
 async function sendDataPointValue(entity, dp, value, cmd, seq = undefined) {
     return await sendDataPoints(entity, [dpValueFromIntValue(dp, value)], cmd, seq);
 }
@@ -197,9 +193,6 @@ async function sendDataPointRaw(entity, dp, value, cmd, seq = undefined) {
 }
 async function sendDataPointBitmap(entity, dp, value, cmd, seq = undefined) {
     return await sendDataPoints(entity, [dpValueFromBitmap(dp, value)], cmd, seq);
-}
-async function sendDataPointStringBuffer(entity, dp, value, cmd, seq = undefined) {
-    return await sendDataPoints(entity, [dpValueFromStringBuffer(dp, value)], cmd, seq);
 }
 // biome-ignore lint/suspicious/noExplicitAny: ignored using `--suppress`
 function convertRawToCycleTimer(value) {
@@ -302,24 +295,6 @@ const silvercrestModes = {
     white: 0,
     color: 1,
     effect: 2,
-};
-const silvercrestEffects = {
-    steady: "00",
-    snow: "01",
-    rainbow: "02",
-    snake: "03",
-    twinkle: "04",
-    firework: "05",
-    horizontal_flag: "06",
-    waves: "07",
-    updown: "08",
-    vintage: "09",
-    fading: "0a",
-    collide: "0b",
-    strobe: "0c",
-    sparkles: "0d",
-    carnaval: "0e",
-    glow: "0f",
 };
 const fanModes = {
     0: "low",
@@ -729,7 +704,6 @@ const dataPoints = {
     silvercrestSetBrightness: 3,
     silvercrestSetColorTemp: 4,
     silvercrestSetColor: 5,
-    silvercrestSetEffect: 6,
     // Fantem
     fantemPowerSupplyMode: 101,
     fantemReportingTime: 102,
@@ -1808,6 +1782,9 @@ const fromZigbee = {
             const dpValue = firstDpValue(msg, meta, "moes_thermostat");
             const dp = dpValue.dp;
             const value = getDataValue(dpValue);
+            // BHT-002 firmware occasionally sends DP 16 with an invalid datatype, which would publish an undefined setpoint
+            if (value === undefined)
+                return;
             const stateLookup = { "0": "cool", "1": "heat", "2": "fan_only" };
             // biome-ignore lint/suspicious/noImplicitAnyLet: ignored using `--suppress`
             let temperature;
@@ -2082,7 +2059,6 @@ const fromZigbee = {
                 case dataPoints.connecteState:
                     return { state: value ? "ON" : "OFF" };
                 case dataPoints.connecteMode:
-                    // biome-ignore lint/nursery/useExhaustiveSwitchCases: legacy
                     switch (value) {
                         case 0: // manual
                             return { system_mode: "heat", away_mode: "OFF" };
@@ -3555,57 +3531,6 @@ const fromZigbee = {
                         break;
                     default:
                         logger_1.logger.debug(`Unrecognized DP #${dpValue.dp} with data ${JSON.stringify(dpValue)}`, "zhc:legacy:fz:wls100z_water_leak");
-                }
-            }
-            return result;
-        },
-    },
-    silvercrest_smart_led_string: {
-        cluster: "manuSpecificTuya",
-        type: ["commandDataResponse", "commandDataReport"],
-        convert: (model, msg, publish, options, meta) => {
-            const dpValue = firstDpValue(msg, meta, "silvercrest_smart_led_string");
-            const dp = dpValue.dp;
-            const value = getDataValue(dpValue);
-            const result = {};
-            if (dp === dataPoints.silvercrestChangeMode) {
-                if (value !== silvercrestModes.effect) {
-                    result.effect = null;
-                }
-            }
-            if (dp === dataPoints.silvercrestSetBrightness) {
-                result.brightness = utils.mapNumberRange(value, 0, 1000, 0, 255);
-            }
-            else if (dp === dataPoints.silvercrestSetColor) {
-                const h = Number.parseInt(value.substring(0, 4), 16);
-                const s = Number.parseInt(value.substring(4, 8), 16);
-                const b = Number.parseInt(value.substring(8, 12), 16);
-                result.color_mode = "hs";
-                result.color = { b: utils.mapNumberRange(b, 0, 1000, 0, 255), h, s: utils.mapNumberRange(s, 0, 1000, 0, 100) };
-                result.brightness = result.color.b;
-            }
-            else if (dp === dataPoints.silvercrestSetEffect) {
-                result.effect = {
-                    effect: utils.getKey(silvercrestEffects, value.substring(0, 2), "", String),
-                    speed: utils.mapNumberRange(Number.parseInt(value.substring(2, 4), 10), 0, 64, 0, 100),
-                    colors: [],
-                };
-                const colorsString = value.substring(4);
-                // Colors are 6 characters.
-                const n = Math.floor(colorsString.length / 6);
-                // The incoming message can contain anywhere between 0 to 6 colors.
-                // In the following loop we're extracting every color the led
-                // string gives us.
-                for (let i = 0; i < n; ++i) {
-                    const part = colorsString.substring(i * 6, (i + 1) * 6);
-                    const r = part[0] + part[1];
-                    const g = part[2] + part[3];
-                    const b = part[4] + part[5];
-                    result.effect.colors.push({
-                        r: Number.parseInt(r, 16),
-                        g: Number.parseInt(g, 16),
-                        b: Number.parseInt(b, 16),
-                    });
                 }
             }
             return result;
@@ -5906,142 +5831,6 @@ const toZigbee2 = {
         key: ["child_lock"],
         convertSet: async (entity, key, value, meta) => {
             await sendDataPointBool(entity, dataPoints.evanellChildLock, value === "LOCK");
-        },
-    },
-    silvercrest_smart_led_string: {
-        key: ["color", "brightness", "effect"],
-        // biome-ignore lint/suspicious/noExplicitAny: ignored using `--suppress`
-        convertSet: async (entity, key, value, meta) => {
-            if (key === "effect") {
-                await sendDataPointEnum(entity, dataPoints.silvercrestChangeMode, silvercrestModes.effect);
-                // biome-ignore lint/suspicious/noExplicitAny: ignored using `--suppress`
-                let data = [];
-                const effect = silvercrestEffects[value.effect];
-                data = data.concat(convertStringToHexArray(effect));
-                let speed = utils.mapNumberRange(value.speed, 0, 100, 0, 64);
-                // Max speed what the gateways sends is 64.
-                if (speed > 64) {
-                    speed = 64;
-                }
-                // Make it a string and attach a leading zero (0x30)
-                let speedString = String(speed);
-                if (speedString.length === 1) {
-                    speedString = `0${speedString}`;
-                }
-                if (!speedString) {
-                    speedString = "00";
-                }
-                data = data.concat(convertStringToHexArray(speedString));
-                let colors = value.colors;
-                // @ts-expect-error ignore
-                if (!colors && meta.state && meta.state.effect && meta.state.effect.colors) {
-                    // @ts-expect-error ignore
-                    colors = meta.state.effect.colors;
-                }
-                if (colors) {
-                    for (const color of colors) {
-                        let r = "00";
-                        let g = "00";
-                        let b = "00";
-                        if (color.r) {
-                            r = color.r.toString(16);
-                        }
-                        if (r.length === 1) {
-                            r = `0${r}`;
-                        }
-                        if (color.g) {
-                            g = color.g.toString(16);
-                        }
-                        if (g.length === 1) {
-                            g = `0${g}`;
-                        }
-                        if (color.b) {
-                            b = color.b.toString(16);
-                        }
-                        if (b.length === 1) {
-                            b = `0${b}`;
-                        }
-                        data = data.concat(convertStringToHexArray(r));
-                        data = data.concat(convertStringToHexArray(g));
-                        data = data.concat(convertStringToHexArray(b));
-                    }
-                }
-                await sendDataPointStringBuffer(entity, dataPoints.silvercrestSetEffect, data);
-            }
-            else if (key === "brightness") {
-                await sendDataPointEnum(entity, dataPoints.silvercrestChangeMode, silvercrestModes.white);
-                // It expects 2 leading zero's.
-                let data = [0x00, 0x00];
-                // Scale it to what the device expects (0-1000 instead of 0-255)
-                const scaled = utils.mapNumberRange(value, 0, 255, 0, 1000);
-                data = data.concat(convertDecimalValueTo2ByteHexArray(scaled));
-                await sendDataPoint(entity, { dp: dataPoints.silvercrestSetBrightness, datatype: dataTypes.value, data: Buffer.from(data) });
-            }
-            else if (key === "color") {
-                await sendDataPointEnum(entity, dataPoints.silvercrestChangeMode, silvercrestModes.color);
-                const make4sizedString = (v) => {
-                    if (v.length >= 4) {
-                        return v;
-                    }
-                    if (v.length === 3) {
-                        return `0${v}`;
-                    }
-                    if (v.length === 2) {
-                        return `00${v}`;
-                    }
-                    if (v.length === 1) {
-                        return `000${v}`;
-                    }
-                    return "0000";
-                };
-                // biome-ignore lint/suspicious/noExplicitAny: ignored using `--suppress`
-                const fillInHSB = (h, s, b, state) => {
-                    // Define default values. Device expects leading zero in string.
-                    const hsb = {
-                        h: "0168", // 360
-                        s: "03e8", // 1000
-                        b: "03e8", // 1000
-                    };
-                    if (h) {
-                        // The device expects 0-359
-                        // The device expects a round number, otherwise everything breaks
-                        hsb.h = make4sizedString(utils.numberWithinRange(utils.precisionRound(h, 0), 0, 359).toString(16));
-                    }
-                    else if (state.color?.h) {
-                        hsb.h = make4sizedString(utils.numberWithinRange(utils.precisionRound(state.color.h, 0), 0, 359).toString(16));
-                    }
-                    // Device expects 0-1000, saturation normally is 0-100 so we expect that from the user
-                    // The device expects a round number, otherwise everything breaks
-                    if (s) {
-                        hsb.s = make4sizedString(utils.mapNumberRange(s, 0, 100, 0, 1000).toString(16));
-                    }
-                    else if (state.color?.s) {
-                        hsb.s = make4sizedString(utils.mapNumberRange(state.color.s, 0, 100, 0, 1000).toString(16));
-                    }
-                    // Scale 0-255 to 0-1000 what the device expects.
-                    if (b) {
-                        hsb.b = make4sizedString(utils.mapNumberRange(b, 0, 255, 0, 1000).toString(16));
-                    }
-                    else if (state.brightness) {
-                        hsb.b = make4sizedString(utils.mapNumberRange(state.brightness, 0, 255, 0, 1000).toString(16));
-                    }
-                    return hsb;
-                };
-                let hsb = {};
-                if (value.hsb != null) {
-                    const split = value.hsb.split(",").map((i) => Number.parseInt(i, 10));
-                    hsb = fillInHSB(split[0], split[1], split[2], meta.state);
-                }
-                else {
-                    hsb = fillInHSB(value.h || value.hue || null, value.s || value.saturation || null, value.b || value.brightness || null, meta.state);
-                }
-                // biome-ignore lint/suspicious/noExplicitAny: ignored using `--suppress`
-                let data = [];
-                data = data.concat(convertStringToHexArray(hsb.h));
-                data = data.concat(convertStringToHexArray(hsb.s));
-                data = data.concat(convertStringToHexArray(hsb.b));
-                await sendDataPointStringBuffer(entity, dataPoints.silvercrestSetColor, data);
-            }
         },
     },
     tuya_data_point_test: {

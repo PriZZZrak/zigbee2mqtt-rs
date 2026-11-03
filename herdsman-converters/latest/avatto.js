@@ -352,7 +352,7 @@ exports.definitions = [
         },
     },
     {
-        fingerprint: tuya.fingerprint("TS0601", ["_TZE204_goecjd1t"]),
+        fingerprint: tuya.fingerprint("TS0601", ["_TZE204_goecjd1t", "_TZE284_goecjd1t"]),
         model: "ZWPM16",
         vendor: "AVATTO",
         description: "Zigbee smart energy meter",
@@ -459,7 +459,7 @@ exports.definitions = [
         model: "ZDMS16-1",
         vendor: "AVATTO",
         description: "Zigbee Module 1 channel Dimmer",
-        whiteLabel: [tuya.whitelabel("NovaDigital", "MS-DM-ZB", "Zigbee Module 1 channel Dimmer", ["_TZE28C1000000_huu3td85"])],
+        whiteLabel: [tuya.whitelabel("Nova Digital", "MS-DM-ZB", "Zigbee Module 1 channel Dimmer", ["_TZE28C1000000_huu3td85"])],
         extend: [tuya.modernExtend.tuyaBase({ dp: true })],
         exposes: [
             tuya.exposes.lightBrightnessWithMinMax(),

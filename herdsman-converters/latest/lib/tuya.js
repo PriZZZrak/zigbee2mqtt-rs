@@ -35,8 +35,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.clusters = exports.modernExtend = exports.fz = exports.tz = exports.valueConverter = exports.valueConverterBasic = exports.Bitmap = exports.BacklightColorEnum = exports.enum = exports.Enum = exports.whitelabel = exports.fingerprint = exports.configureBindBasic = exports.configureQuery = exports.configureMagicPacket = exports.skip = exports.options = exports.exposes = exports.TuyaWeatherID = exports.F3ProTuyaWeatherCondition = exports.M8ProTuyaWeatherCondition = exports.dataTypes = exports.circuitBreakerFaultList = void 0;
 exports.convertBufferToNumber = convertBufferToNumber;
+exports.getDataValue = getDataValue;
 exports.convertDecimalValueTo4ByteHexArray = convertDecimalValueTo4ByteHexArray;
+exports.sendDataPoints = sendDataPoints;
+exports.dpValueFromNumberValue = dpValueFromNumberValue;
+exports.dpValueFromBool = dpValueFromBool;
+exports.dpValueFromEnum = dpValueFromEnum;
 exports.dpValueFromString = dpValueFromString;
+exports.dpValueFromRaw = dpValueFromRaw;
 exports.sendDataPointValue = sendDataPointValue;
 exports.sendDataPointBool = sendDataPointBool;
 exports.sendDataPointEnum = sendDataPointEnum;
@@ -213,11 +219,13 @@ function convertDecimalValueTo4ByteHexArray(value) {
     //          +2 -> 0x00000002 -> [0x00, 0x00, 0x00, 0x02] -> [  0,   0,   0,   2]
     // +4294967294 -> 0XFFFFFFFE -> [0xFF, 0xFF, 0xFF, 0xFE] -> [255, 255, 255, 254]
     //          -2 -> 0xFFFFFFFE -> [0xFF, 0xFF, 0xFF, 0xFE] -> [255, 255, 255, 254]
+    // Scaled values can carry floating point noise (e.g. 1.12 * 100 = 112.00000000000001)
+    let intValue = Math.round(value);
     // Encode negative values as 2s complement
-    if (value < 0) {
-        value = 0x100000000 + value;
+    if (intValue < 0) {
+        intValue = 0x100000000 + intValue;
     }
-    const hexValue = Number(value).toString(16).padStart(8, "0");
+    const hexValue = Number(intValue).toString(16).padStart(8, "0");
     const chunk1 = hexValue.substring(0, 2);
     const chunk2 = hexValue.substring(2, 4);
     const chunk3 = hexValue.substring(4, 6);
@@ -384,11 +392,12 @@ const tuyaExposes = {
         .withDescription("Humidity calibration"),
     soilCalibration: () => e
         .numeric("soil_calibration", ea.STATE_SET)
+        .withLabel("Soil moisture calibration")
         .withValueMin(-30)
         .withValueMax(30)
         .withValueStep(1)
         .withUnit("%")
-        .withDescription("Soil Humidity calibration"),
+        .withDescription("Offset for measured soil moisture"),
     temperatureSampling: () => e
         .numeric("temperature_sampling", ea.STATE_SET)
         .withValueMin(5)
@@ -398,11 +407,12 @@ const tuyaExposes = {
         .withDescription("Air temperature and humidity sampling"),
     soilSampling: () => e
         .numeric("soil_sampling", ea.STATE_SET)
+        .withLabel("Soil sampling interval")
         .withValueMin(5)
         .withValueMax(3600)
         .withValueStep(1)
         .withUnit("s")
-        .withDescription("Soil humidity sampling"),
+        .withDescription("Time interval between soil samplings"),
     soilWarning: () => e
         .numeric("soil_warning", ea.STATE_SET)
         .withValueMin(0)
@@ -988,7 +998,25 @@ exports.valueConverterBasic = {
     divideByWithLimits: (value, min, max) => {
         return {
             to: (v) => (v > max ? max * value : v < min ? min * value : v * value),
-            from: (v) => (v / value > max ? max : v / value < min ? min : v / value),
+            from: (v) => (v / value > max ? max : Math.max(v / value, min)),
+        };
+    },
+    twosComplementWithBitsizeScaled: (bits, scale = 1) => {
+        const overflow = 2 ** bits;
+        const limit = 2 ** (bits - 1);
+        return {
+            to: (v) => {
+                // Apply scale to logical value.
+                const scaled = v * scale;
+                // Convert to 2's complement [raw] representation.
+                return scaled < 0 ? scaled + overflow : scaled;
+            },
+            from: (v) => {
+                // Convert from 2's complement [raw] representation.
+                const signed = v >= limit ? v - overflow : v;
+                // Apply scale to compute logical value.
+                return signed / scale;
+            },
         };
     },
     trueFalse: (valueTrue) => {
@@ -1036,6 +1064,8 @@ exports.valueConverter = {
     divideBy1000: exports.valueConverterBasic.divideBy(1000),
     multiplyBy10: exports.valueConverterBasic.multiplyBy(10),
     divideBy10FromOnly: exports.valueConverterBasic.divideByFromOnly(10),
+    twosComplement8Bit: exports.valueConverterBasic.twosComplementWithBitsizeScaled(8),
+    twosComplement8BitScaled10x: exports.valueConverterBasic.twosComplementWithBitsizeScaled(8, 10),
     switchMode: exports.valueConverterBasic.lookup({ switch: new Enum(0), scene: new Enum(1) }),
     switchMode2: exports.valueConverterBasic.lookup({ switch: new Enum(0), curtain: new Enum(1) }),
     lightMode: exports.valueConverterBasic.lookup({ normal: new Enum(0), on: new Enum(1), off: new Enum(2), flash: new Enum(3) }),
@@ -1194,15 +1224,24 @@ exports.valueConverter = {
         // Captured on _TZE200_nslr42tt: [9,38,0,0,146,153,153,134] -> 0x999986 -> -20 W
         // https://github.com/Koenkk/zigbee2mqtt/issues/18603#issuecomment-2267514694
         // https://github.com/Koenkk/zigbee2mqtt/issues/32995
+        //
+        // Other _TZE200_nslr42tt units send negative power as plain 24 bit two's
+        // complement instead: [9,38,0,0,29,255,255,247] -> 0xfffff7 -> -9 W.
+        // The two negative ranges do not overlap, so both can be decoded:
+        //   0x000000..0x7fffff  positive
+        //   0x800000..0x99999a  offset encoding, -1.67 MW..0 W
+        //   0x99999b..0xffffff  two's complement, about -6.7 MW..-1 W
         const NEGATIVE_POWER_OFFSET = 0x99999a;
-        // Negative readings span 0x800000..0x99999a (down to about -1.67 MW), so any
-        // value with the top bit set is negative; anything below is a real positive reading.
         const NEGATIVE_POWER_THRESHOLD = 0x800000;
+        const TWOS_COMPLEMENT_MODULUS = 0x1000000;
         return {
             from: (v) => {
                 const buf = Buffer.from(v, "base64");
                 let power = buf[7] | (buf[6] << 8) | (buf[5] << 16);
-                if (power >= NEGATIVE_POWER_THRESHOLD) {
+                if (power > NEGATIVE_POWER_OFFSET) {
+                    power -= TWOS_COMPLEMENT_MODULUS;
+                }
+                else if (power >= NEGATIVE_POWER_THRESHOLD) {
                     power -= NEGATIVE_POWER_OFFSET;
                 }
                 return {
@@ -1760,7 +1799,8 @@ exports.valueConverter = {
                 const minutesSinceMidnight = firstByte | secondByte;
                 const hour = Math.floor(minutesSinceMidnight / 60);
                 const minutes = minutesSinceMidnight % 60;
-                schedule.push(`${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}/${(Number.parseFloat(v[index + 3]) / 10.0).toFixed(1)}`);
+                const preset = Number.parseInt(v[index + 2], 10) >> 4;
+                schedule.push(`${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}/${(Number.parseFloat(v[index + 3]) / 10.0).toFixed(1)}/${preset}`);
             }
             return schedule.join(" ");
         },
@@ -1771,21 +1811,25 @@ exports.valueConverter = {
                 throw new Error("Invalid schedule: there should be 6 transitions");
             }
             for (const transition of transitions) {
-                const timeTemp = transition.split("/");
-                if (timeTemp.length !== 2) {
+                const timeTempPreset = transition.split("/");
+                if (timeTempPreset.length !== 3) {
                     throw new Error(`Invalid schedule: wrong transition format: ${transition}`);
                 }
-                const hourMin = timeTemp[0].split(":");
+                const hourMin = timeTempPreset[0].split(":");
                 const hour = Number.parseInt(hourMin[0], 10);
                 const min = Number.parseInt(hourMin[1], 10);
-                const temperature = Math.floor(Number.parseFloat(timeTemp[1]) * 10);
+                const temperature = Math.floor(Number.parseFloat(timeTempPreset[1]) * 10);
+                const preset = Number.parseInt(timeTempPreset[2], 10);
                 if (hour < 0 || hour > 24 || min < 0 || min > 60 || temperature < 50 || temperature > 300) {
                     throw new Error(`Invalid hour, minute or temperature of: ${transition}`);
+                }
+                if (preset !== 2 && preset !== 3) {
+                    throw new Error(`Invalid preset (2 = eco, 3 = comfort) of: ${transition}`);
                 }
                 const minutesSinceMidnight = hour * 60 + min;
                 const firstByte = ((minutesSinceMidnight & 3840) >> 8) + 192;
                 const secondByte = minutesSinceMidnight & 255;
-                payload.push(firstByte, secondByte, 64, temperature);
+                payload.push(firstByte, secondByte, preset * 16, temperature);
             }
             return payload;
         },
@@ -3233,7 +3277,7 @@ const tuyaFz = {
                         result[dpEntry[1]] = dpEntry[2].from(value, meta, options, publish, msg);
                     }
                     else {
-                        Object.assign(result, dpEntry[2].from(value, meta, options, publish, msg));
+                        Object.assign(result, { ...dpEntry[2].from(value, meta, options, publish, msg), ...result });
                     }
                 }
                 else {
@@ -3778,7 +3822,7 @@ const tuyaModernExtend = {
                     // 0x01: The gateway is connected to the internet.
                     // 0x02: The request timed out after three seconds.
                     msg.endpoint
-                        .command("manuSpecificTuya", "mcuGatewayConnectionStatus", { payloadSize: 1, payload: 1 }, {})
+                        .command("manuSpecificTuya", "mcuGatewayConnectionStatus", { payloadSize: 1, payload: 1 }, { disableResponse: true, disableDefaultResponse: true })
                         .catch((error) => logger_1.logger.error(`Failed respond to gateway connection status '${msg.device.ieeeAddr}' (${error})`, NS));
                 }
             },
@@ -4135,7 +4179,7 @@ const tuyaModernExtend = {
         return result;
     },
     tuyaOnOff: (args = {}) => {
-        const { onOffCountdown = false, indicatorMode = false, powerOutageMemory = false, childLock = false, inchingSwitch = false, backlightModeOffOn = false, powerOnBehavior2 = false, powerOnBehavior3 = false, switchType = false, switchTypeButton = false, } = args;
+        const { onOffCountdown = false, indicatorMode = false, powerOutageMemory = false, childLock = false, inchingSwitch = false, backlightModeOffOn = false, powerOnBehavior2 = false, powerOnBehavior3 = false, powerOnBehavior = true, switchType = false, switchTypeButton = false, } = args;
         const exposes = args.endpoints
             ? args.endpoints.map((ee) => e.switch().withEndpoint(ee))
             : [e.switch()];
@@ -4144,6 +4188,19 @@ const tuyaModernExtend = {
         const toZigbee = [];
         if (onOffCountdown) {
             fromZigbee.push(tuyaFz.on_off_countdown);
+            // Some devices (e.g. Lidl HG06620) report offWaitTime for ON+countdown instead of onTime
+            fromZigbee.push({
+                cluster: "genOnOff",
+                type: ["attributeReport", "readResponse"],
+                convert: (model, msg, publish, options, meta) => {
+                    if (msg.data.offWaitTime !== undefined) {
+                        const payload = {};
+                        const property = utils.postfixWithEndpointName("countdown", msg, model, meta);
+                        payload[property] = msg.data.offWaitTime;
+                        return payload;
+                    }
+                },
+            });
             toZigbee.push(tuyaTz.on_off_countdown);
             if (typeof onOffCountdown === "function") {
                 exposes.push((d) => (onOffCountdown(d.manufacturerName) ? [tuyaExposes.countdown()] : []));
@@ -4221,7 +4278,7 @@ const tuyaModernExtend = {
                 exposes.push(...result.exposes);
             }
         }
-        else {
+        else if (powerOnBehavior) {
             fromZigbee.push(tuyaFz.power_on_behavior_1);
             toZigbee.push(tuyaTz.power_on_behavior_1);
             exposes.push(e.power_on_behavior());
