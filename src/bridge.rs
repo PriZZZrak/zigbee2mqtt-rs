@@ -35,6 +35,33 @@ pub struct Bridge {
     external: Arc<ExternalConverter>,
 }
 
+/// Resolve when the service manager or user asks the bridge to stop.
+///
+/// Without this, OpenWrt's procd sends SIGTERM and the process exits before the
+/// post-loop offline publication and database flush can run.
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+        let mut terminate = match signal(SignalKind::terminate()) {
+            Ok(signal) => signal,
+            Err(error) => {
+                warn!("Cannot install SIGTERM handler: {error}");
+                let _ = tokio::signal::ctrl_c().await;
+                return;
+            }
+        };
+        tokio::select! {
+            _ = terminate.recv() => {}
+            _ = tokio::signal::ctrl_c() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
 impl Bridge {
     fn device_allowed(cfg: &Config, ieee: &str) -> bool {
         let ieee = ieee.to_lowercase();
@@ -116,6 +143,25 @@ impl Bridge {
         }
     }
 
+    /// Flush any debounced database update immediately and surface failures.
+    ///
+    /// Called on shutdown so an accepted join/rename isn't lost while the
+    /// 500 ms write task is still sleeping. A failed write keeps the dirty
+    /// state in memory and is reported as an error, not swallowed.
+    async fn flush_database(&self) {
+        let result = {
+            let db = self.database.lock().await;
+            db.write()
+        };
+        match result {
+            Ok(()) => {
+                let mut pending = self.db_write_pending.lock().await;
+                *pending = false;
+            }
+            Err(error) => error!("Failed to flush database.db: {error}"),
+        }
+    }
+
     async fn persist_database(&self, coordinator_ieee: Option<IeeeAddr>) {
         // Batching: update in-memory immediately, debounce disk write to save memory/I/O (upstream Entity.database.update(write:false))
         {
@@ -149,7 +195,9 @@ impl Bridge {
             }
             let db = db_clone.lock().await;
             if let Err(e) = db.write() {
-                warn!("Failed to write database.db (batched): {e}");
+                // Keep the in-memory records; the next mutation or the shutdown
+                // flush retries the write. Never report success to the caller.
+                error!("Failed to write database.db (batched): {e}");
             }
         });
     }
@@ -885,17 +933,17 @@ impl Bridge {
                         }
                     }
                 }
+                _ = shutdown_signal() => {
+                    info!("Shutdown signal received, stopping bridge");
+                    break;
+                }
             }
         }
 
         if let Err(e) = mqtt.publish_bridge_state(false).await {
             warn!("Failed to publish offline state: {e}");
         }
-        // Flush any pending batched database write
-        {
-            let db = self.database.lock().await;
-            let _ = db.write();
-        }
+        self.flush_database().await;
         Ok(())
     }
 

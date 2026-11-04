@@ -35,12 +35,14 @@ R1 — явно ограниченный релиз для проверенно�
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и
   Rust/parity workflow. GitHub Actions ещё не запускался.
 - **PR-02 — частично выполнено**: STORE-01 (lossless YAML merge, unknown
-  options, referenced files) и STORE-02 (стабильные group/device database ID,
-  epList/interviewState/swBuildId) реализованы с локальными regression tests.
-  STORE-03 (durability/ENOSPC/SIGTERM flush) и STORE-04 (migration kit) не начаты.
-  Node/differential oracle и hardware evidence отсутствуют, поэтому строки имеют
-  статус `IN_PROGRESS`, а не `VERIFIED`.
-- Следующий шаг: STORE-03, затем STORE-04 и reference harness (EVID-04).
+  options, referenced files), STORE-02 (стабильные group/device database ID,
+  epList/interviewState/swBuildId) и STORE-03 (SIGTERM-handler, принудительный
+  flush, fsync каталога, видимые ошибки записи) реализованы с локальными
+  regression tests. STORE-04 (migration kit) не начат; SIGTERM/ENOSPC/power-loss
+  и Node/differential oracle отсутствуют, поэтому строки `IN_PROGRESS`, а не
+  `VERIFIED`.
+- Следующий шаг: STORE-04 (migration/preflight/rollback), затем reference harness
+  (EVID-04) и Z-Stack resume (ZB-01).
 
 ## Документы
 

@@ -284,6 +284,25 @@ impl PersistentDatabase {
         f.sync_all()?;
         drop(f);
         std::fs::rename(tmp_path, &self.path)?;
+        // Make the rename durable across power loss. Directory fsync is not
+        // supported on every filesystem, so a refusal is reported rather than
+        // turning an otherwise complete write into a failure.
+        if let Some(parent) = self.path.parent() {
+            match std::fs::File::open(parent) {
+                Ok(directory) => {
+                    if let Err(error) = directory.sync_all() {
+                        warn!(
+                            "Cannot fsync database directory {}: {error}",
+                            parent.display()
+                        );
+                    }
+                }
+                Err(error) => warn!(
+                    "Cannot open database directory {} for fsync: {error}",
+                    parent.display()
+                ),
+            }
+        }
         Ok(())
     }
 
@@ -998,5 +1017,28 @@ mod tests {
         db.sync_devices(&devices, coord);
         assert!(db.entries.contains_key(&10), "Group should be preserved");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn write_is_atomic_and_replaces_stale_tmp() {
+        let path = temp_db("atomic", "");
+        let mut db = PersistentDatabase::open(&path);
+        let device = Device::new(parse_ieee("0xec1bbdfffeaa66db").unwrap(), 0x1234);
+        let assigned = db.sync_devices(std::slice::from_ref(&device), None);
+        // Simulate a crashed previous write.
+        std::fs::write(format!("{}.tmp", path.display()), "partial").unwrap();
+
+        db.write().unwrap();
+
+        assert!(
+            !Path::new(&format!("{}.tmp", path.display())).exists(),
+            "temporary file must be renamed or replaced"
+        );
+        let reopened = PersistentDatabase::open(&path);
+        assert_eq!(
+            reopened.entries.get(&assigned[0].1).unwrap()["ieeeAddr"],
+            "0xec1bbdfffeaa66db"
+        );
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 }
