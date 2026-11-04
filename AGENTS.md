@@ -18,6 +18,26 @@
 
 ## 1. Mission and definition of compatibility
 
+### Approved first-release milestone (R1, conversation 2026-11-04)
+
+R1 is a limited operational milestone, distinct from complete Stage 1 and global
+parity. Its hardware acceptance requires **SONOFF Dongle-P only** on Routerich
+AX3000 v1 / OpenWrt 24.10.8. The user removed CC2531 hardware verification as an
+R1 release gate; preserve its implementation and regression tests. All other
+references in this file requiring both coordinators apply to **complete Stage 1**,
+not R1. No adapter or shared feature is excluded from the global target.
+
+R1 prioritizes bidirectional migration and the user's Lytko, Moes switches and
+temperature sensor. These are initial fixtures/HIL subjects for **one generic
+upstream-definition mechanism**, never a whitelist or personal-device bypass.
+Exact device identities, router RAM and free writable storage must be measured;
+the reported 54 MB is total storage, not a free-space budget. Converter packages
+must be validated before activation, with a pinned working version and rollback;
+automatic versus manual activation remains an open decision.
+
+See `docs/parity/decisions.md` and `.opencode/plan/README.md`. An R1 acceptance
+result does not establish complete Stage 1 parity or universal drop-in support.
+
 The goal is a maintainable, **pure Rust** implementation targeting embedded ARM (notably aarch64 Raspberry Pi 3) that can replace the upstream Zigbee2MQTT deployment without changing the expectations of MQTT consumers, device owners, Home Assistant integrations, coordinator hardware, and operational tooling. Stage 1 must fully support Z-Stack coordinators (especially CC2531 and CC2652P SONOFF Dongle-P); the final target extends to every adapter family the pinned upstream supports. Use upstream behavior as the contract; do **not** automatically preserve implementation details that have no observable effect.
 
 - Behavioral parity: identical or explicitly justified equivalent outputs for the same input, state, and configuration.

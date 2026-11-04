@@ -1,16 +1,30 @@
 # zigbee2mqtt-rs
 
-A drop-in replacement for [zigbee2mqtt](https://www.zigbee2mqtt.io/) written in pure Rust. Bridges Zigbee devices to MQTT with full Home Assistant auto-discovery support.
+A Rust Zigbee-to-MQTT bridge aiming for behavioral compatibility with
+[Zigbee2MQTT](https://www.zigbee2mqtt.io/). **Work in progress: a general drop-in
+replacement and complete Home Assistant/device support are not yet verified.**
+
+The [development roadmap](.opencode/plan/README.md) separates the first OpenWrt /
+Dongle-P release from full Z-Stack and global adapter parity. See the
+[source audit](docs/parity/evidence/AUDIT-20261104.md) and
+[parity accounting limitations](docs/parity/README.md).
 
 ## Features
 
-- **Drop-in replacement** -- imports existing zigbee2mqtt `database.db` so devices don't need re-pairing
-- **Home Assistant MQTT discovery** -- lights, switches, sensors, binary sensors, diagnostics
-- **Pure Rust** -- no C dependencies, no TLS libraries (ring/openssl), fast cross-compilation
-- **Z-Stack support** -- works with CC2531 (Z-Stack 1.2) and CC2652/CC1352 (Z-Stack 3.0)
+- **Database import** -- reads herdsman NDJSON; lossless round-trip and network resume still need work
+- **Home Assistant MQTT discovery** -- builders for several entity types; full lifecycle/exposes parity pending
+- **Pure-Rust application dependency goal** -- audited native/aarch64 Cargo trees; target builds and TLS remain separate gates
+- **Z-Stack implementation** -- CC2531 legacy paths and modern ZNP paths; hardware acceptance pending
 - **ZCL cluster support** -- On/Off, Level, Color (HS/XY/CT), Temperature, Humidity, Illuminance, Occupancy, IAS Zone, Power/Battery, Thermostat, Electrical Measurement, Metering, Binary/Multistate Input, On/Off Switch Config
 - **Optimistic state** -- set commands immediately publish expected state back to MQTT
-- **Small binary** -- optimized for embedded targets like Raspberry Pi 3
+- **Embedded target** -- Raspberry Pi 3 and planned OpenWrt release; router memory/storage budgets require measurement
+
+The audit passed 247 Rust tests and the native release build. These checks do
+not prove migration, upstream JS execution or hardware compatibility. Known
+gaps include lossy config writes, database ID stability, coordinator resume,
+real converter host APIs, and bridge requests that currently return placeholder
+responses. The existing parity tracker cannot yet provide a reliable completion
+percentage.
 
 ## Quick Start
 
@@ -27,17 +41,11 @@ cargo build --release
 
 ## Web UI
 
-The original zigbee2mqtt frontend (`zigbee2mqtt-windfront`) works without changes:
-the bridge's MQTT interface is compatible. On OpenWrt the frontend is served by
-uhttpd from `/www/zigbee2mqtt/` (port 80) and connects to mosquitto over
-WebSocket on port 9001:
-
-```
-http://<router-ip>/zigbee2mqtt/
-```
-
-On other systems, serve the frontend's `dist/` with any static HTTP server and
-point it at your MQTT broker's WebSocket listener.
+Unmodified `zigbee2mqtt-windfront` requires the application's JSON WebSocket
+`/api` protocol (`{topic,payload}`), snapshots and request side effects. Serving
+assets with uhttpd and enabling MQTT-over-WebSocket on mosquitto does not supply
+that protocol. The required backend is not implemented yet; see the
+[frontend plan](.opencode/plan/07-windfront-ha-and-features.md).
 
 ## Cross-Compile for ARM (aarch64)
 
@@ -164,16 +172,20 @@ platform.
 
 ## OpenWrt
 
-A ready-to-use OpenWrt SDK package is provided in `openwrt/`:
+OpenWrt packaging scaffolding is provided in `openwrt/`; installation and resource
+acceptance on the target router remain unverified:
 
 - Package `zigbee2mqtt-rs` installs the static binary, init script, config and
   an optional frontend into `/www/zigbee2mqtt/`.
-- mosquitto WebSocket listener is added on port 9001.
+- The current port-9001 mosquitto setup does not provide Windfront's application API.
 - Build with the SDK: `make package/zigbee2mqtt-rs/compile V=s`
 
 ## Configuration
 
-Uses the same `configuration.yaml` format as zigbee2mqtt:
+Currently accepts a subset of Zigbee2MQTT-like YAML. Unknown fields are not
+preserved on save, and upstream `mqtt.user` differs from local `username`.
+`mqtts://` currently does not enable TLS. The example below describes local
+configuration, not a lossless upstream migration contract:
 
 ```yaml
 serial:
@@ -209,10 +221,12 @@ devices:
 
 ## Migrating from zigbee2mqtt
 
-1. Stop zigbee2mqtt
-2. Copy `database.db` from zigbee2mqtt's data directory to the same directory as `configuration.yaml`
-3. Update `configuration.yaml` with your settings (or copy from zigbee2mqtt)
-4. Start zigbee2mqtt-rs -- it will import all paired devices automatically
+Bidirectional migration without data loss or re-pairing is a first-release gate,
+not a verified capability. Database import alone does not establish safe network
+resume: configuration preservation, stable record IDs and Z-Stack startup
+strategy have identified gaps. Follow the
+[storage/migration plan](.opencode/plan/03-storage-and-config.md) for the planned
+reference, rollback and hardware acceptance procedure.
 
 The bridge auto-discovers `database.db` in these locations:
 - Same directory as `configuration.yaml`
@@ -222,7 +236,8 @@ The bridge auto-discovers `database.db` in these locations:
 
 ## MQTT Topics
 
-Fully compatible with zigbee2mqtt's MQTT interface:
+Implemented topic surface (payloads, options and side effects are only partially
+compatible; the table is not an end-to-end verification claim):
 
 | Topic | Description |
 |---|---|
@@ -262,7 +277,10 @@ mosquitto_pub -t 'zigbee2mqtt/bridge/request/permit_join' -m '{"value":true,"tim
 
 ## Supported Devices
 
-Any Zigbee device using standard ZCL clusters:
+Native handlers cover the following clusters. Cluster support alone does not
+establish device compatibility: endpoint mappings, manufacturer quirks,
+configure/get/set and reporting also matter. The generic upstream converter
+pipeline is incomplete; no full-catalog support claim is made.
 
 | Cluster | Devices | State Fields |
 |---|---|---|

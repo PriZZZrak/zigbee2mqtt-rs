@@ -10,14 +10,14 @@
       "repo": "https://github.com/Koenkk/zigbee-herdsman.git",
       "commit": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
       "resolved_version": "10.10.0",
-      "lock_integrity": null,
+      "lock_integrity": "sha512-sd4ReEBDjC4UP7RzQjaAD0nP+WrDXaAac+ASJec0GNDcpyfbnT0qh+wJ2l8C3mw12f5eXX4nnA88A7h58QdTYA==",
       "tag": "v10.10.0"
     },
     "zigbee-herdsman-converters": {
       "repo": "https://github.com/Koenkk/zigbee-herdsman-converters.git",
       "commit": "9dabbe4e343573c5a3070605efd843a1b3a16058",
       "resolved_version": "26.115.1",
-      "lock_integrity": null,
+      "lock_integrity": "sha512-JSoTPMdKNP6OhiR6Ahd1uueNOclhVReDhNnp7a2vmQJMpYrT2dLV//pzZwtRSu8sKFQ7CPoj+jBTEEMMhP/DRA==",
       "tag": "v26.115.1"
     },
     "frontend": {
@@ -26,18 +26,61 @@
       "commit": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
       "lock_integrity": null,
       "repo": "https://github.com/Nerivec/zigbee2mqtt-windfront.git",
-      "tag": "v2.15.1"
+      "tag": "v2.15.1",
+      "provenance_status": "MISMATCH: historical pin retained; app resolves 2.15.0, not 2.15.1"
     }
   },
   "latest_heads": {
     "zigbee2mqtt": "3c841fdfd66c92239921ef84fde8f039c64e1662",
-    "zigbee-herdsman": "c1a54e3d52858fa0055aeaf1cf74c3dac65e9811",
-    "zigbee-herdsman-converters": "c18c32d94c77f683fa768618d1fd32b348fdd7b9",
-    "zigbee2mqtt-windfront": "353c7d89f1d8bf005db435c4ec809e6c6130ce9d",
-    "zigbee2mqtt.io": "a55fd7deaca449e502fefe705b6443af6a58ed86"
+    "zigbee-herdsman": "eb80ba1f1cb339071b0557fabd18fa856d4ce36a",
+    "zigbee-herdsman-converters": "367100282578111770f1c8ab0e38805d9ec581d0",
+    "zigbee2mqtt-windfront": "b32226926e4dce8c68861b737d7c4fb06a6cf276",
+    "zigbee2mqtt.io": "14acd6165880130fa3c1608aab74cb5f38b2547a"
   },
-  "last_successful_fetch_utc": "2026-11-02T15:00:00Z",
-  "last_checked_utc": "2026-11-02T15:00:00Z",
+  "last_successful_fetch_utc": "2026-11-04T09:08:33.742736+00:00",
+  "last_checked_utc": "2026-11-04T09:08:33.742736+00:00",
   "freshness_status": "DRIFT_DETECTED",
-  "baseline_approved_at_utc": null
+  "baseline_approved_at_utc": null,
+  "baseline_validation_status": "BLOCKED_FRONTEND_MISMATCH",
+  "app_resolved_frontends": {
+    "zigbee2mqtt-windfront": {
+      "resolved_version": "2.15.0",
+      "commit": "73072392d8fecaff0e02112eb05b6fc5c08fca2f",
+      "tag": "v2.15.0",
+      "lock_integrity": "sha512-t3JiUjzfLoaHJhYfN36lx1FObOm6unMOP4d4h6lh/KTbH5re75NDSaW6BHbHX8fZvbutxq5gF7WH9KV1vtXg5Q==",
+      "status": "Tag resolved; matched reference execution pending; historical baseline not advanced"
+    },
+    "zigbee2mqtt-frontend": {
+      "resolved_version": "0.9.21",
+      "commit": null,
+      "lock_integrity": "sha512-ClHYlG7g0v/tnIsD6kycNCi1ZEKIbQuU7lGJR3WqYcDmuqEMVcHDGbRiRwYRQcZGMxkqCf7guxNsXiKnC10+kg==",
+      "status": "Package pinned; repository/SHA mapping and source audit UNKNOWN"
+    }
+  },
+  "dependency_provenance": {
+    "source": "zigbee2mqtt@344b6e03b43644c97154a72ca9eae17193c553a2/package.json:60-63 and pnpm-lock.yaml:1278-1295",
+    "package_manager": "pnpm@11.26.0",
+    "node_engine": "^22.2.0 || ^24 || <=26.2",
+    "package_to_git_content_equivalence": "UNVERIFIED; tag versions inspected, package tarballs not executed"
+  },
+  "repository_checks": {
+    "zigbee2mqtt": {"checked_utc": "2026-11-04T09:06:04.251728+00:00", "fetch_exit": 0, "default_branch": "master"},
+    "zigbee-herdsman": {"checked_utc": "2026-11-04T09:06:05.512035+00:00", "fetch_exit": 0, "default_branch": "master"},
+    "zigbee-herdsman-converters": {"checked_utc": "2026-11-04T09:06:06.999710+00:00", "fetch_exit": 0, "default_branch": "master"},
+    "zigbee2mqtt-windfront": {"checked_utc": "2026-11-04T09:06:03.828297+00:00", "fetch_exit": 0, "default_branch": "main"},
+    "zigbee2mqtt.io": {
+      "checked_utc": "2026-11-04T09:08:33.742736+00:00",
+      "fetch_exit": 0,
+      "default_branch": "master",
+      "local_head": "a55fd7deaca449e502fefe705b6443af6a58ed86",
+      "initial_fetch_result": "timeout after 60s; final fetch succeeded"
+    }
+  },
+  "distributed_converter_observation": {
+    "checked_utc": "2026-11-03T21:05:22.215282+00:00",
+    "url": "https://prizzzrak.github.io/zigbee2mqtt-rs/herdsman-converters/latest/VERSION",
+    "version": "v26.125.0",
+    "status": "HTTP observation only; not compatibility baseline or runtime verification"
+  },
+  "audit_evidence": "docs/parity/evidence/AUDIT-20261104.md"
 }
