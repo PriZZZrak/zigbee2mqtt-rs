@@ -1004,49 +1004,120 @@ impl Bridge {
                                     }
                                 }
                                 "group/members/add" => {
-                                    let group_id = payload.get("group").and_then(|v| v.as_str()).or_else(|| payload.get("id").and_then(|v| v.as_str())).unwrap_or("");
-                                    let device = payload.get("device").and_then(|v| v.as_str()).unwrap_or("");
+                                    let group_key = payload.get("group").and_then(|v| v.as_str()).or_else(|| payload.get("id").and_then(|v| v.as_str())).unwrap_or("");
+                                    let device_key = payload.get("device").and_then(|v| v.as_str()).unwrap_or("");
                                     let endpoint: u8 = payload.get("endpoint").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
-                                    let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
-                                    if groups.add_member(gid, device.to_string(), endpoint) {
-                                        let _ = mqtt.publish_bridge_groups(&groups).await;
-                                        self.persist_database(coord.info.ieee_addr).await;
-                                        self.persist_groups_config().await;
-                                        let resp = mk_resp("ok", json!({}), None);
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                    } else {
-                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    let group = group_key.parse::<u16>().ok().and_then(|id| groups.get_by_id(id))
+                                        .or_else(|| groups.get_by_name(group_key));
+                                    let device = find_device_for_id(&devices, device_key);
+                                    match (group, device) {
+                                        (Some(group), Some(device)) => {
+                                            trans_id = trans_id.wrapping_add(1);
+                                            let tsn = trans_id;
+                                            let command = crate::zigbee::zcl::clusters::groups::add_group_payload(tsn, group.id, &group.friendly_name);
+                                            match send_group_command(&coord, device.nwk_addr, endpoint, tsn, command, Some(crate::zigbee::zcl::clusters::groups::RSP_ADD_GROUP)).await {
+                                                Ok(response) if response.is_success() => {
+                                                    groups.add_member(group.id, device.ieee_addr.as_hex(), endpoint);
+                                                    let _ = mqtt.publish_bridge_groups(&groups).await;
+                                                    self.persist_database(coord.info.ieee_addr).await;
+                                                    self.persist_groups_config().await;
+                                                    let resp = mk_resp("ok", response.as_json(), None);
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Ok(response) => {
+                                                    let resp = mk_resp("error", response.as_json(), Some(format!("addGroup status {}", response.status)));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Err(error) => {
+                                                    let resp = mk_resp("error", json!({}), Some(error));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                            }
+                                        }
+                                        (None, _) => {
+                                            let resp = mk_resp("error", json!({}), Some("group not found".into()));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        (_, None) => {
+                                            let resp = mk_resp("error", json!({}), Some("device not found".into()));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
                                     }
                                 }
                                 "group/members/remove" => {
-                                    let group_id = payload.get("group").and_then(|v| v.as_str()).unwrap_or("");
-                                    let device = payload.get("device").and_then(|v| v.as_str()).unwrap_or("");
+                                    let group_key = payload.get("group").and_then(|v| v.as_str()).unwrap_or("");
+                                    let device_key = payload.get("device").and_then(|v| v.as_str()).unwrap_or("");
                                     let endpoint: u8 = payload.get("endpoint").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
-                                    let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
-                                    if groups.remove_member(gid, device, endpoint) {
-                                        let _ = mqtt.publish_bridge_groups(&groups).await;
-                                        self.persist_database(coord.info.ieee_addr).await;
-                                        self.persist_groups_config().await;
-                                        let resp = mk_resp("ok", json!({}), None);
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                    } else {
-                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    let group = group_key.parse::<u16>().ok().and_then(|id| groups.get_by_id(id))
+                                        .or_else(|| groups.get_by_name(group_key));
+                                    let device = find_device_for_id(&devices, device_key);
+                                    match (group, device) {
+                                        (Some(group), Some(device)) => {
+                                            trans_id = trans_id.wrapping_add(1);
+                                            let tsn = trans_id;
+                                            let command = crate::zigbee::zcl::clusters::groups::remove_group_payload(tsn, group.id);
+                                            match send_group_command(&coord, device.nwk_addr, endpoint, tsn, command, Some(crate::zigbee::zcl::clusters::groups::RSP_REMOVE_GROUP)).await {
+                                                Ok(response) if response.is_success() => {
+                                                    groups.remove_member(group.id, &device.ieee_addr.as_hex(), endpoint);
+                                                    let _ = mqtt.publish_bridge_groups(&groups).await;
+                                                    self.persist_database(coord.info.ieee_addr).await;
+                                                    self.persist_groups_config().await;
+                                                    let resp = mk_resp("ok", response.as_json(), None);
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Ok(response) => {
+                                                    let resp = mk_resp("error", response.as_json(), Some(format!("removeGroup status {}", response.status)));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Err(error) => {
+                                                    let resp = mk_resp("error", json!({}), Some(error));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                            }
+                                        }
+                                        (None, _) => {
+                                            let resp = mk_resp("error", json!({}), Some("group not found".into()));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        (_, None) => {
+                                            let resp = mk_resp("error", json!({}), Some("device not found".into()));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
                                     }
                                 }
                                 "group/members/remove_all" => {
-                                    let group_id = payload.get("group").and_then(|v| v.as_str()).unwrap_or("");
-                                    let gid: u16 = group_id.parse().unwrap_or_else(|_| groups.get_by_name(group_id).map(|g| g.id).unwrap_or(0));
-                                    if groups.clear_members(gid) {
-                                        let _ = mqtt.publish_bridge_groups(&groups).await;
-                                        self.persist_database(coord.info.ieee_addr).await;
-                                        self.persist_groups_config().await;
-                                        let resp = mk_resp("ok", json!({}), None);
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                    } else {
-                                        let resp = mk_resp("error", json!({}), Some("group not found".into()));
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    let device_key = payload.get("device").and_then(|v| v.as_str()).unwrap_or("");
+                                    let endpoint: u8 = payload.get("endpoint").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+                                    match find_device_for_id(&devices, device_key) {
+                                        Some(device) => {
+                                            trans_id = trans_id.wrapping_add(1);
+                                            let tsn = trans_id;
+                                            let command = crate::zigbee::zcl::clusters::groups::remove_all_groups_payload(tsn);
+                                            match send_group_command(&coord, device.nwk_addr, endpoint, tsn, command, None).await {
+                                                Ok(response) if response.is_success() => {
+                                                    for group in groups.all() {
+                                                        groups.remove_member(group.id, &device.ieee_addr.as_hex(), endpoint);
+                                                    }
+                                                    let _ = mqtt.publish_bridge_groups(&groups).await;
+                                                    self.persist_database(coord.info.ieee_addr).await;
+                                                    self.persist_groups_config().await;
+                                                    let resp = mk_resp("ok", json!({"device": device.friendly_name, "endpoint": endpoint}), None);
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Ok(response) => {
+                                                    let resp = mk_resp("error", response.as_json(), Some(format!("removeAllGroups status {}", response.status)));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Err(error) => {
+                                                    let resp = mk_resp("error", json!({}), Some(error));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                            }
+                                        }
+                                        None => {
+                                            let resp = mk_resp("error", json!({}), Some("device not found".into()));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
                                     }
                                 }
                                 "device/bind" | "device/unbind" | "device/binds/clear" => {
@@ -2157,6 +2228,31 @@ where
         }
     }
     (merged, failed)
+}
+
+async fn send_group_command(
+    coord: &CoordinatorHandle,
+    nwk_addr: u16,
+    endpoint: u8,
+    tsn: u8,
+    payload: Vec<u8>,
+    expected_response: Option<u8>,
+) -> std::result::Result<crate::zigbee::zcl::clusters::groups::GroupResponse, String> {
+    let response = coord
+        .request_zcl_expected(
+            nwk_addr,
+            endpoint,
+            crate::zigbee::zcl::clusters::groups::CLUSTER_ID,
+            tsn,
+            payload,
+            Duration::from_secs(3),
+            2,
+            expected_response,
+        )
+        .await
+        .map_err(|error| format!("group command failed: {error}"))?;
+    crate::zigbee::zcl::clusters::groups::parse_response(&response.data)
+        .ok_or_else(|| "invalid groups cluster response".to_string())
 }
 
 /// Build the MQTT bridge response envelope for reporting requests.

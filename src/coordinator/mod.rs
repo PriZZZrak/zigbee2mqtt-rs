@@ -88,6 +88,35 @@ impl CoordinatorHandle {
             .await
     }
 
+    /// Send a ZCL frame and wait for a specific response command.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn request_zcl_expected(
+        &self,
+        dst_addr: u16,
+        dst_ep: u8,
+        cluster_id: u16,
+        trans_id: u8,
+        payload: Vec<u8>,
+        timeout: std::time::Duration,
+        attempts: u8,
+        expected_response: Option<u8>,
+    ) -> Result<ZclIncoming> {
+        self.inner
+            .lock()
+            .await
+            .request_zcl_expected(
+                dst_addr,
+                dst_ep,
+                cluster_id,
+                trans_id,
+                payload,
+                timeout,
+                attempts,
+                expected_response,
+            )
+            .await
+    }
+
     /// Send a ZCL frame and wait for the device response (see ZnpHandle).
     #[allow(clippy::too_many_arguments)]
     pub async fn request_zcl(

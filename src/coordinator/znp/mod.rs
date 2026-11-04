@@ -725,8 +725,34 @@ impl ZnpHandle {
         timeout: Duration,
         attempts: u8,
     ) -> Result<ZclIncoming> {
-        let request = ZclRequest::from_payload(dst_addr, dst_ep, cluster_id, &payload)
-            .ok_or_else(|| Error::Zcl("cannot parse outgoing ZCL header".into()))?;
+        self.request_zcl_expected(
+            dst_addr, dst_ep, cluster_id, trans_id, payload, timeout, attempts, None,
+        )
+        .await
+    }
+
+    /// Like `request_zcl`, but for cluster-specific commands with a known
+    /// response command id (for example Groups addGroup response 0x00).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn request_zcl_expected(
+        &self,
+        dst_addr: u16,
+        dst_ep: u8,
+        cluster_id: u16,
+        trans_id: u8,
+        payload: Vec<u8>,
+        timeout: Duration,
+        attempts: u8,
+        expected_response: Option<u8>,
+    ) -> Result<ZclIncoming> {
+        let request = ZclRequest::from_payload_with_response(
+            dst_addr,
+            dst_ep,
+            cluster_id,
+            &payload,
+            expected_response,
+        )
+        .ok_or_else(|| Error::Zcl("cannot parse outgoing ZCL header".into()))?;
         if !request.expects_response() {
             return Err(Error::Zcl(
                 "ZCL command does not expect a response; use send_zcl".into(),

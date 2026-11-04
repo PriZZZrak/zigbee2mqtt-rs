@@ -77,6 +77,10 @@ R1 — явно ограниченный релиз для проверенно�
 - **CV-08 частично**: async `convertGet` исполняется с Boa job queue и возвращает
   запрошенные чтения; stub поддерживает только `read`, endpoint всегда 1,
   timers/другие host methods не реализованы.
+- **FEAT-01 groups частично**: membership add/remove/remove_all отправляются
+  реальными ZCL Groups-командами (0x0004) с ожиданием ответа и обновляют
+  локальное состояние только после success; remove_all исправлен на
+  endpoint-направление. Group fanout/state, bind flags и HIL отсутствуют.
 - **CV-05/07/08 частично**: упрощённый `prepareDefinition` объединяет modern
   extend from/to/exposes/options; в `msg` передаются реальные endpoint/LQI/groupID
   и helpers `getDevice`/`deviceIeeeAddress`; native и converter значения

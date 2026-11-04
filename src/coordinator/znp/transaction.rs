@@ -130,6 +130,20 @@ impl ZclRequest {
         })
     }
 
+    /// Override the expected response command (cluster-specific commands).
+    #[must_use]
+    pub fn from_payload_with_response(
+        nwk_addr: u16,
+        endpoint: u8,
+        cluster_id: u16,
+        payload: &[u8],
+        expected_response: Option<u8>,
+    ) -> Option<Self> {
+        let mut request = Self::from_payload(nwk_addr, endpoint, cluster_id, payload)?;
+        request.expected_response = expected_response;
+        Some(request)
+    }
+
     #[must_use]
     pub fn expects_response(&self) -> bool {
         self.expected_response.is_some() || self.expects_default_response
@@ -318,6 +332,20 @@ mod tests {
         assert_eq!(waiters.deliver(&response), 1);
         let delivered = rx.try_recv().unwrap().unwrap();
         assert_eq!(delivered.default_response_status(), Some(0x01));
+    }
+
+    #[tokio::test]
+    async fn explicit_cluster_specific_response_is_matched() {
+        // Groups addGroup request: cluster-specific, TSN 7, command 0x00.
+        let payload = vec![0x01, 7, 0x00, 0x34, 0x12, 0x01, b'g'];
+        let request =
+            ZclRequest::from_payload_with_response(NWK, EP, 0x0004, &payload, Some(0x00)).unwrap();
+        let mut waiters = ZclWaiters::default();
+        let (_, rx) = waiters.register(request, Duration::from_secs(1));
+        let mut response = incoming(0x00, EP, 0x0004, TSN, 1);
+        response.frame_type = 0x01;
+        assert_eq!(waiters.deliver(&response), 1);
+        assert_eq!(rx.await.unwrap().unwrap().command, 0x00);
     }
 
     #[test]
