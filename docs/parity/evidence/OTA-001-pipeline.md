@@ -16,6 +16,21 @@ Pinned app/herdsman:
 - `test/device-ota.test.ts` and related fixtures are the reference for transfer
   sequences; they have not been executed in this environment.
 
+## Bridge/metadata integration
+
+- `src/ota.rs` parses the 56-byte OTA file header and owns per-device
+  `OtaTransfer`s.
+- Bridge `device/ota_update/check` accepts a hex image payload, validates the
+  header and responds with manufacturer/image type/version/size.
+- `device/ota_update/update` starts a transfer, publishes
+  `update: {state: "updating", progress: 0}`, and `update/abort`/`unschedule`
+  aborts it.
+- Incoming ZCL cluster 0x0019 frames are routed to the manager: QueryNextImage,
+  ImageBlock and UpgradeEnd responses are sent back to the device, progress is
+  published (rounded percent), and completion returns the update state to idle.
+- The image source is currently an explicit hex payload; network URL/index
+  metadata and persistent firmware storage are not implemented.
+
 ## Rust change (transport-independent core)
 
 - Typed parsers for QueryNextImageRequest, ImageBlockRequest (including optional
@@ -35,16 +50,21 @@ Pinned app/herdsman:
 
 ## Tests and evidence
 
-Seven tests: query parsing/response, block progress/fragmentation, wrong identity,
-premature upgrade end, block/upgrade-end parsing, and full replay.
+Nine OTA core tests plus two manager tests: image header parsing/rejection and a
+fake-coordinator replay through start → query → blocks → upgrade end → abort.
+The bridge request handler itself is not yet covered by an E2E test.
 
-`cargo test --locked` → **353 passed** (321 library, 2 binary, 30 compatibility);
+`cargo test --locked` → **355 passed** (323 library, 2 binary, 30 compatibility);
 clippy exit 0 with five existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
 
-- No bridge/MQTT integration: `device/ota_update/*` still returns placeholder
-  responses and no image source/metadata/cache is implemented.
+- No bridge request E2E or MQTT broker test; the handler is exercised only
+  through the manager.
+- `check` reports any valid image as available; it does not compare device
+  identity or query the device first.
+- Only hex image payloads are supported; URL/index metadata, persistence,
+  downgrade rules and scheduling are missing.
 - No image file checksum/signature validation, manufacturer/hardware applicability
   beyond identity, block-size negotiation, retry/timeout policy, upgrade delay or
   progress publication.

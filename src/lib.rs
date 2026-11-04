@@ -9,4 +9,5 @@ pub mod groups;
 pub mod homeassistant;
 pub mod migration;
 pub mod mqtt;
+pub mod ota;
 pub mod zigbee;

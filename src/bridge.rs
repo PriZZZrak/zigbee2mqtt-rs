@@ -129,6 +129,7 @@ pub struct Bridge {
     database: Arc<Mutex<PersistentDatabase>>,
     db_write_pending: Arc<Mutex<bool>>,
     external: Arc<ExternalConverter>,
+    ota: Arc<Mutex<crate::ota::OtaManager>>,
 }
 
 /// Resolve when the service manager or user asks the bridge to stop.
@@ -236,6 +237,7 @@ impl Bridge {
             database: Arc::new(Mutex::new(db)),
             db_write_pending: Arc::new(Mutex::new(false)),
             external: Arc::new(external),
+            ota: Arc::new(Mutex::new(crate::ota::OtaManager::default())),
         }
     }
 
@@ -672,6 +674,57 @@ impl Bridge {
                             }
                             if cluster_id == 0x0500 {
                                 Self::handle_ias_zone_type_response(&devices, src_addr, &data);
+                            }
+                            if cluster_id == crate::zigbee::zcl::clusters::ota::CLUSTER_ID {
+                                if let Some(ieee) =
+                                    devices.get_by_nwk(src_addr).map(|device| device.ieee_addr)
+                                {
+                                    let tsn = if data.first().is_some_and(|control| control & 0x04 != 0) {
+                                        data.get(3).copied().unwrap_or(0)
+                                    } else {
+                                        data.get(1).copied().unwrap_or(0)
+                                    };
+                                    let action = self
+                                        .ota
+                                        .lock()
+                                        .await
+                                        .handle_zcl(&ieee.as_hex(), &data, tsn);
+                                    if let Some(action) = action {
+                                        if let Err(error) = coord
+                                            .send_zcl(
+                                                src_addr,
+                                                src_ep,
+                                                crate::zigbee::zcl::clusters::ota::CLUSTER_ID,
+                                                tsn,
+                                                action.response,
+                                            )
+                                            .await
+                                        {
+                                            warn!("OTA response send failed: {error}");
+                                        }
+                                        if let Some(progress) = action.progress {
+                                            if let Some(mut device) = devices.get_mut_by_nwk(src_addr) {
+                                                device.state.insert(
+                                                    "update".into(),
+                                                    json!({
+                                                        "state": if action.completed { "idle" } else { "updating" },
+                                                        "progress": (progress * 100.0).round(),
+                                                    }),
+                                                );
+                                                let state = serde_json::Value::Object(device.state.clone());
+                                                let name = device.friendly_name.clone();
+                                                drop(device);
+                                                Self::publish_state(
+                                                    &mqtt,
+                                                    self.cfg.advanced.output,
+                                                    &name,
+                                                    &state,
+                                                )
+                                                .await;
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             let zone_type = devices.get_by_nwk(src_addr).and_then(|d| d.zone_type);
@@ -1169,8 +1222,94 @@ impl Bridge {
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 _ if request.starts_with("device/ota_update/") => {
-                                    let resp = mk_resp("ok", json!({}), None);
-                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    let suffix = request
+                                        .strip_prefix("device/ota_update/")
+                                        .unwrap_or("");
+                                    let id = payload
+                                        .get("id")
+                                        .and_then(|value| value.as_str())
+                                        .or_else(|| payload.as_str())
+                                        .unwrap_or("");
+                                    let device = find_device_for_id(&devices, id);
+                                    let Some(device) = device else {
+                                        let resp = mk_resp("error", json!({}), Some(format!("Device '{id}' does not exist")));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        continue;
+                                    };
+                                    let hex_data = payload
+                                        .get("hex")
+                                        .and_then(|hex| hex.get("data"))
+                                        .and_then(|data| data.as_str());
+                                    let image_bytes = hex_data.and_then(|data| hex::decode(data).ok());
+                                    match suffix {
+                                        "check" | "check/downgrade" => {
+                                            let check_result = if let Some(bytes) = &image_bytes {
+                                                self.ota.lock().await.check(bytes)
+                                            } else {
+                                                Err("missing or invalid hex image".to_string())
+                                            };
+                                            match check_result {
+                                                Ok(info) => {
+                                                    let resp = mk_resp("ok", json!({
+                                                        "id": id,
+                                                        "update_available": true,
+                                                        "downgrade": suffix.ends_with("downgrade"),
+                                                        "source": null,
+                                                        "release_notes": null,
+                                                        "manufacturer_code": info.manufacturer_code,
+                                                        "image_type": info.image_type,
+                                                        "file_version": info.file_version,
+                                                        "image_size": info.size,
+                                                    }), None);
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Err(error) => {
+                                                    let resp = mk_resp("error", json!({}), Some(error));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                            }
+                                        }
+                                        "update" | "update/downgrade" => {
+                                            let result = if let Some(bytes) = &image_bytes {
+                                                let mut manager = self.ota.lock().await;
+                                                manager.start(&device.ieee_addr.as_hex(), bytes)
+                                            } else {
+                                                Err("missing or invalid hex image".to_string())
+                                            };
+                                            match result {
+                                                Ok(info) => {
+                                                    if let Some(mut live) = devices.get_mut_by_nwk(device.nwk_addr) {
+                                                        live.state.insert("update".into(), json!({"state": "updating", "progress": 0}));
+                                                        let state = serde_json::Value::Object(live.state.clone());
+                                                        let name = live.friendly_name.clone();
+                                                        drop(live);
+                                                        Self::publish_state(&mqtt, self.cfg.advanced.output, &name, &state).await;
+                                                    }
+                                                    let resp = mk_resp("ok", json!({
+                                                        "id": id,
+                                                        "manufacturer_code": info.manufacturer_code,
+                                                        "image_type": info.image_type,
+                                                        "file_version": info.file_version,
+                                                        "image_size": info.size,
+                                                    }), None);
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                                Err(error) => {
+                                                    let resp = mk_resp("error", json!({}), Some(error));
+                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                                }
+                                            }
+                                        }
+                                        "update/abort" | "unschedule" => {
+                                            let aborted = self.ota.lock().await.abort(&device.ieee_addr.as_hex());
+                                            let resp = mk_resp("ok", json!({"id": id, "aborted": aborted}), None);
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        _ => {
+                                            let resp = mk_resp("error", json!({}), Some(format!("Unsupported OTA request {suffix}")));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                    }
                                 }
                                 _ => {
                                     warn!("Unsupported bridge request: {request}");
