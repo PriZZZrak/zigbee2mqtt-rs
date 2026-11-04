@@ -80,8 +80,9 @@ R1 — явно ограниченный релиз для проверенно�
   timers/другие host methods не реализованы.
 - **FEAT-02 OTA частично**: ZCL 0x0019 codecs, `OtaTransfer` и OTA manager
   (hex image header, bridge check/update/abort, incoming query/block/end,
-  progress) покрыты fake-coordinator replay. URL metadata/cache, checksums,
-  retry/timeout, bridge request E2E и HIL отсутствуют.
+  progress) покрыты fake-coordinator replay. Bridge request E2E для
+  check/update/abort и progress payload добавлен; URL metadata/cache, checksums,
+  retry/timeout, broker и HIL отсутствуют.
 - **HA cleanup частично**: retained discovery configs удаляются пустым payload
   (`retain=true`, QoS1) при remove; rename очищает старые configs и публикует
   новые. Golden-тесты покрывают exact topics/payload; live-broker/HA migration

@@ -50,17 +50,25 @@ Pinned app/herdsman:
 
 ## Tests and evidence
 
-Nine OTA core tests plus two manager tests: image header parsing/rejection and a
-fake-coordinator replay through start → query → blocks → upgrade end → abort.
-The bridge request handler itself is not yet covered by an E2E test.
+Twelve OTA tests: nine core/manager tests (header parsing, query/blocks/end replay)
+plus three bridge-request tests:
 
-`cargo test --locked` → **355 passed** (323 library, 2 binary, 30 compatibility);
+- `ota_bridge_check_and_update_requests_end_to_end`: real bridge request
+  payloads → check info, update state `{state: updating, progress: 0}`, abort →
+  idle.
+- `ota_bridge_request_error_paths`: unknown device, invalid hex, unsupported
+  schedule request.
+- `ota_progress_payload_matches_state_contract`: 0.5 → 50 while updating and
+  completion → idle/100.
+
+`cargo test --locked` → **358 passed** (326 library, 2 binary, 30 compatibility);
 clippy exit 0 with five existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
 
-- No bridge request E2E or MQTT broker test; the handler is exercised only
-  through the manager.
+- The bridge request handler is covered directly with a fake coordinator/manager,
+  but not through the MQTT event loop or a broker; state publication is asserted
+  as payload fields, not on the wire.
 - `check` reports any valid image as available; it does not compare device
   identity or query the device first.
 - Only hex image payloads are supported; URL/index metadata, persistence,

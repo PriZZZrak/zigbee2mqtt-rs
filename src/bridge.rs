@@ -706,10 +706,7 @@ impl Bridge {
                                             if let Some(mut device) = devices.get_mut_by_nwk(src_addr) {
                                                 device.state.insert(
                                                     "update".into(),
-                                                    json!({
-                                                        "state": if action.completed { "idle" } else { "updating" },
-                                                        "progress": (progress * 100.0).round(),
-                                                    }),
+                                                    ota_update_state(progress, action.completed),
                                                 );
                                                 let state = serde_json::Value::Object(device.state.clone());
                                                 let name = device.friendly_name.clone();
@@ -1222,91 +1219,32 @@ impl Bridge {
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 _ if request.starts_with("device/ota_update/") => {
-                                    let suffix = request
-                                        .strip_prefix("device/ota_update/")
-                                        .unwrap_or("");
-                                    let id = payload
-                                        .get("id")
-                                        .and_then(|value| value.as_str())
-                                        .or_else(|| payload.as_str())
-                                        .unwrap_or("");
-                                    let device = find_device_for_id(&devices, id);
-                                    let Some(device) = device else {
-                                        let resp = mk_resp("error", json!({}), Some(format!("Device '{id}' does not exist")));
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                        continue;
-                                    };
-                                    let hex_data = payload
-                                        .get("hex")
-                                        .and_then(|hex| hex.get("data"))
-                                        .and_then(|data| data.as_str());
-                                    let image_bytes = hex_data.and_then(|data| hex::decode(data).ok());
-                                    match suffix {
-                                        "check" | "check/downgrade" => {
-                                            let check_result = if let Some(bytes) = &image_bytes {
-                                                self.ota.lock().await.check(bytes)
-                                            } else {
-                                                Err("missing or invalid hex image".to_string())
-                                            };
-                                            match check_result {
-                                                Ok(info) => {
-                                                    let resp = mk_resp("ok", json!({
-                                                        "id": id,
-                                                        "update_available": true,
-                                                        "downgrade": suffix.ends_with("downgrade"),
-                                                        "source": null,
-                                                        "release_notes": null,
-                                                        "manufacturer_code": info.manufacturer_code,
-                                                        "image_type": info.image_type,
-                                                        "file_version": info.file_version,
-                                                        "image_size": info.size,
-                                                    }), None);
-                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                                }
-                                                Err(error) => {
-                                                    let resp = mk_resp("error", json!({}), Some(error));
-                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                                }
-                                            }
-                                        }
-                                        "update" | "update/downgrade" => {
-                                            let result = if let Some(bytes) = &image_bytes {
-                                                let mut manager = self.ota.lock().await;
-                                                manager.start(&device.ieee_addr.as_hex(), bytes)
-                                            } else {
-                                                Err("missing or invalid hex image".to_string())
-                                            };
-                                            match result {
-                                                Ok(info) => {
-                                                    if let Some(mut live) = devices.get_mut_by_nwk(device.nwk_addr) {
-                                                        live.state.insert("update".into(), json!({"state": "updating", "progress": 0}));
-                                                        let state = serde_json::Value::Object(live.state.clone());
-                                                        let name = live.friendly_name.clone();
-                                                        drop(live);
-                                                        Self::publish_state(&mqtt, self.cfg.advanced.output, &name, &state).await;
+                                    match handle_ota_request(
+                                        &self.ota, &devices, &request, &payload,
+                                    ).await {
+                                        Ok(outcome) => {
+                                            if let Some((ieee, update)) = outcome.state_update {
+                                                if let Some(address) = IeeeAddr::from_hex(&ieee) {
+                                                    if let Some(mut device) = devices.get_mut_by_ieee(&address) {
+                                                        device.state.insert("update".into(), update);
+                                                        let state = serde_json::Value::Object(device.state.clone());
+                                                        let name = device.friendly_name.clone();
+                                                        drop(device);
+                                                        Self::publish_state(
+                                                            &mqtt,
+                                                            self.cfg.advanced.output,
+                                                            &name,
+                                                            &state,
+                                                        )
+                                                        .await;
                                                     }
-                                                    let resp = mk_resp("ok", json!({
-                                                        "id": id,
-                                                        "manufacturer_code": info.manufacturer_code,
-                                                        "image_type": info.image_type,
-                                                        "file_version": info.file_version,
-                                                        "image_size": info.size,
-                                                    }), None);
-                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                                }
-                                                Err(error) => {
-                                                    let resp = mk_resp("error", json!({}), Some(error));
-                                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                                 }
                                             }
-                                        }
-                                        "update/abort" | "unschedule" => {
-                                            let aborted = self.ota.lock().await.abort(&device.ieee_addr.as_hex());
-                                            let resp = mk_resp("ok", json!({"id": id, "aborted": aborted}), None);
+                                            let resp = mk_resp("ok", outcome.data, None);
                                             let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                         }
-                                        _ => {
-                                            let resp = mk_resp("error", json!({}), Some(format!("Unsupported OTA request {suffix}")));
+                                        Err(error) => {
+                                            let resp = mk_resp("error", json!({}), Some(error));
                                             let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                         }
                                     }
@@ -2388,6 +2326,84 @@ where
     (merged, failed)
 }
 
+#[derive(Debug)]
+struct OtaRequestOutcome {
+    data: serde_json::Value,
+    state_update: Option<(String, serde_json::Value)>,
+}
+
+fn ota_update_state(progress: f64, completed: bool) -> serde_json::Value {
+    json!({
+        "state": if completed { "idle" } else { "updating" },
+        "progress": (progress * 100.0).round() as i64,
+    })
+}
+
+async fn handle_ota_request(
+    ota: &Mutex<crate::ota::OtaManager>,
+    devices: &DeviceRegistry,
+    request: &str,
+    payload: &serde_json::Value,
+) -> std::result::Result<OtaRequestOutcome, String> {
+    let suffix = request
+        .strip_prefix("device/ota_update/")
+        .ok_or_else(|| "invalid OTA request".to_string())?;
+    let id = payload
+        .get("id")
+        .and_then(|value| value.as_str())
+        .or_else(|| payload.as_str())
+        .unwrap_or("");
+    let device =
+        find_device_for_id(devices, id).ok_or_else(|| format!("Device '{id}' does not exist"))?;
+    let image_bytes = payload
+        .get("hex")
+        .and_then(|hex| hex.get("data"))
+        .and_then(|data| data.as_str())
+        .and_then(|data| hex::decode(data).ok());
+    match suffix {
+        "check" | "check/downgrade" => {
+            let bytes = image_bytes.ok_or_else(|| "missing or invalid hex image".to_string())?;
+            let info = ota.lock().await.check(&bytes)?;
+            Ok(OtaRequestOutcome {
+                data: json!({
+                    "id": id,
+                    "update_available": true,
+                    "downgrade": suffix.ends_with("downgrade"),
+                    "source": null,
+                    "release_notes": null,
+                    "manufacturer_code": info.manufacturer_code,
+                    "image_type": info.image_type,
+                    "file_version": info.file_version,
+                    "image_size": info.size,
+                }),
+                state_update: None,
+            })
+        }
+        "update" | "update/downgrade" => {
+            let bytes = image_bytes.ok_or_else(|| "missing or invalid hex image".to_string())?;
+            let info = ota.lock().await.start(&device.ieee_addr.as_hex(), &bytes)?;
+            Ok(OtaRequestOutcome {
+                data: json!({
+                    "id": id,
+                    "manufacturer_code": info.manufacturer_code,
+                    "image_type": info.image_type,
+                    "file_version": info.file_version,
+                    "image_size": info.size,
+                }),
+                state_update: Some((device.ieee_addr.as_hex(), ota_update_state(0.0, false))),
+            })
+        }
+        "update/abort" | "unschedule" => {
+            let aborted = ota.lock().await.abort(&device.ieee_addr.as_hex());
+            Ok(OtaRequestOutcome {
+                data: json!({"id": id, "aborted": aborted}),
+                state_update: Some((device.ieee_addr.as_hex(), ota_update_state(1.0, true))),
+            })
+        }
+        _ => Err(format!("Unsupported OTA request {suffix}")),
+    }
+}
+
 async fn send_group_command(
     coord: &CoordinatorHandle,
     nwk_addr: u16,
@@ -3195,5 +3211,105 @@ mod tests {
         .await;
         assert_eq!(failed, 0);
         assert_eq!(merged.get("temperature"), Some(&json!(22.5)));
+    }
+
+    fn ota_fixture_image() -> Vec<u8> {
+        let size = 64usize;
+        let mut bytes = vec![0u8; size];
+        bytes[0..4].copy_from_slice(&0x0BEE_F11Eu32.to_le_bytes());
+        bytes[4..6].copy_from_slice(&0x0100u16.to_le_bytes());
+        bytes[6..8].copy_from_slice(&56u16.to_le_bytes());
+        bytes[10..12].copy_from_slice(&0x1037u16.to_le_bytes());
+        bytes[12..14].copy_from_slice(&1u16.to_le_bytes());
+        bytes[14..18].copy_from_slice(&0x01020304u32.to_le_bytes());
+        bytes[18..20].copy_from_slice(&2u16.to_le_bytes());
+        bytes[20..36].copy_from_slice(b"rust-ota-fixture");
+        bytes[52..56].copy_from_slice(&(size as u32).to_le_bytes());
+        bytes
+    }
+
+    fn ota_test_devices() -> DeviceRegistry {
+        let devices = DeviceRegistry::new();
+        let mut device = Device::new(IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap(), 0x1234);
+        device.friendly_name = "ota_device".into();
+        device.interview_complete = true;
+        devices.add(device);
+        devices
+    }
+
+    #[tokio::test]
+    async fn ota_bridge_check_and_update_requests_end_to_end() {
+        let devices = ota_test_devices();
+        let ota = Mutex::new(crate::ota::OtaManager::default());
+        let image = hex::encode(ota_fixture_image());
+        let payload = json!({
+            "id": "0xec1bbdfffeaa66db",
+            "hex": {"data": image, "file_name": "fixture.ota"},
+        });
+
+        let check = handle_ota_request(&ota, &devices, "device/ota_update/check", &payload)
+            .await
+            .expect("check");
+        assert_eq!(check.data["update_available"], true);
+        assert_eq!(check.data["manufacturer_code"], 0x1037);
+        assert_eq!(check.data["image_size"], 64);
+        assert!(check.state_update.is_none());
+
+        let update = handle_ota_request(&ota, &devices, "device/ota_update/update", &payload)
+            .await
+            .expect("update");
+        assert_eq!(update.data["file_version"], 0x01020304);
+        let (ieee, state) = update.state_update.expect("update state");
+        assert_eq!(ieee, "0xec1bbdfffeaa66db");
+        assert_eq!(state["state"], "updating");
+        assert_eq!(state["progress"], 0);
+
+        let abort = handle_ota_request(&ota, &devices, "device/ota_update/update/abort", &payload)
+            .await
+            .expect("abort");
+        assert_eq!(abort.data["aborted"], true);
+        assert_eq!(abort.state_update.unwrap().1["state"], "idle");
+    }
+
+    #[tokio::test]
+    async fn ota_bridge_request_error_paths() {
+        let devices = ota_test_devices();
+        let ota = Mutex::new(crate::ota::OtaManager::default());
+
+        let unknown = json!({"id": "0xffffffffffffffff", "hex": {"data": "00"}});
+        assert!(
+            handle_ota_request(&ota, &devices, "device/ota_update/update", &unknown)
+                .await
+                .unwrap_err()
+                .contains("does not exist")
+        );
+
+        let invalid = json!({"id": "0xec1bbdfffeaa66db", "hex": {"data": "zzzz"}});
+        assert!(
+            handle_ota_request(&ota, &devices, "device/ota_update/check", &invalid)
+                .await
+                .unwrap_err()
+                .contains("invalid hex")
+        );
+
+        let unsupported = json!({"id": "0xec1bbdfffeaa66db"});
+        assert!(
+            handle_ota_request(&ota, &devices, "device/ota_update/schedule", &unsupported)
+                .await
+                .unwrap_err()
+                .contains("Unsupported")
+        );
+    }
+
+    #[test]
+    fn ota_progress_payload_matches_state_contract() {
+        assert_eq!(
+            ota_update_state(0.5, false),
+            json!({"state": "updating", "progress": 50})
+        );
+        assert_eq!(
+            ota_update_state(1.0, true),
+            json!({"state": "idle", "progress": 100})
+        );
     }
 }
