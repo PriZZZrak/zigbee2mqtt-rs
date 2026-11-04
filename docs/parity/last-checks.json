@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-04T20:58:20+00:00",
+  "captured_utc": "2026-11-04T21:33:33+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent",
   "commands": [
     {
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "399 library + 2 binary + 30 compatibility = 431 passed, 0 failed"
+      "result": "406 library + 2 binary + 30 compatibility = 438 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",

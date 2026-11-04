@@ -124,9 +124,10 @@ seeding, and `convert_from_zigbee_with_data` for cluster-command payloads.
 - Six fixtures across two models (SNZB-02, TS0601/TS0002 Tuya) and two modes
   (`fromZigbee`, `convertSet`); no MQTT, ZCL wire, storage, groups, OTA or
   frontend differentials yet.
-- Cluster-command payload conversion (`msg.data`) is exercised by the candidate
-  API but the bridge still only dispatches global attribute reports; Tuya
-  `commandDataReport` frames are not yet converted in the running bridge.
+- Cluster-command payload conversion (`msg.data`) is now wired into the bridge
+  runtime for Tuya datapoint commands (CONVERTER-005); tests with an in-process
+  broker assert the published state. Other Tuya commands (time sync, OTA,
+  weather) are still not structured.
 - Converter `publish()` side effects and `postProcessConvertedFromZigbeeMessage`
   are not applied on either side of the differential.
 - Real runs need network + built checkouts; CI keeps only the fake smoke.

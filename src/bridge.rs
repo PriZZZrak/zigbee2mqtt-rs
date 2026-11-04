@@ -750,152 +750,18 @@ impl Bridge {
                                 }
                             }
 
-                            let zone_type = devices.get_by_nwk(src_addr).and_then(|d| d.zone_type);
-                            let held_arrow_direction = devices
-                                .get_by_nwk(src_addr)
-                                .and_then(|d| d.arrow_hold_direction.clone());
-
-                            // Native parse and upstream definition conversion run for
-                            // the same frame; their values are merged once and published
-                            // once, with the device definition taking precedence.
-                            let mut values = serde_json::Map::new();
-                            let mut arrow_update = None;
-                            let mut parse_error = None;
-                            match zcl::parse_message(
+                            Self::process_zcl_message(
+                                &devices,
+                                &external,
+                                &mqtt,
+                                self.cfg.advanced.output,
+                                src_addr,
+                                src_ep,
                                 cluster_id,
-                                &data,
-                                zone_type,
-                                held_arrow_direction.as_deref(),
-                            ) {
-                                Ok(Some(mut zcl_msg)) => {
-                                    if cluster_id == 0x0000 {
-                                        for key in BASIC_CLUSTER_METADATA_KEYS {
-                                            zcl_msg.values.remove(key);
-                                        }
-                                    }
-                                    arrow_update = zcl_msg.arrow_hold_direction;
-                                    values = zcl_msg.values;
-                                }
-                                Ok(None) => {}
-                                Err(error) => parse_error = Some(error),
-                            }
-
-                            let mut external_values = None;
-                            if let Ok((header, offset)) =
-                                zcl::frame::ZclFrameHeader::parse(&data)
-                            {
-                                if header.frame_type == zcl::frame::FrameType::Global {
-                                    let msg_type = match header.command_id {
-                                        zcl::frame::global::REPORT_ATTRIBUTES => {
-                                            Some("attributeReport")
-                                        }
-                                        zcl::frame::global::READ_ATTRIBUTES_RSP => {
-                                            Some("readResponse")
-                                        }
-                                        _ => None,
-                                    };
-                                    if let Some(msg_type) = msg_type {
-                                        let reports: Vec<(u16, serde_json::Value)> =
-                                            if msg_type == "readResponse" {
-                                                zcl::parse_read_attr_rsp(&data[offset..])
-                                            } else {
-                                                zcl::attribute::AttributeReport::parse_all(
-                                                    &data[offset..],
-                                                )
-                                            }
-                                            .into_iter()
-                                            .filter_map(|report| {
-                                                attribute_json(&report.value)
-                                                    .map(|value| (report.attr_id, value))
-                                            })
-                                            .collect();
-                                        if !reports.is_empty() {
-                                            let prepared = devices
-                                                .get_by_nwk(src_addr)
-                                                .map(|dev| {
-                                                    let info = crate::converters::external::ExternalDeviceInfo::from_device(&dev);
-                                                    (
-                                                        dev.model.clone().unwrap_or_default(),
-                                                        info,
-                                                        dev.state.clone(),
-                                                    )
-                                                });
-                                            if let Some((model, info, state)) = prepared {
-                                                if external
-                                                    .ensure_device_files(&model, &info)
-                                                    .await
-                                                    .is_some()
-                                                {
-                                                    let message =
-                                                        crate::converters::external::IncomingMessageInfo {
-                                                            endpoint: src_ep,
-                                                            linkquality: link_quality,
-                                                            group_id: 0,
-                                                        };
-                                                    if let Some(converted) =
-                                                        external.convert_from_zigbee_session(
-                                                            &model,
-                                                            cluster_id,
-                                                            msg_type,
-                                                            &reports,
-                                                            &info,
-                                                            &message,
-                                                            &state,
-                                                        )
-                                                    {
-                                                        external_values = Some(converted);
-                                                    }
-                                                } else {
-                                                    debug!("external converter: no candidates for model {model:?}");
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            let external_used = external_values.is_some();
-                            values = merge_converted_values(values, external_values);
-                            if !values.is_empty() {
-                                let suffix = devices
-                                    .get_by_nwk(src_addr)
-                                    .and_then(|d| endpoint_suffix(&d, src_ep));
-                                if let Some(suffix) = &suffix {
-                                    let keys: Vec<String> = values.keys().cloned().collect();
-                                    let mut suffixed = serde_json::Map::new();
-                                    for key in keys {
-                                        if let Some(value) = values.remove(&key) {
-                                            suffixed.insert(format!("{key}_{suffix}"), value);
-                                        }
-                                    }
-                                    values = suffixed;
-                                }
-                                if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
-                                    if let Some(direction_update) = arrow_update {
-                                        dev.arrow_hold_direction = direction_update;
-                                    }
-                                    dev.merge_state(values);
-                                    dev.state.insert("linkquality".into(), json!(link_quality));
-                                    dev.state.insert("last_seen".into(), json!(now_iso8601()));
-                                    let state = serde_json::Value::Object(dev.state.clone());
-                                    let name = dev.friendly_name.clone();
-                                    Self::strip_transient_action_fields(&mut dev.state);
-                                    drop(dev);
-                                    Self::publish_state(
-                                        &mqtt,
-                                        self.cfg.advanced.output,
-                                        &name,
-                                        &state,
-                                    )
-                                    .await;
-                                    let _ = mqtt.publish_availability(&name, true).await;
-                                }
-                                if external_used {
-                                    debug!("external converter handled cluster 0x{cluster_id:04X} for 0x{src_addr:04X}");
-                                }
-                            } else if let Some(error) = parse_error {
-                                warn!("ZCL parse error: {error}");
-                            }
+                                link_quality,
+                                data,
+                            )
+                            .await;
                         }
                     }
                 }
@@ -1813,6 +1679,190 @@ impl Bridge {
             drop(dev);
             Self::publish_state(mqtt, output, &friendly_name, &state).await;
             let _ = mqtt.publish_availability(&friendly_name, true).await;
+        }
+    }
+
+    /// Apply one incoming ZCL frame: native cluster parsing plus definition
+    /// conversion, merged and published exactly once.
+    #[allow(clippy::too_many_arguments)]
+    async fn process_zcl_message(
+        devices: &DeviceRegistry,
+        external: &ExternalConverter,
+        mqtt: &MqttBridge,
+        output: OutputMode,
+        src_addr: u16,
+        src_ep: u8,
+        cluster_id: u16,
+        link_quality: u8,
+        data: Vec<u8>,
+    ) {
+        let zone_type = devices.get_by_nwk(src_addr).and_then(|d| d.zone_type);
+        let held_arrow_direction = devices
+            .get_by_nwk(src_addr)
+            .and_then(|d| d.arrow_hold_direction.clone());
+
+        // Native parse and upstream definition conversion run for
+        // the same frame; their values are merged once and published
+        // once, with the device definition taking precedence.
+        let mut values = serde_json::Map::new();
+        let mut arrow_update = None;
+        let mut parse_error = None;
+        match zcl::parse_message(
+            cluster_id,
+            &data,
+            zone_type,
+            held_arrow_direction.as_deref(),
+        ) {
+            Ok(Some(mut zcl_msg)) => {
+                if cluster_id == 0x0000 {
+                    for key in BASIC_CLUSTER_METADATA_KEYS {
+                        zcl_msg.values.remove(key);
+                    }
+                }
+                arrow_update = zcl_msg.arrow_hold_direction;
+                values = zcl_msg.values;
+            }
+            Ok(None) => {}
+            Err(error) => parse_error = Some(error),
+        }
+
+        let mut external_values = None;
+        let prepared = devices.get_by_nwk(src_addr).map(|dev| {
+            let info = crate::converters::external::ExternalDeviceInfo::from_device(&dev);
+            (
+                dev.model.clone().unwrap_or_default(),
+                info,
+                dev.state.clone(),
+            )
+        });
+        if let Ok((header, offset)) = zcl::frame::ZclFrameHeader::parse(&data) {
+            if header.frame_type == zcl::frame::FrameType::Global {
+                let msg_type = match header.command_id {
+                    zcl::frame::global::REPORT_ATTRIBUTES => Some("attributeReport"),
+                    zcl::frame::global::READ_ATTRIBUTES_RSP => Some("readResponse"),
+                    _ => None,
+                };
+                if let Some(msg_type) = msg_type {
+                    let reports: Vec<(u16, serde_json::Value)> = if msg_type == "readResponse" {
+                        zcl::parse_read_attr_rsp(&data[offset..])
+                    } else {
+                        zcl::attribute::AttributeReport::parse_all(&data[offset..])
+                    }
+                    .into_iter()
+                    .filter_map(|report| {
+                        attribute_json(&report.value).map(|value| (report.attr_id, value))
+                    })
+                    .collect();
+                    if !reports.is_empty() {
+                        if let Some((model, info, state)) = prepared.as_ref() {
+                            if external.ensure_device_files(model, info).await.is_some() {
+                                let message = crate::converters::external::IncomingMessageInfo {
+                                    endpoint: src_ep,
+                                    linkquality: link_quality,
+                                    group_id: 0,
+                                };
+                                if let Some(converted) = external.convert_from_zigbee_session(
+                                    model, cluster_id, msg_type, &reports, info, &message, state,
+                                ) {
+                                    external_values = Some(converted);
+                                }
+                            } else {
+                                debug!("external converter: no candidates for model {model:?}");
+                            }
+                        }
+                    }
+                }
+            } else if header.frame_type == zcl::frame::FrameType::ClusterSpecific
+                && cluster_id == crate::zigbee::zcl::clusters::tuya::CLUSTER_ID
+            {
+                // Tuya datapoints are cluster-specific commands, not
+                // attribute reports. Convert them through the same
+                // definition path with a structured msg.data.
+                if let Some(msg_type) =
+                    crate::zigbee::zcl::clusters::tuya::message_type(header.command_id)
+                {
+                    match crate::zigbee::zcl::clusters::tuya::parse_datapoints(&data[offset..]) {
+                        Ok((sequence, points)) => {
+                            if let Some((model, info, state)) = prepared.as_ref() {
+                                if external.ensure_device_files(model, info).await.is_some() {
+                                    let message =
+                                        crate::converters::external::IncomingMessageInfo {
+                                            endpoint: src_ep,
+                                            linkquality: link_quality,
+                                            group_id: 0,
+                                        };
+                                    let dp_values: Vec<serde_json::Value> = points
+                                        .iter()
+                                        .map(|point| {
+                                            json!({
+                                                "dp": point.dp,
+                                                "datatype": point.datatype,
+                                                "data": point.data,
+                                            })
+                                        })
+                                        .collect();
+                                    let data_map = serde_json::Map::from_iter([
+                                        ("seq".to_string(), json!(sequence)),
+                                        ("dpValues".to_string(), json!(dp_values)),
+                                    ]);
+                                    if let Some(converted) = external
+                                        .convert_from_zigbee_session_with_data(
+                                            model, cluster_id, msg_type, &data_map, info, &message,
+                                            state,
+                                        )
+                                    {
+                                        external_values = Some(converted);
+                                    }
+                                } else {
+                                    debug!("external converter: no candidates for model {model:?}");
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            warn!("Tuya command parse error: {error}");
+                        }
+                    }
+                }
+            }
+        }
+
+        let external_used = external_values.is_some();
+        values = merge_converted_values(values, external_values);
+        if !values.is_empty() {
+            let suffix = devices
+                .get_by_nwk(src_addr)
+                .and_then(|d| endpoint_suffix(&d, src_ep));
+            if let Some(suffix) = &suffix {
+                let keys: Vec<String> = values.keys().cloned().collect();
+                let mut suffixed = serde_json::Map::new();
+                for key in keys {
+                    if let Some(value) = values.remove(&key) {
+                        suffixed.insert(format!("{key}_{suffix}"), value);
+                    }
+                }
+                values = suffixed;
+            }
+            if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
+                if let Some(direction_update) = arrow_update {
+                    dev.arrow_hold_direction = direction_update;
+                }
+                dev.merge_state(values);
+                dev.state.insert("linkquality".into(), json!(link_quality));
+                dev.state.insert("last_seen".into(), json!(now_iso8601()));
+                let state = serde_json::Value::Object(dev.state.clone());
+                let name = dev.friendly_name.clone();
+                Self::strip_transient_action_fields(&mut dev.state);
+                drop(dev);
+                Self::publish_state(mqtt, output, &name, &state).await;
+                let _ = mqtt.publish_availability(&name, true).await;
+            }
+            if external_used {
+                debug!(
+                    "external converter handled cluster 0x{cluster_id:04X} for 0x{src_addr:04X}"
+                );
+            }
+        } else if let Some(error) = parse_error {
+            warn!("ZCL parse error: {error}");
         }
     }
 
@@ -4876,6 +4926,133 @@ module.exports = {definitions};
         (devices, ieee)
     }
 
+    async fn wait_for_publish(
+        broker: &crate::mqtt::fake_broker::FakeBroker,
+        predicate: impl Fn(&crate::mqtt::fake_broker::Published) -> bool,
+    ) -> crate::mqtt::fake_broker::Published {
+        for _ in 0..250 {
+            if let Some(found) = broker.publishes().into_iter().find(|item| predicate(item)) {
+                return found;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("publish not observed; saw {:?}", broker.publishes());
+    }
+
+    /// Minimal converter package with a Tuya cluster-command fromZigbee handler.
+    fn tuya_fixture() -> (std::path::PathBuf, ExternalConverter) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "z2m-bridge-tuya-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("devices")).unwrap();
+        std::fs::write(
+            dir.join("devices").join("tuya_fixture.js"),
+            r#"
+const definitions = [
+    {
+        model: "FixtureTuya",
+        vendor: "Fixture",
+        description: "Tuya cluster-command fixture",
+        fromZigbee: [
+            {
+                cluster: "manuSpecificTuya",
+                type: ["commandDataReport", "commandDataResponse"],
+                convert: (model, msg) => {
+                    const point = msg.data.dpValues[0];
+                    if (!point) return;
+                    return {
+                        local_temperature: ((point.data[0] << 8) | point.data[1]) / 10,
+                        dp_id: point.dp,
+                        tuya_seq: msg.data.seq,
+                    };
+                },
+            },
+        ],
+    },
+];
+module.exports = {definitions};
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("registry.json"),
+            serde_json::json!({
+                "lookup": {"fixturetuya": [["tuya_fixture.js", 0]]},
+                "fingerprints": [],
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl.json"),
+            serde_json::json!({
+                "clusters": {"61184": "manuSpecificTuya"},
+                "manufacturerCodes": {},
+                "dataTypes": {},
+                "attributes": {"manuSpecificTuya": {}},
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl-commands.json"),
+            serde_json::json!({
+                "clusters": {
+                    "61184": {
+                        "name": "manuSpecificTuya",
+                        "attributes": {},
+                        "commands": {
+                            "2": {"name": "dataReport", "parameters": [
+                                {"name": "seq", "type": 33},
+                                {"name": "dpValues", "type": 1011}
+                            ]}
+                        }
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let converter = ExternalConverter::new(&dir, "https://example.invalid/x");
+        (dir, converter)
+    }
+
+    async fn tuya_devices() -> (DeviceRegistry, IeeeAddr) {
+        let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
+        let mut device = Device::new(ieee, 0x5678);
+        device.friendly_name = "trv".into();
+        device.model = Some("FixtureTuya".into());
+        device.manufacturer = Some("_TZE200_b6wax7g0".into());
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0301,
+            input_clusters: vec![0x0000, 0xEF00],
+            output_clusters: vec![],
+        });
+        let devices = DeviceRegistry::new();
+        devices.add(device);
+        (devices, ieee)
+    }
+
+    /// Cluster-specific Tuya frame with a manufacturer code, sequence 0x1234
+    /// and one datapoint 3 (value) = 14.0.
+    fn tuya_data_report_frame() -> Vec<u8> {
+        vec![
+            0x15, 0x02, 0x10, // control (specific+mfr+disable rsp), mfr 0x1002
+            0x34, // TSN
+            0x02, // dataReport
+            0x34, 0x12, // sequence 0x1234
+            0x03, 0x02, 0x00, 0x02, 0x00, 0x8C, // dp 3, value, len 2, 140
+        ]
+    }
+
     async fn lock_devices() -> (DeviceRegistry, IeeeAddr) {
         let ieee = IeeeAddr::from_hex("0x00158d0001a2b3c4").unwrap();
         let mut device = Device::new(ieee, 0x2345);
@@ -5167,6 +5344,106 @@ module.exports = {definitions};
                 .is_none(),
             "failed lock acknowledgement must not publish optimistic state"
         );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn tuya_command_data_report_publishes_converted_state() {
+        let (dir, external) = tuya_fixture();
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = tuya_devices().await;
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            &mqtt,
+            OutputMode::Json,
+            0x5678,
+            1,
+            crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
+            42,
+            tuya_data_report_frame(),
+        )
+        .await;
+
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/trv").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        assert_eq!(state["local_temperature"], json!(14));
+        assert_eq!(state["dp_id"], json!(3));
+        assert_eq!(state["tuya_seq"], json!(0x1234));
+        assert_eq!(state["linkquality"], json!(42));
+        assert!(state.get("last_seen").is_some());
+
+        let device = devices.find_by_name("trv").unwrap();
+        assert_eq!(device.state.get("local_temperature"), Some(&json!(14)));
+        drop(device);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn truncated_tuya_command_is_not_published() {
+        let (dir, external) = tuya_fixture();
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = tuya_devices().await;
+
+        // Same frame but the datapoint claims 4 bytes while only 1 is present.
+        let mut frame = tuya_data_report_frame();
+        frame.truncate(frame.len() - 1);
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            &mqtt,
+            OutputMode::Json,
+            0x5678,
+            1,
+            crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
+            42,
+            frame,
+        )
+        .await;
+
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(
+            !broker
+                .publishes()
+                .iter()
+                .any(|item| item.topic == "zigbee2mqtt/trv"),
+            "a malformed datapoint must not publish device state"
+        );
+        assert!(devices
+            .find_by_name("trv")
+            .unwrap()
+            .state
+            .get("local_temperature")
+            .is_none());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn tuya_command_data_response_uses_the_same_runtime_path() {
+        let (dir, external) = tuya_fixture();
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = tuya_devices().await;
+
+        let mut frame = tuya_data_report_frame();
+        frame[4] = 0x01; // dataResponse
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            &mqtt,
+            OutputMode::Json,
+            0x5678,
+            1,
+            crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
+            42,
+            frame,
+        )
+        .await;
+
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/trv").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        assert_eq!(state["local_temperature"], json!(14));
+        assert_eq!(state["tuya_seq"], json!(0x1234));
         std::fs::remove_dir_all(&dir).ok();
     }
 }

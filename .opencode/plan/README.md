@@ -40,7 +40,10 @@ R1 — явно ограниченный релиз для проверенно�
 - **EVID-04 частично**: **6 реальных differential-фикстур** (SNZB-02 x3,
   TS0002 multi-endpoint, Tuya TRV report + convertSet) Node-vs-Rust проходят на
   **app-resolved herdsman 10.10.0**, все 4 пина MATCH. Нет MQTT/ZCL-wire/storage/
-  frontend differential; bridge пока не конвертирует Tuya commandDataReport.
+  frontend differential. Bridge **теперь конвертирует Tuya commandDataReport/
+  commandDataResponse** через persistent session (CONVERTER-005): парсер
+  `seq+dpValues`, fake-broker тесты проверяют опубликованный state, битый
+  datapoint ничего не публикует. Time-sync/OTA/weather команды остаются raw.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

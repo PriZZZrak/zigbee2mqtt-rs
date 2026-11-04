@@ -19,6 +19,7 @@ pub mod power;
 pub mod scenes;
 pub mod temperature;
 pub mod thermostat;
+pub mod tuya;
 pub mod user_interface_cfg;
 
 use serde_json::Value;
