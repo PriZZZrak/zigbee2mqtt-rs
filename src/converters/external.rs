@@ -602,7 +602,7 @@ impl ExternalConverter {
                 const prepared = Object.assign({{}}, definition, {{
                     fromZigbee: [...(definition.fromZigbee || [])],
                     toZigbee: [...(definition.toZigbee || [])],
-                    exposes: [...(definition.exposes || [])],
+                    exposes: typeof definition.exposes === "function" ? definition.exposes : [...(definition.exposes || [])],
                     options: [...(definition.options || [])],
                 }});
                 for (const extend of definition.extend) {{
@@ -987,6 +987,130 @@ fn cluster_name_to_id(zcl: &ZclMaps, name: &str) -> Option<u16> {
         .find_map(|(id, value)| (value == name).then(|| id.parse::<u16>().ok()).flatten())
 }
 
+fn cjs_bootstrap(sources: &HashMap<String, String>, zcl: &ZclMaps) -> String {
+    let stub = stub_source(zcl);
+    format!(
+        r#"
+        const __sources = {sources};
+        const __stub = {stub};
+        const __modules = {{}};
+        function __resolve(from, spec) {{
+            if (spec === "zigbee-herdsman") return "__builtin__/zigbee-herdsman";
+            if (spec.startsWith(".")) {{
+                const parts = from.split("/").slice(0, -1).concat(spec.split("/"));
+                const out = [];
+                for (const p of parts) {{
+                    if (p === "" || p === ".") continue;
+                    if (p === "..") {{ out.pop(); continue; }}
+                    out.push(p);
+                }}
+                let joined = out.join("/");
+                if (!/\.[a-z0-9]+$/i.test(joined)) joined += ".js";
+                return joined;
+            }}
+            return spec;
+        }}
+        function __require(from) {{
+            return function(spec) {{
+                const key = __resolve(from, spec);
+                if (key === "__builtin__/zigbee-herdsman") {{
+                    if (!__modules[key]) {{
+                        const module = {{exports: {{}}}};
+                        const fn_ = new Function("require", "module", "exports", __stub);
+                        fn_(__require(key), module, module.exports);
+                        __modules[key] = module;
+                    }}
+                    return __modules[key].exports;
+                }}
+                if (!__sources[key]) throw new Error("Cannot find module '" + spec + "' from '" + from + "'");
+                if (!__modules[key]) {{
+                    const module = {{exports: {{}}}};
+                    __modules[key] = module;
+                    const fn_ = new Function("require", "module", "exports", __sources[key]);
+                    fn_(__require(key), module, module.exports);
+                }}
+                return __modules[key].exports;
+            }};
+        }}
+        function __prepareDefinition(definition) {{
+            if (!definition || !Array.isArray(definition.extend)) return definition;
+            const prepared = Object.assign({{}}, definition, {{
+                fromZigbee: [...(definition.fromZigbee || [])],
+                toZigbee: [...(definition.toZigbee || [])],
+                exposes: typeof definition.exposes === "function" ? definition.exposes : [...(definition.exposes || [])],
+                options: [...(definition.options || [])],
+            }});
+            for (const extend of definition.extend) {{
+                if (!extend || !extend.isModernExtend) continue;
+                if (extend.fromZigbee) prepared.fromZigbee.push(...extend.fromZigbee);
+                if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
+                if (Array.isArray(prepared.exposes) && extend.exposes) prepared.exposes.push(...extend.exposes);
+                if (extend.options) prepared.options.push(...extend.options);
+            }}
+            return prepared;
+        }}
+        "#,
+        sources = serde_json::to_string(sources).unwrap_or_default(),
+        stub = serde_json::to_string(&stub).unwrap_or_default(),
+    )
+}
+
+impl ExternalConverter {
+    /// Evaluate the prepared definition's exposes as JSON.
+    ///
+    /// Upstream exposes can be an array or a function of the device. Function
+    /// values inside expose objects are dropped during serialization.
+    pub fn exposes(
+        &self,
+        model: &str,
+        device: &ExternalDeviceInfo,
+    ) -> Option<Vec<serde_json::Value>> {
+        let registry = self.load_registry()?;
+        let (file, index) = select_definition(&registry, model, device)?;
+        let zcl = self.load_zcl()?;
+        let module_src = self
+            .load_js(&format!("devices/{file}"))
+            .or_else(|| self.load_js(&file))?;
+        let sources = collect_sources(&self.dir, &module_src, &file)?;
+        let meta = serde_json::json!({
+            "device": {
+                "modelID": device.model_id,
+                "manufacturerID": device.manufacturer_id,
+                "manufacturerName": device.manufacturer_name,
+                "ieeeAddr": device.ieee_addr,
+                "powerSource": device.power_source,
+                "type": device.device_type,
+                "softwareBuildID": device.software_build_id,
+                "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
+            },
+        });
+        let script = format!(
+            r#"(function() {{
+                const defs = __require("devices/__entry__.js")("./{file}").definitions;
+                const definition = __prepareDefinition(defs[{index}]);
+                const meta = JSON.parse({meta});
+                const device = meta.device;
+                device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
+                let exposes = definition.exposes;
+                if (typeof exposes === "function") exposes = exposes(device);
+                if (!Array.isArray(exposes)) exposes = [];
+                return JSON.stringify(exposes, (key, value) => typeof value === "function" ? undefined : value);
+            }})()"#,
+            file = file,
+            index = index,
+            meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
+        );
+        let mut ctx = Context::default();
+        let bootstrap = cjs_bootstrap(&sources, &zcl);
+        if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
+            return None;
+        }
+        let raw = eval_string(&mut ctx, &script)?;
+        let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        parsed.as_array().cloned()
+    }
+}
+
 /// Collect every CJS source reachable from the entry device file.
 /// Keys are dist-relative paths (`devices/lytko.js`, `converters/foo.js`, ...).
 fn collect_sources(
@@ -1181,6 +1305,9 @@ const definitions = [
         model: "FixtureBulb",
         vendor: "Fixture",
         description: "test fixture",
+        exposes: [
+            {type: "numeric", name: "temperature", property: "temperature", access: 1, unit: "°C"},
+        ],
         fromZigbee: [
             {
                 cluster: "msTemperatureMeasurement",
@@ -1687,5 +1814,49 @@ module.exports = {definitions};
             Some(&serde_json::json!("0x0011223344556677"))
         );
         assert_eq!(out.get("endpoint_count"), Some(&serde_json::json!(1)));
+    }
+
+    const EXPOSE_DEVICE_JS: &str = r#"
+const definitions = [
+    {
+        model: "ExposeBulb",
+        vendor: "Fixture",
+        description: "function exposes fixture",
+        exposes: (device) => [
+            {type: "numeric", name: device.modelID === "FixtureBulb" ? "temperature" : "other", property: "temperature", access: 1},
+        ],
+        fromZigbee: [],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    #[test]
+    fn exposes_array_is_returned_as_json() {
+        let (_tmp, conv) = fixture_dir();
+        let exposes = conv.exposes("FixtureBulb", &device()).expect("exposes");
+        assert_eq!(exposes.len(), 1);
+        assert_eq!(exposes[0]["name"], "temperature");
+        assert_eq!(exposes[0]["unit"], "°C");
+    }
+
+    #[test]
+    fn exposes_function_receives_the_device() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("exposedev.js"),
+            EXPOSE_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"exposebulb": [["exposedev.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let exposes = conv.exposes("ExposeBulb", &device()).expect("exposes");
+        assert_eq!(exposes[0]["name"], "temperature");
     }
 }
