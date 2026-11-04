@@ -77,10 +77,10 @@ New tests:
 
 ## Divergences and gaps (not verified)
 
-- Config-switch **values are not executed**: without `toZigbee.convertSet`, the
-  bridge parses the attribute and updates optimistic state but sends no ZCL
-  command for properties like `window_detection`. Discovery/command-topic parity
-  only.
+- Config-switch values now go through `toZigbee.convertSet` (CV-09): the bridge
+  runs the converter, encodes the recorded writes/commands with the published
+  `zcl-commands.json` type table and sends them. The generator run, complex ZCL
+  types and a bridge-level fake-coordinator assertion are still missing.
 - Lock writes are fire-and-forget (`send_zcl`); the Lock Door response status is
   parsed by the codec but not awaited, and no lock-specific attributes are read.
 - `object_id`/`default_entity_id` follow this project's existing naming

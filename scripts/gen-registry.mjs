@@ -221,4 +221,37 @@ fs.writeFileSync(
     path.join(outDir, ref, "zcl.json"),
     JSON.stringify({ref, manufacturerCodes, dataTypes, clusters: clustersById, attributes: attributesByCluster}, null, 2),
 );
+// Attribute/command data types for converter-initiated writes and commands.
+// Rust refuses to guess types, so this table must come from the pinned
+// herdsman definition rather than from format guesses.
+const clusterTypes = {};
+for (const [name, cl] of Object.entries(Clusters)) {
+    const attributes = {};
+    for (const [attrName, attr] of Object.entries(cl.attributes ?? {})) {
+        if (typeof attr.type !== "number") continue;
+        attributes[String(attr.ID)] = {name: attrName, type: attr.type};
+    }
+    const commands = {};
+    for (const [cmdName, cmd] of Object.entries(cl.commands ?? {})) {
+        const parameters = (cmd.parameters ?? [])
+            .filter((p) => typeof p.type === "number")
+            .map((p) => ({name: p.name, type: p.type}));
+        if (parameters.length !== (cmd.parameters ?? []).length) continue;
+        commands[String(cmd.ID)] = {name: cmdName, parameters};
+    }
+    if (Object.keys(attributes).length === 0 && Object.keys(commands).length === 0) continue;
+    clusterTypes[String(cl.ID)] = {name, attributes, commands};
+}
+if (Object.keys(clusterTypes).length < 50) fail(`smoke: expected 50+ typed clusters`);
+if (clusterTypes["6"]?.commands?.["66"]?.parameters?.length !== 3) {
+    fail("smoke: genOnOff.onWithTimedOff must have 3 typed parameters");
+}
+fs.writeFileSync(
+    path.join(outDir, ref, "zcl-commands.json"),
+    JSON.stringify({ref, clusters: clusterTypes}, null, 2),
+);
+console.log(
+    `zcl-types ${ref}: ${Object.keys(clusterTypes).length} typed clusters ` +
+        `(${Object.keys(clusterTypes["6"]?.attributes ?? {}).length} genOnOff attributes)`,
+);
 console.log(`zcl ${ref}: ${Object.keys(clustersById).length} clusters, ${Object.keys(manufacturerCodes).length} manufacturer codes`);

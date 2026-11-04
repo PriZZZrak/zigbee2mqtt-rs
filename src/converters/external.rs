@@ -31,7 +31,49 @@ pub struct ExternalConverter {
     runtime: Arc<Mutex<Option<mpsc::Sender<ConverterJob>>>>,
 }
 
+/// One ZCL operation requested by a converter `convertSet`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConvertSetOp {
+    Write {
+        cluster: u16,
+        manufacturer_code: Option<u16>,
+        disable_default_response: bool,
+        attributes: Vec<(String, serde_json::Value)>,
+    },
+    Command {
+        cluster: u16,
+        command: u8,
+        manufacturer_code: Option<u16>,
+        disable_default_response: bool,
+        payload: serde_json::Value,
+    },
+    Read {
+        cluster: u16,
+        attributes: Vec<String>,
+    },
+    /// Recorded so callers can log an unsupported request instead of silently
+    /// claiming the converter succeeded.
+    Unsupported { kind: String },
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ConvertSetOutcome {
+    pub handled: bool,
+    pub state: serde_json::Map<String, serde_json::Value>,
+    pub ops: Vec<ConvertSetOp>,
+}
+
 enum ConverterJob {
+    ConvertSet {
+        model: String,
+        endpoint: u8,
+        endpoint_name: Option<String>,
+        key: String,
+        value: serde_json::Value,
+        device: ExternalDeviceInfo,
+        state: serde_json::Map<String, serde_json::Value>,
+        reply: mpsc::Sender<Option<ConvertSetOutcome>>,
+    },
     Convert {
         model: String,
         cluster_id: u16,
@@ -49,6 +91,7 @@ struct ConverterSession {
     file: String,
     index: usize,
     zcl: ZclMaps,
+    types: crate::converters::zcl_types::ZclTypesFile,
 }
 
 /// Minimal device identity for the `meta.device` stub.
@@ -380,6 +423,23 @@ impl ExternalConverter {
     fn load_registry(&self) -> Option<RegistryFile> {
         let text = std::fs::read_to_string(self.registry_path()).ok()?;
         serde_json::from_str(&text).ok()
+    }
+
+    /// Attribute/command type metadata published alongside `zcl.json`.
+    ///
+    /// A missing file yields an empty table: `convertSet` still records the
+    /// symbolic operations, but encoding refuses to guess data types.
+    /// Public accessor used by the bridge to encode `convertSet` operations.
+    #[must_use]
+    pub fn zcl_types(&self) -> crate::converters::zcl_types::ZclTypesFile {
+        self.load_zcl_types()
+    }
+
+    fn load_zcl_types(&self) -> crate::converters::zcl_types::ZclTypesFile {
+        std::fs::read_to_string(self.dir.join("zcl-commands.json"))
+            .ok()
+            .and_then(|text| crate::converters::zcl_types::ZclTypesFile::from_json(&text).ok())
+            .unwrap_or_default()
     }
 
     fn load_zcl(&self) -> Option<ZclMaps> {
@@ -815,6 +875,7 @@ impl ExternalConverter {
             file,
             index,
             zcl,
+            types: self.load_zcl_types(),
         })
     }
 
@@ -957,6 +1018,319 @@ impl ExternalConverter {
         Some(map)
     }
 
+    /// Execute the upstream `toZigbee` converter for one key and record the ZCL
+    /// operations it requests.
+    ///
+    /// The JS host resolves cluster/command names against the published ZCL
+    /// metadata; unresolved names become `Unsupported` so the caller can refuse
+    /// them instead of sending a guessed frame.
+    #[allow(clippy::too_many_arguments)]
+    fn dispatch_session_set(
+        &self,
+        session: &mut ConverterSession,
+        endpoint: u8,
+        endpoint_name: Option<&str>,
+        key: &str,
+        value: &serde_json::Value,
+        device: &ExternalDeviceInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<ConvertSetOutcome> {
+        let meta = serde_json::json!({
+            "state": state,
+            "device": {
+                "modelID": device.model_id,
+                "manufacturerID": device.manufacturer_id,
+                "manufacturerName": device.manufacturer_name,
+                "ieeeAddr": device.ieee_addr,
+                "powerSource": device.power_source,
+                "type": device.device_type,
+                "softwareBuildID": device.software_build_id,
+                "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
+            },
+            "options": {},
+            "endpoint_name": endpoint_name,
+            "message": {},
+        });
+        let cluster_names = serde_json::json!(session
+            .zcl
+            .clusters
+            .iter()
+            .filter_map(|(id, name)| name
+                .is_empty()
+                .then_some(())
+                .map(|_| (id, name))
+                .or(Some((id, name))))
+            .collect::<std::collections::HashMap<_, _>>());
+        let script = format!(
+            r#"(function() {{
+                const defs = __require("devices/__entry__.js")("./{file}").definitions;
+                const definition = __prepareDefinition(defs[{index}]);
+                const meta = JSON.parse({meta});
+                const incomingDevice = meta.device;
+                const device = globalThis.__device || (globalThis.__device = incomingDevice);
+                Object.assign(device, incomingDevice);
+                device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
+                meta.device = device;
+                const key = JSON.parse({key});
+                const value = JSON.parse({value});
+                const endpointId = {endpoint};
+                const endpointName = {endpoint_name};
+                const clusterNames = {cluster_names};
+                const clusterId = (cluster) => {{
+                    if (cluster && cluster.ID !== undefined) return cluster.ID;
+                    if (typeof cluster === "number") return cluster;
+                    if (typeof cluster === "string") {{
+                        if (cluster in clusterNames) return Number(cluster);
+                        for (const [id, name] of Object.entries(clusterNames)) if (name === cluster) return Number(id);
+                    }}
+                    return null;
+                }};
+                const clusterLabel = (cluster) => {{
+                    if (typeof cluster === "string") return cluster;
+                    if (cluster && cluster.name) return cluster.name;
+                    return String(cluster);
+                }};
+                const optionsOf = (options) => ({{
+                    manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
+                    disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                }});
+                globalThis.__setOut = {{handled: false, state: {{}}, ops: [], error: null}};
+                globalThis.__setDone = false;
+                const out = globalThis.__setOut;
+                const entity = {{
+                    ID: endpointId,
+                    deviceIeeeAddress: device.ieeeAddr,
+                    getDevice: () => device,
+                    getEndpoint: () => entity,
+                    write: (cluster, attributes, options) => {{
+                        out.ops.push({{op: "write", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), attributes: attributes || {{}}, options: optionsOf(options)}});
+                        return Promise.resolve();
+                    }},
+                    command: (cluster, command, payload, options) => {{
+                        out.ops.push({{op: "command", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), command: typeof command === "string" ? command : String(command), payload: payload || {{}}, options: optionsOf(options)}});
+                        return Promise.resolve();
+                    }},
+                    read: (cluster, attributes) => {{
+                        out.ops.push({{op: "read", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), attributes: Array.isArray(attributes) ? attributes : [attributes]}});
+                        return Promise.resolve();
+                    }},
+                    configureReporting: () => Promise.resolve(),
+                    bind: () => Promise.resolve(),
+                }};
+                (async function() {{
+                    try {{
+                        for (const converter of (definition.toZigbee || [])) {{
+                            const keys = Array.isArray(converter.key) ? converter.key : [converter.key];
+                            if (keys.includes(key) && typeof converter.convertSet === "function") {{
+                                out.handled = true;
+                                const result = await converter.convertSet(entity, key, value, meta);
+                                if (result && result.state && typeof result.state === "object") {{
+                                    for (const k of Object.keys(result.state)) out.state[k] = result.state[k];
+                                }}
+                                break;
+                            }}
+                        }}
+                    }} catch (error) {{
+                        out.error = String((error && error.stack) || error);
+                    }}
+                    globalThis.__setDone = true;
+                }})();
+                return "started";
+            }})()"#,
+            file = session.file,
+            index = session.index,
+            meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
+            key = serde_json::to_string(&serde_json::to_string(key).unwrap()).unwrap(),
+            value = serde_json::to_string(&serde_json::to_string(value).unwrap()).unwrap(),
+            endpoint = endpoint,
+            endpoint_name = serde_json::to_string(&endpoint_name).unwrap(),
+            cluster_names = serde_json::to_string(&cluster_names).unwrap(),
+        );
+        let _ = eval_string(&mut session.ctx, &script)?;
+        for _ in 0..1000 {
+            session.ctx.run_jobs();
+            let state = eval_string(
+                &mut session.ctx,
+                "JSON.stringify({done: !!globalThis.__setDone, error: globalThis.__setOut && globalThis.__setOut.error})",
+            )?;
+            let state: serde_json::Value = serde_json::from_str(&state).ok()?;
+            if state.get("done").and_then(|value| value.as_bool()) == Some(true) {
+                if let Some(error) = state.get("error").and_then(|value| value.as_str()) {
+                    warn!("external converter convertSet failed: {error}");
+                    return None;
+                }
+                break;
+            }
+            let pumped = eval_string(&mut session.ctx, "String(globalThis.__pumpTimers(60000))")?;
+            if pumped == "0" {
+                warn!("external converter convertSet waiting on an unserviceable timer");
+                return None;
+            }
+        }
+        let raw = eval_string(&mut session.ctx, "JSON.stringify(globalThis.__setOut)")?;
+        let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        let mut outcome = ConvertSetOutcome {
+            handled: parsed
+                .get("handled")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false),
+            state: parsed
+                .get("state")
+                .and_then(|value| value.as_object())
+                .cloned()
+                .unwrap_or_default(),
+            ops: Vec::new(),
+        };
+        for op in parsed
+            .get("ops")
+            .and_then(|value| value.as_array())
+            .into_iter()
+            .flatten()
+        {
+            let kind = op.get("op").and_then(|value| value.as_str()).unwrap_or("");
+            let cluster_id = op
+                .get("cluster_id")
+                .and_then(|value| value.as_u64())
+                .filter(|id| *id <= u16::MAX as u64)
+                .map(|id| id as u16)
+                .or_else(|| {
+                    let name = op.get("cluster").and_then(|value| value.as_str())?;
+                    session
+                        .zcl
+                        .clusters
+                        .iter()
+                        .find_map(|(id, value)| {
+                            (value == name).then(|| id.parse::<u16>().ok()).flatten()
+                        })
+                        .or_else(|| session.types.cluster_id_by_name(name))
+                });
+            let Some(cluster) = cluster_id else {
+                outcome.ops.push(ConvertSetOp::Unsupported {
+                    kind: format!("{kind} on unknown cluster"),
+                });
+                continue;
+            };
+            let manufacturer_code = op
+                .get("options")
+                .and_then(|options| options.get("manufacturerCode"))
+                .and_then(|value| value.as_u64())
+                .filter(|code| *code <= u16::MAX as u64)
+                .map(|code| code as u16);
+            let disable_default_response = op
+                .get("options")
+                .and_then(|options| options.get("disableDefaultResponse"))
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            match kind {
+                "write" => {
+                    let attributes: Vec<(String, serde_json::Value)> = op
+                        .get("attributes")
+                        .and_then(|value| value.as_object())
+                        .map(|object| {
+                            object
+                                .iter()
+                                .map(|(name, value)| (name.clone(), value.clone()))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    outcome.ops.push(ConvertSetOp::Write {
+                        cluster,
+                        manufacturer_code,
+                        disable_default_response,
+                        attributes,
+                    });
+                }
+                "command" => {
+                    let command = op
+                        .get("command")
+                        .and_then(|value| match value {
+                            serde_json::Value::Number(number) => number.as_u64(),
+                            serde_json::Value::String(name) => session
+                                .types
+                                .command_id_by_name(cluster, name)
+                                .map(u64::from),
+                            _ => None,
+                        })
+                        .filter(|id| *id <= u8::MAX as u64);
+                    let Some(command) = command else {
+                        outcome.ops.push(ConvertSetOp::Unsupported {
+                            kind: "command id could not be resolved".into(),
+                        });
+                        continue;
+                    };
+                    outcome.ops.push(ConvertSetOp::Command {
+                        cluster,
+                        command: command as u8,
+                        manufacturer_code,
+                        disable_default_response,
+                        payload: op
+                            .get("payload")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null),
+                    });
+                }
+                "read" => {
+                    let attributes: Vec<String> = op
+                        .get("attributes")
+                        .and_then(|value| value.as_array())
+                        .map(|array| {
+                            array
+                                .iter()
+                                .filter_map(|value| match value {
+                                    serde_json::Value::String(name) => Some(name.clone()),
+                                    serde_json::Value::Number(number) => Some(number.to_string()),
+                                    _ => None,
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    outcome.ops.push(ConvertSetOp::Read {
+                        cluster,
+                        attributes,
+                    });
+                }
+                other => outcome.ops.push(ConvertSetOp::Unsupported {
+                    kind: format!("operation '{other}'"),
+                }),
+            }
+        }
+        Some(outcome)
+    }
+
+    /// Run `toZigbee.convertSet` in the persistent per-device session.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_set(
+        &self,
+        model: &str,
+        endpoint: u8,
+        endpoint_name: Option<&str>,
+        key: &str,
+        value: &serde_json::Value,
+        device: &ExternalDeviceInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<ConvertSetOutcome> {
+        let sender = self.runtime_sender()?;
+        let (reply, receiver) = mpsc::channel();
+        let job = ConverterJob::ConvertSet {
+            model: model.to_string(),
+            endpoint,
+            endpoint_name: endpoint_name.map(str::to_string),
+            key: key.to_string(),
+            value: value.clone(),
+            device: device.clone(),
+            state: state.clone(),
+            reply,
+        };
+        sender.send(job).ok()?;
+        match receiver.recv_timeout(Duration::from_secs(10)) {
+            Ok(result) => result,
+            Err(error) => {
+                warn!("external converter convertSet timed out: {error}");
+                None
+            }
+        }
+    }
+
     fn runtime_sender(&self) -> Option<mpsc::Sender<ConverterJob>> {
         let mut guard = self.runtime.lock().ok()?;
         if let Some(sender) = guard.as_ref() {
@@ -972,6 +1346,41 @@ impl ExternalConverter {
                 let mut sessions: HashMap<String, ConverterSession> = HashMap::new();
                 while let Ok(job) = receiver.recv() {
                     match job {
+                        ConverterJob::ConvertSet {
+                            model,
+                            endpoint,
+                            endpoint_name,
+                            key,
+                            value,
+                            device,
+                            state,
+                            reply,
+                        } => {
+                            let session_key = format!("{}|{model}", device.ieee_addr);
+                            if !sessions.contains_key(&session_key) {
+                                match converter.open_session(&model, &device) {
+                                    Some(session) => {
+                                        sessions.insert(session_key.clone(), session);
+                                    }
+                                    None => {
+                                        let _ = reply.send(None);
+                                        continue;
+                                    }
+                                }
+                            }
+                            let result = sessions.get_mut(&session_key).and_then(|session| {
+                                converter.dispatch_session_set(
+                                    session,
+                                    endpoint,
+                                    endpoint_name.as_deref(),
+                                    &key,
+                                    &value,
+                                    &device,
+                                    &state,
+                                )
+                            });
+                            let _ = reply.send(result);
+                        }
                         ConverterJob::Convert {
                             model,
                             cluster_id,
@@ -1662,6 +2071,27 @@ const definitions = [
                     await entity.read("msTemperatureMeasurement", [attribute]);
                 },
             },
+            {
+                key: ["window_detection"],
+                convertSet: async (entity, key, value, meta) => {
+                    await entity.write("genOnOff", {onOff: value === "ON" ? 1 : 0});
+                    return {state: {[key]: value}};
+                },
+            },
+            {
+                key: ["on_timed"],
+                convertSet: async (entity, key, value, meta) => {
+                    await entity.command("genOnOff", "onWithTimedOff", {ctrlbits: 0, ontime: 10, offwaittime: 5});
+                    return {state: {[key]: value}};
+                },
+            },
+            {
+                key: ["vendor_flag"],
+                convertSet: async (entity, key, value, meta) => {
+                    await entity.write("manuSpecificUnknown", {flag: 1});
+                    return {state: {[key]: value}};
+                },
+            },
         ],
     },
 ];
@@ -1701,6 +2131,31 @@ module.exports = {double};
             },
             "fingerprints": [],
         });
+        std::fs::write(
+            dir.join("zcl-commands.json"),
+            serde_json::json!({
+                "clusters": {
+                    "6": {
+                        "name": "genOnOff",
+                        "attributes": {"0": {"name": "onOff", "type": 16}},
+                        "commands": {
+                            "66": {"name": "onWithTimedOff", "parameters": [
+                                {"name": "ctrlbits", "type": 32},
+                                {"name": "ontime", "type": 33},
+                                {"name": "offwaittime", "type": 33}
+                            ]}
+                        }
+                    },
+                    "1026": {
+                        "name": "msTemperatureMeasurement",
+                        "attributes": {"0": {"name": "measuredValue", "type": 41}},
+                        "commands": {}
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
         std::fs::write(
             dir.join("registry.json"),
             serde_json::to_string(&registry).unwrap(),
@@ -2433,5 +2888,102 @@ module.exports = {definitions};
                 .expect("future timer frame");
             assert_eq!(out.get("fired"), Some(&serde_json::json!(expected)));
         }
+    }
+
+    #[test]
+    fn convert_set_records_write_and_returns_state() {
+        let (_tmp, conv) = fixture_dir();
+        let outcome = conv
+            .convert_set(
+                "FixtureBulb",
+                1,
+                None,
+                "window_detection",
+                &serde_json::json!("ON"),
+                &device(),
+                &Default::default(),
+            )
+            .expect("convertSet outcome");
+        assert!(outcome.handled);
+        assert_eq!(
+            outcome.state.get("window_detection"),
+            Some(&serde_json::json!("ON"))
+        );
+        assert_eq!(
+            outcome.ops,
+            vec![ConvertSetOp::Write {
+                cluster: 6,
+                manufacturer_code: None,
+                disable_default_response: false,
+                attributes: vec![("onOff".to_string(), serde_json::json!(1))],
+            }]
+        );
+    }
+
+    #[test]
+    fn convert_set_records_cluster_command_with_payload() {
+        let (_tmp, conv) = fixture_dir();
+        let outcome = conv
+            .convert_set(
+                "FixtureBulb",
+                1,
+                None,
+                "on_timed",
+                &serde_json::json!(true),
+                &device(),
+                &Default::default(),
+            )
+            .expect("convertSet outcome");
+        assert!(outcome.handled);
+        assert_eq!(
+            outcome.ops,
+            vec![ConvertSetOp::Command {
+                cluster: 6,
+                command: 66,
+                manufacturer_code: None,
+                disable_default_response: false,
+                payload: serde_json::json!({"ctrlbits": 0, "ontime": 10, "offwaittime": 5}),
+            }]
+        );
+    }
+
+    #[test]
+    fn convert_set_marks_unknown_cluster_as_unsupported() {
+        let (_tmp, conv) = fixture_dir();
+        let outcome = conv
+            .convert_set(
+                "FixtureBulb",
+                1,
+                None,
+                "vendor_flag",
+                &serde_json::json!(true),
+                &device(),
+                &Default::default(),
+            )
+            .expect("convertSet outcome");
+        assert!(outcome.handled);
+        assert_eq!(outcome.ops.len(), 1);
+        assert!(matches!(
+            outcome.ops[0],
+            ConvertSetOp::Unsupported { ref kind } if kind.contains("unknown cluster")
+        ));
+    }
+
+    #[test]
+    fn convert_set_without_matching_converter_is_not_handled() {
+        let (_tmp, conv) = fixture_dir();
+        let outcome = conv
+            .convert_set(
+                "FixtureBulb",
+                1,
+                None,
+                "not_a_key",
+                &serde_json::json!(1),
+                &device(),
+                &Default::default(),
+            )
+            .expect("convertSet outcome");
+        assert!(!outcome.handled);
+        assert!(outcome.ops.is_empty());
     }
 }

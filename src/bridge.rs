@@ -933,7 +933,8 @@ impl Bridge {
                         }) => {
                             info!("MQTT set: {friendly_name} (endpoint {endpoint:?}) -> {payload}");
                             Self::handle_set(
-                                &devices, &coord, &mqtt, self.cfg.advanced.output, &mut trans_id,
+                                &devices, &self.external, &coord, &mqtt,
+                                self.cfg.advanced.output, &mut trans_id,
                                 &friendly_name, endpoint, &payload,
                             ).await;
                         }
@@ -1818,6 +1819,7 @@ impl Bridge {
     #[allow(clippy::too_many_arguments)]
     async fn handle_set(
         devices: &DeviceRegistry,
+        external: &ExternalConverter,
         coord: &CoordinatorHandle,
         mqtt: &MqttBridge,
         output: OutputMode,
@@ -2232,6 +2234,172 @@ impl Bridge {
                         warn!("Failed to write recovery: {e}");
                     }
                     optimistic.insert("recovery".into(), json!("OFF"));
+                }
+            }
+        }
+
+        // Definition-driven keys (config switches and other expose features)
+        // run through `toZigbee.convertSet`; the recorded ZCL operations are
+        // encoded with published type metadata and sent to the device.
+        if payload.is_object() {
+            let converter_keys = converter_set_keys(payload);
+            if !converter_keys.is_empty() {
+                let object = payload.as_object().expect("checked above");
+                let model = dev.model.clone().unwrap_or_default();
+                let info = crate::converters::external::ExternalDeviceInfo::from_device(&dev);
+                let cached_state = dev.state.clone();
+                let types = external.zcl_types();
+                for key in converter_keys {
+                    let Some(value) = object.get(&key) else {
+                        continue;
+                    };
+                    let target_endpoint = endpoint
+                        .or_else(|| {
+                            parse_endpoint_key(&key).and_then(|(_, suffix)| {
+                                crate::mqtt::endpoint_index(&suffix)
+                                    .or_else(|| endpoint_named(&endpoints, &suffix))
+                            })
+                        })
+                        .or_else(|| endpoints.first().map(|candidate| candidate.endpoint));
+                    let Some(target_endpoint) = target_endpoint else {
+                        continue;
+                    };
+                    let endpoint_name = endpoint_suffix(&dev, target_endpoint)
+                        .or_else(|| Some(target_endpoint.to_string()));
+                    let Some(outcome) = external.convert_set(
+                        &model,
+                        target_endpoint,
+                        endpoint_name.as_deref(),
+                        &key,
+                        value,
+                        &info,
+                        &cached_state,
+                    ) else {
+                        debug!("convertSet for '{key}' produced no outcome");
+                        continue;
+                    };
+                    if !outcome.handled {
+                        debug!("no toZigbee converter handles '{key}'");
+                        continue;
+                    }
+                    for (state_key, state_value) in &outcome.state {
+                        optimistic.insert(state_key.clone(), state_value.clone());
+                    }
+                    for op in &outcome.ops {
+                        match op {
+                            crate::converters::external::ConvertSetOp::Write {
+                                cluster,
+                                manufacturer_code,
+                                attributes,
+                                ..
+                            } => match encode_write_attributes(&types, *cluster, attributes) {
+                                Ok(encoded) => {
+                                    let refs: Vec<(u16, u8, &[u8])> = encoded
+                                        .iter()
+                                        .map(|(id, data_type, bytes)| {
+                                            (*id, *data_type, bytes.as_slice())
+                                        })
+                                        .collect();
+                                    let frame = zcl::write::write_attributes_payload(
+                                        *trans_id,
+                                        *manufacturer_code,
+                                        &refs,
+                                    );
+                                    *trans_id = trans_id.wrapping_add(1);
+                                    if let Err(error) = coord
+                                        .send_zcl(
+                                            nwk_addr,
+                                            target_endpoint,
+                                            *cluster,
+                                            *trans_id,
+                                            frame,
+                                        )
+                                        .await
+                                    {
+                                        warn!("convertSet write failed: {error}");
+                                    }
+                                }
+                                Err(error) => {
+                                    warn!("convertSet write skipped for '{key}': {error}")
+                                }
+                            },
+                            crate::converters::external::ConvertSetOp::Command {
+                                cluster,
+                                command,
+                                manufacturer_code,
+                                disable_default_response,
+                                payload,
+                            } => match encode_command_op(&types, *cluster, *command, payload) {
+                                Ok(parameters) => {
+                                    let frame = command_frame(
+                                        *trans_id,
+                                        *command,
+                                        *manufacturer_code,
+                                        *disable_default_response,
+                                        &parameters,
+                                    );
+                                    *trans_id = trans_id.wrapping_add(1);
+                                    if let Err(error) = coord
+                                        .send_zcl(
+                                            nwk_addr,
+                                            target_endpoint,
+                                            *cluster,
+                                            *trans_id,
+                                            frame,
+                                        )
+                                        .await
+                                    {
+                                        warn!("convertSet command failed: {error}");
+                                    }
+                                }
+                                Err(error) => {
+                                    warn!("convertSet command skipped for '{key}': {error}")
+                                }
+                            },
+                            crate::converters::external::ConvertSetOp::Read {
+                                cluster,
+                                attributes,
+                            } => {
+                                let ids: Option<Vec<u16>> = attributes
+                                    .iter()
+                                    .map(|name| {
+                                        name.parse::<u16>()
+                                            .ok()
+                                            .or_else(|| types.attribute_by_name(*cluster, name))
+                                    })
+                                    .collect();
+                                match ids {
+                                    Some(ids) if !ids.is_empty() => {
+                                        let payload =
+                                            crate::zigbee::zcl::frame::read_attributes_payload(
+                                                *trans_id, &ids,
+                                            );
+                                        *trans_id = trans_id.wrapping_add(1);
+                                        if let Err(error) = coord
+                                            .request_zcl(
+                                                nwk_addr,
+                                                target_endpoint,
+                                                *cluster,
+                                                *trans_id,
+                                                payload,
+                                                GET_ZCL_TIMEOUT,
+                                                GET_ZCL_ATTEMPTS,
+                                            )
+                                            .await
+                                        {
+                                            warn!("convertSet read failed: {error}");
+                                        }
+                                    }
+                                    _ => warn!(
+                                        "convertSet read skipped for '{key}': unknown attributes"
+                                    ),
+                                }
+                            }
+                            crate::converters::external::ConvertSetOp::Unsupported { kind } => {
+                                warn!("convertSet operation unsupported for '{key}': {kind}")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2821,6 +2989,105 @@ async fn send_group_command(
         .map_err(|error| format!("group command failed: {error}"))?;
     crate::zigbee::zcl::clusters::groups::parse_response(&response.data)
         .ok_or_else(|| "invalid groups cluster response".to_string())
+}
+
+/// Keys the bridge handles natively; everything else is a candidate for
+/// `toZigbee.convertSet`.
+const NATIVE_SET_KEYS: &[&str] = &[
+    "state",
+    "brightness",
+    "color",
+    "color_temp",
+    "sensor_type",
+    "hysteresis",
+    "correction",
+    "switch_type",
+    "decoupled",
+    "recovery",
+    "position",
+    "tilt",
+    "transition",
+];
+
+fn converter_set_keys(payload: &serde_json::Value) -> Vec<String> {
+    let Some(object) = payload.as_object() else {
+        return Vec::new();
+    };
+    object
+        .keys()
+        .filter(|key| {
+            let native = NATIVE_SET_KEYS.contains(&key.as_str())
+                || parse_endpoint_key(key).is_some_and(|(base, _)| NATIVE_SET_KEYS.contains(&base));
+            !native
+        })
+        .cloned()
+        .collect()
+}
+
+/// Attributes/values for a converter-requested write, encoded with the ZCL
+/// metadata published alongside the converter package.
+fn encode_write_attributes(
+    types: &crate::converters::zcl_types::ZclTypesFile,
+    cluster: u16,
+    attributes: &[(String, serde_json::Value)],
+) -> std::result::Result<Vec<(u16, u8, Vec<u8>)>, String> {
+    let mut out = Vec::new();
+    for (name, value) in attributes {
+        let attribute_id = name
+            .parse::<u16>()
+            .ok()
+            .or_else(|| types.attribute_by_name(cluster, name))
+            .ok_or_else(|| format!("unknown attribute '{name}' for cluster 0x{cluster:04X}"))?;
+        let data_type = types
+            .attribute(cluster, attribute_id)
+            .map(|info| info.data_type)
+            .ok_or_else(|| {
+                format!("no ZCL type metadata for attribute 0x{attribute_id:04X} (cluster 0x{cluster:04X})")
+            })?;
+        let bytes = crate::converters::zcl_types::encode_value(data_type, value)
+            .map_err(|error| error.to_string())?;
+        out.push((attribute_id, data_type, bytes));
+    }
+    Ok(out)
+}
+
+/// Encode a converter-requested cluster command body (parameters only).
+fn encode_command_op(
+    types: &crate::converters::zcl_types::ZclTypesFile,
+    cluster: u16,
+    command: u8,
+    payload: &serde_json::Value,
+) -> std::result::Result<Vec<u8>, String> {
+    let info = types.command(cluster, command).ok_or_else(|| {
+        format!("no ZCL command metadata for command 0x{command:02X} (cluster 0x{cluster:04X})")
+    })?;
+    crate::converters::zcl_types::encode_command_parameters(info, payload)
+        .map_err(|error| error.to_string())
+}
+
+/// Build a cluster-specific ZCL frame for a converter command.
+fn command_frame(
+    sequence: u8,
+    command: u8,
+    manufacturer_code: Option<u16>,
+    disable_default_response: bool,
+    parameters: &[u8],
+) -> Vec<u8> {
+    let mut control = 0x01u8; // cluster-specific, client -> server
+    if manufacturer_code.is_some() {
+        control |= 0x04;
+    }
+    if disable_default_response {
+        control |= 0x10;
+    }
+    let mut frame = vec![control];
+    if let Some(code) = manufacturer_code {
+        frame.extend_from_slice(&code.to_le_bytes());
+    }
+    frame.push(sequence);
+    frame.push(command);
+    frame.extend_from_slice(parameters);
+    frame
 }
 
 /// Build the MQTT bridge response envelope for reporting requests.
@@ -4217,5 +4484,92 @@ mod tests {
         assert_eq!(payload["status"], "ok");
         assert_eq!(payload["transaction"], "tx-socket");
         assert!(devices.get_by_ieee(&ieee).is_none());
+    }
+
+    fn fixture_zcl_types() -> crate::converters::zcl_types::ZclTypesFile {
+        crate::converters::zcl_types::ZclTypesFile::from_json(
+            r#"{"clusters": {
+              "6": {
+                "name": "genOnOff",
+                "attributes": {"0": {"name": "onOff", "type": 16},
+                               "16387": {"name": "startUpOnOff", "type": 48}},
+                "commands": {"66": {"name": "onWithTimedOff", "parameters": [
+                    {"name": "ctrlbits", "type": 32},
+                    {"name": "ontime", "type": 33},
+                    {"name": "offwaittime", "type": 33}
+                ]}}
+              }
+            }}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn converter_set_keys_exclude_native_and_suffixed_native_keys() {
+        let payload = json!({
+            "state": "ON",
+            "brightness_l2": 20,
+            "position_l1": 40,
+            "window_detection": "ON",
+            "indicator_l1": "OFF",
+            "transition": 1.0
+        });
+        assert_eq!(
+            converter_set_keys(&payload),
+            vec!["indicator_l1".to_string(), "window_detection".to_string()]
+        );
+    }
+
+    #[test]
+    fn encode_write_attributes_uses_published_types() {
+        let types = fixture_zcl_types();
+        let encoded = encode_write_attributes(
+            &types,
+            6,
+            &[
+                ("onOff".to_string(), json!(1)),
+                ("16387".to_string(), json!(0)),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            encoded,
+            vec![(0x0000, 0x10, vec![1]), (0x4003, 0x30, vec![0])]
+        );
+    }
+
+    #[test]
+    fn encode_write_attributes_refuses_unknown_attributes() {
+        let types = fixture_zcl_types();
+        let error =
+            encode_write_attributes(&types, 6, &[("nope".to_string(), json!(1))]).unwrap_err();
+        assert!(error.contains("unknown attribute"));
+    }
+
+    #[test]
+    fn encode_command_op_and_frame_layout() {
+        let types = fixture_zcl_types();
+        let parameters = encode_command_op(
+            &types,
+            6,
+            66,
+            &json!({"ctrlbits": 0, "ontime": 10, "offwaittime": 5}),
+        )
+        .unwrap();
+        assert_eq!(parameters, vec![0, 10, 0, 5, 0]);
+
+        let frame = command_frame(7, 66, None, false, &parameters);
+        assert_eq!(&frame[..3], &[0x01, 7, 66]);
+        assert_eq!(&frame[3..], &parameters[..]);
+
+        let with_mfr = command_frame(7, 66, Some(0x1037), true, &[]);
+        assert_eq!(with_mfr, vec![0x15, 0x37, 0x10, 7, 66]);
+    }
+
+    #[test]
+    fn encode_command_op_refuses_unknown_command() {
+        let types = fixture_zcl_types();
+        let error = encode_command_op(&types, 6, 99, &json!({})).unwrap_err();
+        assert!(error.contains("no ZCL command metadata"));
     }
 }

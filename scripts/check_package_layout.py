@@ -26,7 +26,7 @@ def validate(root: Path, expected_ref=None):
         elif not any(directory.rglob("*.js")):
             errors.append(f"{name}/ contains no JavaScript files")
 
-    for name in ("registry.json", "zcl.json", "manifest.json"):
+    for name in ("registry.json", "zcl.json", "zcl-commands.json", "manifest.json"):
         if not (root / name).is_file():
             errors.append(f"missing {name}")
 
@@ -64,6 +64,22 @@ def validate(root: Path, expected_ref=None):
             errors.append("registry.json has no fingerprints list")
     elif registry is not None:
         errors.append("registry.json root must be an object")
+
+    zcl_types = None
+    try:
+        zcl_types = json.loads((root / "zcl-commands.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        errors.append(f"zcl-commands.json is unreadable: {error}")
+    if isinstance(zcl_types, dict):
+        clusters = zcl_types.get("clusters")
+        if not isinstance(clusters, dict) or not clusters:
+            errors.append("zcl-commands.json has no clusters table")
+        else:
+            gen_on_off = clusters.get("6")
+            if not isinstance(gen_on_off, dict) or "attributes" not in gen_on_off:
+                errors.append("zcl-commands.json is missing genOnOff (cluster 6)")
+    elif zcl_types is not None:
+        errors.append("zcl-commands.json root must be an object")
 
     manifest = None
     try:

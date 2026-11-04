@@ -95,6 +95,11 @@ R1 — явно ограниченный релиз для проверенно�
   QueryNextImage запускает auto-check и публикует `available` с throttling;
   bridge-level helper проверен fake index/device fixture. Полный Message loop,
   настраиваемый override, реальный HTTPS/cache и HIL отсутствуют.
+- **CV-09 convertSet частично**: `toZigbee.convertSet` исполняется в persistent
+  Boa session, записанные write/command/read кодируются по опубликованному
+  `zcl-commands.json` (генерируется из pinned herdsman) и отправляются в bridge.
+  Generator/Node не запускался, сложные ZCL-типы и опции (transition/executeIfOff/
+  readAfterWriteTime) не покрыты, bridge fake-coordinator E2E отсутствует.
 - **HA config switches/locks частично**: `SWITCH_DIFFERENT`-свойства дают
   config-switch с `command_topic_postfix`, lock discovery (0x0101) и cover
   `running`/`motor_state` шаблоны портированы с golden-тестами. Значения
