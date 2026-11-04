@@ -745,13 +745,16 @@ impl ZnpHandle {
         attempts: u8,
         expected_response: Option<u8>,
     ) -> Result<ZclIncoming> {
-        let request = ZclRequest::from_payload_with_response(
-            dst_addr,
-            dst_ep,
-            cluster_id,
-            &payload,
-            expected_response,
-        )
+        let request = match expected_response {
+            Some(expected) => ZclRequest::from_payload_with_response(
+                dst_addr,
+                dst_ep,
+                cluster_id,
+                &payload,
+                Some(expected),
+            ),
+            None => ZclRequest::from_payload(dst_addr, dst_ep, cluster_id, &payload),
+        }
         .ok_or_else(|| Error::Zcl("cannot parse outgoing ZCL header".into()))?;
         if !request.expects_response() {
             return Err(Error::Zcl(
@@ -972,5 +975,117 @@ mod request_flow_tests {
         .await;
         assert!(result.unwrap_err().to_string().contains("0xE9"));
         assert_eq!(waiters.lock().await.pending(), 0);
+    }
+}
+
+#[cfg(test)]
+mod fake_serial_e2e_tests {
+    use super::*;
+    use futures::SinkExt;
+    use tokio::io::DuplexStream;
+    use tokio_stream::StreamExt;
+    use tokio_util::codec::Framed;
+
+    fn af_incoming(cluster: u16, src: u16, src_ep: u8, zcl: Vec<u8>) -> Vec<u8> {
+        let mut raw = vec![0u8; 17];
+        raw[2..4].copy_from_slice(&cluster.to_le_bytes());
+        raw[4..6].copy_from_slice(&src.to_le_bytes());
+        raw[6] = src_ep;
+        raw[7] = 1;
+        raw[9] = 200;
+        raw[15] = 9;
+        raw[16] = zcl.len() as u8;
+        raw.extend(zcl);
+        raw
+    }
+
+    fn fake_handle() -> (Framed<DuplexStream, frame::ZnpCodec>, ZnpHandle) {
+        let (client, server) = tokio::io::duplex(4096);
+        let (transport, events) =
+            transport::spawn_test_transport(Framed::new(server, frame::ZnpCodec));
+        let waiters = Arc::new(Mutex::new(transaction::ZclWaiters::default()));
+        let pump_waiters = Arc::clone(&waiters);
+        let (event_tx, _event_rx) = mpsc::channel(16);
+        tokio::spawn(event_pump(events, event_tx, pump_waiters));
+        (
+            Framed::new(client, frame::ZnpCodec),
+            ZnpHandle { transport, waiters },
+        )
+    }
+
+    async fn spawn_fake_device<F>(
+        mut wire: Framed<DuplexStream, frame::ZnpCodec>,
+        response: F,
+    ) -> tokio::task::JoinHandle<()>
+    where
+        F: FnOnce(u8) -> Vec<u8> + Send + 'static,
+    {
+        tokio::spawn(async move {
+            let request = wire.next().await.unwrap().unwrap();
+            assert_eq!(request.frame_type, frame::FrameType::SReq);
+            assert_eq!(request.subsystem, frame::Subsystem::Af);
+            let tsn = request.data[6];
+            wire.send(frame::ZnpFrame::new(
+                frame::FrameType::SRsp,
+                frame::Subsystem::Af,
+                0x01,
+                vec![0x00],
+            ))
+            .await
+            .unwrap();
+            wire.send(frame::ZnpFrame::new(
+                frame::FrameType::AReq,
+                frame::Subsystem::Af,
+                0x81,
+                af_incoming(0x0402, 0x1234, 1, response(tsn)),
+            ))
+            .await
+            .unwrap();
+        })
+    }
+
+    #[tokio::test]
+    async fn fake_serial_get_reads_temperature_response() {
+        let (wire, handle) = fake_handle();
+        let device = spawn_fake_device(wire, |tsn| {
+            // global readRsp: attr 0x0000, status 0, int16 2250 = 22.50 C
+            vec![0x18, tsn, 0x01, 0x00, 0x00, 0x00, 0x29, 0xCA, 0x08]
+        })
+        .await;
+        let request = crate::zigbee::zcl::frame::read_attributes_payload(7, &[0x0000]);
+        let response = handle
+            .request_zcl(0x1234, 1, 0x0402, 7, request, Duration::from_secs(1), 1)
+            .await
+            .expect("get response over fake serial");
+        assert_eq!(response.command, 0x01);
+        let parsed = crate::zigbee::zcl::parse_message(0x0402, &response.data, None, None)
+            .unwrap()
+            .expect("temperature values");
+        assert_eq!(parsed.values["temperature"], serde_json::json!(22.5));
+        device.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn fake_serial_reporting_read_returns_configuration() {
+        let (wire, handle) = fake_handle();
+        let device = spawn_fake_device(wire, |tsn| {
+            // read reporting config rsp: attr 0, status 0, u16, min 10, max 300, change 50
+            vec![
+                0x18, tsn, 0x09, 0x00, 0x00, 0x00, 0x00, 0x21, 0x0A, 0x00, 0x2C, 0x01, 0x32, 0x00,
+            ]
+        })
+        .await;
+        let request = crate::zigbee::zcl::frame::read_reporting_config_payload(7, &[0x0000]);
+        let response = handle
+            .request_zcl(0x1234, 1, 0x0402, 7, request, Duration::from_secs(1), 1)
+            .await
+            .expect("reporting response over fake serial");
+        assert_eq!(response.command, 0x09);
+        let (_, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data).unwrap();
+        let configs = crate::zigbee::zcl::parse_reporting_config_rsp(&response.data[offset..]);
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].minimum_interval, Some(10));
+        assert_eq!(configs[0].maximum_interval, Some(300));
+        device.await.unwrap();
     }
 }

@@ -52,6 +52,8 @@ New tests:
 - MQTT command contract: empty `.../get` payload becomes `GetDevice` with null
   payload, a JSON key object is preserved, raw `.../set` keeps the `{state:...}`
   fallback, and unrelated topics produce no command.
+- `fake_serial_get_reads_temperature_response` (coordinator module): real ZNP
+  SREQ/SRSP + AF response over a duplex transport actor produces 22.5 °C.
 - `broker_free_mqtt_get_request_end_to_end`: a real MQTT get topic/payload is
   parsed into `GetDevice`, key selection builds targets, a fake read returns a
   readRsp, and the merged temperature is 22.5 C.

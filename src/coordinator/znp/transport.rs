@@ -291,6 +291,34 @@ impl ZnpTransport {
     }
 }
 
+/// Test-only actor over an arbitrary duplex stream, used by coordinator-level
+/// fake-serial E2E tests.
+#[cfg(test)]
+pub(crate) fn spawn_test_transport<S>(
+    framed: Framed<S, ZnpCodec>,
+) -> (ZnpTransport, mpsc::Receiver<ZnpEvent>)
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let (actor_tx, actor_rx) = mpsc::channel(CHANNEL_CAPACITY);
+    let (event_tx, event_rx) = mpsc::channel(CHANNEL_CAPACITY);
+    let actor = TransportActor {
+        framed,
+        actor_rx,
+        event_tx,
+        pending: None,
+        queued: VecDeque::new(),
+    };
+    tokio::spawn(actor.run());
+    (
+        ZnpTransport {
+            actor_tx,
+            next_id: Arc::new(AtomicU64::new(0)),
+        },
+        event_rx,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

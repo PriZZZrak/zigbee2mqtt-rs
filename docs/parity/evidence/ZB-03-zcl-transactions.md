@@ -55,11 +55,17 @@ Transaction tests (10):
 - AF→ZCL field parsing;
 - event-pump integration: `AfIncomingMsg` resolves, `AfDataConfirm` failure
   propagates, success confirm leaves the waiter pending.
+- Fake ZNP serial E2E: a duplex stream drives the real transport actor, SREQ/SRSP
+  and event pump; a temperature get response parses to 22.5 °C and a reporting
+  response parses min/max intervals.
+- Fixed `request_zcl_expected(None)`: it now derives the expected response from
+  the ZCL command instead of overwriting it with `None`, which previously made
+  read/reporting requests report "does not expect a response".
 
 ## Divergences and gaps (not verified)
 
-- No hardware/ZNP stream; `request_zcl`'s flow is tested with a fake sender
-  (`request_flow_tests`), not against real serial I/O or timing.
+- Fake serial uses an in-memory duplex rather than real serial timing/hardware;
+  the full bridge event loop is still not driven in one test.
 - `AF_DATA_CONFIRM` carries no destination address, so confirmation correlates by
   TSN only; a late confirm from a previous retry can affect a new attempt with the
   same TSN. Upstream has the same wire limitation and uses queue/recovery logic.
