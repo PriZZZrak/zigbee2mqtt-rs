@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-04T11:23:58+00:00",
+  "captured_utc": "2026-11-04T11:31:10+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable",
   "commands": [
     {
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "236 library + 2 binary + 30 compatibility = 268 passed, 0 failed"
+      "result": "237 library + 2 binary + 30 compatibility = 269 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",

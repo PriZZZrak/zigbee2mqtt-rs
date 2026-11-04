@@ -1,4 +1,5 @@
 /// The main bridge -- ties coordinator, MQTT, device registry, and ZCL together.
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,6 +25,26 @@ use crate::zigbee::zcl::clusters::color;
 use crate::zigbee::zcl::clusters::level;
 use crate::zigbee::zcl::clusters::on_off;
 use crate::zigbee::{EndpointDesc, IeeeAddr};
+
+/// De-duplicates IEEE-address lookups for unknown network addresses.
+///
+/// Mirrors herdsman's `unknownDevices` set: a failed lookup stays suppressed for
+/// the rest of the process so a non-responding device cannot spam the
+/// coordinator; a successful resolution clears the key.
+#[derive(Default)]
+struct UnknownDeviceTracker {
+    requested: HashSet<u16>,
+}
+
+impl UnknownDeviceTracker {
+    fn should_identify(&mut self, nwk_addr: u16) -> bool {
+        self.requested.insert(nwk_addr)
+    }
+
+    fn identified(&mut self, nwk_addr: u16) {
+        self.requested.remove(&nwk_addr);
+    }
+}
 
 pub struct Bridge {
     cfg: Config,
@@ -294,6 +315,7 @@ impl Bridge {
 
         // 7. Main event loop
         let mut trans_id: u8 = 0;
+        let mut unknown_devices = UnknownDeviceTracker::default();
 
         loop {
             tokio::select! {
@@ -306,6 +328,7 @@ impl Bridge {
                         }
                         Some(CoordinatorEvent::DeviceJoined { ieee_addr, nwk_addr }) => {
                             let ieee = ieee_addr;
+                            unknown_devices.identified(nwk_addr);
                             if !Self::device_allowed(&self.cfg, &ieee.as_hex()) {
                                 info!("Device {ieee} is blocked/filtered, skipping");
                                 continue;
@@ -347,6 +370,7 @@ impl Bridge {
                         Some(CoordinatorEvent::AddressResolved { ieee_addr, nwk_addr }) => {
                             let ieee = ieee_addr;
                             debug!("Address resolved: {ieee} -> 0x{nwk_addr:04X}");
+                            unknown_devices.identified(nwk_addr);
 
                             let known = devices.get_by_ieee(&ieee).is_some();
                             if known {
@@ -527,8 +551,13 @@ impl Bridge {
                         }) => {
                             debug!("AF msg from 0x{src_addr:04X} ep={src_ep} cluster=0x{cluster_id:04X} lqi={link_quality}");
 
-                            // Unknown NWK? Request IEEE address to link it.
-                            if devices.get_by_nwk(src_addr).is_none() {
+                            // Unknown NWK? Request IEEE address once per runtime session.
+                            // A failed lookup stays suppressed (upstream keeps the nwk
+                            // in its unknownDevices set) until a successful resolution or
+                            // a fresh announce clears it.
+                            if devices.get_by_nwk(src_addr).is_none()
+                                && unknown_devices.should_identify(src_addr)
+                            {
                                 debug!("Unknown NWK 0x{src_addr:04X}, requesting IEEE address");
                                 if let Err(e) = coord.request_ieee_addr(src_addr).await {
                                     warn!("Failed to request IEEE address: {e}");
@@ -1731,5 +1760,17 @@ mod tests {
         assert_eq!(find_ep_with_cluster(&eps, 0x0006), Some(1));
         assert_eq!(find_ep_with_cluster(&eps, 0x0402), Some(2));
         assert_eq!(find_ep_with_cluster(&eps, 0x9999), None);
+    }
+
+    #[test]
+    fn unknown_device_tracker_dedups_until_identified() {
+        let mut tracker = UnknownDeviceTracker::default();
+        assert!(tracker.should_identify(0x1234));
+        assert!(!tracker.should_identify(0x1234));
+        assert!(tracker.should_identify(0x5678));
+        // A failed lookup stays suppressed; a successful resolution allows a
+        // later re-identification (for example after another NWK change).
+        tracker.identified(0x1234);
+        assert!(tracker.should_identify(0x1234));
     }
 }

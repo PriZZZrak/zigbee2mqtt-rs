@@ -44,11 +44,12 @@ R1 — явно ограниченный релиз для проверенно�
   поэтому строки `IN_PROGRESS`, а не `VERIFIED`.
 - Следующий шаг: завершить STORE-04 (restore/rollback), затем reference harness
   (EVID-04) и Z-Stack resume (ZB-01).
-- **PR-03 начат (ZB-02)**: SREQ теперь сериализуются FIFO, второй запрос больше не
-  перезаписывает pending, отмена освобождает очередь; legacy доставка SRSP с
-  несовпадающим subsystem сохранена. Добавлены in-memory duplex tests. Расхождение
-  с upstream concurrency 2/16, 10s deadline, serial recovery и HIL ещё не закрыты.
-  ZB-01/03/04 не начаты.
+- **PR-03 начат (ZB-02, ZB-04)**: SREQ сериализуются FIFO, второй запрос больше
+  не перезаписывает pending, отмена освобождает очередь; legacy доставка SRSP с
+  несовпадающим subsystem сохранена. Unknown NWK идентифицируется один раз за
+  сессию, stale NWK-индекс очищается. Добавлены in-memory duplex и tracker tests.
+  Upstream concurrency 2/16, 10s deadline, serial recovery, coordinator round-trip
+  и HIL ещё не закрыты. ZB-01/03 не начаты.
 - **CV-03 начат**: registry lookup по Zigbee modelID, bucket `null`, NUL-нормализация
   и fingerprint priority реализованы; product `models` больше не используется как
   ключ. Неизвестные fingerprint-поля, реальный пакет и Node oracle ещё не проверены;
