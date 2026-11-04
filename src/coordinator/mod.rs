@@ -1,5 +1,6 @@
 pub mod znp;
 
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
@@ -127,11 +128,11 @@ impl CoordinatorHandle {
     }
 }
 
-pub async fn open_coordinator(cfg: &Config) -> Result<CoordinatorHandle> {
+pub async fn open_coordinator(cfg: &Config, config_path: &Path) -> Result<CoordinatorHandle> {
     match cfg.serial.adapter {
         AdapterType::Znp | AdapterType::Zstack | AdapterType::Auto => {
             let coord = ZnpCoordinator::open(&cfg.serial.port, cfg.serial.baudrate)?;
-            coord.start(cfg).await
+            coord.start(cfg, config_path).await
         }
         AdapterType::Ezsp => Err(crate::error::Error::Config(
             "EZSP adapter not yet supported".into(),

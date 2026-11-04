@@ -1,7 +1,9 @@
 pub mod commands;
 pub mod frame;
+pub mod strategy;
 pub mod transport;
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,6 +17,10 @@ use crate::config::Config;
 use crate::coordinator::{CoordinatorEvent, CoordinatorHandle, CoordinatorInfo};
 use crate::error::{Error, Result};
 use crate::zigbee::IeeeAddr;
+use strategy::{
+    determine_strategy, load_backup, parse_has_configured, parse_key_descriptor, parse_nib,
+    AdapterNvState, BackupNetwork, NetworkOptions, StartupStrategy, ZnpVersion,
+};
 
 pub struct ZnpCoordinator {
     transport: ZnpTransport,
@@ -31,7 +37,7 @@ impl ZnpCoordinator {
     }
 
     /// Full coordinator startup sequence.
-    pub async fn start(mut self, cfg: &Config) -> Result<CoordinatorHandle> {
+    pub async fn start(mut self, cfg: &Config, config_path: &Path) -> Result<CoordinatorHandle> {
         self.reset().await?;
         // Mirror upstream ping-retry (zStackAdapter.ts start(): 3 attempts, SYS ping capabilities=1)
         self.ping().await?;
@@ -42,10 +48,48 @@ impl ZnpCoordinator {
         // configuration below is silently skipped or wrongly applied -- if
         // joins fail on a given adapter, check the "ZNP version:" log line
         // logged just above against that adapter's actual stack version.
-        let is_zstack3 = version.product_id >= 1;
-        self.write_nv_config(cfg).await?;
-        if is_zstack3 {
-            self.configure_channel_bdb(cfg).await?;
+        let znp_version = ZnpVersion::from_product_id(version.product_id);
+        let is_zstack3 = znp_version == ZnpVersion::ZStack3;
+
+        match self
+            .determine_startup(znp_version, cfg, config_path)
+            .await?
+        {
+            Some(decision) => {
+                for warning in &decision.warnings {
+                    warn!("ZNP startup: {warning}");
+                }
+                match decision.strategy {
+                    StartupStrategy::Startup => {
+                        info!("ZNP startup: resuming the existing network without rewriting NV");
+                    }
+                    StartupStrategy::RestoreBackup => {
+                        return Err(Error::Znp(
+                            "coordinator backup restore is not implemented; refusing to re-commission over an existing backup"
+                                .into(),
+                        ));
+                    }
+                    StartupStrategy::StartCommissioning => {
+                        info!("ZNP startup: commissioning a new network");
+                        self.write_nv_config(cfg).await?;
+                        if is_zstack3 {
+                            self.configure_channel_bdb(cfg).await?;
+                        }
+                    }
+                }
+            }
+            None => {
+                // Transitional fallback for firmware where the strategy probe is
+                // unsupported. It is explicit in the log, unlike the previous
+                // unconditional rewrite.
+                warn!(
+                    "ZNP startup: cannot determine adapter strategy from NV memory; using legacy NV write path"
+                );
+                self.write_nv_config(cfg).await?;
+                if is_zstack3 {
+                    self.configure_channel_bdb(cfg).await?;
+                }
+            }
         }
         self.register_endpoints().await?;
         self.start_network().await?;
@@ -125,6 +169,158 @@ impl ZnpCoordinator {
             }
             None => Err(Error::Znp("failed to parse SYS_VERSION response".into())),
         }
+    }
+
+    /// Read one NV item using OSAL_NV_LENGTH + chunked OSAL_NV_READ_EXT.
+    async fn read_nv_item(&self, item_id: u16) -> Result<Option<Vec<u8>>> {
+        let length_rsp = self.transport.request(sys_osal_nv_length(item_id)).await?;
+        if length_rsp.data.len() < 2 {
+            return Err(Error::Znp(format!(
+                "OSAL_NV_LENGTH 0x{item_id:04X} returned {} bytes",
+                length_rsp.data.len()
+            )));
+        }
+        let length = u16::from_le_bytes([length_rsp.data[0], length_rsp.data[1]]) as usize;
+        if length == 0 {
+            return Ok(None);
+        }
+        let mut data = Vec::with_capacity(length);
+        let mut offset: u16 = 0;
+        while (offset as usize) < length {
+            let rsp = self
+                .transport
+                .request(sys_osal_nv_read_ext(item_id, offset))
+                .await?;
+            if rsp.data.len() < 2 {
+                return Err(Error::Znp(format!(
+                    "OSAL_NV_READ_EXT 0x{item_id:04X} returned a short response"
+                )));
+            }
+            let status = rsp.data[0];
+            let chunk = rsp.data[1] as usize;
+            if status != 0 {
+                return Err(Error::Znp(format!(
+                    "OSAL_NV_READ_EXT 0x{item_id:04X} failed with status {status}"
+                )));
+            }
+            if chunk == 0 || rsp.data.len() < 2 + chunk {
+                return Err(Error::Znp(format!(
+                    "OSAL_NV_READ_EXT 0x{item_id:04X} returned an invalid chunk"
+                )));
+            }
+            data.extend_from_slice(&rsp.data[2..2 + chunk]);
+            offset = offset.saturating_add(chunk as u16);
+        }
+        data.truncate(length);
+        Ok(Some(data))
+    }
+
+    async fn coordinator_extended_pan_id(&self, cfg: &Config) -> Option<[u8; 8]> {
+        if cfg.advanced.ext_pan_id != [0xdd; 8] {
+            return None;
+        }
+        let response = self.transport.request(sys_get_ext_addr()).await.ok()?;
+        if response.data.len() < 8 {
+            return None;
+        }
+        let mut address = [0u8; 8];
+        address.copy_from_slice(&response.data[..8]);
+        address.reverse();
+        Some(address)
+    }
+
+    /// Read adapter state and return the source-backed startup decision.
+    ///
+    /// `Ok(None)` means the firmware did not answer the NV probe; the caller
+    /// then uses the explicitly logged legacy path.
+    async fn determine_startup(
+        &self,
+        version: ZnpVersion,
+        cfg: &Config,
+        config_path: &Path,
+    ) -> Result<Option<strategy::Decision>> {
+        let configured_id = if version == ZnpVersion::ZStack12 {
+            nv::ZNP_HAS_CONFIGURED_ZSTACK1
+        } else {
+            nv::ZNP_HAS_CONFIGURED_ZSTACK3
+        };
+        let configured = match self.read_nv_item(configured_id).await {
+            Ok(value) => value.map(|bytes| parse_has_configured(&bytes)),
+            Err(error) => {
+                info!("ZNP startup: NV probe unavailable ({error})");
+                return Ok(None);
+            }
+        };
+        let nib_bytes = self.read_nv_item(nv::NIB).await?;
+        let nib = match nib_bytes {
+            Some(bytes) => match parse_nib(&bytes) {
+                Some(nib) if bytes.len() == 112 => Some(nib),
+                _ => {
+                    // Aligned-memory targets or future layouts are not parsed;
+                    // do not claim a decision from misunderstood bytes.
+                    info!(
+                        "ZNP startup: unsupported NIB length {}; falling back",
+                        bytes.len()
+                    );
+                    return Ok(None);
+                }
+            },
+            None => None,
+        };
+        let read_key = |id: u16| async move {
+            match self.read_nv_item(id).await? {
+                Some(bytes) => parse_key_descriptor(&bytes)
+                    .map(Some)
+                    .ok_or_else(|| Error::Znp(format!("short key descriptor for NV 0x{id:04X}"))),
+                None => Ok(None),
+            }
+        };
+        let preconfigured_key = read_key(nv::PRECFGKEY).await?;
+        let (active_key, alternate_key) = if version == ZnpVersion::ZStack12 {
+            // Z-Stack 1.2 has no key-info entries; upstream uses the
+            // preconfigured key as both active and alternate.
+            (preconfigured_key, preconfigured_key)
+        } else {
+            (
+                read_key(nv::NWK_ACTIVE_KEY_INFO).await?,
+                read_key(nv::NWK_ALTERN_KEY_INFO).await?,
+            )
+        };
+
+        let default_ext = self.coordinator_extended_pan_id(cfg).await;
+        let has_default_extended_pan_id = default_ext.is_some();
+        let extended_pan_id = default_ext.unwrap_or(cfg.advanced.ext_pan_id);
+        let config_network = NetworkOptions {
+            pan_id: cfg.advanced.pan_id,
+            extended_pan_id,
+            channel_mask: 1 << cfg.advanced.channel,
+            network_key: cfg.advanced.network_key,
+            network_key_distribute: false,
+            has_default_extended_pan_id,
+        };
+        let adapter = AdapterNvState {
+            has_configured: configured.unwrap_or(false),
+            nib,
+            preconfigured_key,
+            active_key,
+            alternate_key,
+        };
+
+        let backup_path = config_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("coordinator_backup.json");
+        let backup: Option<BackupNetwork> = load_backup(&backup_path)?;
+        let decision =
+            determine_strategy(version, &config_network, &adapter, backup.as_ref(), false)?;
+        info!(
+            "ZNP startup strategy: {:?} (configured={}, nib={}, backup={})",
+            decision.strategy,
+            adapter.has_configured,
+            adapter.nib.is_some(),
+            backup.is_some()
+        );
+        Ok(Some(decision))
     }
 
     /// Write network configuration to NVRAM before starting the network.

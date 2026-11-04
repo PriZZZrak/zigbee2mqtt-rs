@@ -11,6 +11,9 @@ mod sys {
     pub const RESET_REQ: u8 = 0x00;
     pub const VERSION: u8 = 0x02;
     pub const OSAL_NV_WRITE: u8 = 0x09;
+    pub const GET_EXT_ADDR: u8 = 0x04;
+    pub const OSAL_NV_LENGTH: u8 = 0x13;
+    pub const OSAL_NV_READ_EXT: u8 = 0x1C;
 }
 
 pub fn sys_ping() -> ZnpFrame {
@@ -66,6 +69,30 @@ pub mod nv {
     pub const PRECFGKEY: u16 = 0x0062;
     pub const PRECFGKEYS_ENABLE: u16 = 0x0063;
     pub const ZDO_DIRECT_CB: u16 = 0x008F;
+    pub const NIB: u16 = 0x0021;
+    pub const NWK_ACTIVE_KEY_INFO: u16 = 0x003A;
+    pub const NWK_ALTERN_KEY_INFO: u16 = 0x003B;
+    pub const ZNP_HAS_CONFIGURED_ZSTACK1: u16 = 0x0F00;
+    pub const ZNP_HAS_CONFIGURED_ZSTACK3: u16 = 0x0060;
+}
+
+pub fn sys_get_ext_addr() -> ZnpFrame {
+    ZnpFrame::sreq(Subsystem::Sys, sys::GET_EXT_ADDR, vec![])
+}
+
+pub fn sys_osal_nv_length(item_id: u16) -> ZnpFrame {
+    ZnpFrame::sreq(
+        Subsystem::Sys,
+        sys::OSAL_NV_LENGTH,
+        item_id.to_le_bytes().to_vec(),
+    )
+}
+
+pub fn sys_osal_nv_read_ext(item_id: u16, offset: u16) -> ZnpFrame {
+    let mut payload = Vec::with_capacity(4);
+    payload.extend_from_slice(&item_id.to_le_bytes());
+    payload.extend_from_slice(&offset.to_le_bytes());
+    ZnpFrame::sreq(Subsystem::Sys, sys::OSAL_NV_READ_EXT, payload)
 }
 
 pub fn sys_osal_nv_write(item_id: u16, data: &[u8]) -> ZnpFrame {

@@ -290,7 +290,7 @@ impl Bridge {
         info!("MQTT connected (base_topic={})", self.cfg.mqtt.base_topic);
 
         // 5. Open coordinator
-        let mut coord = open_coordinator(&self.cfg).await?;
+        let mut coord = open_coordinator(&self.cfg, &self.config_path).await?;
         info!("Coordinator ready");
 
         // 6. Publish retained MQTT state
