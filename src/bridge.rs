@@ -2355,6 +2355,7 @@ async fn handle_ota_request(
         .unwrap_or("");
     let device =
         find_device_for_id(devices, id).ok_or_else(|| format!("Device '{id}' does not exist"))?;
+    let expected_sha512 = payload.get("sha512").and_then(|value| value.as_str());
     let image_bytes = payload
         .get("hex")
         .and_then(|hex| hex.get("data"))
@@ -2363,7 +2364,7 @@ async fn handle_ota_request(
     match suffix {
         "check" | "check/downgrade" => {
             let bytes = image_bytes.ok_or_else(|| "missing or invalid hex image".to_string())?;
-            let info = ota.lock().await.check(&bytes)?;
+            let info = ota.lock().await.check_checked(&bytes, expected_sha512)?;
             Ok(OtaRequestOutcome {
                 data: json!({
                     "id": id,
@@ -3241,10 +3242,12 @@ mod tests {
     async fn ota_bridge_check_and_update_requests_end_to_end() {
         let devices = ota_test_devices();
         let ota = Mutex::new(crate::ota::OtaManager::default());
-        let image = hex::encode(ota_fixture_image());
+        let fixture = ota_fixture_image();
+        let image = hex::encode(&fixture);
         let payload = json!({
             "id": "0xec1bbdfffeaa66db",
             "hex": {"data": image, "file_name": "fixture.ota"},
+            "sha512": crate::ota::sha512_hex(&fixture),
         });
 
         let check = handle_ota_request(&ota, &devices, "device/ota_update/check", &payload)

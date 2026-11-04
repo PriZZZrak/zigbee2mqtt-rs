@@ -16,6 +16,21 @@ Pinned app/herdsman:
 - `test/device-ota.test.ts` and related fixtures are the reference for transfer
   sequences; they have not been executed in this environment.
 
+## Checksum, index metadata and schedule/retry policy
+
+- Added a dependency-free SHA-512 implementation (verified against the standard
+  `abc` vector), `validate_firmware` (checksum over the full file, then strips any
+  vendor prefix before the OTA magic) and `OtaManager::start_checked`.
+- `OtaIndexEntry`/`parse_index` deserialize the published index fields;
+  `select_image` mirrors herdsman `findMatchingOtaImage` filters: manufacturer,
+  image type, min/max file version, hardware min/max, modelId and
+  manufacturerName list (first matching entry in index order).
+- `OtaCheckScheduler` implements the per-device check interval
+  (`ota.update_check_interval` in the app); `OtaRetryPolicy` provides bounded
+  attempts with backoff.
+- Bridge check/update accept an optional `sha512` field and validate it before
+  parsing/starting; a wrong checksum returns an `error` response.
+
 ## Bridge/metadata integration
 
 - `src/ota.rs` parses the 56-byte OTA file header and owns per-device
@@ -50,8 +65,9 @@ Pinned app/herdsman:
 
 ## Tests and evidence
 
-Twelve OTA tests: nine core/manager tests (header parsing, query/blocks/end replay)
-plus three bridge-request tests:
+OTA tests now also cover SHA-512, checksum/prefix validation, index
+parsing/selection filters, check scheduling and retry backoff. Twelve core
+OTA/manager tests plus three bridge-request tests:
 
 - `ota_bridge_check_and_update_requests_end_to_end`: real bridge request
   payloads → check info, update state `{state: updating, progress: 0}`, abort →
@@ -61,7 +77,7 @@ plus three bridge-request tests:
 - `ota_progress_payload_matches_state_contract`: 0.5 → 50 while updating and
   completion → idle/100.
 
-`cargo test --locked` → **358 passed** (326 library, 2 binary, 30 compatibility);
+`cargo test --locked` → **363 passed** (331 library, 2 binary, 30 compatibility);
 clippy exit 0 with five existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
@@ -71,8 +87,12 @@ clippy exit 0 with five existing warnings; release build OK.
   as payload fields, not on the wire.
 - `check` reports any valid image as available; it does not compare device
   identity or query the device first.
-- Only hex image payloads are supported; URL/index metadata, persistence,
-  downgrade rules and scheduling are missing.
+- The index parser/selector and scheduler/retry are unit-tested but not wired to
+  the bridge or network; only hex payloads (optionally with `sha512`) are
+  accepted. URL download, override index, persistence and downgrade selection
+  are missing.
+- The SHA-512 implementation is new code and needs independent review/fuzzing
+  before security-sensitive use.
 - No image file checksum/signature validation, manufacturer/hardware applicability
   beyond identity, block-size negotiation, retry/timeout policy, upgrade delay or
   progress publication.
