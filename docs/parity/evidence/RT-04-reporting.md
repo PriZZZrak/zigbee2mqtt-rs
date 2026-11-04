@@ -41,6 +41,20 @@ attributes present in the published `zcl.json`.
   `configuredReportings` (`cluster`, `attrId`, `minRepIntval`, `maxRepIntval`,
   `repChange`) and the database is written immediately.
 
+## Fake-coordinator end-to-end tests
+
+`ReportingIo` is a small transport seam implemented by `CoordinatorHandle`. The
+tests use a fake coordinator and a real in-memory database:
+
+- `reporting_read_e2e_with_fake_coordinator_persists_and_replies`: handler →
+  ZCL 0x08 → fake 0x09 response → parsed config (u16, min 10, max 300) →
+  persisted `configuredReportings` → `reporting_mqtt_response` status `ok` with
+  the transaction field.
+- `reporting_configure_e2e_with_fake_coordinator_binds_and_persists`: payload
+  validation → type discovery 0x08/0x09 → bind (recorded once) → 0x06 → fake 0x07
+  success → persisted min/max/repChange → `error` reply envelope for a failed
+  request.
+
 ## Tests and evidence
 
 - `read_reporting_config_payload_layout` (ZCL bytes).
@@ -54,8 +68,8 @@ attributes present in the published `zcl.json`.
 
 ## Divergences and gaps (not verified)
 
-- No fake coordinator/broker test for the bridge handler; only ZCL codecs are
-  unit-tested.
+- The handler is covered with a fake coordinator and in-memory database; a real
+  MQTT broker round trip and a real coordinator are still untested.
 - Data-type discovery requires the attribute to already have a reporting
   configuration; a never-configured attribute cannot be configured yet.
 - Bind is sent but its ZDO response is not awaited; a bind failure may surface

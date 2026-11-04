@@ -641,6 +641,24 @@ impl PersistentDatabase {
         false
     }
 
+    /// Read the persisted configured-reporting records for a device endpoint.
+    pub fn configured_reportings(&self, ieee_addr: &str, endpoint: u8) -> Vec<serde_json::Value> {
+        self.entries
+            .values()
+            .find(|entry| {
+                entry
+                    .get("ieeeAddr")
+                    .and_then(|value| value.as_str())
+                    .is_some_and(|value| value.eq_ignore_ascii_case(ieee_addr))
+            })
+            .and_then(|entry| entry.get("endpoints"))
+            .and_then(|endpoints| endpoints.get(endpoint.to_string()))
+            .and_then(|endpoint| endpoint.get("configuredReportings"))
+            .and_then(|reports| reports.as_array())
+            .cloned()
+            .unwrap_or_default()
+    }
+
     pub fn sync_groups(&mut self, groups: &[Group]) {
         // Capture group identities before removing the records. The previous
         // implementation retained only non-group entries and then searched for

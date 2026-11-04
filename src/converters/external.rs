@@ -655,7 +655,10 @@ impl ExternalConverter {
             "data": data_obj,
             "linkquality": message.linkquality,
             "groupID": message.group_id,
-            "endpoint": {"ID": message.endpoint},
+            "endpoint": {
+                "ID": message.endpoint,
+                "deviceIeeeAddress": device.ieee_addr,
+            },
         });
         let meta = serde_json::json!({
             "state": state,
@@ -682,6 +685,9 @@ impl ExternalConverter {
                 const definition = __prepareDefinition(defs[{index}]);
                 const msg = JSON.parse({msg});
                 const meta = JSON.parse({meta});
+                const device = meta.device;
+                device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
+                msg.endpoint.getDevice = () => device;
                 const __published = [];
                 const publish = (p) => {{ __published.push(p); }};
                 const out = {{}};
@@ -841,6 +847,11 @@ impl ExternalConverter {
                 "powerSource": device.power_source,
                 "type": device.device_type,
                 "softwareBuildID": device.software_build_id,
+                "applicationVersion": device.application_version,
+                "dateCode": device.date_code,
+                "hardwareVersion": device.hardware_version,
+                "stackVersion": device.stack_version,
+                "zclVersion": device.zcl_version,
                 "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
             },
             "options": {},
@@ -855,8 +866,12 @@ impl ExternalConverter {
                 const keys = JSON.parse({keys});
                 const reads = [];
                 const errors = [];
+                const __device = meta.device;
+                __device.getEndpoint = (id) => (__device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
                 const entity = {{
                     ID: 1,
+                    deviceIeeeAddress: __device.ieeeAddr,
+                    getDevice: () => __device,
                     read: (cluster, attributes) => {{
                         const clusterId = (cluster && cluster.ID !== undefined) ? cluster.ID
                             : (typeof cluster === "number" ? cluster : __clusterNames[String(cluster)]);
@@ -1182,6 +1197,13 @@ const definitions = [
                 key: ["temperature"],
                 convertGet: async (entity, key, meta) => {
                     await entity.read("msTemperatureMeasurement", ["measuredValue"]);
+                },
+            },
+            {
+                key: ["device_info"],
+                convertGet: async (entity, key, meta) => {
+                    const attribute = entity.getDevice().modelID === "FixtureBulb" ? "measuredValue" : "unknown";
+                    await entity.read("msTemperatureMeasurement", [attribute]);
                 },
             },
         ],
@@ -1520,6 +1542,24 @@ module.exports = {definitions};
     }
 
     #[test]
+    fn convert_get_entity_exposes_device_identity() {
+        let (_tmp, conv) = fixture_dir();
+        let reads = conv.convert_get(
+            "FixtureBulb",
+            &["device_info".to_string()],
+            &device(),
+            &Default::default(),
+        );
+        assert_eq!(
+            reads,
+            vec![ConvertGetRead {
+                cluster_id: 1026,
+                attributes: vec![0],
+            }]
+        );
+    }
+
+    #[test]
     fn missing_convert_get_returns_no_reads() {
         let (_tmp, conv) = fixture_dir();
         assert!(conv
@@ -1567,9 +1607,12 @@ const definitions = [
             {
                 cluster: "msTemperatureMeasurement",
                 type: ["attributeReport"],
-                convert: (model, msg) => ({
+                convert: (model, msg, publish, options, meta) => ({
                     endpoint_seen: msg.endpoint.ID,
                     lqi_seen: msg.linkquality,
+                    device_model: msg.endpoint.getDevice().modelID,
+                    ieee_seen: msg.endpoint.deviceIeeeAddress,
+                    endpoint_count: meta.device.endpoints.length,
                 }),
             },
         ],
@@ -1635,5 +1678,14 @@ module.exports = {definitions};
             .expect("metadata converter should match");
         assert_eq!(out.get("endpoint_seen"), Some(&serde_json::json!(3)));
         assert_eq!(out.get("lqi_seen"), Some(&serde_json::json!(77)));
+        assert_eq!(
+            out.get("device_model"),
+            Some(&serde_json::json!("FixtureBulb"))
+        );
+        assert_eq!(
+            out.get("ieee_seen"),
+            Some(&serde_json::json!("0x0011223344556677"))
+        );
+        assert_eq!(out.get("endpoint_count"), Some(&serde_json::json!(1)));
     }
 }

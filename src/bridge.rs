@@ -46,6 +46,81 @@ impl UnknownDeviceTracker {
     }
 }
 
+type ReportingFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+
+/// Transport seam for the reporting bridge requests, enabling a fake coordinator
+/// in tests without a serial port.
+pub(crate) trait ReportingIo {
+    fn coordinator_ieee(&self) -> Option<IeeeAddr>;
+    fn read<'a>(
+        &'a self,
+        nwk_addr: u16,
+        endpoint: u8,
+        cluster: u16,
+        tsn: u8,
+        payload: Vec<u8>,
+    ) -> ReportingFuture<'a, crate::error::Result<crate::coordinator::znp::transaction::ZclIncoming>>;
+    #[allow(clippy::too_many_arguments)]
+    fn bind<'a>(
+        &'a self,
+        nwk_addr: u16,
+        source_ieee: [u8; 8],
+        endpoint: u8,
+        cluster: u16,
+        destination_ieee: [u8; 8],
+    ) -> ReportingFuture<'a, crate::error::Result<()>>;
+}
+
+impl ReportingIo for CoordinatorHandle {
+    fn coordinator_ieee(&self) -> Option<IeeeAddr> {
+        self.info.ieee_addr
+    }
+
+    fn read<'a>(
+        &'a self,
+        nwk_addr: u16,
+        endpoint: u8,
+        cluster: u16,
+        tsn: u8,
+        payload: Vec<u8>,
+    ) -> ReportingFuture<'a, crate::error::Result<crate::coordinator::znp::transaction::ZclIncoming>>
+    {
+        Box::pin(async move {
+            self.request_zcl(
+                nwk_addr,
+                endpoint,
+                cluster,
+                tsn,
+                payload,
+                Duration::from_secs(3),
+                2,
+            )
+            .await
+        })
+    }
+
+    fn bind<'a>(
+        &'a self,
+        nwk_addr: u16,
+        source_ieee: [u8; 8],
+        endpoint: u8,
+        cluster: u16,
+        destination_ieee: [u8; 8],
+    ) -> ReportingFuture<'a, crate::error::Result<()>> {
+        Box::pin(async move {
+            self.request_bind(
+                nwk_addr,
+                source_ieee,
+                endpoint,
+                cluster,
+                destination_ieee,
+                1,
+            )
+            .await
+        })
+    }
+}
+
 pub struct Bridge {
     cfg: Config,
     config_path: PathBuf,
@@ -956,19 +1031,12 @@ impl Bridge {
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 "device/reporting/read" | "device/reporting/configure" => {
-                                    match Self::handle_reporting(
+                                    let result = Self::handle_reporting(
                                         &devices, &self.external, &coord, &self.database,
                                         &request, &payload, &mut trans_id,
-                                    ).await {
-                                        Ok(data) => {
-                                            let resp = mk_resp("ok", data, None);
-                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                        }
-                                        Err(error) => {
-                                            let resp = mk_resp("error", json!({}), Some(error));
-                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                        }
-                                    }
+                                    ).await;
+                                    let resp = reporting_mqtt_response(result, transaction.as_deref());
+                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 "backup" => {
                                     let resp = mk_resp("ok", json!({"zip": ""}), None);
@@ -1100,14 +1168,12 @@ impl Bridge {
     async fn handle_reporting(
         devices: &DeviceRegistry,
         external: &ExternalConverter,
-        coord: &CoordinatorHandle,
+        io: &dyn ReportingIo,
         database: &Arc<Mutex<PersistentDatabase>>,
         request: &str,
         payload: &serde_json::Value,
         trans_id: &mut u8,
     ) -> std::result::Result<serde_json::Value, String> {
-        const REPORTING_TIMEOUT: Duration = Duration::from_secs(3);
-        const REPORTING_ATTEMPTS: u8 = 2;
         let id = payload
             .get("id")
             .and_then(|id| id.as_str())
@@ -1160,16 +1226,8 @@ impl Bridge {
             let tsn = *trans_id;
             let request_payload =
                 crate::zigbee::zcl::frame::read_reporting_config_payload(tsn, &attributes);
-            let response = coord
-                .request_zcl(
-                    device.nwk_addr,
-                    endpoint,
-                    cluster,
-                    tsn,
-                    request_payload,
-                    REPORTING_TIMEOUT,
-                    REPORTING_ATTEMPTS,
-                )
+            let response = io
+                .read(device.nwk_addr, endpoint, cluster, tsn, request_payload)
                 .await
                 .map_err(|error| format!("read reporting config failed: {error}"))?;
             let (header, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data)
@@ -1255,16 +1313,8 @@ impl Bridge {
         let read_tsn = *trans_id;
         let read_payload =
             crate::zigbee::zcl::frame::read_reporting_config_payload(read_tsn, &[attribute]);
-        let read_response = coord
-            .request_zcl(
-                device.nwk_addr,
-                endpoint,
-                cluster,
-                read_tsn,
-                read_payload,
-                REPORTING_TIMEOUT,
-                REPORTING_ATTEMPTS,
-            )
+        let read_response = io
+            .read(device.nwk_addr, endpoint, cluster, read_tsn, read_payload)
             .await
             .map_err(|error| format!("cannot discover reporting data type: {error}"))?;
         let (_, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&read_response.data)
@@ -1280,15 +1330,14 @@ impl Bridge {
         let change = encode_reportable_change(data_type, reportable_change)
             .ok_or_else(|| format!("unsupported data type 0x{data_type:02X} for reporting"))?;
 
-        if let Some(coordinator_ieee) = coord.info.ieee_addr {
-            if let Err(error) = coord
-                .request_bind(
+        if let Some(coordinator_ieee) = io.coordinator_ieee() {
+            if let Err(error) = io
+                .bind(
                     device.nwk_addr,
                     device.ieee_addr.0,
                     endpoint,
                     cluster,
                     coordinator_ieee.0,
-                    1,
                 )
                 .await
             {
@@ -1310,16 +1359,8 @@ impl Bridge {
         command_payload.extend_from_slice(&change);
         *trans_id = trans_id.wrapping_add(1);
         let tsn = *trans_id;
-        let response = coord
-            .request_zcl(
-                device.nwk_addr,
-                endpoint,
-                cluster,
-                tsn,
-                command_payload,
-                REPORTING_TIMEOUT,
-                REPORTING_ATTEMPTS,
-            )
+        let response = io
+            .read(device.nwk_addr, endpoint, cluster, tsn, command_payload)
             .await
             .map_err(|error| format!("configure reporting failed: {error}"))?;
         let (header, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data)
@@ -2090,6 +2131,21 @@ where
     (merged, failed)
 }
 
+/// Build the MQTT bridge response envelope for reporting requests.
+fn reporting_mqtt_response(
+    result: std::result::Result<serde_json::Value, String>,
+    transaction: Option<&str>,
+) -> serde_json::Value {
+    let mut response = match result {
+        Ok(data) => json!({"status": "ok", "data": data}),
+        Err(error) => json!({"status": "error", "data": {}, "error": error}),
+    };
+    if let Some(transaction) = transaction {
+        response["transaction"] = json!(transaction);
+    }
+    response
+}
+
 fn reportable_change_value(data_type: u8, bytes: &[u8]) -> serde_json::Value {
     match data_type {
         0x39 if bytes.len() >= 4 => {
@@ -2581,5 +2637,215 @@ mod tests {
         let native = serde_json::Map::from_iter([("state".to_string(), json!("OFF"))]);
         let merged = merge_converted_values(native, None);
         assert_eq!(merged["state"], "OFF");
+    }
+
+    struct FakeReporting {
+        ieee: Option<IeeeAddr>,
+        requests: std::sync::Mutex<Vec<(u8, u16, u8, u8)>>,
+        binds: std::sync::atomic::AtomicUsize,
+    }
+
+    impl FakeReporting {
+        fn new() -> Self {
+            Self {
+                ieee: IeeeAddr::from_hex("0x00124b00120144ae"),
+                requests: std::sync::Mutex::new(Vec::new()),
+                binds: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl ReportingIo for FakeReporting {
+        fn coordinator_ieee(&self) -> Option<IeeeAddr> {
+            self.ieee
+        }
+
+        fn read<'a>(
+            &'a self,
+            _nwk_addr: u16,
+            endpoint: u8,
+            cluster: u16,
+            tsn: u8,
+            payload: Vec<u8>,
+        ) -> ReportingFuture<
+            'a,
+            crate::error::Result<crate::coordinator::znp::transaction::ZclIncoming>,
+        > {
+            let command = payload.get(2).copied().unwrap_or(0);
+            self.requests
+                .lock()
+                .unwrap()
+                .push((endpoint, cluster, tsn, command));
+            let data = if command == 0x08 {
+                // read reporting config response: attr 0, status 0, u16,
+                // min 10, max 300, change 50
+                vec![
+                    0x18, tsn, 0x09, 0x00, 0x00, 0x00, 0x00, 0x21, 0x0A, 0x00, 0x2C, 0x01, 0x32,
+                    0x00,
+                ]
+            } else {
+                // configure reporting response: success
+                vec![0x18, tsn, 0x07, 0x00]
+            };
+            Box::pin(async move {
+                Ok(crate::coordinator::znp::transaction::ZclIncoming {
+                    nwk_addr: 0x1234,
+                    endpoint,
+                    cluster_id: cluster,
+                    trans_seq: tsn,
+                    frame_type: 0x00,
+                    direction: 1,
+                    command: data[2],
+                    data,
+                })
+            })
+        }
+
+        fn bind<'a>(
+            &'a self,
+            _nwk_addr: u16,
+            _source_ieee: [u8; 8],
+            _endpoint: u8,
+            _cluster: u16,
+            _destination_ieee: [u8; 8],
+        ) -> ReportingFuture<'a, crate::error::Result<()>> {
+            self.binds
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Box::pin(async { Ok(()) })
+        }
+    }
+
+    fn reporting_device() -> (
+        DeviceRegistry,
+        Arc<Mutex<PersistentDatabase>>,
+        std::path::PathBuf,
+    ) {
+        let dir = std::env::temp_dir().join(format!(
+            "z2m_reporting_e2e_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("database.db");
+        std::fs::write(
+            &path,
+            r#"{"id":2,"type":"Router","ieeeAddr":"0xec1bbdfffeaa66db","nwkAddr":4660,"endpoints":{"1":{"profId":260,"epId":1,"devId":0,"inClusterList":[1026],"outClusterList":[],"clusters":{},"binds":[],"configuredReportings":[],"meta":{}}},"meta":{}}"#,
+        )
+        .unwrap();
+        let devices = DeviceRegistry::new();
+        let ieee = IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap();
+        let mut device = Device::new(ieee, 0x1234);
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![1026],
+            output_clusters: vec![],
+        });
+        devices.add(device);
+        let db = Arc::new(Mutex::new(PersistentDatabase::open(&path)));
+        (devices, db, dir)
+    }
+
+    #[tokio::test]
+    async fn reporting_read_e2e_with_fake_coordinator_persists_and_replies() {
+        let (devices, db, dir) = reporting_device();
+        let external = ExternalConverter::new(dir.join("cache"), "https://example.invalid");
+        let fake = FakeReporting::new();
+        let mut trans_id = 0;
+        let payload = json!({
+            "id": "0xec1bbdfffeaa66db",
+            "endpoint": 1,
+            "cluster": 1026,
+            "configs": [{"attribute": 0}],
+        });
+        let result = Bridge::handle_reporting(
+            &devices,
+            &external,
+            &fake,
+            &db,
+            "device/reporting/read",
+            &payload,
+            &mut trans_id,
+        )
+        .await;
+        let data = result.expect("reporting read should succeed");
+        assert_eq!(data["configs"][0]["attribute"], 0);
+        assert_eq!(data["configs"][0]["data_type"], 0x21);
+        assert_eq!(data["configs"][0]["minimum_report_interval"], 10);
+        assert_eq!(data["configs"][0]["maximum_report_interval"], 300);
+        assert_eq!(data["configs"][0]["reportable_change"], "3200");
+        assert_eq!(
+            fake.requests.lock().unwrap().as_slice(),
+            &[(1, 1026, 1, 0x08)]
+        );
+
+        let db = db.lock().await;
+        let reports = db.configured_reportings("0xec1bbdfffeaa66db", 1);
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0]["minRepIntval"], 10);
+        assert_eq!(reports[0]["maxRepIntval"], 300);
+
+        let reply = reporting_mqtt_response(Ok(data), Some("tx-1"));
+        assert_eq!(reply["status"], "ok");
+        assert_eq!(reply["transaction"], "tx-1");
+        drop(db);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn reporting_configure_e2e_with_fake_coordinator_binds_and_persists() {
+        let (devices, db, dir) = reporting_device();
+        let external = ExternalConverter::new(dir.join("cache"), "https://example.invalid");
+        let fake = FakeReporting::new();
+        let mut trans_id = 0;
+        let payload = json!({
+            "id": "0xec1bbdfffeaa66db",
+            "endpoint": 1,
+            "cluster": 1026,
+            "attribute": 0,
+            "minimum_report_interval": 5,
+            "maximum_report_interval": 600,
+            "reportable_change": 100,
+        });
+        let result = Bridge::handle_reporting(
+            &devices,
+            &external,
+            &fake,
+            &db,
+            "device/reporting/configure",
+            &payload,
+            &mut trans_id,
+        )
+        .await;
+        let data = result.expect("reporting configure should succeed");
+        assert_eq!(data["minimum_report_interval"], 5);
+        assert_eq!(data["maximum_report_interval"], 600);
+        assert_eq!(fake.binds.load(std::sync::atomic::Ordering::Relaxed), 1);
+        let commands: Vec<u8> = fake
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(_, _, _, command)| *command)
+            .collect();
+        assert_eq!(commands, vec![0x08, 0x06]);
+
+        let db = db.lock().await;
+        let reports = db.configured_reportings("0xec1bbdfffeaa66db", 1);
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0]["minRepIntval"], 5);
+        assert_eq!(reports[0]["maxRepIntval"], 600);
+        assert_eq!(reports[0]["repChange"], 100.0);
+        drop(db);
+
+        let reply = reporting_mqtt_response(Err("bad payload".into()), None);
+        assert_eq!(reply["status"], "error");
+        assert_eq!(reply["error"], "bad payload");
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

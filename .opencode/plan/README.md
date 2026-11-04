@@ -71,14 +71,16 @@ R1 — явно ограниченный релиз для проверенно�
   upstream `convertGet` (Boa + read recording), его reads отправляются через
   `request_zcl`. Reporting read/configure реализованы через ZCL 0x08/0x09 и
   0x06/0x07, успешные configs сохраняются в `configuredReportings`. Broker-free
-  тесты покрывают MQTT-команду, target mapping и read/parse/merge через fake
-  read; реальный broker/reply, timers и HIL отсутствуют.
+  тесты покрывают MQTT-команду, target mapping, read/parse/merge и полный
+  fake-coordinator reporting E2E (0x08/0x09, 0x06/0x07, bind, persistence, reply
+  envelope). Реальный broker/coordinator, timers и HIL отсутствуют.
 - **CV-08 частично**: async `convertGet` исполняется с Boa job queue и возвращает
   запрошенные чтения; stub поддерживает только `read`, endpoint всегда 1,
   timers/другие host methods не реализованы.
 - **CV-05/07/08 частично**: упрощённый `prepareDefinition` объединяет modern
-  extend from/to/exposes/options; в `msg` передаются реальные endpoint/LQI/groupID;
-  native и converter значения сливаются в одну публикацию с приоритетом definition.
+  extend from/to/exposes/options; в `msg` передаются реальные endpoint/LQI/groupID
+  и helpers `getDevice`/`deviceIeeeAddress`; native и converter значения
+  сливаются в одну публикацию с приоритетом definition.
   Exposes API, meta/configure/onEvent, timers и publish-callback semantics ещё не
   реализованы.
 

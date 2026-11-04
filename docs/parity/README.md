@@ -31,7 +31,7 @@ Inventory audit: incomplete; no substantiated domain fraction, catalog total or 
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).
 Open upstream deltas: see upstream-changes.md; freshness DRIFT_DETECTED.
-Last test run (2026-11-04T13:03:39+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0.
+Last test run (2026-11-04T13:15:51+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0.
 Known exclusions: none approved; future adapters are deferred, not excluded.
 R1 acceptance is tracked separately in .opencode/plan/10-acceptance-matrix.md; these percentages are not R1 completion.
 Counting rule: only whole VERIFIED rows with existing evidence and test references contribute; newly discovered work increases denominators and is not counted as verified progress.
