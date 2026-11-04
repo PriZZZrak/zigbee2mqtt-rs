@@ -44,6 +44,11 @@ R1 — явно ограниченный релиз для проверенно�
   поэтому строки `IN_PROGRESS`, а не `VERIFIED`.
 - Следующий шаг: завершить STORE-04 (restore/rollback), затем reference harness
   (EVID-04) и Z-Stack resume (ZB-01).
+- **PR-03 начат (ZB-02)**: SREQ теперь сериализуются FIFO, второй запрос больше не
+  перезаписывает pending, отмена освобождает очередь; legacy доставка SRSP с
+  несовпадающим subsystem сохранена. Добавлены in-memory duplex tests. Расхождение
+  с upstream concurrency 2/16, 10s deadline, serial recovery и HIL ещё не закрыты.
+  ZB-01/03/04 не начаты.
 
 ## Документы
 

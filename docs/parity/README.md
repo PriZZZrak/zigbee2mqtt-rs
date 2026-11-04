@@ -24,14 +24,14 @@ Stage 1 Z-Stack parity: **0/92 = 0.00%** [complete Stage 1 requires CC2531 + CC2
 Global upstream parity: **0/99 = 0.00%** [all adapter families].
 Stage 1 / global weighted parity: 0.00% / 0.00% (0/119, 0/133).
 Stage 1 / global scenarios: 0/191 = 0.00% and 0/191 = 0.00% [17/24 unmeasured rows].
-Status breakdown: DISCOVERED 24, IMPLEMENTED_UNVERIFIED 58, IN_PROGRESS 7, PARTIAL 10 (99 total).
+Status breakdown: DISCOVERED 24, IMPLEMENTED_UNVERIFIED 58, IN_PROGRESS 8, PARTIAL 9 (99 total).
 Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, DRIFT-001, HA-001, MQTT-001, MQTT-002, MQTT-003, MQTT-004, MQTT-006, MQTT-010, RUNTIME-001, RUNTIME-002 (+19 more)
 Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 0/87, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
 Inventory audit: incomplete; no substantiated domain fraction, catalog total or converter denominator.
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).
 Open upstream deltas: see upstream-changes.md; freshness DRIFT_DETECTED.
-Last test run (2026-11-04T10:59:49+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0.
+Last test run (2026-11-04T11:07:37+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0.
 Known exclusions: none approved; future adapters are deferred, not excluded.
 R1 acceptance is tracked separately in .opencode/plan/10-acceptance-matrix.md; these percentages are not R1 completion.
 Counting rule: only whole VERIFIED rows with existing evidence and test references contribute; newly discovered work increases denominators and is not counted as verified progress.

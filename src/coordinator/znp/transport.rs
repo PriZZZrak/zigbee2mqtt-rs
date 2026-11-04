@@ -6,11 +6,13 @@
 ///
 /// SREQ/SRSP pairing is handled internally: `request()` sends an SREQ and
 /// waits for the matching SRSP (same cmd0 subsystem bits + cmd1).
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::SinkExt;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{mpsc, oneshot};
 use tokio_serial::SerialPortBuilderExt;
 use tokio_stream::StreamExt;
@@ -62,11 +64,21 @@ enum ActorMsg {
 
 // ── Actor task ────────────────────────────────────────────────────────────────
 
-struct TransportActor {
-    framed: Framed<tokio_serial::SerialStream, ZnpCodec>,
+struct TransportActor<S> {
+    framed: Framed<S, ZnpCodec>,
     actor_rx: mpsc::Receiver<ActorMsg>,
     event_tx: mpsc::Sender<ZnpEvent>,
     pending: Option<PendingRequest>,
+    /// SREQ frames that arrived while another request was in flight. ZNP has
+    /// no wire-level request id, so serializing requests is the only correct
+    /// way to keep a response from being delivered to the wrong caller.
+    queued: VecDeque<QueuedRequest>,
+}
+
+struct QueuedRequest {
+    frame: ZnpFrame,
+    id: u64,
+    reply_tx: oneshot::Sender<Result<ZnpFrame>>,
 }
 
 struct PendingRequest {
@@ -76,7 +88,10 @@ struct PendingRequest {
     reply_tx: oneshot::Sender<Result<ZnpFrame>>,
 }
 
-impl TransportActor {
+impl<S> TransportActor<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send,
+{
     async fn run(mut self) {
         loop {
             tokio::select! {
@@ -91,23 +106,14 @@ impl TransportActor {
                             }
                         }
                         Some(ActorMsg::Request { frame, id, reply_tx }) => {
-                            let expected_cmd0 = frame.cmd0();
-                            let cmd1          = frame.cmd1;
-                            trace!(?frame, "→ ZNP send SREQ");
-                            if let Err(e) = self.framed.send(frame).await {
-                                let _ = reply_tx.send(Err(Error::Io(e)));
-                                continue;
-                            }
-                            self.pending = Some(PendingRequest {
-                                id,
-                                expected_sub: expected_cmd0 & 0x1F,
-                                expected_cmd1: cmd1,
-                                reply_tx,
-                            });
+                            self.queued.push_back(QueuedRequest { frame, id, reply_tx });
+                            self.advance().await;
                         }
                         Some(ActorMsg::Cancel(id)) => {
+                            self.queued.retain(|request| request.id != id);
                             if self.pending.as_ref().is_some_and(|p| p.id == id) {
                                 self.pending = None;
+                                self.advance().await;
                             }
                         }
                     }
@@ -124,7 +130,10 @@ impl TransportActor {
                             error!("ZNP serial read error: {e}");
                         }
                         Some(Ok(f)) => {
-                            self.dispatch(f);
+                            let completed = self.dispatch(f);
+                            if completed {
+                                self.advance().await;
+                            }
                         }
                     }
                 }
@@ -132,7 +141,30 @@ impl TransportActor {
         }
     }
 
-    fn dispatch(&mut self, frame: ZnpFrame) {
+    /// Send the next queued SREQ when no request is in flight.
+    async fn advance(&mut self) {
+        while self.pending.is_none() {
+            let Some(next) = self.queued.pop_front() else {
+                break;
+            };
+            let expected_sub = next.frame.cmd0() & 0x1F;
+            let expected_cmd1 = next.frame.cmd1;
+            trace!(?next.frame, "→ ZNP send SREQ");
+            if let Err(error) = self.framed.send(next.frame).await {
+                let _ = next.reply_tx.send(Err(Error::Io(error)));
+                continue;
+            }
+            self.pending = Some(PendingRequest {
+                id: next.id,
+                expected_sub,
+                expected_cmd1,
+                reply_tx: next.reply_tx,
+            });
+        }
+    }
+
+    /// Deliver a matching SRSP. Returns whether the in-flight request completed.
+    fn dispatch(&mut self, frame: ZnpFrame) -> bool {
         trace!(?frame, "← ZNP recv");
 
         if frame.frame_type == FrameType::SRsp {
@@ -142,7 +174,7 @@ impl TransportActor {
                 {
                     let pending = self.pending.take().unwrap();
                     let _ = pending.reply_tx.send(Ok(frame));
-                    return;
+                    return true;
                 }
                 // Mismatched subsystem but there's a pending request — deliver it
                 // anyway. Z-Stack 1.2 may return subsystem 0 for errors.
@@ -153,14 +185,14 @@ impl TransportActor {
                     );
                     let pending = self.pending.take().unwrap();
                     let _ = pending.reply_tx.send(Ok(frame));
-                    return;
+                    return true;
                 }
             }
             warn!(
                 "Unexpected SRSP sub=0x{:02X} cmd1=0x{:02X}",
                 frame.subsystem as u8, frame.cmd1
             );
-            return;
+            return false;
         }
 
         // AREQ – convert to typed event and fan-out
@@ -182,6 +214,7 @@ impl TransportActor {
         if let Err(e) = self.event_tx.try_send(event) {
             warn!("ZNP event queue full, dropping: {e}");
         }
+        false
     }
 }
 
@@ -209,6 +242,7 @@ impl ZnpTransport {
             actor_rx,
             event_tx,
             pending: None,
+            queued: VecDeque::new(),
         };
         tokio::spawn(actor.run());
 
@@ -252,5 +286,150 @@ impl ZnpTransport {
                 Err(Error::Timeout)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::DuplexStream;
+
+    fn sreq(cmd1: u8) -> ZnpFrame {
+        ZnpFrame::sreq(Subsystem::Sys, cmd1, vec![cmd1])
+    }
+
+    fn srsp(cmd1: u8, data: u8) -> ZnpFrame {
+        ZnpFrame::new(FrameType::SRsp, Subsystem::Sys, cmd1, vec![data])
+    }
+
+    fn spawn_actor() -> (
+        ZnpTransport,
+        Framed<DuplexStream, ZnpCodec>,
+        mpsc::Receiver<ZnpEvent>,
+    ) {
+        let (wire, serial) = tokio::io::duplex(4096);
+        let (actor_tx, actor_rx) = mpsc::channel(CHANNEL_CAPACITY);
+        let (event_tx, event_rx) = mpsc::channel(CHANNEL_CAPACITY);
+        let actor = TransportActor {
+            framed: Framed::new(serial, ZnpCodec),
+            actor_rx,
+            event_tx,
+            pending: None,
+            queued: VecDeque::new(),
+        };
+        tokio::spawn(actor.run());
+        (
+            ZnpTransport {
+                actor_tx,
+                next_id: Arc::new(AtomicU64::new(0)),
+            },
+            Framed::new(wire, ZnpCodec),
+            event_rx,
+        )
+    }
+
+    #[tokio::test]
+    async fn sreq_requests_are_serialized_and_lose_no_response() {
+        let (transport, mut wire, _events) = spawn_actor();
+
+        let first = tokio::spawn({
+            let transport = transport.clone();
+            async move { transport.request(sreq(0x01)).await }
+        });
+        let sent_first = wire.next().await.unwrap().unwrap();
+        assert_eq!(sent_first.cmd1, 0x01);
+
+        let second = tokio::spawn({
+            let transport = transport.clone();
+            async move { transport.request(sreq(0x02)).await }
+        });
+        // The second request must wait for the first SRSP instead of replacing
+        // the pending request (the bug this queue fixes).
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), wire.next())
+                .await
+                .is_err(),
+            "second SREQ was sent while the first was still outstanding"
+        );
+
+        wire.send(srsp(0x01, 0xA1)).await.unwrap();
+        let first_reply = first.await.unwrap().unwrap();
+        assert_eq!(first_reply.data, vec![0xA1]);
+
+        let sent_second = tokio::time::timeout(Duration::from_millis(250), wire.next())
+            .await
+            .expect("queued SREQ must be sent after the first completes")
+            .unwrap()
+            .unwrap();
+        assert_eq!(sent_second.cmd1, 0x02);
+
+        wire.send(srsp(0x02, 0xB2)).await.unwrap();
+        let second_reply = second.await.unwrap().unwrap();
+        assert_eq!(second_reply.data, vec![0xB2]);
+    }
+
+    #[tokio::test]
+    async fn cancelled_queued_request_is_dropped_and_does_not_block_others() {
+        let (transport, mut wire, _events) = spawn_actor();
+        let (first_tx, first_rx) = oneshot::channel();
+        transport
+            .actor_tx
+            .send(ActorMsg::Request {
+                frame: sreq(0x03),
+                id: 100,
+                reply_tx: first_tx,
+            })
+            .await
+            .unwrap();
+        assert_eq!(wire.next().await.unwrap().unwrap().cmd1, 0x03);
+
+        let (second_tx, second_rx) = oneshot::channel();
+        transport
+            .actor_tx
+            .send(ActorMsg::Request {
+                frame: sreq(0x04),
+                id: 101,
+                reply_tx: second_tx,
+            })
+            .await
+            .unwrap();
+        transport
+            .actor_tx
+            .send(ActorMsg::Cancel(101))
+            .await
+            .unwrap();
+        assert!(
+            second_rx.await.is_err(),
+            "cancelled caller must observe a closed reply channel"
+        );
+
+        wire.send(srsp(0x03, 0xC3)).await.unwrap();
+        assert_eq!(first_rx.await.unwrap().unwrap().data, vec![0xC3]);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), wire.next())
+                .await
+                .is_err(),
+            "cancelled SREQ must never reach the wire"
+        );
+    }
+
+    #[tokio::test]
+    async fn mismatched_subsystem_response_is_still_delivered() {
+        let (transport, mut wire, _events) = spawn_actor();
+        let request = tokio::spawn({
+            let transport = transport.clone();
+            async move { transport.request(sreq(0x05)).await }
+        });
+        assert_eq!(wire.next().await.unwrap().unwrap().cmd1, 0x05);
+        // Z-Stack 1.2 error responses may use subsystem 0.
+        wire.send(ZnpFrame::new(
+            FrameType::SRsp,
+            Subsystem::Zdo,
+            0x05,
+            vec![0xEE],
+        ))
+        .await
+        .unwrap();
+        assert_eq!(request.await.unwrap().unwrap().data, vec![0xEE]);
     }
 }
