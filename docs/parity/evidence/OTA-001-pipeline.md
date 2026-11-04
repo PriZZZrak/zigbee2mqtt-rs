@@ -30,6 +30,12 @@ Pinned app/herdsman:
   attempts with backoff.
 - Bridge check/update accept an optional `sha512` field and validate it before
   parsing/starting; a wrong checksum returns an `error` response.
+- `OtaIndexProvider` loads HTTP(S) or local indexes through an `IndexFetcher`
+  (`CommandFetcher` uses curl/wget/uclient-fetch with an 8 MiB cap), puts override
+  entries first, and tolerates main-index failure only when an override exists.
+- `OtaManager::check_for_update` wires the check scheduler: the first query is
+  checked, subsequent checks are throttled by the interval, and the selected
+  index entry is returned. `set_check_interval` configures it.
 - Local index files are wired into the bridge: `index` + `image_type` (and
   optional manufacturer/file/hardware fields) select an entry, resolve its local
   URL relative to the config directory, verify `sha512`, and use the selected
@@ -70,7 +76,8 @@ Pinned app/herdsman:
 ## Tests and evidence
 
 OTA tests now also cover SHA-512, checksum/prefix validation, index
-parsing/selection filters, check scheduling and retry backoff. Twelve core
+parsing/selection filters, check scheduling, retry backoff, HTTP-index override
+precedence and main-index fallback. Twelve core
 OTA/manager tests plus three bridge-request tests:
 
 - `ota_bridge_check_and_update_requests_end_to_end`: real bridge request
@@ -81,7 +88,7 @@ OTA/manager tests plus three bridge-request tests:
 - `ota_progress_payload_matches_state_contract`: 0.5 → 50 while updating and
   completion → idle/100.
 
-`cargo test --locked` → **366 passed** (334 library, 2 binary, 30 compatibility);
+`cargo test --locked` → **370 passed** (338 library, 2 binary, 30 compatibility);
 clippy exit 0 with five existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
@@ -91,11 +98,13 @@ clippy exit 0 with five existing warnings; release build OK.
   as payload fields, not on the wire.
 - `check` reports any valid image as available; it does not compare device
   identity or query the device first.
-- Only **local** index/image files are wired; HTTP(S) download, main index URLs,
-  override index precedence, persistence and automatic downgrade selection are
-  missing. The local bridge path requires explicit manufacturer/image metadata
-  until the device query is used for selection.
-- The scheduler/retry policy is unit-tested but not wired to automatic checks.
+- HTTP(S) index loading is implemented through a system downloader, but the
+  provider/scheduler are only exercised at manager level and are not wired into
+  the bridge's automatic device-query path yet. Local bridge index handling still
+  requires explicit manufacturer/image metadata until the query is used.
+- Override/main selection and throttling are tested with a fake fetcher; no real
+  HTTPS fetch, ETag/cache, persistence or downgrade selection.
+- The retry policy is unit-tested but not wired to automatic checks.
 - The SHA-512 implementation is new code and needs independent review/fuzzing
   before security-sensitive use.
 - No image file checksum/signature validation, manufacturer/hardware applicability

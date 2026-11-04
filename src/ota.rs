@@ -360,6 +360,12 @@ pub struct OtaCheckScheduler {
     last_checked: HashMap<String, Instant>,
 }
 
+impl Default for OtaCheckScheduler {
+    fn default() -> Self {
+        Self::new(Duration::from_secs(24 * 60 * 60))
+    }
+}
+
 impl OtaCheckScheduler {
     #[must_use]
     pub fn new(interval: Duration) -> Self {
@@ -430,10 +436,98 @@ impl OtaRetryPolicy {
     }
 }
 
+/// Pluggable index fetcher (HTTP(S) subprocess in production, fake in tests).
+pub trait IndexFetcher: Send + Sync {
+    fn load(&self, location: &str) -> Result<String, String>;
+}
+
+/// Fetch HTTP(S) index URLs via the system downloader already used for converter
+/// packages; local paths are read directly.
+pub struct CommandFetcher;
+
+impl IndexFetcher for CommandFetcher {
+    fn load(&self, location: &str) -> Result<String, String> {
+        if !location.starts_with("http://") && !location.starts_with("https://") {
+            return std::fs::read_to_string(location)
+                .map_err(|error| format!("cannot read OTA index {location}: {error}"));
+        }
+        for program in ["curl", "wget", "uclient-fetch"] {
+            let output = match program {
+                "curl" => std::process::Command::new("curl")
+                    .arg("-fsSL")
+                    .arg(location)
+                    .output(),
+                "wget" => std::process::Command::new("wget")
+                    .arg("-qO-")
+                    .arg(location)
+                    .output(),
+                _ => std::process::Command::new("uclient-fetch")
+                    .arg("-qO-")
+                    .arg(location)
+                    .output(),
+            };
+            if let Ok(output) = output {
+                if output.status.success() {
+                    if output.stdout.len() > 8 * 1024 * 1024 {
+                        return Err("OTA index response is too large".into());
+                    }
+                    return String::from_utf8(output.stdout)
+                        .map_err(|_| "OTA index is not UTF-8".to_string());
+                }
+            }
+        }
+        Err(format!("cannot download OTA index {location}"))
+    }
+}
+
+pub struct OtaIndexProvider {
+    main: String,
+    override_location: Option<String>,
+    fetcher: Box<dyn IndexFetcher>,
+}
+
+impl OtaIndexProvider {
+    #[must_use]
+    pub fn new(
+        main: impl Into<String>,
+        override_location: Option<String>,
+        fetcher: Box<dyn IndexFetcher>,
+    ) -> Self {
+        Self {
+            main: main.into(),
+            override_location,
+            fetcher,
+        }
+    }
+
+    /// Load override-first entries; the main index is optional when an override
+    /// is present (upstream falls back to override-only on main index failure).
+    pub fn load_entries(&self) -> Result<Vec<OtaIndexEntry>, String> {
+        let override_entries = match &self.override_location {
+            Some(location) => Some(parse_index(&self.fetcher.load(location)?)?),
+            None => None,
+        };
+        let main_result = self
+            .fetcher
+            .load(&self.main)
+            .and_then(|body| parse_index(&body));
+        match (override_entries, main_result) {
+            (Some(mut override_entries), Ok(main_entries)) => {
+                override_entries.extend(main_entries);
+                Ok(override_entries)
+            }
+            (Some(override_entries), Err(_)) => Ok(override_entries),
+            (None, Ok(main_entries)) => Ok(main_entries),
+            (None, Err(error)) => Err(error),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct OtaManager {
     transfers: HashMap<String, OtaTransfer>,
     images: HashMap<String, OtaImage>,
+    scheduler: OtaCheckScheduler,
 }
 
 /// Parse the 56-byte OTA file header used by Zigbee OTA images.
@@ -505,6 +599,28 @@ impl OtaManager {
         self.transfers
             .insert(ieee.to_string(), OtaTransfer::new(image));
         Ok(info)
+    }
+
+    /// Automatic check throttled by the scheduler: override entries take
+    /// precedence over the main index, and a main-index failure is tolerated
+    /// when an override exists.
+    pub fn check_for_update(
+        &mut self,
+        provider: &OtaIndexProvider,
+        ieee: &str,
+        identity: &OtaQueryIdentity<'_>,
+        now: Instant,
+    ) -> Result<Option<OtaIndexEntry>, String> {
+        if !self.scheduler.should_check(ieee, now) {
+            return Ok(None);
+        }
+        self.scheduler.mark_checked(ieee, now);
+        let entries = provider.load_entries()?;
+        Ok(select_image(&entries, identity).cloned())
+    }
+
+    pub fn set_check_interval(&mut self, interval: Duration) {
+        self.scheduler = OtaCheckScheduler::new(interval);
     }
 
     pub fn abort(&mut self, ieee: &str) -> bool {
@@ -757,5 +873,113 @@ mod tests {
             .unwrap_err()
             .contains("no matching"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    struct FakeFetcher {
+        responses: HashMap<String, String>,
+        failures: std::collections::HashSet<String>,
+    }
+
+    impl IndexFetcher for FakeFetcher {
+        fn load(&self, location: &str) -> Result<String, String> {
+            if self.failures.contains(location) {
+                return Err(format!("failed to fetch {location}"));
+            }
+            self.responses
+                .get(location)
+                .cloned()
+                .ok_or_else(|| format!("no response for {location}"))
+        }
+    }
+
+    fn index_body(version: u32, url: &str) -> String {
+        format!(
+            r#"[{{"fileName":"{url}","fileVersion":{version},"url":"{url}","manufacturerCode":4151,"imageType":1}}]"#
+        )
+    }
+
+    #[test]
+    fn http_index_override_takes_precedence_and_checks_are_throttled() {
+        let fetcher = FakeFetcher {
+            responses: HashMap::from([
+                (
+                    "https://main/index.json".to_string(),
+                    index_body(2, "main.ota"),
+                ),
+                (
+                    "https://override/index.json".to_string(),
+                    index_body(3, "override.ota"),
+                ),
+            ]),
+            failures: std::collections::HashSet::new(),
+        };
+        let provider = OtaIndexProvider::new(
+            "https://main/index.json",
+            Some("https://override/index.json".into()),
+            Box::new(fetcher),
+        );
+        let mut manager = OtaManager::default();
+        manager.set_check_interval(Duration::from_secs(60));
+        let identity = OtaQueryIdentity {
+            manufacturer_code: 0x1037,
+            image_type: 1,
+            file_version: 1,
+            hardware_version: None,
+            model_id: None,
+            manufacturer_name: None,
+        };
+        let now = Instant::now();
+        let selected = manager
+            .check_for_update(&provider, "0xec1bbdfffeaa66db", &identity, now)
+            .unwrap()
+            .expect("first check selects override");
+        assert_eq!(selected.file_version, 3);
+        assert_eq!(selected.url, "override.ota");
+
+        assert!(manager
+            .check_for_update(
+                &provider,
+                "0xec1bbdfffeaa66db",
+                &identity,
+                now + Duration::from_secs(30)
+            )
+            .unwrap()
+            .is_none());
+        let again = manager
+            .check_for_update(
+                &provider,
+                "0xec1bbdfffeaa66db",
+                &identity,
+                now + Duration::from_secs(61),
+            )
+            .unwrap()
+            .expect("interval elapsed");
+        assert_eq!(again.file_version, 3);
+    }
+
+    #[test]
+    fn failed_main_index_falls_back_to_override_but_fails_without_one() {
+        let fetcher = FakeFetcher {
+            responses: HashMap::from([(
+                "https://override/index.json".to_string(),
+                index_body(3, "override.ota"),
+            )]),
+            failures: std::collections::HashSet::from(["https://main/index.json".to_string()]),
+        };
+        let provider = OtaIndexProvider::new(
+            "https://main/index.json",
+            Some("https://override/index.json".into()),
+            Box::new(fetcher),
+        );
+        let entries = provider.load_entries().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].file_version, 3);
+
+        let fetcher = FakeFetcher {
+            responses: HashMap::new(),
+            failures: std::collections::HashSet::from(["https://main/index.json".to_string()]),
+        };
+        let provider = OtaIndexProvider::new("https://main/index.json", None, Box::new(fetcher));
+        assert!(provider.load_entries().is_err());
     }
 }

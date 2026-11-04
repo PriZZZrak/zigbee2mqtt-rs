@@ -82,9 +82,9 @@ R1 — явно ограниченный релиз для проверенно�
   (hex image header, bridge check/update/abort, incoming query/block/end,
   progress) покрыты fake-coordinator replay. Bridge request E2E для
   check/update/abort и progress payload добавлен; checksum SHA-512 и локальный
-  index/sha512 подключены к bridge check/update, schedule/retry policy покрыты
-  unit-тестами. HTTP index, автоматическая scheduler-интеграция, broker и HIL
-  отсутствуют.
+  index/sha512 подключены к bridge check/update; HTTP/override index provider и
+  scheduler `check_for_update` покрыты fake-fetcher тестами. Автоматическая
+  bridge-query интеграция, реальный HTTPS/cache, broker и HIL отсутствуют.
 - **HA cleanup частично**: retained discovery configs удаляются пустым payload
   (`retain=true`, QoS1) при remove; rename очищает старые configs и публикует
   новые. Fake MQTT sink E2E проводит device/remove через publish path и проверяет
