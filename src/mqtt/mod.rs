@@ -78,6 +78,28 @@ pub(crate) fn parse_device_command(
     })
 }
 
+/// Topic for a bridge request response.
+pub(crate) fn bridge_response_topic(base_topic: &str, request: &str) -> String {
+    format!("{base_topic}/bridge/response/{request}")
+}
+
+/// Parse a `<base>/bridge/request/<request>` publish.
+pub(crate) fn parse_bridge_request(
+    base_topic: &str,
+    topic: &str,
+    payload: &[u8],
+) -> Option<(String, serde_json::Value)> {
+    let marker = "bridge/request";
+    if !topic.contains(marker) {
+        return None;
+    }
+    let prefix = format!("{base_topic}/bridge/request/");
+    let request = topic.strip_prefix(&prefix).unwrap_or(topic).to_string();
+    let payload =
+        serde_json::from_slice::<serde_json::Value>(payload).unwrap_or(serde_json::Value::Null);
+    Some((request, payload))
+}
+
 // ── MqttBridge ────────────────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -224,7 +246,7 @@ impl MqttBridge {
         request: &str,
         payload: &serde_json::Value,
     ) -> Result<()> {
-        let topic = format!("{}/bridge/response/{}", self.base_topic, request);
+        let topic = bridge_response_topic(&self.base_topic, request);
         let bytes = serde_json::to_vec(payload)?;
         self.client
             .publish(&topic, QoS::AtLeastOnce, false, bytes)
@@ -338,12 +360,9 @@ async fn run_event_loop(
 
                 if let Some(cmd) = parse_device_command(base_topic, topic, payload) {
                     let _ = cmd_tx.send(cmd).await;
-                } else if topic.contains("bridge/request") {
-                    // Extract full request path after "<base_topic>/bridge/request/"
-                    let prefix = format!("{}/bridge/request/", base_topic);
-                    let request = topic.strip_prefix(&prefix).unwrap_or(topic).to_string();
-                    let json_value = serde_json::from_slice::<serde_json::Value>(payload)
-                        .unwrap_or(serde_json::Value::Null);
+                } else if let Some((request, json_value)) =
+                    parse_bridge_request(base_topic, topic, payload)
+                {
                     // permit_join has legacy dedicated handling but also goes via bridge/request
                     if request == "permit_join" || request.starts_with("permit_join") {
                         let duration = parse_permit_join_payload(payload);
@@ -573,5 +592,22 @@ mod tests {
             other => panic!("unexpected command: {other:?}"),
         }
         assert!(parse_device_command("zigbee2mqtt", "zigbee2mqtt/kitchen", b"").is_none());
+    }
+
+    #[test]
+    fn bridge_request_parsing_and_response_topic() {
+        let (request, payload) = parse_bridge_request(
+            "zigbee2mqtt",
+            "zigbee2mqtt/bridge/request/device/reporting/read",
+            br#"{"id":"0xec1bbdfffeaa66db","endpoint":1}"#,
+        )
+        .unwrap();
+        assert_eq!(request, "device/reporting/read");
+        assert_eq!(payload["endpoint"], 1);
+        assert!(parse_bridge_request("zigbee2mqtt", "zigbee2mqtt/kitchen", b"{}").is_none());
+        assert_eq!(
+            bridge_response_topic("zigbee2mqtt", "device/reporting/read"),
+            "zigbee2mqtt/bridge/response/device/reporting/read"
+        );
     }
 }

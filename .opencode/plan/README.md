@@ -73,7 +73,8 @@ R1 — явно ограниченный релиз для проверенно�
   0x06/0x07, успешные configs сохраняются в `configuredReportings`. Broker-free
   тесты покрывают MQTT-команду, target mapping, read/parse/merge и полный
   fake-coordinator reporting E2E (0x08/0x09, 0x06/0x07, bind, persistence, reply
-  envelope). Реальный broker/coordinator, timers и HIL отсутствуют.
+  envelope) и broker-free MQTT get/reporting pipeline с реальными topic/payload.
+  Реальный broker/coordinator, retain/QoS/auth и HIL отсутствуют.
 - **CV-08 частично**: async `convertGet` исполняется с Boa job queue и возвращает
   запрошенные чтения; stub поддерживает только `read`, endpoint всегда 1,
   timers/другие host methods не реализованы.

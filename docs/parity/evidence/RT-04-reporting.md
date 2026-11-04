@@ -46,10 +46,12 @@ attributes present in the published `zcl.json`.
 `ReportingIo` is a small transport seam implemented by `CoordinatorHandle`. The
 tests use a fake coordinator and a real in-memory database:
 
-- `reporting_read_e2e_with_fake_coordinator_persists_and_replies`: handler →
+- `reporting_read_e2e_with_fake_coordinator_persists_and_replies`: real
+  `bridge/request` topic/payload is parsed, handler →
   ZCL 0x08 → fake 0x09 response → parsed config (u16, min 10, max 300) →
   persisted `configuredReportings` → `reporting_mqtt_response` status `ok` with
-  the transaction field.
+  the transaction field; `bridge_response_topic` is asserted to produce
+  `zigbee2mqtt/bridge/response/device/reporting/read`.
 - `reporting_configure_e2e_with_fake_coordinator_binds_and_persists`: payload
   validation → type discovery 0x08/0x09 → bind (recorded once) → 0x06 → fake 0x07
   success → persisted min/max/repChange → `error` reply envelope for a failed

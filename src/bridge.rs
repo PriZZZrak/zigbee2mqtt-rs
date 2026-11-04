@@ -2881,18 +2881,23 @@ mod tests {
         let external = ExternalConverter::new(dir.join("cache"), "https://example.invalid");
         let fake = FakeReporting::new();
         let mut trans_id = 0;
-        let payload = json!({
+        let mqtt_topic = "zigbee2mqtt/bridge/request/device/reporting/read";
+        let mqtt_payload = serde_json::to_vec(&json!({
             "id": "0xec1bbdfffeaa66db",
             "endpoint": 1,
             "cluster": 1026,
             "configs": [{"attribute": 0}],
-        });
+        }))
+        .unwrap();
+        let (request, payload) =
+            crate::mqtt::parse_bridge_request("zigbee2mqtt", mqtt_topic, &mqtt_payload)
+                .expect("MQTT bridge request");
         let result = Bridge::handle_reporting(
             &devices,
             &external,
             &fake,
             &db,
-            "device/reporting/read",
+            &request,
             &payload,
             &mut trans_id,
         )
@@ -2971,5 +2976,66 @@ mod tests {
         assert_eq!(reply["status"], "error");
         assert_eq!(reply["error"], "bad payload");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn broker_free_mqtt_get_request_end_to_end() {
+        let command = crate::mqtt::parse_device_command(
+            "zigbee2mqtt",
+            "zigbee2mqtt/bulb/get",
+            br#"{"temperature":""}"#,
+        )
+        .expect("get command");
+        let (name, payload) = match command {
+            MqttCommand::GetDevice {
+                friendly_name,
+                payload,
+            } => (friendly_name, payload),
+            other => panic!("unexpected command: {other:?}"),
+        };
+        assert_eq!(name, "bulb");
+
+        let devices = DeviceRegistry::new();
+        let mut device = Device::new(IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap(), 0x1234);
+        device.friendly_name = name;
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0402],
+            output_clusters: vec![],
+        });
+        devices.add(device);
+
+        let requested: Vec<String> = payload
+            .as_object()
+            .map(|object| object.keys().cloned().collect())
+            .unwrap_or_default();
+        let wanted: Vec<&str> = requested.iter().map(String::as_str).collect();
+        let endpoints = devices.find_by_name("bulb").unwrap().endpoints.clone();
+        let targets = build_get_targets(&endpoints, &wanted);
+        let mut trans_id = 0;
+        let (merged, failed) = execute_get_reads(
+            "bulb",
+            &targets,
+            &mut trans_id,
+            None,
+            |_endpoint, _cluster, tsn, _payload| async move {
+                Ok(crate::coordinator::znp::transaction::ZclIncoming {
+                    nwk_addr: 0x1234,
+                    endpoint: 1,
+                    cluster_id: 0x0402,
+                    trans_seq: tsn,
+                    frame_type: 0x00,
+                    direction: 1,
+                    command: 0x01,
+                    data: vec![0x18, tsn, 0x01, 0x00, 0x00, 0x00, 0x29, 0xCA, 0x08],
+                })
+            },
+        )
+        .await;
+        assert_eq!(failed, 0);
+        assert_eq!(merged.get("temperature"), Some(&json!(22.5)));
     }
 }
