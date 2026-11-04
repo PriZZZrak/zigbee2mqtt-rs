@@ -76,6 +76,11 @@ R1 — явно ограниченный релиз для проверенно�
 - **CV-08 частично**: async `convertGet` исполняется с Boa job queue и возвращает
   запрошенные чтения; stub поддерживает только `read`, endpoint всегда 1,
   timers/другие host methods не реализованы.
+- **CV-05/07/08 частично**: упрощённый `prepareDefinition` объединяет modern
+  extend from/to/exposes/options; в `msg` передаются реальные endpoint/LQI/groupID;
+  native и converter значения сливаются в одну публикацию с приоритетом definition.
+  Exposes API, meta/configure/onEvent, timers и publish-callback semantics ещё не
+  реализованы.
 
 ## Документы
 

@@ -71,6 +71,24 @@ impl ExternalDeviceInfo {
     }
 }
 
+/// Per-message fields needed by upstream converters.
+#[derive(Debug, Clone, Copy)]
+pub struct IncomingMessageInfo {
+    pub endpoint: u8,
+    pub linkquality: u8,
+    pub group_id: u16,
+}
+
+impl Default for IncomingMessageInfo {
+    fn default() -> Self {
+        Self {
+            endpoint: 1,
+            linkquality: 0,
+            group_id: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 struct RegistryFile {
     #[serde(default)]
@@ -501,6 +519,28 @@ impl ExternalConverter {
         device: &ExternalDeviceInfo,
         state: &serde_json::Map<String, serde_json::Value>,
     ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        self.convert_from_zigbee_with_message(
+            model,
+            cluster_id,
+            msg_type,
+            reports,
+            device,
+            &IncomingMessageInfo::default(),
+            state,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_with_message(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        reports: &[(u16, serde_json::Value)],
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
         let registry = self.load_registry()?;
         let (file, index) = select_definition(&registry, model, device)?;
         let zcl = self.load_zcl()?;
@@ -557,6 +597,23 @@ impl ExternalConverter {
                     return __modules[key].exports;
                 }};
             }}
+            function __prepareDefinition(definition) {{
+                if (!definition || !Array.isArray(definition.extend)) return definition;
+                const prepared = Object.assign({{}}, definition, {{
+                    fromZigbee: [...(definition.fromZigbee || [])],
+                    toZigbee: [...(definition.toZigbee || [])],
+                    exposes: [...(definition.exposes || [])],
+                    options: [...(definition.options || [])],
+                }});
+                for (const extend of definition.extend) {{
+                    if (!extend || !extend.isModernExtend) continue;
+                    if (extend.fromZigbee) prepared.fromZigbee.push(...extend.fromZigbee);
+                    if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
+                    if (extend.exposes) prepared.exposes.push(...extend.exposes);
+                    if (extend.options) prepared.options.push(...extend.options);
+                }}
+                return prepared;
+            }}
             "#,
             sources = serde_json::to_string(&sources).unwrap_or_default(),
             stub = serde_json::to_string(&stub_source(&zcl)).unwrap_or_default(),
@@ -596,8 +653,9 @@ impl ExternalConverter {
             "cluster": cluster_name,
             "type": msg_type,
             "data": data_obj,
-            "linkquality": 0,
-            "endpoint": {"ID": 1},
+            "linkquality": message.linkquality,
+            "groupID": message.group_id,
+            "endpoint": {"ID": message.endpoint},
         });
         let meta = serde_json::json!({
             "state": state,
@@ -621,7 +679,7 @@ impl ExternalConverter {
         let script = format!(
             r#"(function() {{
                 const defs = __require("devices/__entry__.js")("./{file}").definitions;
-                const definition = defs[{index}];
+                const definition = __prepareDefinition(defs[{index}]);
                 const msg = JSON.parse({msg});
                 const meta = JSON.parse({meta});
                 const __published = [];
@@ -752,6 +810,23 @@ impl ExternalConverter {
                     return __modules[key].exports;
                 }};
             }}
+            function __prepareDefinition(definition) {{
+                if (!definition || !Array.isArray(definition.extend)) return definition;
+                const prepared = Object.assign({{}}, definition, {{
+                    fromZigbee: [...(definition.fromZigbee || [])],
+                    toZigbee: [...(definition.toZigbee || [])],
+                    exposes: [...(definition.exposes || [])],
+                    options: [...(definition.options || [])],
+                }});
+                for (const extend of definition.extend) {{
+                    if (!extend || !extend.isModernExtend) continue;
+                    if (extend.fromZigbee) prepared.fromZigbee.push(...extend.fromZigbee);
+                    if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
+                    if (extend.exposes) prepared.exposes.push(...extend.exposes);
+                    if (extend.options) prepared.options.push(...extend.options);
+                }}
+                return prepared;
+            }}
             "#,
             sources = serde_json::to_string(&sources).unwrap_or_default(),
             stub = serde_json::to_string(&stub).unwrap_or_default(),
@@ -775,7 +850,7 @@ impl ExternalConverter {
             r#"(function() {{
                 const __clusterNames = {cluster_names};
                 const defs = __require("devices/__entry__.js")("./{file}").definitions;
-                const definition = defs[{index}];
+                const definition = __prepareDefinition(defs[{index}]);
                 const meta = JSON.parse({meta});
                 const keys = JSON.parse({keys});
                 const reads = [];
@@ -1455,5 +1530,110 @@ module.exports = {definitions};
                 &Default::default(),
             )
             .is_empty());
+    }
+
+    const EXTEND_DEVICE_JS: &str = r#"
+const definitions = [
+    {
+        model: "ExtendBulb",
+        vendor: "Fixture",
+        description: "extend-only fixture",
+        extend: [
+            {
+                isModernExtend: true,
+                fromZigbee: [
+                    {
+                        cluster: "msTemperatureMeasurement",
+                        type: ["attributeReport"],
+                        convert: (model, msg) => ({temperature: msg.data.measuredValue / 100}),
+                    },
+                ],
+                exposes: [],
+            },
+        ],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    const META_DEVICE_JS: &str = r#"
+const definitions = [
+    {
+        model: "MetaBulb",
+        vendor: "Fixture",
+        description: "message metadata fixture",
+        fromZigbee: [
+            {
+                cluster: "msTemperatureMeasurement",
+                type: ["attributeReport"],
+                convert: (model, msg) => ({
+                    endpoint_seen: msg.endpoint.ID,
+                    lqi_seen: msg.linkquality,
+                }),
+            },
+        ],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    #[test]
+    fn extend_only_definition_is_prepared_before_dispatch() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("extenddev.js"),
+            EXTEND_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"extendbulb": [["extenddev.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let out = conv
+            .convert_from_zigbee(
+                "ExtendBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .expect("modern extend should be prepared");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(20)));
+    }
+
+    #[test]
+    fn message_endpoint_and_linkquality_reach_the_converter() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(conv.dir.join("devices").join("metadev.js"), META_DEVICE_JS).unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"metabulb": [["metadev.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let out = conv
+            .convert_from_zigbee_with_message(
+                "MetaBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &IncomingMessageInfo {
+                    endpoint: 3,
+                    linkquality: 77,
+                    group_id: 0,
+                },
+                &Default::default(),
+            )
+            .expect("metadata converter should match");
+        assert_eq!(out.get("endpoint_seen"), Some(&serde_json::json!(3)));
+        assert_eq!(out.get("lqi_seen"), Some(&serde_json::json!(77)));
     }
 }
