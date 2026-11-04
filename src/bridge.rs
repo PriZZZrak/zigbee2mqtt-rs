@@ -753,8 +753,10 @@ impl Bridge {
                             Self::process_zcl_message(
                                 &devices,
                                 &external,
+                                Some(&coord),
                                 &mqtt,
                                 self.cfg.advanced.output,
+                                &mut trans_id,
                                 src_addr,
                                 src_ep,
                                 cluster_id,
@@ -1697,11 +1699,14 @@ impl Bridge {
         link_quality: u8,
         data: Vec<u8>,
     ) {
+        let mut trans_id = 0u8;
         Self::process_zcl_message(
             devices,
             external,
+            None,
             mqtt,
             output,
+            &mut trans_id,
             src_addr,
             src_ep,
             cluster_id,
@@ -1709,6 +1714,51 @@ impl Bridge {
             data,
         )
         .await;
+    }
+
+    /// Encode and send response commands requested by a `fromZigbee` converter.
+    async fn forward_frame_commands(
+        coord: Option<&CoordinatorHandle>,
+        types: &crate::converters::zcl_types::ZclTypesFile,
+        trans_id: &mut u8,
+        dst_addr: u16,
+        dst_ep: u8,
+        commands: &[crate::converters::external::FrameCommand],
+    ) {
+        let Some(coord) = coord else {
+            debug!(
+                "converter requested {} response command(s) but no coordinator is attached",
+                commands.len()
+            );
+            return;
+        };
+        for command in commands {
+            match encode_command_op(types, command.cluster, command.command, &command.payload) {
+                Ok(parameters) => {
+                    let frame = command_frame(
+                        *trans_id,
+                        command.command,
+                        command.manufacturer_code,
+                        command.disable_default_response,
+                        &parameters,
+                    );
+                    *trans_id = trans_id.wrapping_add(1);
+                    if let Err(error) = coord
+                        .send_zcl(dst_addr, dst_ep, command.cluster, *trans_id, frame)
+                        .await
+                    {
+                        warn!(
+                            "converter response command 0x{:02X} on cluster 0x{:04X} failed: {error}",
+                            command.command, command.cluster
+                        );
+                    }
+                }
+                Err(error) => warn!(
+                    "converter response command 0x{:02X} on cluster 0x{:04X} skipped: {error}",
+                    command.command, command.cluster
+                ),
+            }
+        }
     }
 
     /// Build the `msg.data` JSON shape for a parsed Tuya command.
@@ -1763,8 +1813,10 @@ impl Bridge {
     async fn process_zcl_message(
         devices: &DeviceRegistry,
         external: &ExternalConverter,
+        coord: Option<&CoordinatorHandle>,
         mqtt: &MqttBridge,
         output: OutputMode,
+        trans_id: &mut u8,
         src_addr: u16,
         src_ep: u8,
         cluster_id: u16,
@@ -1802,6 +1854,8 @@ impl Bridge {
         }
 
         let mut external_values = None;
+        let mut frame_commands = Vec::new();
+        let zcl_types = external.zcl_types();
         let prepared = devices.get_by_nwk(src_addr).map(|dev| {
             let info = crate::converters::external::ExternalDeviceInfo::from_device(&dev);
             (
@@ -1836,10 +1890,11 @@ impl Bridge {
                                     linkquality: link_quality,
                                     group_id: 0,
                                 };
-                                if let Some(converted) = external.convert_from_zigbee_session(
+                                if let Some(frame) = external.convert_from_zigbee_session_full(
                                     model, cluster_id, msg_type, &reports, info, &message, state,
                                 ) {
-                                    external_values = Some(converted);
+                                    external_values = Some(frame.state);
+                                    frame_commands.extend(frame.commands);
                                 }
                             } else {
                                 debug!("external converter: no candidates for model {model:?}");
@@ -1869,13 +1924,14 @@ impl Bridge {
                                             group_id: 0,
                                         };
                                     let data_map = Self::tuya_command_data(&parsed);
-                                    if let Some(converted) = external
-                                        .convert_from_zigbee_session_with_data(
+                                    if let Some(frame) = external
+                                        .convert_from_zigbee_session_with_data_full(
                                             model, cluster_id, msg_type, &data_map, info, &message,
                                             state,
                                         )
                                     {
-                                        external_values = Some(converted);
+                                        external_values = Some(frame.state);
+                                        frame_commands.extend(frame.commands);
                                     }
                                 } else {
                                     debug!("external converter: no candidates for model {model:?}");
@@ -1894,6 +1950,18 @@ impl Bridge {
                     }
                 }
             }
+        }
+
+        if !frame_commands.is_empty() {
+            Self::forward_frame_commands(
+                coord,
+                &zcl_types,
+                trans_id,
+                src_addr,
+                src_ep,
+                &frame_commands,
+            )
+            .await;
         }
 
         let external_used = external_values.is_some();
@@ -5149,6 +5217,107 @@ module.exports = {definitions};
         (dir, converter)
     }
 
+    /// Converter package whose fromZigbee handler answers a time-sync frame.
+    fn tuya_reply_fixture() -> (std::path::PathBuf, ExternalConverter) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "z2m-bridge-tuya-reply-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("devices")).unwrap();
+        std::fs::write(
+            dir.join("devices").join("tuya_reply.js"),
+            r#"
+const definitions = [
+    {
+        model: "FixtureTuyaReply",
+        vendor: "Fixture",
+        description: "Tuya response-command fixture",
+        fromZigbee: [
+            {
+                cluster: "manuSpecificTuya",
+                type: ["commandMcuSyncTime"],
+                convert: (model, msg) => {
+                    msg.endpoint.command(
+                        "manuSpecificTuya",
+                        "mcuSyncTime",
+                        {payloadSize: 2, payload: [0xAA, 0xBB]},
+                        {},
+                    );
+                },
+            },
+        ],
+    },
+];
+module.exports = {definitions};
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("registry.json"),
+            serde_json::json!({
+                "lookup": {"fixturetuyareply": [["tuya_reply.js", 0]]},
+                "fingerprints": [],
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl.json"),
+            serde_json::json!({
+                "clusters": {"61184": "manuSpecificTuya"},
+                "manufacturerCodes": {},
+                "dataTypes": {},
+                "attributes": {"manuSpecificTuya": {}},
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl-commands.json"),
+            serde_json::json!({
+                "clusters": {
+                    "61184": {
+                        "name": "manuSpecificTuya",
+                        "attributes": {},
+                        "commands": {
+                            "36": {"name": "mcuSyncTime", "parameters": [
+                                {"name": "payloadSize", "type": 33},
+                                {"name": "payload", "type": 1001}
+                            ]}
+                        }
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let converter = ExternalConverter::new(&dir, "https://example.invalid/x");
+        (dir, converter)
+    }
+
+    async fn tuya_reply_devices() -> (DeviceRegistry, IeeeAddr) {
+        let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
+        let mut device = Device::new(ieee, 0x5678);
+        device.friendly_name = "trv".into();
+        device.model = Some("FixtureTuyaReply".into());
+        device.manufacturer = Some("_TZE200_b6wax7g0".into());
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0301,
+            input_clusters: vec![0x0000, 0xEF00],
+            output_clusters: vec![],
+        });
+        let devices = DeviceRegistry::new();
+        devices.add(device);
+        (devices, ieee)
+    }
+
     async fn tuya_devices() -> (DeviceRegistry, IeeeAddr) {
         let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
         let mut device = Device::new(ieee, 0x5678);
@@ -5479,12 +5648,15 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        let mut trans_id = 0u8;
 
         Bridge::process_zcl_message(
             &devices,
             &external,
+            None,
             &mqtt,
             OutputMode::Json,
+            &mut trans_id,
             0x5678,
             1,
             crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
@@ -5512,6 +5684,7 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        let mut trans_id = 0u8;
 
         // Same frame but the datapoint claims 4 bytes while only 1 is present.
         let mut frame = tuya_data_report_frame();
@@ -5519,8 +5692,10 @@ module.exports = {definitions};
         Bridge::process_zcl_message(
             &devices,
             &external,
+            None,
             &mqtt,
             OutputMode::Json,
+            &mut trans_id,
             0x5678,
             1,
             crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
@@ -5551,14 +5726,17 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        let mut trans_id = 0u8;
 
         let mut frame = tuya_data_report_frame();
         frame[4] = 0x01; // dataResponse
         Bridge::process_zcl_message(
             &devices,
             &external,
+            None,
             &mqtt,
             OutputMode::Json,
+            &mut trans_id,
             0x5678,
             1,
             crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
@@ -5585,12 +5763,15 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        let mut trans_id = 0u8;
 
         Bridge::process_zcl_message(
             &devices,
             &external,
+            None,
             &mqtt,
             OutputMode::Json,
+            &mut trans_id,
             0x5678,
             1,
             crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
@@ -5611,13 +5792,16 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        let mut trans_id = 0u8;
         let payload = [0x00, 0x00, 0x01, 0x00, 0x12, 0x05, 0x01, 0x00];
 
         Bridge::process_zcl_message(
             &devices,
             &external,
+            None,
             &mqtt,
             OutputMode::Json,
+            &mut trans_id,
             0x5678,
             1,
             crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
@@ -5638,12 +5822,15 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        let mut trans_id = 0u8;
 
         Bridge::process_zcl_message(
             &devices,
             &external,
+            None,
             &mqtt,
             OutputMode::Json,
+            &mut trans_id,
             0x5678,
             1,
             crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
@@ -5660,6 +5847,44 @@ module.exports = {definitions};
                 .any(|item| item.topic == "zigbee2mqtt/trv"),
             "OTA payloads are explicitly rejected, not published"
         );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn converter_response_command_is_forwarded_as_af_frame() {
+        let (dir, external) = tuya_reply_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = tuya_reply_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |_sent| vec![success_srsp()]);
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            Some(&coord),
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            0x5678,
+            1,
+            crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
+            42,
+            tuya_command_frame(0x24, &[0x02, 0x00, 0x00, 0x00]),
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].cluster, 0xEF00);
+        assert_eq!(frames[0].endpoint, 1);
+        // control=0x01 (cluster-specific, no manufacturer, default response),
+        // TSN=0, command 0x24, params payloadSize u16 LE + two payload bytes.
+        assert_eq!(
+            frames[0].payload,
+            vec![0x01, 0x00, 0x24, 0x02, 0x00, 0xAA, 0xBB]
+        );
+        assert_eq!(frames[0].af_trans_id, 1);
         std::fs::remove_dir_all(&dir).ok();
     }
 }

@@ -1,0 +1,26 @@
+{
+  "id": "tuya-weather-response",
+  "input": {
+    "mode": "fromZigbeeOps",
+    "model": "TS0601",
+    "manufacturer_name": "_TZE284_iwyqtclw",
+    "ieee_addr": "0x00124b0000000002",
+    "cluster_id": 61184,
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {},
+    "msg_type": "commandTuyaWeatherRequest",
+    "data": {
+      "payload": [
+        0,
+        0,
+        1,
+        0,
+        18,
+        5,
+        1,
+        0
+      ]
+    }
+  }
+}

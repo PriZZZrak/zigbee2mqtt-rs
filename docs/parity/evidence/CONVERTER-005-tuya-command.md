@@ -49,8 +49,10 @@ Behavior: CONVERTER-005; related CONVERTER-009/018, EVID-004, MQTT-003.
 - Weather request/sync `payload` is wrapped as a `Buffer` before the converter
   runs (herdsman behaviour); time-sync stays an array and gateway status a
   number.
-- `msg.endpoint.command()` resolves so converters that answer a frame complete;
-  **the requested response command is not forwarded to the coordinator yet**.
+- `msg.endpoint.command()` calls are recorded and forwarded to the coordinator
+  by `Bridge::forward_frame_commands` (see CONVERTER-020), so time-sync,
+  gateway-status and weather replies are actually sent. The command is built
+  with `zcl-commands.json` types and the source endpoint.
 
 ## Tests and evidence
 
@@ -68,13 +70,15 @@ Behavior: CONVERTER-005; related CONVERTER-009/018, EVID-004, MQTT-003.
   `bridge-tuya-trv-report` (published topic/payload), and
   `bridge-tuya-mcu-sync-time`, `bridge-tuya-gateway-status`,
   `bridge-tuya-weather-request`, `bridge-tuya-ota-block` (both sides publish no
-  state; OTA is explicitly rejected only on the Rust side).
+  state; OTA is explicitly rejected only on the Rust side), plus
+  `tuya-gateway-status-response` and `tuya-weather-response` comparing the
+  recorded response commands themselves.
 
 ## Gaps
 
-- Converter-requested response commands during `fromZigbee` (time sync, gateway
-  status, weather sync) are resolved but **not sent**; upstream responds to the
-  device. The differential therefore verifies “no state publish”, not the reply.
+- Converter-requested response commands are sent (CONVERTER-020), but replies
+  are fire-and-forget and the no-publish bridge fixtures still compare only the
+  MQTT side; the wire frame is covered by a fake-coordinator test.
 - `mcuVersionResponse` is parsed but not covered by a bridge differential (the
   converter updates device metadata and returns no state; device metadata
   publishing is not implemented).

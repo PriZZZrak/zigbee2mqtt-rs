@@ -155,6 +155,64 @@ fn main() {
         return;
     }
 
+    if mode == "fromZigbeeOps" {
+        let message = IncomingMessageInfo {
+            endpoint,
+            linkquality,
+            group_id: 0,
+        };
+        let frame = match input.get("data").and_then(|value| value.as_object()) {
+            Some(data) => converter.convert_from_zigbee_with_data_full(
+                model, cluster_id, msg_type, data, &device, &message, &state,
+            ),
+            None => {
+                let attribute = input
+                    .get("attribute")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_else(|| fail("fixture is missing 'attribute' or 'data'"));
+                let value = input
+                    .get("value")
+                    .cloned()
+                    .unwrap_or_else(|| fail("fixture is missing 'value'"));
+                let attribute_id = converter
+                    .attribute_id(cluster_id, attribute)
+                    .or_else(|| attribute.parse::<u16>().ok())
+                    .unwrap_or_else(|| fail(format!("cannot resolve attribute '{attribute}'")));
+                converter.convert_from_zigbee_with_message_full(
+                    model,
+                    cluster_id,
+                    msg_type,
+                    &[(attribute_id, value)],
+                    &device,
+                    &message,
+                    &state,
+                )
+            }
+        }
+        .unwrap_or_default();
+        let commands: Vec<Value> = frame
+            .commands
+            .iter()
+            .map(|command| {
+                json!({
+                    "cluster": command.cluster,
+                    "command": command.command,
+                    "payload": command.payload,
+                    "options": {
+                        "manufacturerCode": command.manufacturer_code,
+                        "disableDefaultResponse": command.disable_default_response,
+                    },
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string(&json!({"state": frame.state, "commands": commands}))
+                .unwrap_or_else(|_| "{}".into())
+        );
+        return;
+    }
+
     if mode == "convertSet" {
         let key = input
             .get("key")

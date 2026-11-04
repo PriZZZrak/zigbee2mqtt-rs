@@ -88,9 +88,10 @@ Regression tests: `converter_attribute_json_uses_herdsman_numeric_booleans`,
 
 - `payload.last_seen` is ignored: the Rust bridge always includes it, while
   upstream defaults to `disable`. That divergence is known and not resolved here.
-- For time sync / gateway status / weather, the converter’s **response
-  command** (`msg.endpoint.command`) is resolved but not forwarded, so the
-  differential proves “no state publish”, not the device reply.
+- For time sync / gateway status / weather, the converter’s response command is
+  forwarded by the bridge (CONVERTER-020); the bridge differential observes only
+  the MQTT side, while the wire frame and the requested commands are covered by
+  the fake-coordinator test and the `fromZigbeeOps` differential.
 - Not compared: retain/QoS flags, availability topic, Home Assistant
   `adjustMessageBeforePublish` mock properties, debounce/throttle, groups.
 - One frame per fixture, no persistence/restart, no live broker or HA.

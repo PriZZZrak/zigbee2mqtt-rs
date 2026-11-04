@@ -121,7 +121,9 @@ Reference output is converter output + upstream
 `postProcessConvertedFromZigbeeMessage` + cached state + `linkquality` +
 `last_seen`; only `payload.last_seen` is ignored.
 `docs/parity/reports/evid04-bridge.json` → **7 passed, 0 failed**, all pins
-MATCH. Details and the two defects it found (double endpoint suffix, boolean
+MATCH. A `fromZigbeeOps` mode additionally compares converter-requested response
+commands (`tuya-gateway-status-response`, `tuya-weather-response`); the main
+converter report is **8 passed, 0 failed**. Details and the two defects it found (double endpoint suffix, boolean
 attributes sent as `true` instead of 0/1) are in
 `docs/parity/evidence/EVID-04-bridge.md`.
 
@@ -137,9 +139,10 @@ attributes sent as `true` instead of 0/1) are in
 
 ## Gaps
 
-- Thirteen fixtures: six converter-level (`fromZigbee`, `convertSet`) and seven
-  bridge-level MQTT topic/payload comparisons (including explicit no-publish
-  cases); no ZCL-wire, storage, groups or frontend differentials yet.
+- Fifteen fixtures: eight converter-level (`fromZigbee`, `convertSet`,
+  `fromZigbeeOps`) and seven bridge-level MQTT topic/payload comparisons
+  (including explicit no-publish cases); no ZCL-wire, storage, groups or
+  frontend differentials yet.
 - Cluster-command payload conversion (`msg.data`) is now wired into the bridge
   runtime for Tuya datapoint commands (CONVERTER-005); tests with an in-process
   broker assert the published state. Other Tuya commands (time sync, OTA,

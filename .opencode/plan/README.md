@@ -32,7 +32,7 @@ R1 — явно ограниченный релиз для проверенно�
 
 - **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 475 952 B,
   sha256 `b9571660…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
-  (5 562 053 B, sha256 `59989b7a…`, installed 11 929 600 B с app-resolved Windfront 2.15.0,
+  (5 569 984 B, sha256 `e37eee4b…`, installed 11 929 600 B с app-resolved Windfront 2.15.0,
   `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
@@ -49,7 +49,11 @@ R1 — явно ограниченный релиз для проверенно�
   TS0002, SNZB-02 + time-sync/gateway/weather/OTA no-publish) сравнивают
   topic/payload реального bridge с pinned Node reference — 7/7 PASS.
   Differential нашёл и исправил двойной endpoint-суффикс и boolean-атрибуты.
-  Ответные команды конвертеров (time sync/weather) пока не отправляются.
+  Ответные команды конвертеров (`msg.endpoint.command`: time sync, gateway
+  status, weather) теперь **отправляются** в координатор через
+  `forward_frame_commands`; AF-кадр проверен fake-coordinator тестом, а
+  `fromZigbeeOps` differential сравнивает запрошенные команды с Node (2 кейса).
+  Ответы fire-and-forget; read/write из fromZigbee не пересылаются.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

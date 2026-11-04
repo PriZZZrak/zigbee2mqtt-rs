@@ -1,6 +1,6 @@
 {
-  "captured_utc": "2026-11-04T22:51:32+00:00",
-  "git_sha": "592ee51f01c278c269cf4bffef8616abd85f549f",
+  "captured_utc": "2026-11-04T23:22:54+00:00",
+  "git_sha": "918002ac352f3e56a7fd783633b168a5aea964a1",
   "sdk": {
     "name": "openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64",
     "sha256": "d9fd074f281823a3023e8f6a73aaac598018c898ec9ac4d1c507b596930d7482",
@@ -9,8 +9,8 @@
     "architecture": "aarch64_cortex-a53"
   },
   "binary": {
-    "sha256": "b6a1c5cf3d4664e4259ee5e7b62e3fb49433dfab34bb3218b712b525ae6806e1",
-    "bytes": 5497024,
+    "sha256": "54410a4de33a431b2d23279749fb544c584580a5d051d8dea191427be00fbe78",
+    "bytes": 5506056,
     "source": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl"
   },
   "frontend": {
@@ -21,11 +21,11 @@
   },
   "ipk": {
     "file": "zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk",
-    "sha256": "59989b7adeb63caed1a97de65952188ad0a9e5cecd4b4408b1aa77fc1e74054c",
-    "bytes": 5562053,
+    "sha256": "e37eee4b4eaad5f57fc0d14959ce244aeef0db4edd559890c46ddbad401d8971",
+    "bytes": 5569984,
     "installed_size": 11929600,
-    "data_bytes": 5583210,
-    "payload_binary_bytes": 5495521,
+    "data_bytes": 5588623,
+    "payload_binary_bytes": 5504553,
     "web_bytes": 6266677,
     "package": "zigbee2mqtt-rs",
     "version": "0.1.0-r1",

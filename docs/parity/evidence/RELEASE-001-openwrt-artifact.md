@@ -48,7 +48,7 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: b6a1c5cf3d4664e4259ee5e7b62e3fb49433dfab34bb3218b712b525ae6806e1 (5497024 bytes)
+binary sha256: 54410a4de33a431b2d23279749fb544c584580a5d051d8dea191427be00fbe78 (5506056 bytes)
 archive sha256: 8e8161c7f26c587109c040d237833cba8df8793126f8b44b40724598d7abb61c (5554721 bytes)
 manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=02aa2a9..., rustc 1.99.1
 
@@ -70,10 +70,10 @@ $ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
 $ make defconfig
 $ make package/zigbee2mqtt-rs/compile
 ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
-        installed 11929600 B, data 5583210 B, binary 5495521 B, web 6266677 B
+        installed 11929600 B, data 5588623 B, binary 5504553 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
-sha256: 59989b7adeb63caed1a97de65952188ad0a9e5cecd4b4408b1aa77fc1e74054c
-bytes:  5562053
+sha256: e37eee4b4eaad5f57fc0d14959ce244aeef0db4edd559890c46ddbad401d8971
+bytes:  5569984
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
@@ -94,7 +94,7 @@ The binary inside the `.ipk` is **not byte-identical** to
 (5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
 recorded here so the hash difference is not mistaken for a different build.
 Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
-(`59989b7a…`), i.e. packaging is reproducible with the pinned SDK fed by the same
+(`e37eee4b…`), i.e. packaging is reproducible with the pinned SDK fed by the same
 binary and frontend assets.
 
 `scripts/check_ipk.py` validates the outer/inner layout, control fields,

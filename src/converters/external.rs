@@ -63,6 +63,24 @@ pub struct ConvertSetOutcome {
     pub ops: Vec<ConvertSetOp>,
 }
 
+/// One cluster command a `fromZigbee` converter asked the bridge to send back
+/// (for example a Tuya time-sync or weather response).
+#[derive(Debug, Clone, PartialEq)]
+pub struct FrameCommand {
+    pub cluster: u16,
+    pub command: u8,
+    pub manufacturer_code: Option<u16>,
+    pub disable_default_response: bool,
+    pub payload: serde_json::Value,
+}
+
+/// Converter output for one frame: state plus requested response commands.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ConvertedFrame {
+    pub state: serde_json::Map<String, serde_json::Value>,
+    pub commands: Vec<FrameCommand>,
+}
+
 enum ConverterJob {
     ConvertSet {
         model: String,
@@ -82,7 +100,7 @@ enum ConverterJob {
         device: ExternalDeviceInfo,
         message: IncomingMessageInfo,
         state: serde_json::Map<String, serde_json::Value>,
-        reply: mpsc::Sender<Option<serde_json::Map<String, serde_json::Value>>>,
+        reply: mpsc::Sender<Option<ConvertedFrame>>,
     },
     ConvertData {
         model: String,
@@ -92,7 +110,7 @@ enum ConverterJob {
         device: ExternalDeviceInfo,
         message: IncomingMessageInfo,
         state: serde_json::Map<String, serde_json::Value>,
-        reply: mpsc::Sender<Option<serde_json::Map<String, serde_json::Value>>>,
+        reply: mpsc::Sender<Option<ConvertedFrame>>,
     },
 }
 
@@ -640,7 +658,7 @@ impl ExternalConverter {
 
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
-    fn convert_with_data(
+    fn convert_with_data_full(
         &self,
         model: &str,
         cluster_id: u16,
@@ -649,7 +667,7 @@ impl ExternalConverter {
         device: &ExternalDeviceInfo,
         message: &IncomingMessageInfo,
         state: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+    ) -> Option<ConvertedFrame> {
         let registry = self.load_registry()?;
         let (file, index) = select_definition(&registry, model, device)?;
         let zcl = self.load_zcl()?;
@@ -833,10 +851,22 @@ const __norm = (v) => {{
                 meta.device = device;
                 msg.endpoint.getDevice = () => device;
                 msg.endpoint.constructor = {{name: "Endpoint"}};
-                // Some fromZigbee converters answer a frame (Tuya time sync,
-                // gateway status, weather). The response command is not
-                // forwarded yet; resolve so the converter still completes.
-                msg.endpoint.command = () => Promise.resolve();
+                // Record response commands requested by fromZigbee converters
+                // (Tuya time sync, gateway status, weather); the bridge encodes
+                // and sends them after conversion.
+                const __commands = [];
+                msg.endpoint.command = (cluster, command, payload, options) => {{
+                    __commands.push({{
+                        cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                        command: (command && command.ID !== undefined) ? command.ID : command,
+                        payload: __norm(payload || {{}}),
+                        options: {{
+                            manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
+                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                        }},
+                    }});
+                    return Promise.resolve();
+                }};
                 msg.device = device;
                 if ((msg.type === "commandTuyaWeatherRequest" || msg.type === "commandTuyaWeatherSync") && Array.isArray(msg.data.payload)) {{
                     msg.data.payload = Buffer.from(msg.data.payload);
@@ -871,7 +901,7 @@ const __norm = (v) => {{
                     }}
                 }}
                 if (__debug) out.__debug = {{matched: __matched, errors: __errors}};
-                return JSON.stringify(out);
+                return JSON.stringify({{__state: out, __commands}});
               }} catch (error) {{
                 return JSON.stringify({{__fatal: String((error && (error.stack || error.message)) || error)}});
               }}
@@ -885,11 +915,35 @@ const __norm = (v) => {{
         );
         let out_str = eval_string(&mut ctx, &script)?;
         let out: serde_json::Value = serde_json::from_str(&out_str).ok()?;
-        let map = out.as_object().cloned()?;
-        if map.is_empty() {
+        if let Some(fatal) = out.get("__fatal").and_then(|value| value.as_str()) {
+            warn!("external converter failed: {fatal}");
             return None;
         }
-        Some(map)
+        let state = out.get("__state")?.as_object()?.clone();
+        let commands =
+            frame_commands_from_json(&zcl, &self.load_zcl_types(), out.get("__commands"));
+        if state.is_empty() && commands.is_empty() {
+            return None;
+        }
+        Some(ConvertedFrame { state, commands })
+    }
+
+    /// Compatibility wrapper returning only converted state.
+    #[allow(clippy::too_many_arguments)]
+    fn convert_with_data(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        data_obj: serde_json::Map<String, serde_json::Value>,
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let frame = self.convert_with_data_full(
+            model, cluster_id, msg_type, data_obj, device, message, state,
+        )?;
+        (!frame.state.is_empty()).then_some(frame.state)
     }
 }
 
@@ -927,6 +981,79 @@ globalThis.__pumpTimers = function(maxAdvance) {
 };
 "#;
 
+/// Resolve a recorded `msg.endpoint.command` list into ZCL ids.
+fn frame_commands_from_json(
+    zcl: &ZclMaps,
+    types: &crate::converters::zcl_types::ZclTypesFile,
+    raw: Option<&serde_json::Value>,
+) -> Vec<FrameCommand> {
+    let Some(items) = raw.and_then(|value| value.as_array()) else {
+        return Vec::new();
+    };
+    let mut commands = Vec::new();
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let cluster = object
+            .get("cluster")
+            .and_then(|value| match value {
+                serde_json::Value::Number(number) => number.as_u64(),
+                serde_json::Value::Object(object) => object.get("ID").and_then(|id| id.as_u64()),
+                serde_json::Value::String(name) => zcl
+                    .clusters
+                    .iter()
+                    .find_map(|(id, value)| {
+                        (value == name).then(|| id.parse::<u16>().ok()).flatten()
+                    })
+                    .map(u64::from)
+                    .or_else(|| types.cluster_id_by_name(name).map(u64::from)),
+                _ => None,
+            })
+            .and_then(|id| u16::try_from(id).ok());
+        let Some(cluster) = cluster else {
+            warn!("external converter requested a command on an unresolved cluster");
+            continue;
+        };
+        let command = object
+            .get("command")
+            .and_then(|value| match value {
+                serde_json::Value::Number(number) => number.as_u64(),
+                serde_json::Value::Object(object) => object.get("ID").and_then(|id| id.as_u64()),
+                serde_json::Value::String(name) => {
+                    types.command_id_by_name(cluster, name).map(u64::from)
+                }
+                _ => None,
+            })
+            .and_then(|id| u8::try_from(id).ok());
+        let Some(command) = command else {
+            warn!("external converter requested an unresolved command on cluster 0x{cluster:04X}");
+            continue;
+        };
+        let manufacturer_code = object
+            .get("options")
+            .and_then(|options| options.get("manufacturerCode"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u16::try_from(value).ok());
+        let disable_default_response = object
+            .get("options")
+            .and_then(|options| options.get("disableDefaultResponse"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        commands.push(FrameCommand {
+            cluster,
+            command,
+            manufacturer_code,
+            disable_default_response,
+            payload: object
+                .get("payload")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        });
+    }
+    commands
+}
+
 impl ExternalConverter {
     fn open_session(&self, model: &str, device: &ExternalDeviceInfo) -> Option<ConverterSession> {
         let registry = self.load_registry()?;
@@ -959,7 +1086,7 @@ impl ExternalConverter {
     #[allow(clippy::too_many_arguments)]
     /// Convert a frame whose payload is described as attribute reports.
     #[allow(clippy::too_many_arguments)]
-    pub fn convert_from_zigbee_with_message(
+    pub fn convert_from_zigbee_with_message_full(
         &self,
         model: &str,
         cluster_id: u16,
@@ -968,7 +1095,7 @@ impl ExternalConverter {
         device: &ExternalDeviceInfo,
         message: &IncomingMessageInfo,
         state: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+    ) -> Option<ConvertedFrame> {
         let zcl = self.load_zcl()?;
         let cluster_name = zcl.clusters.get(&cluster_id.to_string())?.clone();
         let data_obj: serde_json::Map<String, serde_json::Value> = reports
@@ -983,8 +1110,50 @@ impl ExternalConverter {
                 (name, value.clone())
             })
             .collect();
-        self.convert_with_data(
+        self.convert_with_data_full(
             model, cluster_id, msg_type, data_obj, device, message, state,
+        )
+    }
+
+    /// Compatibility wrapper returning only state.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_with_message(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        reports: &[(u16, serde_json::Value)],
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let frame = self.convert_from_zigbee_with_message_full(
+            model, cluster_id, msg_type, reports, device, message, state,
+        )?;
+        (!frame.state.is_empty()).then_some(frame.state)
+    }
+
+    /// Full converter output (state + requested response commands) for a
+    /// structured `msg.data`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_with_data_full(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        data: &serde_json::Map<String, serde_json::Value>,
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<ConvertedFrame> {
+        self.convert_with_data_full(
+            model,
+            cluster_id,
+            msg_type,
+            data.clone(),
+            device,
+            message,
+            state,
         )
     }
 
@@ -1022,7 +1191,7 @@ impl ExternalConverter {
         device: &ExternalDeviceInfo,
         message: &IncomingMessageInfo,
         state: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+    ) -> Option<ConvertedFrame> {
         let cluster_name = session.zcl.clusters.get(&cluster_id.to_string())?.clone();
         let data_obj: serde_json::Map<String, serde_json::Value> = reports
             .iter()
@@ -1054,7 +1223,7 @@ impl ExternalConverter {
         device: &ExternalDeviceInfo,
         message: &IncomingMessageInfo,
         state: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+    ) -> Option<ConvertedFrame> {
         let cluster_name = session.zcl.clusters.get(&cluster_id.to_string())?.clone();
         let msg = serde_json::json!({
             "cluster": cluster_name,
@@ -1102,10 +1271,21 @@ const __norm = (v) => {{
                 meta.device = device;
                 msg.endpoint.getDevice = () => device;
                 msg.endpoint.constructor = {{name: "Endpoint"}};
-                // Some fromZigbee converters answer a frame (Tuya time sync,
-                // gateway status, weather). The response command is not
-                // forwarded yet; resolve so the converter still completes.
-                msg.endpoint.command = () => Promise.resolve();
+                // Record response commands requested by fromZigbee converters;
+                // the bridge encodes and sends them after conversion.
+                const __commands = [];
+                msg.endpoint.command = (cluster, command, payload, options) => {{
+                    __commands.push({{
+                        cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                        command: (command && command.ID !== undefined) ? command.ID : command,
+                        payload: __norm(payload || {{}}),
+                        options: {{
+                            manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
+                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                        }},
+                    }});
+                    return Promise.resolve();
+                }};
                 msg.device = device;
                 if ((msg.type === "commandTuyaWeatherRequest" || msg.type === "commandTuyaWeatherSync") && Array.isArray(msg.data.payload)) {{
                     msg.data.payload = Buffer.from(msg.data.payload);
@@ -1141,7 +1321,7 @@ const __norm = (v) => {{
                             }}
                         }}
                         if (__debug) out.__debug = {{matched: __matched, errors: __errors}};
-                        globalThis.__dispatchOut = out;
+                        globalThis.__dispatchOut = {{__state: out, __commands}};
                     }} catch (e) {{
                         globalThis.__dispatchError = String(e);
                     }}
@@ -1183,11 +1363,13 @@ const __norm = (v) => {{
         }
         let out_str = eval_string(&mut session.ctx, "JSON.stringify(globalThis.__dispatchOut)")?;
         let out: serde_json::Value = serde_json::from_str(&out_str).ok()?;
-        let map = out.as_object().cloned()?;
-        if map.is_empty() {
+        let state = out.get("__state")?.as_object()?.clone();
+        let commands =
+            frame_commands_from_json(&session.zcl, &session.types, out.get("__commands"));
+        if state.is_empty() && commands.is_empty() {
             return None;
         }
-        Some(map)
+        Some(ConvertedFrame { state, commands })
     }
 
     /// Execute the upstream `toZigbee` converter for one key and record the ZCL
@@ -1632,7 +1814,7 @@ const __norm = (v) => {{
     /// Falls back to the per-call context only when the runtime thread cannot be
     /// started or has stopped.
     #[allow(clippy::too_many_arguments)]
-    pub fn convert_from_zigbee_session(
+    pub fn convert_from_zigbee_session_full(
         &self,
         model: &str,
         cluster_id: u16,
@@ -1641,9 +1823,9 @@ const __norm = (v) => {{
         device: &ExternalDeviceInfo,
         message: &IncomingMessageInfo,
         state: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+    ) -> Option<ConvertedFrame> {
         let Some(sender) = self.runtime_sender() else {
-            return self.convert_from_zigbee_with_message(
+            return self.convert_from_zigbee_with_message_full(
                 model, cluster_id, msg_type, reports, device, message, state,
             );
         };
@@ -1659,7 +1841,7 @@ const __norm = (v) => {{
             reply,
         };
         if sender.send(job).is_err() {
-            return self.convert_from_zigbee_with_message(
+            return self.convert_from_zigbee_with_message_full(
                 model, cluster_id, msg_type, reports, device, message, state,
             );
         }
@@ -1672,10 +1854,28 @@ const __norm = (v) => {{
         }
     }
 
+    /// Compatibility wrapper returning only state.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_session(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        reports: &[(u16, serde_json::Value)],
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let frame = self.convert_from_zigbee_session_full(
+            model, cluster_id, msg_type, reports, device, message, state,
+        )?;
+        (!frame.state.is_empty()).then_some(frame.state)
+    }
+
     /// Session variant for cluster commands whose `msg.data` is structured
     /// (Tuya `commandDataReport` and friends).
     #[allow(clippy::too_many_arguments)]
-    pub fn convert_from_zigbee_session_with_data(
+    pub fn convert_from_zigbee_session_with_data_full(
         &self,
         model: &str,
         cluster_id: u16,
@@ -1684,9 +1884,9 @@ const __norm = (v) => {{
         device: &ExternalDeviceInfo,
         message: &IncomingMessageInfo,
         state: &serde_json::Map<String, serde_json::Value>,
-    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+    ) -> Option<ConvertedFrame> {
         let Some(sender) = self.runtime_sender() else {
-            return self.convert_from_zigbee_with_data(
+            return self.convert_from_zigbee_with_data_full(
                 model, cluster_id, msg_type, data, device, message, state,
             );
         };
@@ -1702,7 +1902,7 @@ const __norm = (v) => {{
             reply,
         };
         if sender.send(job).is_err() {
-            return self.convert_from_zigbee_with_data(
+            return self.convert_from_zigbee_with_data_full(
                 model, cluster_id, msg_type, data, device, message, state,
             );
         }
@@ -1713,6 +1913,24 @@ const __norm = (v) => {{
                 None
             }
         }
+    }
+
+    /// Compatibility wrapper returning only state.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_session_with_data(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        data: &serde_json::Map<String, serde_json::Value>,
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let frame = self.convert_from_zigbee_session_with_data_full(
+            model, cluster_id, msg_type, data, device, message, state,
+        )?;
+        (!frame.state.is_empty()).then_some(frame.state)
     }
 }
 

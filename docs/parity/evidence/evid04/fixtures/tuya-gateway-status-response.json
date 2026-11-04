@@ -1,0 +1,18 @@
+{
+  "id": "tuya-gateway-status-response",
+  "input": {
+    "mode": "fromZigbeeOps",
+    "model": "TS0601",
+    "manufacturer_name": "_TZE200_a1ovdobn",
+    "ieee_addr": "0x00124b0000000002",
+    "cluster_id": 61184,
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {},
+    "msg_type": "commandMcuGatewayConnectionStatus",
+    "data": {
+      "payloadSize": 1,
+      "payload": 1
+    }
+  }
+}

@@ -102,7 +102,7 @@ function selectDefinition(input) {
     return load(best ? best.candidate : candidates[0]);
 }
 
-async function runFromZigbee({input, definition, meta, clusterName, clusterId, msgType, endpoint, lenient = false}) {
+async function runFromZigbee({input, definition, meta, clusterName, clusterId, msgType, endpoint, clusters, lenient = false}) {
     let data;
     if (input.data && typeof input.data === "object") {
         data = normalize(input.data);
@@ -124,8 +124,42 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
         groupID: 0,
     };
     msg.endpoint.constructor = {name: "Endpoint"};
+    const commands = [];
+    const clusterMap = clusters.Clusters || clusters;
+    const clusterIdOf = (cluster) => {
+        if (cluster && cluster.ID !== undefined) return cluster.ID;
+        if (typeof cluster === "number") return cluster;
+        if (typeof cluster === "string" && clusterMap[cluster]) return clusterMap[cluster].ID;
+        return cluster;
+    };
+    const commandIdOf = (cluster, command) => {
+        if (command && command.ID !== undefined) return command.ID;
+        if (typeof command === "number") return command;
+        const definition =
+            typeof cluster === "string"
+                ? clusterMap[cluster]
+                : Object.values(clusterMap).find((entry) => entry.ID === cluster);
+        if (definition && definition.commands && definition.commands[command]) {
+            return definition.commands[command].ID;
+        }
+        return command;
+    };
     Object.assign(msg.endpoint, {
-        command: () => Promise.resolve(),
+        command: (cluster, command, payload, options) => {
+            commands.push({
+                cluster: clusterIdOf(cluster),
+                command: commandIdOf(cluster, command),
+                payload: normalize(payload || {}),
+                options: {
+                    manufacturerCode:
+                        options && options.manufacturerCode !== undefined
+                            ? options.manufacturerCode
+                            : null,
+                    disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                },
+            });
+            return Promise.resolve();
+        },
         read: () => Promise.resolve(),
         write: () => Promise.resolve(),
     });
@@ -147,10 +181,10 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
         }
     }
     if (!matched) {
-        if (lenient) return {};
+        if (lenient) return {state: {}, commands};
         fail(`no fromZigbee converter matched ${clusterName}/${msgType}`);
     }
-    return out;
+    return {state: out, commands};
 }
 
 async function main() {
@@ -185,7 +219,7 @@ async function main() {
 
     const mode = input.mode || "fromZigbee";
     if (mode === "fromZigbee") {
-        const out = await runFromZigbee({
+        const result = await runFromZigbee({
             input,
             definition,
             meta,
@@ -193,13 +227,34 @@ async function main() {
             clusterId,
             msgType,
             endpoint,
+            clusters,
         });
-        process.stdout.write(`${JSON.stringify(normalize(out))}\n`);
+        process.stdout.write(`${JSON.stringify(normalize(result.state))}\n`);
+        return;
+    }
+
+    if (mode === "fromZigbeeOps") {
+        const result = await runFromZigbee({
+            input,
+            definition,
+            meta,
+            clusterName,
+            clusterId,
+            msgType,
+            endpoint,
+            clusters,
+        });
+        process.stdout.write(
+            `${JSON.stringify({
+                state: normalize(result.state),
+                commands: normalize(result.commands),
+            })}\n`,
+        );
         return;
     }
 
     if (mode === "bridge") {
-        const out = await runFromZigbee({
+        const result = await runFromZigbee({
             input,
             definition,
             meta,
@@ -207,8 +262,10 @@ async function main() {
             clusterId,
             msgType,
             endpoint,
+            clusters,
             lenient: true,
         });
+        const out = result.state;
         const baseTopic = input.base_topic || "zigbee2mqtt";
         const friendlyName = input.friendly_name || "device";
         const topic = `${baseTopic}/${friendlyName}`;
