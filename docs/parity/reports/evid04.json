@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-04T19:05:03.663284+00:00",
+  "generated_at": "2026-11-04T19:14:36.307593+00:00",
   "reference_cmd": "env HC_CONVERTERS_DIST=/config/workspace/zigbee2mqtt-rs/.upstream/zigbee-herdsman-converters/dist node scripts/evid04_node_reference.js",
   "candidate_cmd": "env EVID04_CACHE=/tmp/opencode/evid04/herdsman-converters/v26.115.1 ./target/release/evid04_candidate",
   "fixtures": "docs/parity/evidence/evid04/fixtures",
