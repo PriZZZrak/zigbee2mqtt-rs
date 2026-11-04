@@ -12,6 +12,7 @@ pub mod multistate_input;
 pub mod occupancy;
 pub mod on_off;
 pub mod on_off_switch_cfg;
+pub mod ota;
 pub mod power;
 pub mod scenes;
 pub mod temperature;
