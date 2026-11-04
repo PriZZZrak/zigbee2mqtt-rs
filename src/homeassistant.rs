@@ -340,6 +340,248 @@ async fn publish_sensor(ctx: &SensorDiscoveryCtx<'_>, device_class: &str, unit: 
     publish(mqtt, "sensor", ieee_hex, device_class, &config).await;
 }
 
+fn expose_property(expose: &Value) -> Option<&str> {
+    expose
+        .get("property")
+        .and_then(|value| value.as_str())
+        .or_else(|| expose.get("name").and_then(|value| value.as_str()))
+}
+
+fn payload_string(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Bool(boolean) => boolean.to_string(),
+        Value::Number(number) => number.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn sensor_class(property: &str) -> Option<&'static str> {
+    Some(match property {
+        "temperature" => "temperature",
+        "humidity" => "humidity",
+        "illuminance" => "illuminance",
+        "battery" => "battery",
+        "voltage" => "voltage",
+        "current" => "current",
+        "power" => "power",
+        "energy" => "energy",
+        "carbon_dioxide" => "carbon_dioxide",
+        "pm25" => "pm25",
+        _ => return None,
+    })
+}
+
+fn binary_class(property: &str) -> Option<&'static str> {
+    Some(match property {
+        "contact" => "door",
+        "occupancy" | "motion" => "motion",
+        "tamper" => "tamper",
+        "smoke" => "smoke",
+        "water_leak" => "moisture",
+        _ => return None,
+    })
+}
+
+/// Map prepared upstream exposes to HA discovery configs.
+///
+/// Returns `(component, object_id, config)` tuples for the expose kinds with a
+/// verified simple mapping. Unknown/complex exposes (climate, cover, lock, fan,
+/// vendor features) are skipped until their contracts are ported.
+pub(crate) fn configs_from_exposes(
+    device: &Device,
+    exposes: &[Value],
+    base_topic: &str,
+    coordinator_ieee: &str,
+) -> Vec<(String, String, Value)> {
+    let ieee_hex = device.ieee_addr.as_hex();
+    let ha_device = device_block(device, base_topic, coordinator_ieee);
+    let availability = availability_block(base_topic);
+    let state_topic = format!("{}/{}", base_topic, device.friendly_name);
+    let command_topic = format!("{}/set", state_topic);
+    let mut configs = Vec::new();
+    for expose in exposes {
+        let Some(property) = expose_property(expose) else {
+            continue;
+        };
+        let kind = expose
+            .get("type")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        let access = expose
+            .get("access")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0);
+        match kind {
+            "numeric" => {
+                let mut config = json!({
+                    "availability": availability,
+                    "state_topic": state_topic,
+                    "object_id": property,
+                    "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                    "device": ha_device,
+                    "value_template": format!("{{{{ value_json.{property} }}}}"),
+                    "state_class": "measurement",
+                    "enabled_by_default": true,
+                });
+                if let Some(unit) = expose.get("unit").and_then(|value| value.as_str()) {
+                    config["unit_of_measurement"] = json!(unit);
+                }
+                if let Some(class) = sensor_class(property) {
+                    config["device_class"] = json!(class);
+                }
+                configs.push(("sensor".to_string(), property.to_string(), config));
+            }
+            "binary" if access & 0x02 != 0 && property == "state" => {
+                let on = expose
+                    .get("value_on")
+                    .map(payload_string)
+                    .unwrap_or_else(|| "ON".into());
+                let off = expose
+                    .get("value_off")
+                    .map(payload_string)
+                    .unwrap_or_else(|| "OFF".into());
+                configs.push((
+                    "switch".to_string(),
+                    property.to_string(),
+                    json!({
+                        "availability": availability,
+                        "command_topic": command_topic,
+                        "state_topic": state_topic,
+                        "object_id": property,
+                        "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                        "device": ha_device,
+                        "value_template": format!("{{{{ value_json.{property} }}}}"),
+                        "payload_on": on,
+                        "payload_off": off,
+                    }),
+                ));
+            }
+            "binary" => {
+                let on = expose
+                    .get("value_on")
+                    .cloned()
+                    .unwrap_or_else(|| json!("ON"));
+                let off = expose
+                    .get("value_off")
+                    .cloned()
+                    .unwrap_or_else(|| json!("OFF"));
+                let mut config = json!({
+                    "availability": availability,
+                    "state_topic": state_topic,
+                    "object_id": property,
+                    "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                    "device": ha_device,
+                    "value_template": format!("{{{{ value_json.{property} }}}}"),
+                    "payload_on": on,
+                    "payload_off": off,
+                    "enabled_by_default": true,
+                });
+                if let Some(class) = binary_class(property) {
+                    config["device_class"] = json!(class);
+                }
+                configs.push(("binary_sensor".to_string(), property.to_string(), config));
+            }
+            "switch" => {
+                let on = expose
+                    .get("value_on")
+                    .map(payload_string)
+                    .unwrap_or_else(|| "ON".into());
+                let off = expose
+                    .get("value_off")
+                    .map(payload_string)
+                    .unwrap_or_else(|| "OFF".into());
+                configs.push((
+                    "switch".to_string(),
+                    property.to_string(),
+                    json!({
+                        "availability": availability,
+                        "command_topic": command_topic,
+                        "state_topic": state_topic,
+                        "object_id": property,
+                        "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                        "device": ha_device,
+                        "value_template": format!("{{{{ value_json.{property} }}}}"),
+                        "payload_on": on,
+                        "payload_off": off,
+                    }),
+                ));
+            }
+            "light" => {
+                let features = expose
+                    .get("features")
+                    .and_then(|value| value.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                let has_brightness = features.iter().any(|feature| {
+                    feature.get("name").and_then(|name| name.as_str()) == Some("brightness")
+                });
+                let has_color_temp = features.iter().any(|feature| {
+                    matches!(
+                        feature.get("name").and_then(|name| name.as_str()),
+                        Some("color_temp") | Some("color_temperature")
+                    )
+                });
+                let has_color = features.iter().any(|feature| {
+                    matches!(
+                        feature.get("name").and_then(|name| name.as_str()),
+                        Some("color_xy") | Some("color_hs")
+                    )
+                });
+                let mut config = json!({
+                    "availability": availability,
+                    "command_topic": command_topic,
+                    "state_topic": state_topic,
+                    "schema": "json",
+                    "object_id": device.friendly_name,
+                    "unique_id": format!("{ieee_hex}_light_{base_topic}"),
+                    "device": ha_device,
+                    "brightness": has_brightness,
+                    "brightness_scale": 254,
+                });
+                let mut modes = Vec::new();
+                if has_brightness {
+                    modes.push("brightness");
+                }
+                if has_color_temp {
+                    modes.push("color_temp");
+                }
+                if has_color {
+                    modes.push("xy");
+                }
+                if !modes.is_empty() {
+                    config["supported_color_modes"] = json!(modes);
+                }
+                configs.push(("light".to_string(), "light".to_string(), config));
+            }
+            _ => {}
+        }
+    }
+    configs
+}
+
+/// Publish discovery derived from upstream exposes.
+pub async fn publish_exposes_discovery(
+    mqtt: &MqttBridge,
+    device: &Device,
+    exposes: &[Value],
+    base_topic: &str,
+    coordinator_ieee: &str,
+) {
+    for (component, object_id, config) in
+        configs_from_exposes(device, exposes, base_topic, coordinator_ieee)
+    {
+        publish(
+            mqtt,
+            &component,
+            &device.ieee_addr.as_hex(),
+            &object_id,
+            &config,
+        )
+        .await;
+    }
+}
+
 fn device_block(device: &Device, _base_topic: &str, coordinator_ieee: &str) -> Value {
     let ieee_hex = device.ieee_addr.as_hex();
     // z2m hardcodes the "zigbee2mqtt" identifier prefix regardless of the
@@ -837,5 +1079,84 @@ mod tests {
         assert_eq!(config["unit_of_measurement"], "lqi");
         assert_eq!(config["icon"], "mdi:signal");
         assert_eq!(config["value_template"], "{{ value_json.linkquality }}");
+    }
+
+    #[test]
+    fn prepared_exposes_map_to_discovery_configs() {
+        let dev = make_light();
+        let exposes = vec![
+            json!({"type": "numeric", "name": "temperature", "property": "temperature", "access": 5, "unit": "°C"}),
+            json!({"type": "numeric", "name": "battery", "property": "battery", "access": 1, "unit": "%"}),
+            json!({"type": "binary", "name": "contact", "property": "contact", "access": 1, "value_on": false, "value_off": true}),
+            json!({"type": "switch", "name": "state", "property": "state", "access": 7, "value_on": "ON", "value_off": "OFF"}),
+            json!({"type": "light", "name": "light", "features": [{"name": "brightness"}, {"name": "color_temp"}]}),
+        ];
+        let configs = configs_from_exposes(&dev, &exposes, BASE, COORD_IEEE);
+        assert_eq!(configs.len(), 5);
+
+        let temperature = configs
+            .iter()
+            .find(|(component, id, _)| component == "sensor" && id == "temperature")
+            .map(|(_, _, config)| config)
+            .expect("temperature sensor");
+        assert_eq!(temperature["unit_of_measurement"], "°C");
+        assert_eq!(temperature["device_class"], "temperature");
+        assert_eq!(
+            temperature["value_template"],
+            "{{ value_json.temperature }}"
+        );
+        assert_eq!(
+            temperature["unique_id"],
+            format!("{}_temperature_{BASE}", dev.ieee_addr.as_hex())
+        );
+
+        let contact = configs
+            .iter()
+            .find(|(component, id, _)| component == "binary_sensor" && id == "contact")
+            .map(|(_, _, config)| config)
+            .expect("contact binary sensor");
+        // Upstream binary_sensor keeps the raw value_on/value_off types.
+        assert_eq!(contact["payload_on"], false);
+        assert_eq!(contact["payload_off"], true);
+        assert_eq!(contact["device_class"], "door");
+
+        let switch = configs
+            .iter()
+            .find(|(component, id, _)| component == "switch" && id == "state")
+            .map(|(_, _, config)| config)
+            .expect("switch");
+        // Switch payloads use strings, matching the existing Rust contract.
+        assert_eq!(switch["payload_on"], "ON");
+        assert_eq!(switch["payload_off"], "OFF");
+
+        let light = configs
+            .iter()
+            .find(|(component, _, _)| component == "light")
+            .map(|(_, _, config)| config)
+            .expect("light");
+        assert_eq!(light["schema"], "json");
+        assert_eq!(light["brightness"], true);
+        assert_eq!(
+            light["supported_color_modes"],
+            json!(["brightness", "color_temp"])
+        );
+    }
+
+    #[test]
+    fn function_exposes_output_uses_the_same_mapping() {
+        let dev = make_light();
+        // This is the shape produced by ExternalConverter::exposes when the
+        // upstream exposes is a function of the device.
+        let exposes = vec![json!({
+            "type": "numeric",
+            "name": "temperature",
+            "property": "temperature",
+            "access": 1,
+            "unit": "°C"
+        })];
+        let configs = configs_from_exposes(&dev, &exposes, BASE, COORD_IEEE);
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].0, "sensor");
+        assert_eq!(configs[0].1, "temperature");
     }
 }

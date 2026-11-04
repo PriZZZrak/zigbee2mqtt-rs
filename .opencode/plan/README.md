@@ -81,8 +81,9 @@ R1 — явно ограниченный релиз для проверенно�
   extend from/to/exposes/options; в `msg` передаются реальные endpoint/LQI/groupID
   и helpers `getDevice`/`deviceIeeeAddress`; native и converter значения
   сливаются в одну публикацию с приоритетом definition.
-  Exposes API теперь возвращает prepared array/function exposes (без HA mapping),
-  meta/configure/onEvent и publish-callback semantics ещё не реализованы.
+  Exposes API возвращает prepared array/function exposes и подключён к HA discovery
+  для numeric/binary/switch/light (golden tests); climate/cover/lock/fan и cleanup
+  не реализованы. meta/configure/onEvent и publish-callback semantics ещё не готовы.
   Persistent Boa context/timers заблокированы ADR-08: Context не Send, нужен
   выбор между converter actor thread и current_thread runtime.
 

@@ -56,8 +56,8 @@ topology change, and the memory budget per device is unknown.
 
 ## Remaining gaps
 
-- Exposes are not yet wired into Home Assistant discovery; the current HA module
-  still infers entities from device clusters.
+- Exposes are wired into Home Assistant discovery for numeric/binary/switch/light
+  (`HA-003`); complex entity kinds and cleanup still use fallback/are missing.
 - Prepared exposes omit complete meta/configure/onEvent semantics and
   manufacturer-specific overrides.
 - No real package or Node oracle for exposes.

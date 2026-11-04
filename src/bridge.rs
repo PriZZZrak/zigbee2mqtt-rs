@@ -258,6 +258,34 @@ impl Bridge {
         }
     }
 
+    /// Publish HA discovery using upstream exposes when available, otherwise
+    /// the cluster-inference fallback.
+    async fn publish_device_discovery(
+        &self,
+        mqtt: &MqttBridge,
+        device: &Device,
+        base_topic: &str,
+        coordinator_ieee: &str,
+    ) {
+        let info = crate::converters::external::ExternalDeviceInfo::from_device(device);
+        let model = device.model.clone().unwrap_or_default();
+        match self.external.exposes(&model, &info) {
+            Some(exposes) if !exposes.is_empty() => {
+                homeassistant::publish_exposes_discovery(
+                    mqtt,
+                    device,
+                    &exposes,
+                    base_topic,
+                    coordinator_ieee,
+                )
+                .await;
+            }
+            _ => {
+                homeassistant::publish_discovery(mqtt, device, base_topic, coordinator_ieee).await;
+            }
+        }
+    }
+
     async fn persist_database(&self, coordinator_ieee: Option<IeeeAddr>) {
         // Batching: update in-memory immediately, debounce disk write to save memory/I/O (upstream Entity.database.update(write:false))
         {
@@ -616,7 +644,7 @@ impl Bridge {
                             // Publish HA discovery after interview
                             if ha_enabled && interview_just_completed {
                                 if let Some(dev) = devices.get_by_nwk(nwk_addr) {
-                                    homeassistant::publish_discovery(&mqtt, &dev, &base_topic, &coordinator_ieee).await;
+                                    self.publish_device_discovery(&mqtt, &dev, &base_topic, &coordinator_ieee).await;
                                 }
                             }
                         }
@@ -1149,7 +1177,7 @@ impl Bridge {
             Self::publish_state(mqtt, self.cfg.advanced.output, &dev.friendly_name, &state).await;
 
             if self.cfg.homeassistant.enabled() && dev.interview_complete {
-                homeassistant::publish_discovery(
+                self.publish_device_discovery(
                     mqtt,
                     &dev,
                     &self.cfg.mqtt.base_topic,
