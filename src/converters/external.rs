@@ -207,8 +207,10 @@ struct Fingerprint {
     zcl_version: Option<u8>,
     #[serde(default, rename = "type")]
     device_type: Option<String>,
+    /// Upstream allows a RegExp here; JSON serialisation then yields `{}`.
+    /// Any presence is treated as "unsupported match" below.
     #[serde(default, rename = "ieeeAddr")]
-    ieee_addr: Option<String>,
+    ieee_addr: Option<serde_json::Value>,
     #[serde(default)]
     endpoints: Option<Vec<FingerprintEndpoint>>,
     #[serde(default)]
@@ -636,14 +638,19 @@ impl ExternalConverter {
         })?;
 
         let mut ctx = Context::default();
-        let sources = collect_sources(&self.dir, &module_src, &file)?;
+        let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
         let bootstrap = format!(
             r#"
             const __sources = {sources};
-            const __stub = {stub};
             const __modules = {{}};
             function __resolve(from, spec) {{
-                if (spec === "zigbee-herdsman") return "__builtin__/zigbee-herdsman";
+                if (spec === "zigbee-herdsman" || spec.startsWith("zigbee-herdsman/")) return "__builtin__/" + spec;
+                if (spec.startsWith("zigbee-herdsman-converters/")) {{
+                    let rel = spec.slice("zigbee-herdsman-converters/".length);
+                    if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
+                    return rel;
+                }}
+                if (!spec.startsWith(".")) return "__external__/" + spec;
                 if (spec.startsWith(".")) {{
                     const parts = from.split("/").slice(0, -1).concat(spec.split("/"));
                     const out = [];
@@ -662,14 +669,10 @@ impl ExternalConverter {
             function __require(from) {{
                 return function(spec) {{
                     const key = __resolve(from, spec);
-                    if (key === "__builtin__/zigbee-herdsman") {{
-                        if (!__modules[key]) {{
-                            const module = {{exports: {{}}}};
-                            const fn_ = new Function("require", "module", "exports", __stub);
-                            fn_(__require(key), module, module.exports);
-                            __modules[key] = module;
-                        }}
-                        return __modules[key].exports;
+                    if (!__sources[key] && key.startsWith("__external__/")) {{
+                        // Unknown npm packages are exposed as empty modules so the
+                        // package still loads; using them fails at runtime.
+                        __sources[key] = "module.exports = {{}};";
                     }}
                     if (!__sources[key]) throw new Error("Cannot find module '" + spec + "' from '" + from + "'");
                     if (!__modules[key]) {{
@@ -700,7 +703,6 @@ impl ExternalConverter {
             }}
             "#,
             sources = serde_json::to_string(&sources).unwrap_or_default(),
-            stub = serde_json::to_string(&stub_source(&zcl)).unwrap_or_default(),
         );
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
             warn!("external converter: bootstrap eval failed");
@@ -714,8 +716,8 @@ impl ExternalConverter {
             r#"__require("devices/__entry__.js")("./{file}")"#,
             file = file,
         );
-        if ctx.eval(Source::from_bytes(check.as_bytes())).is_err() {
-            warn!("external converter: cannot load {file}");
+        if let Err(error) = ctx.eval(Source::from_bytes(check.as_bytes())) {
+            warn!("external converter: cannot load {file}: {error}");
             return None;
         }
 
@@ -858,7 +860,7 @@ impl ExternalConverter {
         let module_src = self
             .load_js(&format!("devices/{file}"))
             .or_else(|| self.load_js(&file))?;
-        let sources = collect_sources(&self.dir, &module_src, &file)?;
+        let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
         let mut ctx = Context::default();
         let bootstrap = format!("{}{}", cjs_bootstrap(&sources, &zcl), TIMERS_JS);
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
@@ -1501,7 +1503,7 @@ impl ExternalConverter {
         else {
             return Vec::new();
         };
-        let Some(sources) = collect_sources(&self.dir, &module_src, &file) else {
+        let Some(sources) = collect_sources(&self.dir, &module_src, &file, &zcl) else {
             return Vec::new();
         };
         let cluster_ids: HashMap<&str, u16> = zcl
@@ -1509,14 +1511,18 @@ impl ExternalConverter {
             .iter()
             .filter_map(|(id, name)| id.parse::<u16>().ok().map(|id| (name.as_str(), id)))
             .collect();
-        let stub = stub_source(&zcl);
         let bootstrap = format!(
             r#"
             const __sources = {sources};
-            const __stub = {stub};
             const __modules = {{}};
             function __resolve(from, spec) {{
-                if (spec === "zigbee-herdsman") return "__builtin__/zigbee-herdsman";
+                if (spec === "zigbee-herdsman" || spec.startsWith("zigbee-herdsman/")) return "__builtin__/" + spec;
+                if (spec.startsWith("zigbee-herdsman-converters/")) {{
+                    let rel = spec.slice("zigbee-herdsman-converters/".length);
+                    if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
+                    return rel;
+                }}
+                if (!spec.startsWith(".")) return "__external__/" + spec;
                 if (spec.startsWith(".")) {{
                     const parts = from.split("/").slice(0, -1).concat(spec.split("/"));
                     const out = [];
@@ -1534,14 +1540,10 @@ impl ExternalConverter {
             function __require(from) {{
                 return function(spec) {{
                     const key = __resolve(from, spec);
-                    if (key === "__builtin__/zigbee-herdsman") {{
-                        if (!__modules[key]) {{
-                            const module = {{exports: {{}}}};
-                            const fn_ = new Function("require", "module", "exports", __stub);
-                            fn_(__require(key), module, module.exports);
-                            __modules[key] = module;
-                        }}
-                        return __modules[key].exports;
+                    if (!__sources[key] && key.startsWith("__external__/")) {{
+                        // Unknown npm packages are exposed as empty modules so the
+                        // package still loads; using them fails at runtime.
+                        __sources[key] = "module.exports = {{}};";
                     }}
                     if (!__sources[key]) throw new Error("Cannot find module '" + spec + "' from '" + from + "'");
                     if (!__modules[key]) {{
@@ -1572,7 +1574,6 @@ impl ExternalConverter {
             }}
             "#,
             sources = serde_json::to_string(&sources).unwrap_or_default(),
-            stub = serde_json::to_string(&stub).unwrap_or_default(),
         );
         let meta = serde_json::json!({
             "state": state,
@@ -1724,15 +1725,19 @@ fn cluster_name_to_id(zcl: &ZclMaps, name: &str) -> Option<u16> {
         .find_map(|(id, value)| (value == name).then(|| id.parse::<u16>().ok()).flatten())
 }
 
-fn cjs_bootstrap(sources: &HashMap<String, String>, zcl: &ZclMaps) -> String {
-    let stub = stub_source(zcl);
+fn cjs_bootstrap(sources: &HashMap<String, String>, _zcl: &ZclMaps) -> String {
     format!(
         r#"
         const __sources = {sources};
-        const __stub = {stub};
         const __modules = {{}};
         function __resolve(from, spec) {{
-            if (spec === "zigbee-herdsman") return "__builtin__/zigbee-herdsman";
+            if (spec === "zigbee-herdsman" || spec.startsWith("zigbee-herdsman/")) return "__builtin__/" + spec;
+            if (spec.startsWith("zigbee-herdsman-converters/")) {{
+                let rel = spec.slice("zigbee-herdsman-converters/".length);
+                if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
+                return rel;
+            }}
+            if (!spec.startsWith(".")) return "__external__/" + spec;
             if (spec.startsWith(".")) {{
                 const parts = from.split("/").slice(0, -1).concat(spec.split("/"));
                 const out = [];
@@ -1750,14 +1755,8 @@ fn cjs_bootstrap(sources: &HashMap<String, String>, zcl: &ZclMaps) -> String {
         function __require(from) {{
             return function(spec) {{
                 const key = __resolve(from, spec);
-                if (key === "__builtin__/zigbee-herdsman") {{
-                    if (!__modules[key]) {{
-                        const module = {{exports: {{}}}};
-                        const fn_ = new Function("require", "module", "exports", __stub);
-                        fn_(__require(key), module, module.exports);
-                        __modules[key] = module;
-                    }}
-                    return __modules[key].exports;
+                if (!__sources[key] && key.startsWith("__external__/")) {{
+                    __sources[key] = "module.exports = {{}};";
                 }}
                 if (!__sources[key]) throw new Error("Cannot find module '" + spec + "' from '" + from + "'");
                 if (!__modules[key]) {{
@@ -1788,7 +1787,6 @@ fn cjs_bootstrap(sources: &HashMap<String, String>, zcl: &ZclMaps) -> String {
         }}
         "#,
         sources = serde_json::to_string(sources).unwrap_or_default(),
-        stub = serde_json::to_string(&stub).unwrap_or_default(),
     )
 }
 
@@ -1808,7 +1806,7 @@ impl ExternalConverter {
         let module_src = self
             .load_js(&format!("devices/{file}"))
             .or_else(|| self.load_js(&file))?;
-        let sources = collect_sources(&self.dir, &module_src, &file)?;
+        let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
         let meta = serde_json::json!({
             "device": {
                 "modelID": device.model_id,
@@ -1850,11 +1848,16 @@ impl ExternalConverter {
 
 /// Collect every CJS source reachable from the entry device file.
 /// Keys are dist-relative paths (`devices/lytko.js`, `converters/foo.js`, ...).
-/// Collect every CJS source reachable from the entry device file.
+///
+/// Non-relative `require()`s (herdsman subpaths, `node:*`, npm packages) are not
+/// traversed here: the JS bootstrap maps them to synthetic stubs. A missing
+/// *relative* file is treated as a load failure because the package is
+/// incomplete.
 fn collect_sources(
     dir: &Path,
     entry_src: &str,
     entry_file: &str,
+    zcl: &ZclMaps,
 ) -> Option<HashMap<String, String>> {
     let mut sources = HashMap::new();
     let mut stack = vec![format!("devices/{entry_file}")];
@@ -1862,21 +1865,67 @@ fn collect_sources(
     while let Some(path) = stack.pop() {
         let src = sources.get(&path)?.clone();
         for spec in required_specs(&src) {
-            if spec == "zigbee-herdsman" {
+            // Upstream device/lib modules sometimes require their own package
+            // by name (`zigbee-herdsman-converters/lib/...`).
+            let resolved = if let Some(rest) = spec.strip_prefix("zigbee-herdsman-converters/") {
+                let mut joined = rest.to_string();
+                if !joined.ends_with(".js") {
+                    joined.push_str(".js");
+                }
+                joined
+            } else if spec.starts_with('.') {
+                match resolve_relative(&path, &spec) {
+                    Some(resolved) => resolved,
+                    None => {
+                        warn!("external converter: cannot resolve '{spec}' from '{path}'");
+                        return None;
+                    }
+                }
+            } else {
+                // Mapped to a synthetic stub in the bootstrap.
                 continue;
-            }
-            let resolved = resolve_relative(&path, &spec)?;
+            };
             if sources.contains_key(&resolved) {
                 continue;
             }
-            // dist layout mirror first, then legacy flat file.
             let local = dir.join(&resolved);
-            let content = std::fs::read_to_string(&local).ok()?;
+            let content = match std::fs::read_to_string(&local) {
+                Ok(content) => content,
+                Err(error) => {
+                    warn!(
+                        "external converter: missing module '{}' required by '{}': {error}",
+                        resolved, path
+                    );
+                    return None;
+                }
+            };
             sources.insert(resolved.clone(), content);
             stack.push(resolved);
         }
     }
+    inject_synthetic_modules(&mut sources, zcl);
     Some(sources)
+}
+
+/// Deterministic JS stubs for non-relative imports of the compiled package.
+fn inject_synthetic_modules(sources: &mut HashMap<String, String>, zcl: &ZclMaps) {
+    sources.insert("__builtin__/zigbee-herdsman".into(), stub_source(zcl));
+    sources.insert(
+        "__builtin__/zigbee-herdsman/dist/zspec/zcl/definition/enums".into(),
+        enums_stub_source(zcl),
+    );
+    sources.insert(
+        "__builtin__/zigbee-herdsman/dist/zspec/zcl".into(),
+        zcl_subpath_stub_source(),
+    );
+    sources.insert(
+        "__builtin__/zigbee-herdsman/dist/zspec".into(),
+        zspec_stub_source(),
+    );
+    sources.insert("__external__/node:assert".into(), ASSERT_STUB.to_string());
+    sources.insert("__external__/node:buffer".into(), BUFFER_STUB.to_string());
+    sources.insert("__external__/node:util".into(), NODE_UTIL_STUB.to_string());
+    sources.insert("__external__/node:fs".into(), NODE_FS_STUB.to_string());
 }
 
 fn required_specs(src: &str) -> Vec<String> {
@@ -1939,6 +1988,9 @@ fn stub_source(zcl: &ZclMaps) -> String {
         const __dt = {dts};
         const __cl = {cl};
         const __throw = (what) => {{ throw new Error("zigbee-herdsman stub: unsupported " + what + " (see CONVERTER-external.md)"); }};
+        const __status = {{SUCCESS: 0x00, FAILURE: 0x01, NOT_AUTHORIZED: 0x7E, MALFORMED_COMMAND: 0x80,
+            UNSUPPORTED_ATTRIBUTE: 0x86, INVALID_VALUE: 0x87, READ_ONLY: 0x88, NOT_FOUND: 0x8B,
+            INVALID_DATA_TYPE: 0x8D, WRITE_ONLY: 0x8F, TIMEOUT: 0x94, NO_IMAGE_AVAILABLE: 0x98}};
         const Zcl = {{
             ManufacturerCode: __mfr,
             DataType: __dt,
@@ -1947,22 +1999,24 @@ fn stub_source(zcl: &ZclMaps) -> String {
                 if (p in __cl) return {{ID: __cl[p]}};
                 return __throw("Zcl.Clusters." + String(p));
             }} }}),
-            Status: new Proxy({{}}, {{ get: (t, p) => {{
+            Status: typeof __status !== "undefined" ? __status : new Proxy({{}}, {{ get: (t, p) => {{
                 if (p === "__esModule" || p === "then") return undefined;
                 return __throw("Zcl.Status." + String(p));
             }} }}),
-            FrameType: new Proxy({{}}, {{ get: (t, p) => {{
-                if (p === "__esModule" || p === "then") return undefined;
-                return __throw("Zcl.FrameType." + String(p));
-            }} }}),
+            FrameType: {{GLOBAL: 0, SPECIFIC: 1}},
+            Direction: {{CLIENT_TO_SERVER: 0, SERVER_TO_CLIENT: 1}},
+            StructuredIndicatorType: {{Whole: 0x00, WriteAdd: 0x10, WriteRemove: 0x20}},
             Utils: new Proxy({{}}, {{ get: (t, p) => {{
                 if (p === "__esModule" || p === "then") return undefined;
                 return __throw("Zcl.Utils." + String(p));
             }} }}),
-            BuffaloZclDataType: new Proxy({{}}, {{ get: (t, p) => {{
-                if (p === "__esModule" || p === "then") return undefined;
-                return __throw("Zcl.BuffaloZclDataType." + String(p));
-            }} }}),
+            BuffaloZclDataType: {{
+                USE_DATA_TYPE: 1000, LIST_UINT8: 1001, LIST_UINT16: 1002, LIST_UINT24: 1003,
+                LIST_UINT32: 1004, LIST_ZONEINFO: 1005, EXTENSION_FIELD_SETS: 1006,
+                LIST_THERMO_TRANSITIONS: 1007, BUFFER: 1008, GPD_FRAME: 1009,
+                STRUCTURED_SELECTOR: 1010, LIST_TUYA_DATAPOINT_VALUES: 1011,
+                LIST_MIBOXER_ZONES: 1012, BIG_ENDIAN_UINT24: 1013, MI_STRUCT: 1014
+            }},
         }};
         const ZSpec = {{
             HA_PROFILE_ID: 260,
@@ -1978,6 +2032,137 @@ fn stub_source(zcl: &ZclMaps) -> String {
         cl = cl,
     )
 }
+
+/// `zigbee-herdsman/dist/zspec/zcl/definition/enums` replacement.
+fn enums_stub_source(zcl: &ZclMaps) -> String {
+    let dts = serde_json::to_string(&zcl.data_types).unwrap_or_else(|_| "{}".into());
+    format!(
+        r#"const __dt = {dts};
+        const BuffaloZclDataType = {{
+            USE_DATA_TYPE: 1000, LIST_UINT8: 1001, LIST_UINT16: 1002, LIST_UINT24: 1003,
+            LIST_UINT32: 1004, LIST_ZONEINFO: 1005, EXTENSION_FIELD_SETS: 1006,
+            LIST_THERMO_TRANSITIONS: 1007, BUFFER: 1008, GPD_FRAME: 1009,
+            STRUCTURED_SELECTOR: 1010, LIST_TUYA_DATAPOINT_VALUES: 1011,
+            LIST_MIBOXER_ZONES: 1012, BIG_ENDIAN_UINT24: 1013, MI_STRUCT: 1014
+        }};
+        const Direction = {{CLIENT_TO_SERVER: 0, SERVER_TO_CLIENT: 1}};
+        const FrameType = {{GLOBAL: 0, SPECIFIC: 1}};
+        const StructuredIndicatorType = {{Whole: 0x00, WriteAdd: 0x10, WriteRemove: 0x20}};
+        const __status = {{SUCCESS: 0x00, FAILURE: 0x01, NOT_AUTHORIZED: 0x7E, MALFORMED_COMMAND: 0x80,
+            UNSUPPORTED_ATTRIBUTE: 0x86, INVALID_VALUE: 0x87, READ_ONLY: 0x88, NOT_FOUND: 0x8B,
+            INVALID_DATA_TYPE: 0x8D, WRITE_ONLY: 0x8F, TIMEOUT: 0x94, NO_IMAGE_AVAILABLE: 0x98}};
+        const Status = new Proxy(__status, {{ get: (t, p) => {{
+            if (p === "__esModule" || p === "then") return undefined;
+            if (p in t) return t[p];
+            throw new Error("zigbee-herdsman stub: unsupported Zcl.Status." + String(p));
+        }} }});
+        module.exports = {{DataType: __dt, BuffaloZclDataType, Direction, FrameType, Status, StructuredIndicatorType}};"#,
+        dts = dts,
+    )
+}
+
+/// `zigbee-herdsman/dist/zspec/zcl` replacement. Frame construction needs the
+/// full ZCL serializer, which is not ported; accessing it fails explicitly.
+fn zcl_subpath_stub_source() -> String {
+    r#"const __throw = (what) => { throw new Error("zigbee-herdsman stub: unsupported " + what); };
+    const Frame = new Proxy({}, { get: (t, p) => {
+        if (p === "__esModule" || p === "then") return undefined;
+        return __throw("Zcl.Frame." + String(p));
+    } });
+    module.exports = {
+        Frame,
+        FrameType: {GLOBAL: 0, SPECIFIC: 1},
+        Direction: {CLIENT_TO_SERVER: 0, SERVER_TO_CLIENT: 1},
+        Utils: new Proxy({}, { get: (t, p) => {
+            if (p === "__esModule" || p === "then") return undefined;
+            return __throw("Zcl.Utils." + String(p));
+        } }),
+    };"#
+    .to_string()
+}
+
+/// `zigbee-herdsman/dist/zspec` replacement.
+fn zspec_stub_source() -> String {
+    r#"const BuffaloZclDataType = {
+        USE_DATA_TYPE: 1000, LIST_UINT8: 1001, LIST_UINT16: 1002, LIST_UINT24: 1003,
+        LIST_UINT32: 1004, LIST_ZONEINFO: 1005, EXTENSION_FIELD_SETS: 1006,
+        LIST_THERMO_TRANSITIONS: 1007, BUFFER: 1008, GPD_FRAME: 1009,
+        STRUCTURED_SELECTOR: 1010, LIST_TUYA_DATAPOINT_VALUES: 1011,
+        LIST_MIBOXER_ZONES: 1012, BIG_ENDIAN_UINT24: 1013, MI_STRUCT: 1014
+    };
+    module.exports = {BuffaloZclDataType, HA_PROFILE_ID: 260, HA_ENDPOINT: 1};"#
+        .to_string()
+}
+
+/// `node:assert` replacement (compiled converters use `assert_1.default`).
+const ASSERT_STUB: &str = r#"function __assert(value, message) {
+    if (!value) {
+        const error = new Error(message || "Assertion failed");
+        error.name = "AssertionError";
+        throw error;
+    }
+}
+__assert.ok = __assert;
+__assert.strict = __assert;
+__assert.equal = (a, b, m) => __assert(a == b, m || `${a} != ${b}`);
+__assert.strictEqual = (a, b, m) => __assert(a === b, m || `${a} !== ${b}`);
+__assert.notStrictEqual = (a, b, m) => __assert(a !== b, m || `${a} === ${b}`);
+__assert.deepStrictEqual = (a, b, m) => __assert(JSON.stringify(a) === JSON.stringify(b), m || "deepStrictEqual failed");
+__assert.deepEqual = __assert.deepStrictEqual;
+__assert.throws = (fn, _e, m) => { let threw = false; try { fn(); } catch { threw = true; } __assert(threw, m || "expected throw"); };
+__assert.fail = (m) => __assert(false, m || "assert.fail");
+module.exports = __assert;
+module.exports.default = __assert;
+module.exports.strict = __assert;"#;
+
+/// Minimal Buffer shim for compiled converters running inside Boa.
+const BUFFER_STUB: &str = r#"class __Buffer extends Uint8Array {
+    static from(value, encoding) {
+        if (typeof value === "string") {
+            if (encoding === "hex") {
+                const out = [];
+                for (let i = 0; i + 1 < value.length; i += 2) out.push(parseInt(value.substr(i, 2), 16));
+                return new __Buffer(out);
+            }
+            return __Buffer.from(Array.from(new TextEncoder().encode(value)));
+        }
+        if (Array.isArray(value)) return new __Buffer(value);
+        if (value instanceof Uint8Array) return new __Buffer(Array.from(value));
+        if (value && typeof value.length === "number") return new __Buffer(Array.from(value));
+        throw new Error("Buffer stub: unsupported source");
+    }
+    static alloc(size, fill = 0) { const out = new __Buffer(size); out.fill(fill); return out; }
+    static isBuffer(value) { return value instanceof Uint8Array; }
+    toString(encoding) {
+        if (encoding === "hex") return Array.from(this, (b) => b.toString(16).padStart(2, "0")).join("");
+        return new TextDecoder().decode(this);
+    }
+    equals(other) {
+        if (!other || other.length !== this.length) return false;
+        for (let i = 0; i < this.length; i++) if (this[i] !== other[i]) return false;
+        return true;
+    }
+    write(_text, _offset) { throw new Error("Buffer stub: write is unsupported"); }
+}
+if (typeof globalThis.Buffer === "undefined") globalThis.Buffer = __Buffer;
+module.exports = {Buffer: globalThis.Buffer, default: globalThis.Buffer};"#;
+
+const NODE_UTIL_STUB: &str = r#"module.exports = {
+    inspect: (value) => { try { return JSON.stringify(value); } catch { return String(value); } },
+    format: (...args) => args.map((value) => String(value)).join(" "),
+    inherits: (ctor, superCtor) => { Object.setPrototypeOf(ctor.prototype, superCtor.prototype); },
+    promisify: (fn) => fn,
+};"#;
+
+/// `node:fs` is imported by some vendor libraries; file I/O is not exposed to
+/// converters, so reads fail explicitly and existence checks are false.
+const NODE_FS_STUB: &str = r#"module.exports = {
+    existsSync: () => false,
+    readFileSync: () => { throw new Error("node:fs is not available to converters"); },
+    writeFileSync: () => { throw new Error("node:fs is not available to converters"); },
+    mkdirSync: () => {},
+    readdirSync: () => [],
+};"#;
 
 fn eval_string(ctx: &mut Context, script: &str) -> Option<String> {
     let v = ctx.eval(Source::from_bytes(script.as_bytes())).ok()?;
@@ -2037,6 +2222,8 @@ mod tests {
     const DEVICE_JS: &str = r#"
 const {Zcl} = require("zigbee-herdsman");
 const {double} = require("./helpers/util");
+const {check} = require("./helpers/assert_helper");
+const {uint16, listUint8} = require("./helpers/enums_helper");
 const MANU = Zcl.ManufacturerCode.TEXAS_INSTRUMENTS;
 const definitions = [
     {
@@ -2053,7 +2240,12 @@ const definitions = [
                 convert: (model, msg, publish, options, meta) => {
                     if (msg.data.measuredValue === undefined) return;
                     if (MANU !== 7) throw new Error("bad manufacturer code, got " + MANU);
-                    return {temperature: double(msg.data.measuredValue) / 100.0};
+                    return {
+                        temperature: double(msg.data.measuredValue) / 100.0,
+                        stub_uint16: uint16,
+                        stub_list_uint8: listUint8,
+                        checked: check(msg.data.measuredValue),
+                    };
                 },
             },
         ],
@@ -2103,6 +2295,21 @@ function double(x) { return x * 2; }
 module.exports = {double};
 "#;
 
+    const ASSERT_HELPER_JS: &str = r#"
+const assert = require("node:assert");
+function check(value) {
+    assert(value !== undefined, "value required");
+    assert.strictEqual(typeof value, "number");
+    return value;
+}
+module.exports = {check};
+"#;
+
+    const ENUMS_HELPER_JS: &str = r#"
+const enums = require("zigbee-herdsman/dist/zspec/zcl/definition/enums");
+module.exports = {uint16: enums.DataType.UINT16, listUint8: enums.BuffaloZclDataType.LIST_UINT8};
+"#;
+
     struct FixtureDir(PathBuf);
     impl Drop for FixtureDir {
         fn drop(&mut self) {
@@ -2121,6 +2328,11 @@ module.exports = {double};
         f.write_all(DEVICE_JS.as_bytes()).unwrap();
         let mut f = std::fs::File::create(dev_dir.join("helpers").join("util.js")).unwrap();
         f.write_all(HELPER_JS.as_bytes()).unwrap();
+        let mut f =
+            std::fs::File::create(dev_dir.join("helpers").join("assert_helper.js")).unwrap();
+        f.write_all(ASSERT_HELPER_JS.as_bytes()).unwrap();
+        let mut f = std::fs::File::create(dev_dir.join("helpers").join("enums_helper.js")).unwrap();
+        f.write_all(ENUMS_HELPER_JS.as_bytes()).unwrap();
         let registry = serde_json::json!({
             "models": {
                 "fixturebulb": {"file": "fakedev.js", "index": 0, "vendor": "Fixture", "model": "FixtureBulb"},
@@ -2163,7 +2375,7 @@ module.exports = {double};
         .unwrap();
         let zcl = serde_json::json!({
             "manufacturerCodes": {"TEXAS_INSTRUMENTS": 7},
-            "dataTypes": {},
+            "dataTypes": {"UINT16": 33},
             "clusters": {"1026": "msTemperatureMeasurement"},
             "attributes": {"msTemperatureMeasurement": {"0": "measuredValue"}},
         });
@@ -2199,6 +2411,57 @@ module.exports = {double};
             )
             .expect("converter should match");
         assert_eq!(out.get("temperature"), Some(&serde_json::json!(45)));
+    }
+
+    #[test]
+    fn real_package_modules_and_enums_subpath_are_stubbed() {
+        let (_tmp, conv) = fixture_dir();
+        let out = conv
+            .convert_from_zigbee(
+                "FixtureBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .expect("conversion with node:assert and enums stub");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(40)));
+        assert_eq!(out.get("stub_uint16"), Some(&serde_json::json!(33)));
+        assert_eq!(out.get("stub_list_uint8"), Some(&serde_json::json!(1001)));
+        assert_eq!(out.get("checked"), Some(&serde_json::json!(2000)));
+    }
+
+    #[test]
+    fn json_serialized_regex_fingerprint_does_not_break_registry_loading() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("otherdev.js"),
+            OTHER_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"fixturebulb": [["fakedev.js", 0], ["otherdev.js", 0]]},
+                "fingerprints": [
+                    {"file": "fakedev.js", "index": 0, "fingerprint": {"ieeeAddr": {}, "priority": 100}},
+                ],
+            }),
+        );
+        // A RegExp fingerprint cannot be evaluated in Rust; it must not match and
+        // must not abort selection (first candidate is used).
+        let out = conv
+            .convert_from_zigbee(
+                "FixtureBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .expect("selection must fall back to the first candidate");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(40)));
     }
 
     #[test]
@@ -2410,7 +2673,8 @@ module.exports = {definitions};
     fn collect_sources_follows_relative_requires() {
         let (_tmp, conv) = fixture_dir();
         let src = std::fs::read_to_string(conv.dir.join("devices").join("fakedev.js")).unwrap();
-        let map = collect_sources(conv.dir.as_path(), &src, "fakedev.js").expect("collect");
+        let zcl = conv.load_zcl().expect("zcl");
+        let map = collect_sources(conv.dir.as_path(), &src, "fakedev.js", &zcl).expect("collect");
         assert!(map.contains_key("devices/fakedev.js"));
         assert!(map.contains_key("devices/helpers/util.js"));
     }

@@ -1,0 +1,13 @@
+{
+  "id": "battery-snzb02-attribute-report",
+  "input": {
+    "model": "SNZB-02",
+    "manufacturer_name": "eWeLink",
+    "ieee_addr": "0x00124b0024c1e2f3",
+    "cluster_id": 1,
+    "attribute": "batteryPercentageRemaining",
+    "value": 180,
+    "msg_type": "attributeReport",
+    "linkquality": 42
+  }
+}

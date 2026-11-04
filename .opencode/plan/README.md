@@ -30,14 +30,15 @@ R1 — явно ограниченный релиз для проверенно�
 
 ## Состояние выполнения
 
-- **OPS-02 частично**: `scripts/build-openwrt-artifact.sh` собирает tarball и
-  manifest с SHA-256/размерами/target/git SHA, отвергает non-aarch64 и
-  dynamic-ELF; добавлен `openwrt-release.yml` c zigbuild и upload. В этой среде
-  нет aarch64-linker, поэтому artifact собран из закоммиченного prebuilt binary,
-  а CI-workflow не запускался; `.ipk`, install/upgrade и HIL не проверены.
-- **EVID-04 частично**: harness поддерживает pinned-source проверку, fixture
-  schema, явную нормализацию, JSON report и CI smoke. Проверен fake reference;
-  реальные Node-прогоны и corpus fixtures отсутствуют.
+- **OPS-02 частично**: artifact **пересобран из текущего SHA** через
+  `cargo zigbuild` (zig 0.13.0), 5 450 608 B static aarch64, tarball 5 607 694 B;
+  manifest с SHA-256/target/git SHA. CI-workflow сам не запускался, `.ipk`,
+  install/upgrade, free-space бюджет и HIL не проверены.
+- **EVID-04 частично**: harness + Node/pnpm + pinned converters построены;
+  **реальный differential** на 3 фикстурах SNZB-02 (temperature/humidity/battery)
+  прошёл Node-vs-Rust, все 4 пина MATCH. Один производитель/модель, нет
+  MQTT/ZCL/storage/frontend differential; app-herdsman 10.10.0 не задействован
+  (converters lock даёт 10.9.5).
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и
@@ -97,7 +98,11 @@ R1 — явно ограниченный релиз для проверенно�
   настраиваемый override, реальный HTTPS/cache и HIL отсутствуют.
 - **CV-09 convertSet частично**: `toZigbee.convertSet` исполняется в persistent
   Boa session, записанные write/command/read кодируются по опубликованному
-  `zcl-commands.json` (генерируется из pinned herdsman) и отправляются в bridge.
+  `zcl-commands.json`; генератор **реально запущен** (129 типизированных
+  кластеров, 4560 дефинишенов), layout-валидатор исправлен для `.d.ts`, реальный
+  пакет конвертирует SNZB-02 идентично Node. Synthetic-модули для
+  `zigbee-herdsman/dist/...`, `node:assert/buffer/util/fs`; regex-fingerprint
+  (`ieeeAddr:{}`) больше не ломает загрузку реестра.
   Generator/Node не запускался; composite/Buffalo-типы (array/struct/time/date/
   IEEE/lists/zoneinfo/buffer/selector/BE-u24) добавлены, context-dependent типы
   отклоняются явно. Bridge fake-coordinator E2E проверяет точный AF-кадр для

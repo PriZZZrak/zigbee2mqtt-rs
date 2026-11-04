@@ -39,11 +39,13 @@ release. `dist/` is git-ignored.
 ## Verification available here
 
 ```text
+$ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
+$ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
-artifact: /config/workspace/zigbee2mqtt-rs/dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-manifest: .../zigbee2mqtt-rs-0.1.0-aarch64-openwrt.manifest.json
-binary sha256: ea61a9e3bc702c0ee39b5b162109720e6e18d2229d5820c030e0a9af99ec6613 (1775456 bytes)
-archive sha256: 9068729063b3185333aae90f00bd80ed7445620c101b898d196f5c41fd5e060a (3795053 bytes)
+artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
+binary sha256: fcfdbe4c5cee7693db609da00a21c816b4b983c4f45f9417fe579a66eba9a7a9 (5450608 bytes)
+archive sha256: ca6fdbd0f0246a71b2b57de08e7562663c96177dc82ba3862625fcc9526b037d (5607694 bytes)
+manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=f79a7b5..., rustc 1.99.1
 
 $ python3 -m unittest discover -s scripts/tests
 Ran 26 tests ... OK
@@ -55,14 +57,16 @@ non-AArch64 binary.
 
 ## Gaps (not verified)
 
-- **No cross-compilation in this environment**: the installed
-  `aarch64-unknown-linux-musl` target has no aarch64 linker (`/usr/bin/ld`
-  rejects `--fix-cortex-a53-843419`), so the artifact was staged from the
-  committed prebuilt binary, not a fresh build of the current SHA. The manifest
-  correctly records this; it is **not** proof that the committed binary matches
-  the Rust source.
-- The GitHub Actions workflow has not run (no network/runner access here). Its
-  zigbuild/native-audit/release steps are code-reviewed only.
+- The artifact is now built from the current SHA with `cargo zigbuild` (zig
+  0.13.0 is available). Original GNU-`ld` failure (`--fix-cortex-a53-843419`) is
+  avoided by zig's linker.
+- The GitHub Actions workflow itself still has not run; the same zigbuild +
+  packaging steps were executed locally instead.
+- **Real binary is 5 450 608 bytes** (rustc 1.99.1, `opt-level=z`, LTO, strip),
+  much larger than the previously committed 1 775 456-byte binary (which
+  predated the Boa converter host). This is a concrete OPS-03 budget input:
+  installed size + Windfront assets still needs measuring against the router's
+  free overlay, not the reported 54 MB total.
 - The `.ipk` is still produced by the OpenWrt SDK outside this repository; the
   tarball is not an opkg package, and the SDK build is unverified.
 - Installed size/RAM budgets, sysupgrade/conffiles retention, install/upgrade/

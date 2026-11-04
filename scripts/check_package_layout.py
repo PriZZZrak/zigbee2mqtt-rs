@@ -103,6 +103,10 @@ def validate(root: Path, expected_ref=None):
                 errors.append(f"manifest entry missing on disk: {entry['path']}")
 
     for stale in root.rglob("*.ts"):
+        # `dist/lib` legitimately ships `.d.ts` declarations next to the JS;
+        # only reject real TypeScript sources.
+        if stale.name.endswith(".d.ts"):
+            continue
         errors.append(f"TypeScript source leaked into package: {stale.relative_to(root)}")
 
     return errors

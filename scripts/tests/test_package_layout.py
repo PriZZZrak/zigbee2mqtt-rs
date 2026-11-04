@@ -98,6 +98,13 @@ class LayoutTests(unittest.TestCase):
             errors = layout.validate(root)
             self.assertTrue(any("genOnOff" in error for error in errors))
 
+    def test_declaration_files_are_allowed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build_package(root)
+            (root / "lib" / "utils.d.ts").write_text("export {};\n", encoding="utf-8")
+            self.assertEqual(layout.validate(root), [])
+
     def test_manifest_ref_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
