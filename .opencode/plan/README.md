@@ -84,9 +84,9 @@ R1 — явно ограниченный релиз для проверенно�
   check/update/abort и progress payload добавлен; checksum SHA-512 и локальный
   index/sha512 подключены к bridge check/update; HTTP/override index provider и
   scheduler `check_for_update` покрыты fake-fetcher тестами; incoming
-  QueryNextImage запускает auto-check и публикует `available` с throttling.
-  Bridge-level fake-coordinator E2E, настраиваемый override, реальный HTTPS/cache
-  и HIL отсутствуют.
+  QueryNextImage запускает auto-check и публикует `available` с throttling;
+  bridge-level helper проверен fake index/device fixture. Полный Message loop,
+  настраиваемый override, реальный HTTPS/cache и HIL отсутствуют.
 - **HA cleanup частично**: retained discovery configs удаляются пустым payload
   (`retain=true`, QoS1) при remove; rename очищает старые configs и публикует
   новые. Fake MQTT sink E2E проводит device/remove через publish path и проверяет

@@ -693,49 +693,27 @@ impl Bridge {
                                     let mut manager = self.ota.lock().await;
                                     let action = manager.handle_zcl(&ieee.as_hex(), &data, tsn);
                                     let auto_update = if action.is_none() {
-                                        let (model_id, manufacturer_name) = devices
-                                            .get_by_nwk(src_addr)
-                                            .map(|device| {
-                                                (device.model.clone(), device.manufacturer.clone())
-                                            })
-                                            .unwrap_or((None, None));
-                                        crate::ota::auto_check_from_query(
+                                        auto_check_bridge_query(
                                             &mut manager,
                                             &self.ota_provider,
-                                            &ieee.as_hex(),
+                                            &devices,
+                                            src_addr,
+                                            &ieee,
                                             &data,
-                                            model_id.as_deref(),
-                                            manufacturer_name.as_deref(),
                                             std::time::Instant::now(),
                                         )
-                                        .ok()
-                                        .flatten()
                                     } else {
                                         None
                                     };
                                     drop(manager);
-                                    if let Some(entry) = auto_update {
-                                        if let Some(mut device) = devices.get_mut_by_nwk(src_addr) {
-                                            device.state.insert(
-                                                "update".into(),
-                                                json!({
-                                                    "state": "available",
-                                                    "latest_version": entry.file_version,
-                                                    "latest_source": entry.url,
-                                                    "latest_release_notes": entry.release_notes,
-                                                }),
-                                            );
-                                            let state = serde_json::Value::Object(device.state.clone());
-                                            let name = device.friendly_name.clone();
-                                            drop(device);
-                                            Self::publish_state(
-                                                &mqtt,
-                                                self.cfg.advanced.output,
-                                                &name,
-                                                &state,
-                                            )
-                                            .await;
-                                        }
+                                    if let Some((name, state)) = auto_update {
+                                        Self::publish_state(
+                                            &mqtt,
+                                            self.cfg.advanced.output,
+                                            &name,
+                                            &state,
+                                        )
+                                        .await;
                                     }
                                     if let Some(action) = action {
                                         if let Err(error) = coord
@@ -2522,6 +2500,46 @@ async fn handle_ota_request(
     }
 }
 
+/// Bridge-level QueryNextImage auto-check: resolves the device, applies the
+/// scheduler/provider and stores/publishes `update: available` metadata.
+#[allow(clippy::too_many_arguments)]
+fn auto_check_bridge_query(
+    manager: &mut crate::ota::OtaManager,
+    provider: &crate::ota::OtaIndexProvider,
+    devices: &DeviceRegistry,
+    src_addr: u16,
+    ieee: &IeeeAddr,
+    data: &[u8],
+    now: std::time::Instant,
+) -> Option<(String, serde_json::Value)> {
+    let (model_id, manufacturer_name) = devices
+        .get_by_nwk(src_addr)
+        .map(|device| (device.model.clone(), device.manufacturer.clone()))
+        .unwrap_or((None, None));
+    let entry = crate::ota::auto_check_from_query(
+        manager,
+        provider,
+        &ieee.as_hex(),
+        data,
+        model_id.as_deref(),
+        manufacturer_name.as_deref(),
+        now,
+    )
+    .ok()
+    .flatten()?;
+    let update = json!({
+        "state": "available",
+        "latest_version": entry.file_version,
+        "latest_source": entry.url,
+        "latest_release_notes": entry.release_notes,
+    });
+    let mut device = devices.get_mut_by_nwk(src_addr)?;
+    device.state.insert("update".into(), update);
+    let state = serde_json::Value::Object(device.state.clone());
+    let name = device.friendly_name.clone();
+    Some((name, state))
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn process_device_remove(
     devices: &DeviceRegistry,
@@ -3706,5 +3724,77 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("entity not found"));
+    }
+
+    struct BridgeIndexFetcher {
+        body: String,
+    }
+
+    impl crate::ota::IndexFetcher for BridgeIndexFetcher {
+        fn load(&self, _location: &str) -> std::result::Result<String, String> {
+            Ok(self.body.clone())
+        }
+    }
+
+    #[test]
+    fn bridge_auto_check_publishes_available_and_throttles() {
+        let devices = DeviceRegistry::new();
+        let ieee = IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap();
+        let mut device = Device::new(ieee, 0x1234);
+        device.friendly_name = "ota_device".into();
+        device.model = Some("M".into());
+        device.manufacturer = Some("Vendor".into());
+        device.manufacturer_id = Some(0x1037);
+        devices.add(device);
+
+        let provider = crate::ota::OtaIndexProvider::new(
+            "https://main/index.json",
+            None,
+            Box::new(BridgeIndexFetcher {
+                body: r#"[{"fileName":"new.ota","fileVersion":5,"url":"new.ota","manufacturerCode":4151,"imageType":1,"releaseNotes":"fixes"}]"#.into(),
+            }),
+        );
+        let mut manager = crate::ota::OtaManager::default();
+        manager.set_check_interval(std::time::Duration::from_secs(60));
+        let query = vec![
+            0x01, 0x01, 0x01, 0x01, 0x37, 0x10, 0x01, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00, 0x00,
+        ];
+        let now = std::time::Instant::now();
+        let first = auto_check_bridge_query(
+            &mut manager,
+            &provider,
+            &devices,
+            0x1234,
+            &ieee,
+            &query,
+            now,
+        )
+        .expect("first check publishes");
+        assert_eq!(first.0, "ota_device");
+        assert_eq!(first.1["update"]["state"], "available");
+        assert_eq!(first.1["update"]["latest_version"], 5);
+        assert_eq!(first.1["update"]["latest_source"], "new.ota");
+        assert_eq!(first.1["update"]["latest_release_notes"], "fixes");
+
+        assert!(auto_check_bridge_query(
+            &mut manager,
+            &provider,
+            &devices,
+            0x1234,
+            &ieee,
+            &query,
+            now + std::time::Duration::from_secs(30),
+        )
+        .is_none());
+        assert!(auto_check_bridge_query(
+            &mut manager,
+            &provider,
+            &devices,
+            0x1234,
+            &ieee,
+            &query,
+            now + std::time::Duration::from_secs(61),
+        )
+        .is_some());
     }
 }

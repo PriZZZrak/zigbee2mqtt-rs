@@ -37,10 +37,11 @@ Pinned app/herdsman:
   checked, subsequent checks are throttled by the interval, and the selected
   index entry is returned. `set_check_interval` configures it.
 - Bridge auto-check: an incoming QueryNextImageRequest with no active transfer
-  calls `auto_check_from_query` with the device model/manufacturer, using the
+  calls `auto_check_bridge_query` with the device model/manufacturer, using the
   default upstream index URL and the manager scheduler. A selected image is
-  published as `update: {state: "available", latest_version, latest_source,
-  latest_release_notes}`. Repeated queries are throttled.
+  stored in state and returned as `update: {state: "available", latest_version,
+  latest_source, latest_release_notes}` for publication. Repeated queries are
+  throttled.
 - Local index files are wired into the bridge: `index` + `image_type` (and
   optional manufacturer/file/hardware fields) select an entry, resolve its local
   URL relative to the config directory, verify `sha512`, and use the selected
@@ -93,7 +94,7 @@ OTA/manager tests plus three bridge-request tests:
 - `ota_progress_payload_matches_state_contract`: 0.5 → 50 while updating and
   completion → idle/100.
 
-`cargo test --locked` → **372 passed** (340 library, 2 binary, 30 compatibility);
+`cargo test --locked` → **373 passed** (341 library, 2 binary, 30 compatibility);
 clippy exit 0 with five existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
@@ -103,10 +104,11 @@ clippy exit 0 with five existing warnings; release build OK.
   as payload fields, not on the wire.
 - `check` reports any valid image as available; it does not compare device
   identity or query the device first.
-- The bridge auto-check path is wired but not covered by a bridge-level fake
-  coordinator test; only `auto_check_from_query`/manager scheduling is tested.
-  The bridge uses the default main index and has no configurable override
-  location yet, and the fetch is synchronous in the bridge loop.
+- `bridge_auto_check_publishes_available_and_throttles` exercises the bridge-level
+  helper with a fake index provider and device registry, but the full Message
+  event loop/serial coordinator is not driven. The bridge uses the default main
+  index and has no configurable override location yet; the fetch is synchronous
+  in the bridge loop.
 - Override/main selection and throttling are tested with a fake fetcher; no real
   HTTPS fetch, ETag/cache, persistence or downgrade selection.
 - The retry policy is unit-tested but not wired to automatic checks.
