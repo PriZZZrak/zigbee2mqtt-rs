@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-04T11:19:32+00:00",
+  "captured_utc": "2026-11-04T11:23:58+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable",
   "commands": [
     {
@@ -21,6 +21,11 @@
       "command": "cargo build --release --locked",
       "exit": 0,
       "result": "native release build succeeded with 1 warning"
+    },
+    {
+      "command": "python3 -m unittest discover -s scripts/tests",
+      "exit": 0,
+      "result": "19 parity/layout validator tests passed"
     }
   ]
 }

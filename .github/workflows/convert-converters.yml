@@ -111,18 +111,23 @@ jobs:
         run: |
           set -euo pipefail
           REF="${{ steps.ref.outputs.ref }}"
-          mkdir -p "herdsman-converters/$REF"
-          # registry.json is already written there by gen-registry.mjs (validated)
-          test -f "herdsman-converters/$REF/registry.json"
-          cp hc/dist/devices/*.js "herdsman-converters/$REF/"
-          mkdir -p "herdsman-converters/$REF/lib"
-          cp hc/dist/converters/*.js "herdsman-converters/$REF/lib/" 2>/dev/null || true
-          cp hc/dist/lib/*.js "herdsman-converters/$REF/lib/" 2>/dev/null || true
+          DEST="herdsman-converters/$REF"
+          mkdir -p "$DEST/devices" "$DEST/converters" "$DEST/lib"
+          # registry.json/zcl.json are written by gen-registry.mjs (validated).
+          test -f "$DEST/registry.json"
+          test -f "$DEST/zcl.json"
+          # Preserve the compiled dist layout: device modules require
+          # ../converters/* and ../lib/* relative to dist/devices/*.
+          cp hc/dist/devices/*.js "$DEST/devices/"
+          cp hc/dist/converters/*.js "$DEST/converters/"
+          cp -r hc/dist/lib/. "$DEST/lib/"
+          node scripts/gen-manifest.mjs "$DEST" "$REF"
+          python3 scripts/check_package_layout.py "$DEST" "$REF"
           rm -rf herdsman-converters/latest
-          cp -r "herdsman-converters/$REF" herdsman-converters/latest
+          cp -r "$DEST" herdsman-converters/latest
           echo "$REF" > herdsman-converters/latest/VERSION
-          echo "Files in $REF: $(ls "herdsman-converters/$REF" | wc -l)"
           test -f herdsman-converters/latest/registry.json
+          test -f herdsman-converters/latest/manifest.json
           test -f herdsman-converters/latest/VERSION
       - name: Publish to gh-pages (single operation)
         uses: peaceiris/actions-gh-pages@v4

@@ -52,7 +52,11 @@ R1 — явно ограниченный релиз для проверенно�
 - **CV-03 начат**: registry lookup по Zigbee modelID, bucket `null`, NUL-нормализация
   и fingerprint priority реализованы; product `models` больше не используется как
   ключ. Неизвестные fingerprint-поля, реальный пакет и Node oracle ещё не проверены;
-  CV-01/02 (layout публикации) и CV-04..08 не начаты.
+  CV-04..08 не начаты.
+- **CV-01/02 частично**: workflow сохраняет `devices/`, `converters/`, `lib/`,
+  генерирует manifest с SHA-256 и валидирует пакет перед публикацией; добавлены
+  Python layout tests. GitHub Actions и Node staged smoke ещё не выполнялись,
+  live `latest` до следующего запуска остаётся в старом layout.
 
 ## Документы
 
