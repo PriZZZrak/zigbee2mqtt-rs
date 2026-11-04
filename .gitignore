@@ -11,3 +11,6 @@ ref/
 .upstream/
 openwrt-sdk/
 openwrt/files/windfront/
+
+# Python bytecode
+__pycache__/

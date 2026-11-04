@@ -1,0 +1,26 @@
+{
+  "captured_utc": "2026-11-04T10:06:21+00:00",
+  "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable",
+  "commands": [
+    {
+      "command": "cargo fmt --all --check",
+      "exit": 0,
+      "result": "no formatting diff"
+    },
+    {
+      "command": "cargo test --locked",
+      "exit": 0,
+      "result": "217 library + 30 compatibility = 247 passed, 0 failed"
+    },
+    {
+      "command": "cargo clippy --all-targets --locked",
+      "exit": 0,
+      "result": "6 library warnings plus 1 additional test warning; -D warnings not enforced yet"
+    },
+    {
+      "command": "cargo build --release --locked",
+      "exit": 0,
+      "result": "native release build succeeded"
+    }
+  ]
+}
