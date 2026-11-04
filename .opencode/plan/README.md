@@ -67,8 +67,13 @@ R1 — явно ограниченный релиз для проверенно�
 - **RT-04 частично**: MQTT `get` теперь выполняет native ZCL reads через
   `request_zcl` (state/brightness/color/temperature/humidity/illuminance/battery/
   occupancy/contact), объединяет атрибуты по endpoint/cluster и публикует только
-  реальные ответы; cache не выдаётся за ответ. `convertGet`, reporting и broker E2E
-  ещё не подключены.
+  реальные ответы; cache не выдаётся за ответ. Для не-native ключей исполняется
+  upstream `convertGet` (Boa + read recording), его reads отправляются через
+  `request_zcl`. Reporting read/configure реализованы через ZCL 0x08/0x09 и
+  0x06/0x07. Broker E2E, timers/полный host API и HIL отсутствуют.
+- **CV-08 частично**: async `convertGet` исполняется с Boa job queue и возвращает
+  запрошенные чтения; stub поддерживает только `read`, endpoint всегда 1,
+  timers/другие host methods не реализованы.
 
 ## Документы
 

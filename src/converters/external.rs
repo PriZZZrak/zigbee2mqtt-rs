@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 
 use boa_engine::{Context, Source};
 use serde::Deserialize;
-use tracing::warn;
+use tracing::{debug, warn};
 
 /// On-demand external converters (zigbee-herdsman-converters dist JS).
 ///
@@ -304,6 +304,23 @@ impl ExternalConverter {
 
     pub fn registry_path(&self) -> PathBuf {
         self.dir.join("registry.json")
+    }
+
+    /// Resolve an attribute name to its numeric ID for a cluster.
+    pub fn attribute_id(&self, cluster_id: u16, name: &str) -> Option<u16> {
+        let zcl = self.load_zcl()?;
+        let cluster = zcl.clusters.get(&cluster_id.to_string())?;
+        zcl.attributes
+            .get(cluster)?
+            .iter()
+            .find_map(|(id, value)| (value == name).then(|| id.parse::<u16>().ok()).flatten())
+    }
+
+    /// Resolve an attribute ID to the published name for a cluster.
+    pub fn attribute_name(&self, cluster_id: u16, id: u16) -> Option<String> {
+        let zcl = self.load_zcl()?;
+        let cluster = zcl.clusters.get(&cluster_id.to_string())?;
+        zcl.attributes.get(cluster)?.get(&id.to_string()).cloned()
     }
 
     fn zcl_path(&self) -> PathBuf {
@@ -648,6 +665,238 @@ impl ExternalConverter {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConvertGetRead {
+    pub cluster_id: u16,
+    pub attributes: Vec<u16>,
+}
+
+impl ExternalConverter {
+    /// Execute upstream `toZigbee[].convertGet` and return the reads it issued.
+    ///
+    /// The JS host exposes only an endpoint stub whose `read` records the
+    /// requested cluster/attributes and resolves immediately. Promise jobs are
+    /// drained after the call, so async convertGet functions complete. The Rust
+    /// caller performs the actual reads through the ZCL transaction service.
+    pub fn convert_get(
+        &self,
+        model: &str,
+        keys: &[String],
+        device: &ExternalDeviceInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Vec<ConvertGetRead> {
+        let Some(registry) = self.load_registry() else {
+            return Vec::new();
+        };
+        let Some((file, index)) = select_definition(&registry, model, device) else {
+            return Vec::new();
+        };
+        let Some(zcl) = self.load_zcl() else {
+            return Vec::new();
+        };
+        let Some(module_src) = self
+            .load_js(&format!("devices/{file}"))
+            .or_else(|| self.load_js(&file))
+        else {
+            return Vec::new();
+        };
+        let Some(sources) = collect_sources(&self.dir, &module_src, &file) else {
+            return Vec::new();
+        };
+        let cluster_ids: HashMap<&str, u16> = zcl
+            .clusters
+            .iter()
+            .filter_map(|(id, name)| id.parse::<u16>().ok().map(|id| (name.as_str(), id)))
+            .collect();
+        let stub = stub_source(&zcl);
+        let bootstrap = format!(
+            r#"
+            const __sources = {sources};
+            const __stub = {stub};
+            const __modules = {{}};
+            function __resolve(from, spec) {{
+                if (spec === "zigbee-herdsman") return "__builtin__/zigbee-herdsman";
+                if (spec.startsWith(".")) {{
+                    const parts = from.split("/").slice(0, -1).concat(spec.split("/"));
+                    const out = [];
+                    for (const p of parts) {{
+                        if (p === "" || p === ".") continue;
+                        if (p === "..") {{ out.pop(); continue; }}
+                        out.push(p);
+                    }}
+                    let joined = out.join("/");
+                    if (!/\.[a-z0-9]+$/i.test(joined)) joined += ".js";
+                    return joined;
+                }}
+                return spec;
+            }}
+            function __require(from) {{
+                return function(spec) {{
+                    const key = __resolve(from, spec);
+                    if (key === "__builtin__/zigbee-herdsman") {{
+                        if (!__modules[key]) {{
+                            const module = {{exports: {{}}}};
+                            const fn_ = new Function("require", "module", "exports", __stub);
+                            fn_(__require(key), module, module.exports);
+                            __modules[key] = module;
+                        }}
+                        return __modules[key].exports;
+                    }}
+                    if (!__sources[key]) throw new Error("Cannot find module '" + spec + "' from '" + from + "'");
+                    if (!__modules[key]) {{
+                        const module = {{exports: {{}}}};
+                        __modules[key] = module;
+                        const fn_ = new Function("require", "module", "exports", __sources[key]);
+                        fn_(__require(key), module, module.exports);
+                    }}
+                    return __modules[key].exports;
+                }};
+            }}
+            "#,
+            sources = serde_json::to_string(&sources).unwrap_or_default(),
+            stub = serde_json::to_string(&stub).unwrap_or_default(),
+        );
+        let meta = serde_json::json!({
+            "state": state,
+            "device": {
+                "modelID": device.model_id,
+                "manufacturerID": device.manufacturer_id,
+                "manufacturerName": device.manufacturer_name,
+                "ieeeAddr": device.ieee_addr,
+                "powerSource": device.power_source,
+                "type": device.device_type,
+                "softwareBuildID": device.software_build_id,
+                "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
+            },
+            "options": {},
+        });
+        let cluster_names = serde_json::to_string(&cluster_ids).unwrap_or_else(|_| "{}".into());
+        let script = format!(
+            r#"(function() {{
+                const __clusterNames = {cluster_names};
+                const defs = __require("devices/__entry__.js")("./{file}").definitions;
+                const definition = defs[{index}];
+                const meta = JSON.parse({meta});
+                const keys = JSON.parse({keys});
+                const reads = [];
+                const errors = [];
+                const entity = {{
+                    ID: 1,
+                    read: (cluster, attributes) => {{
+                        const clusterId = (cluster && cluster.ID !== undefined) ? cluster.ID
+                            : (typeof cluster === "number" ? cluster : __clusterNames[String(cluster)]);
+                        reads.push({{cluster: clusterId, attributes: Array.isArray(attributes) ? attributes : [attributes]}});
+                        return Promise.resolve();
+                    }},
+                    write: () => Promise.resolve(),
+                    command: () => Promise.resolve(),
+                    configureReporting: () => Promise.resolve(),
+                    bind: () => Promise.resolve(),
+                    getEndpoint: () => entity,
+                }};
+                for (const key of keys) {{
+                    let handled = false;
+                    for (const converter of (definition.toZigbee || [])) {{
+                        const ckeys = Array.isArray(converter.key) ? converter.key : [converter.key];
+                        if (ckeys.includes(key) && typeof converter.convertGet === "function") {{
+                            handled = true;
+                            Promise.resolve(converter.convertGet(entity, key, meta)).then(
+                                () => {{}},
+                                (error) => {{ errors.push(String(error)); }}
+                            );
+                            break;
+                        }}
+                    }}
+                    if (!handled) errors.push("no convertGet for " + key);
+                }}
+                globalThis.__convertGet = {{reads, errors}};
+            }})()"#,
+            file = file,
+            index = index,
+            meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
+            keys = serde_json::to_string(&serde_json::to_string(&keys).unwrap()).unwrap(),
+            cluster_names = cluster_names,
+        );
+        let mut ctx = Context::default();
+        if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
+            return Vec::new();
+        }
+        if let Err(error) = ctx.eval(Source::from_bytes(script.as_bytes())) {
+            warn!("external converter: convertGet eval failed: {error}");
+            return Vec::new();
+        }
+        ctx.run_jobs();
+        let Some(raw) = eval_string(&mut ctx, "JSON.stringify(globalThis.__convertGet)") else {
+            return Vec::new();
+        };
+        let parsed: serde_json::Value = match serde_json::from_str(&raw) {
+            Ok(value) => value,
+            Err(_) => return Vec::new(),
+        };
+        for error in parsed
+            .get("errors")
+            .and_then(|errors| errors.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|error| error.as_str())
+        {
+            debug!("external converter: convertGet: {error}");
+        }
+        let mut result = Vec::new();
+        for read in parsed
+            .get("reads")
+            .and_then(|reads| reads.as_array())
+            .into_iter()
+            .flatten()
+        {
+            let Some(cluster_id) = read.get("cluster").and_then(|cluster| match cluster {
+                serde_json::Value::Number(number) => number.as_u64().map(|id| id as u16),
+                serde_json::Value::String(name) => cluster_name_to_id(&zcl, name),
+                _ => None,
+            }) else {
+                continue;
+            };
+            let cluster_name = zcl.clusters.get(&cluster_id.to_string()).cloned();
+            let mut attributes = Vec::new();
+            for attribute in read
+                .get("attributes")
+                .and_then(|attributes| attributes.as_array())
+                .into_iter()
+                .flatten()
+            {
+                let id = match attribute {
+                    serde_json::Value::Number(number) => number.as_u64().map(|id| id as u16),
+                    serde_json::Value::String(name) => cluster_name
+                        .as_ref()
+                        .and_then(|cluster| zcl.attributes.get(cluster))
+                        .and_then(|attributes| {
+                            attributes.iter().find_map(|(id, value)| {
+                                (value == name).then(|| id.parse::<u16>().ok()).flatten()
+                            })
+                        }),
+                    _ => None,
+                };
+                if let Some(id) = id {
+                    attributes.push(id);
+                }
+            }
+            if !attributes.is_empty() {
+                result.push(ConvertGetRead {
+                    cluster_id,
+                    attributes,
+                });
+            }
+        }
+        result
+    }
+}
+
+fn cluster_name_to_id(zcl: &ZclMaps, name: &str) -> Option<u16> {
+    zcl.clusters
+        .iter()
+        .find_map(|(id, value)| (value == name).then(|| id.parse::<u16>().ok()).flatten())
+}
+
 /// Collect every CJS source reachable from the entry device file.
 /// Keys are dist-relative paths (`devices/lytko.js`, `converters/foo.js`, ...).
 fn collect_sources(
@@ -853,7 +1102,14 @@ const definitions = [
                 },
             },
         ],
-        toZigbee: [],
+        toZigbee: [
+            {
+                key: ["temperature"],
+                convertGet: async (entity, key, meta) => {
+                    await entity.read("msTemperatureMeasurement", ["measuredValue"]);
+                },
+            },
+        ],
     },
 ];
 module.exports = {definitions};
@@ -1168,5 +1424,36 @@ module.exports = {definitions};
     async fn fetch_js_rejects_traversal_before_network() {
         let (_tmp, conv) = fixture_dir();
         assert!(conv.fetch_js("../../etc/passwd").await.is_none());
+    }
+
+    #[test]
+    fn async_convert_get_records_resolved_reads() {
+        let (_tmp, conv) = fixture_dir();
+        let reads = conv.convert_get(
+            "FixtureBulb",
+            &["temperature".to_string()],
+            &device(),
+            &Default::default(),
+        );
+        assert_eq!(
+            reads,
+            vec![ConvertGetRead {
+                cluster_id: 1026,
+                attributes: vec![0],
+            }]
+        );
+    }
+
+    #[test]
+    fn missing_convert_get_returns_no_reads() {
+        let (_tmp, conv) = fixture_dir();
+        assert!(conv
+            .convert_get(
+                "FixtureBulb",
+                &["unknown_key".to_string()],
+                &device(),
+                &Default::default(),
+            )
+            .is_empty());
     }
 }

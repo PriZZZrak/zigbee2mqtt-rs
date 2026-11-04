@@ -74,7 +74,7 @@ impl ZclFrameHeader {
         ))
     }
 
-    fn encode_global(sequence: u8, command_id: u8) -> Vec<u8> {
+    pub(crate) fn encode_global(sequence: u8, command_id: u8) -> Vec<u8> {
         vec![0x10, sequence, command_id] // client→server, disable default rsp
     }
 }
@@ -82,7 +82,21 @@ impl ZclFrameHeader {
 pub mod global {
     pub const READ_ATTRIBUTES: u8 = 0x00;
     pub const READ_ATTRIBUTES_RSP: u8 = 0x01;
+    pub const CONFIGURE_REPORTING: u8 = 0x06;
+    pub const CONFIGURE_REPORTING_RSP: u8 = 0x07;
+    pub const READ_REPORTING_CONFIG: u8 = 0x08;
+    pub const READ_REPORTING_CONFIG_RSP: u8 = 0x09;
     pub const REPORT_ATTRIBUTES: u8 = 0x0A;
+}
+
+/// Build a ZCL Read Reporting Configuration request payload.
+pub fn read_reporting_config_payload(sequence: u8, attr_ids: &[u16]) -> Vec<u8> {
+    let mut payload = ZclFrameHeader::encode_global(sequence, global::READ_REPORTING_CONFIG);
+    payload.push(0x00); // direction: reported attributes
+    for &id in attr_ids {
+        payload.extend_from_slice(&id.to_le_bytes());
+    }
+    payload
 }
 
 /// Build a ZCL Read Attributes request payload.
@@ -118,6 +132,12 @@ mod tests {
         assert_eq!(header.command_id, 0x07);
         assert_eq!(offset, 5);
         assert_eq!(&raw[offset..], [0xAA]);
+    }
+
+    #[test]
+    fn read_reporting_config_payload_layout() {
+        let payload = read_reporting_config_payload(9, &[0x0000, 0x0001]);
+        assert_eq!(payload, vec![0x10, 9, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00]);
     }
 
     #[test]

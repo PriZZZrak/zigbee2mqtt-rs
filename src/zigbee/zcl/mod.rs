@@ -147,6 +147,77 @@ pub fn extract_ias_zone_type(raw: &[u8]) -> Result<Option<u16>> {
     Ok(clusters::ias_zone::extract_zone_type(&reports))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReportingConfig {
+    pub attribute: u16,
+    pub status: u8,
+    pub data_type: Option<u8>,
+    pub minimum_interval: Option<u16>,
+    pub maximum_interval: Option<u16>,
+    pub reportable_change: Option<Vec<u8>>,
+}
+
+pub(crate) fn reportable_change_size(data_type: u8) -> Option<usize> {
+    Some(match data_type {
+        0x08 | 0x10 | 0x18 | 0x20 | 0x28 | 0x30 => 1,
+        0x09 | 0x19 | 0x21 | 0x29 | 0x31 | 0x38 => 2,
+        0x0A | 0x22 | 0x2A => 3,
+        0x0B | 0x23 | 0x2B | 0x39 => 4,
+        0x3A => 8,
+        // Variable-length types are not decoded here.
+        _ => return None,
+    })
+}
+
+/// Parse a Read Reporting Configuration Response payload.
+pub(crate) fn parse_reporting_config_rsp(buf: &[u8]) -> Vec<ReportingConfig> {
+    let mut configs = Vec::new();
+    let mut pos = 0;
+    while pos + 4 <= buf.len() {
+        let _direction = buf[pos];
+        let attribute = u16::from_le_bytes([buf[pos + 1], buf[pos + 2]]);
+        let status = buf[pos + 3];
+        pos += 4;
+        if status != 0 {
+            configs.push(ReportingConfig {
+                attribute,
+                status,
+                data_type: None,
+                minimum_interval: None,
+                maximum_interval: None,
+                reportable_change: None,
+            });
+            continue;
+        }
+        if pos + 5 > buf.len() {
+            break;
+        }
+        let data_type = buf[pos];
+        let minimum_interval = u16::from_le_bytes([buf[pos + 1], buf[pos + 2]]);
+        let maximum_interval = u16::from_le_bytes([buf[pos + 3], buf[pos + 4]]);
+        pos += 5;
+        let size = reportable_change_size(data_type);
+        let reportable_change = size.and_then(|size| {
+            if pos + size > buf.len() {
+                None
+            } else {
+                let value = buf[pos..pos + size].to_vec();
+                pos += size;
+                Some(value)
+            }
+        });
+        configs.push(ReportingConfig {
+            attribute,
+            status,
+            data_type: Some(data_type),
+            minimum_interval: Some(minimum_interval),
+            maximum_interval: Some(maximum_interval),
+            reportable_change,
+        });
+    }
+    configs
+}
+
 /// Parse a Read Attributes Response payload into AttributeReports.
 /// Format per record: attr_id (u16) | status (u8) | [data_type (u8) | value]
 pub(crate) fn parse_read_attr_rsp(buf: &[u8]) -> Vec<AttributeReport> {
@@ -344,5 +415,23 @@ mod tests {
         let raw = [0x05, 0x99, 0x99, 0x01, 0x07];
         let msg = parse_message(0x0005, &raw, None, None).unwrap().unwrap();
         assert_eq!(msg.values["action"], "manufacturer_0x9999_cmd_0x07");
+    }
+
+    #[test]
+    fn parses_reporting_configuration_response() {
+        let payload = vec![
+            0x00, 0x00, 0x00, 0x00, 0x21, 0x0A, 0x00, 0xE0, 0x01, 0x64, 0x00, 0x00, 0x01, 0x00,
+            0x03, // second attribute: unsupported
+        ];
+        let configs = parse_reporting_config_rsp(&payload);
+        assert_eq!(configs.len(), 2);
+        assert_eq!(configs[0].attribute, 0x0000);
+        assert_eq!(configs[0].data_type, Some(0x21));
+        assert_eq!(configs[0].minimum_interval, Some(10));
+        assert_eq!(configs[0].maximum_interval, Some(480));
+        assert_eq!(configs[0].reportable_change, Some(vec![0x64, 0x00]));
+        assert_eq!(configs[1].attribute, 0x0001);
+        assert_eq!(configs[1].status, 0x03);
+        assert!(configs[1].data_type.is_none());
     }
 }

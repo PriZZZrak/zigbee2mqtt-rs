@@ -736,7 +736,8 @@ impl Bridge {
                         Some(MqttCommand::GetDevice { friendly_name, payload }) => {
                             debug!("MQTT get: {friendly_name}");
                             Self::handle_get(
-                                &devices, &coord, &mqtt, self.cfg.advanced.output, &mut trans_id,
+                                &devices, &self.external, &coord, &mqtt,
+                                self.cfg.advanced.output, &mut trans_id,
                                 &friendly_name, &payload,
                             ).await;
                         }
@@ -927,8 +928,19 @@ impl Bridge {
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 "device/reporting/read" | "device/reporting/configure" => {
-                                    let resp = mk_resp("ok", json!({}), None);
-                                    let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                    match Self::handle_reporting(
+                                        &devices, &self.external, &coord, &request, &payload,
+                                        &mut trans_id,
+                                    ).await {
+                                        Ok(data) => {
+                                            let resp = mk_resp("ok", data, None);
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        Err(error) => {
+                                            let resp = mk_resp("error", json!({}), Some(error));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                    }
                                 }
                                 "backup" => {
                                     let resp = mk_resp("ok", json!({"zip": ""}), None);
@@ -1056,8 +1068,236 @@ impl Bridge {
         let _ = mqtt.publish_bridge_extensions().await;
     }
 
+    async fn handle_reporting(
+        devices: &DeviceRegistry,
+        external: &ExternalConverter,
+        coord: &CoordinatorHandle,
+        request: &str,
+        payload: &serde_json::Value,
+        trans_id: &mut u8,
+    ) -> std::result::Result<serde_json::Value, String> {
+        const REPORTING_TIMEOUT: Duration = Duration::from_secs(3);
+        const REPORTING_ATTEMPTS: u8 = 2;
+        let id = payload
+            .get("id")
+            .and_then(|id| id.as_str())
+            .ok_or_else(|| "missing id".to_string())?;
+        let endpoint = payload
+            .get("endpoint")
+            .and_then(|endpoint| endpoint.as_u64())
+            .ok_or_else(|| "missing endpoint".to_string())? as u8;
+        let cluster = payload
+            .get("cluster")
+            .and_then(|cluster| cluster.as_u64())
+            .ok_or_else(|| "missing cluster".to_string())? as u16;
+        let device =
+            find_device_for_id(devices, id).ok_or_else(|| format!("unknown device {id}"))?;
+        if !device
+            .endpoints
+            .iter()
+            .any(|candidate| candidate.endpoint == endpoint)
+        {
+            return Err(format!("device {id} has no endpoint {endpoint}"));
+        }
+
+        if request.ends_with("/read") {
+            let configs = payload
+                .get("configs")
+                .and_then(|configs| configs.as_array())
+                .ok_or_else(|| "missing configs".to_string())?;
+            let mut attributes = Vec::new();
+            for config in configs {
+                match config.get("attribute") {
+                    Some(serde_json::Value::Number(number)) => {
+                        if let Some(attribute) = number.as_u64() {
+                            attributes.push(attribute as u16);
+                        }
+                    }
+                    Some(serde_json::Value::String(name)) => {
+                        if let Some(attribute) = external.attribute_id(cluster, name) {
+                            attributes.push(attribute);
+                        } else {
+                            return Err(format!("unknown attribute {name} for cluster {cluster}"));
+                        }
+                    }
+                    _ => return Err("config is missing an attribute".to_string()),
+                }
+            }
+            if attributes.is_empty() {
+                return Err("no attributes to read".to_string());
+            }
+            *trans_id = trans_id.wrapping_add(1);
+            let tsn = *trans_id;
+            let request_payload =
+                crate::zigbee::zcl::frame::read_reporting_config_payload(tsn, &attributes);
+            let response = coord
+                .request_zcl(
+                    device.nwk_addr,
+                    endpoint,
+                    cluster,
+                    tsn,
+                    request_payload,
+                    REPORTING_TIMEOUT,
+                    REPORTING_ATTEMPTS,
+                )
+                .await
+                .map_err(|error| format!("read reporting config failed: {error}"))?;
+            let (header, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data)
+                .map_err(|error| format!("invalid ZCL response: {error}"))?;
+            if header.command_id != crate::zigbee::zcl::frame::global::READ_REPORTING_CONFIG_RSP {
+                return Err(format!(
+                    "unexpected ZCL command 0x{:02X} for reporting read",
+                    header.command_id
+                ));
+            }
+            let configs = crate::zigbee::zcl::parse_reporting_config_rsp(&response.data[offset..]);
+            let configs: Vec<serde_json::Value> = configs
+                .into_iter()
+                .map(|config| {
+                    json!({
+                        "attribute": config.attribute,
+                        "attribute_name": external.attribute_name(cluster, config.attribute),
+                        "status": config.status,
+                        "data_type": config.data_type,
+                        "minimum_report_interval": config.minimum_interval,
+                        "maximum_report_interval": config.maximum_interval,
+                        "reportable_change": config.reportable_change.map(hex::encode),
+                    })
+                })
+                .collect();
+            return Ok(json!({
+                "id": id,
+                "endpoint": endpoint,
+                "cluster": cluster,
+                "configs": configs,
+            }));
+        }
+
+        // device/reporting/configure
+        let attribute = payload
+            .get("attribute")
+            .and_then(|attribute| {
+                attribute.as_u64().map(|value| value as u16).or_else(|| {
+                    attribute
+                        .as_str()
+                        .and_then(|name| external.attribute_id(cluster, name))
+                })
+            })
+            .ok_or_else(|| "missing or unknown attribute".to_string())?;
+        let minimum = payload
+            .get("minimum_report_interval")
+            .and_then(|value| value.as_u64())
+            .ok_or_else(|| "missing minimum_report_interval".to_string())?
+            as u16;
+        let maximum = payload
+            .get("maximum_report_interval")
+            .and_then(|value| value.as_u64())
+            .ok_or_else(|| "missing maximum_report_interval".to_string())?
+            as u16;
+        let reportable_change = payload
+            .get("reportable_change")
+            .and_then(|value| value.as_f64());
+
+        // The bridge payload does not carry a data type; read the current
+        // reporting configuration first so the command can be encoded correctly.
+        *trans_id = trans_id.wrapping_add(1);
+        let read_tsn = *trans_id;
+        let read_payload =
+            crate::zigbee::zcl::frame::read_reporting_config_payload(read_tsn, &[attribute]);
+        let read_response = coord
+            .request_zcl(
+                device.nwk_addr,
+                endpoint,
+                cluster,
+                read_tsn,
+                read_payload,
+                REPORTING_TIMEOUT,
+                REPORTING_ATTEMPTS,
+            )
+            .await
+            .map_err(|error| format!("cannot discover reporting data type: {error}"))?;
+        let (_, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&read_response.data)
+            .map_err(|error| format!("invalid ZCL response: {error}"))?;
+        let data_type = crate::zigbee::zcl::parse_reporting_config_rsp(&read_response.data[offset..])
+            .into_iter()
+            .find(|config| config.attribute == attribute && config.status == 0)
+            .and_then(|config| config.data_type)
+            .ok_or_else(|| {
+                "cannot determine attribute data type; configure reporting is not supported for this attribute yet"
+                    .to_string()
+            })?;
+        let change = encode_reportable_change(data_type, reportable_change)
+            .ok_or_else(|| format!("unsupported data type 0x{data_type:02X} for reporting"))?;
+
+        if let Some(coordinator_ieee) = coord.info.ieee_addr {
+            if let Err(error) = coord
+                .request_bind(
+                    device.nwk_addr,
+                    device.ieee_addr.0,
+                    endpoint,
+                    cluster,
+                    coordinator_ieee.0,
+                    1,
+                )
+                .await
+            {
+                return Err(format!("cannot bind reporting cluster: {error}"));
+            }
+        } else {
+            return Err("coordinator IEEE address unknown; cannot bind reporting".to_string());
+        }
+
+        let mut command_payload = crate::zigbee::zcl::frame::ZclFrameHeader::encode_global(
+            (*trans_id).wrapping_add(1),
+            crate::zigbee::zcl::frame::global::CONFIGURE_REPORTING,
+        );
+        command_payload.push(0x00); // direction
+        command_payload.extend_from_slice(&attribute.to_le_bytes());
+        command_payload.push(data_type);
+        command_payload.extend_from_slice(&minimum.to_le_bytes());
+        command_payload.extend_from_slice(&maximum.to_le_bytes());
+        command_payload.extend_from_slice(&change);
+        *trans_id = trans_id.wrapping_add(1);
+        let tsn = *trans_id;
+        let response = coord
+            .request_zcl(
+                device.nwk_addr,
+                endpoint,
+                cluster,
+                tsn,
+                command_payload,
+                REPORTING_TIMEOUT,
+                REPORTING_ATTEMPTS,
+            )
+            .await
+            .map_err(|error| format!("configure reporting failed: {error}"))?;
+        let (header, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data)
+            .map_err(|error| format!("invalid ZCL response: {error}"))?;
+        if header.command_id != crate::zigbee::zcl::frame::global::CONFIGURE_REPORTING_RSP {
+            return Err(format!(
+                "unexpected ZCL command 0x{:02X} for configure reporting",
+                header.command_id
+            ));
+        }
+        let status = response.data.get(offset).copied().unwrap_or(0xFF);
+        if status != 0 {
+            return Err(format!("configure reporting status 0x{status:02X}"));
+        }
+        Ok(json!({
+            "id": id,
+            "endpoint": endpoint,
+            "cluster": cluster,
+            "attribute": attribute,
+            "minimum_report_interval": minimum,
+            "maximum_report_interval": maximum,
+            "reportable_change": reportable_change,
+        }))
+    }
+
+    #[allow(clippy::too_many_arguments)]
     async fn handle_get(
         devices: &DeviceRegistry,
+        external: &ExternalConverter,
         coord: &CoordinatorHandle,
         mqtt: &MqttBridge,
         output: OutputMode,
@@ -1095,6 +1335,9 @@ impl Bridge {
         let nwk_addr = dev.nwk_addr;
         let endpoints = dev.endpoints.clone();
         let zone_type = dev.zone_type;
+        let model = dev.model.clone().unwrap_or_default();
+        let info = crate::converters::external::ExternalDeviceInfo::from_device(&dev);
+        let cached_state = dev.state.clone();
         drop(dev);
 
         let requested: Vec<String> = payload
@@ -1154,6 +1397,84 @@ impl Bridge {
                 Err(error) => {
                     failed += 1;
                     warn!("Get for {name}: read cluster 0x{cluster_id:04X} failed: {error}");
+                }
+            }
+        }
+
+        // Fallback for keys the native map does not cover: execute the upstream
+        // definition's convertGet and perform the reads it requests.
+        if !requested.is_empty() {
+            let converter_keys: Vec<String> = requested
+                .iter()
+                .filter(|key| read_target(key).is_none())
+                .cloned()
+                .collect();
+            if !converter_keys.is_empty() {
+                let reads = external.convert_get(&model, &converter_keys, &info, &cached_state);
+                for read in reads {
+                    let Some(endpoint) = find_ep_with_cluster(&endpoints, read.cluster_id) else {
+                        debug!(
+                            "Get for {name}: convertGet requested cluster 0x{:04X} not on any endpoint",
+                            read.cluster_id
+                        );
+                        continue;
+                    };
+                    *trans_id = trans_id.wrapping_add(1);
+                    let tsn = *trans_id;
+                    let request =
+                        crate::zigbee::zcl::frame::read_attributes_payload(tsn, &read.attributes);
+                    match coord
+                        .request_zcl(
+                            nwk_addr,
+                            endpoint,
+                            read.cluster_id,
+                            tsn,
+                            request,
+                            GET_TIMEOUT,
+                            GET_ATTEMPTS,
+                        )
+                        .await
+                    {
+                        Ok(response) => {
+                            match crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data) {
+                                Ok((_, offset)) => {
+                                    let reports = crate::zigbee::zcl::parse_read_attr_rsp(
+                                        &response.data[offset..],
+                                    );
+                                    let pairs: Vec<(u16, serde_json::Value)> = reports
+                                        .iter()
+                                        .filter_map(|report| {
+                                            attribute_json(&report.value)
+                                                .map(|value| (report.attr_id, value))
+                                        })
+                                        .collect();
+                                    if let Some(values) = external.convert_from_zigbee(
+                                        &model,
+                                        read.cluster_id,
+                                        "readResponse",
+                                        &pairs,
+                                        &info,
+                                        &cached_state,
+                                    ) {
+                                        for (key, value) in values {
+                                            merged.insert(key, value);
+                                        }
+                                    }
+                                }
+                                Err(error) => {
+                                    failed += 1;
+                                    warn!("Get for {name}: convertGet response header invalid: {error}");
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            failed += 1;
+                            warn!(
+                                "Get for {name}: convertGet read cluster 0x{:04X} failed: {error}",
+                                read.cluster_id
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -1653,6 +1974,39 @@ impl Bridge {
 const BASIC_CLUSTER_METADATA_KEYS: [&str; 4] =
     ["manufacturer", "model", "power_source", "sw_build_id"];
 
+fn find_device_for_id(devices: &DeviceRegistry, id: &str) -> Option<Device> {
+    devices.find_by_name(id).or_else(|| {
+        IeeeAddr::from_hex(id)
+            .and_then(|address| devices.get_by_ieee(&address).map(|dev| dev.clone()))
+    })
+}
+
+fn encode_reportable_change(data_type: u8, value: Option<f64>) -> Option<Vec<u8>> {
+    let size = crate::zigbee::zcl::reportable_change_size(data_type)?;
+    // Reportable change is only present for analog types in ZCL. For discrete
+    // types return an empty change field. Half-precision floats are not
+    // encoded rather than writing an incorrect value.
+    let analog = matches!(data_type, 0x20..=0x2B | 0x38..=0x3A);
+    if !analog {
+        return Some(Vec::new());
+    }
+    if data_type == 0x38 {
+        return None;
+    }
+    let value = value.unwrap_or(0.0);
+    let mut bytes = Vec::with_capacity(size);
+    match data_type {
+        0x39 => bytes.extend_from_slice(&(value as f32).to_le_bytes()),
+        0x3A => bytes.extend_from_slice(&value.to_le_bytes()),
+        _ => {
+            let raw = value as i64;
+            let raw_bytes = raw.to_le_bytes();
+            bytes.extend_from_slice(&raw_bytes[..size]);
+        }
+    }
+    Some(bytes)
+}
+
 /// Combine requested keys into one attribute read per endpoint/cluster.
 fn build_get_targets(
     endpoints: &[EndpointDesc],
@@ -1984,5 +2338,20 @@ mod tests {
         let targets = build_get_targets(&endpoints, &["temperature", "state"]);
         assert_eq!(targets.len(), 1);
         assert!(targets.contains_key(&(1, 0x0006)));
+    }
+
+    #[test]
+    fn codecs_reportable_change_for_analog_and_discrete_types() {
+        assert_eq!(
+            encode_reportable_change(0x21, Some(100.0)),
+            Some(vec![0x64, 0x00])
+        );
+        assert_eq!(encode_reportable_change(0x20, Some(1.0)), Some(vec![0x01]));
+        assert_eq!(encode_reportable_change(0x10, Some(1.0)), Some(Vec::new()));
+        assert_eq!(
+            encode_reportable_change(0x39, Some(1.5)),
+            Some(1.5f32.to_le_bytes().to_vec())
+        );
+        assert_eq!(encode_reportable_change(0x42, Some(1.0)), None);
     }
 }
