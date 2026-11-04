@@ -1,6 +1,6 @@
 {
-  "captured_utc": "2026-11-04T18:11:07+00:00",
-  "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64 linker unavailable (aarch64-unknown-linux-musl target installed but /usr/bin/ld rejects --fix-cortex-a53-843419)",
+  "captured_utc": "2026-11-04T18:35:00+00:00",
+  "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0 and cargo-zigbuild available; network reachable; Node/pnpm and mosquitto still absent",
   "commands": [
     {
       "command": "cargo fmt --all --check",
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "391 library + 2 binary + 30 compatibility = 423 passed, 0 failed"
+      "result": "396 library + 2 binary + 30 compatibility = 428 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -26,6 +26,11 @@
       "command": "python3 -m unittest discover -s scripts/tests",
       "exit": 0,
       "result": "28 parity/layout/EVID-04/OpenWrt artifact tests passed"
+    },
+    {
+      "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
+      "exit": 0,
+      "result": "static aarch64 ELF built from the current working tree (5450608 bytes)"
     }
   ]
 }

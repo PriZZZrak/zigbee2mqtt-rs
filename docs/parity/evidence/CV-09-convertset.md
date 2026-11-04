@@ -102,12 +102,18 @@ release build succeeds; `python3 -m unittest discover -s scripts/tests` → 28.
   `executeIfOff`, `direction` and `srcEndpoint` are not applied.
 - `readAfterWriteTime` is ignored; converter `publish()` callbacks and
   `result.state` attribute-name rewriting for endpoints are not fully modelled.
-- Bridge-level coverage exists (`convert_set_write_produces_exact_af_frame`,
-  `convert_set_command_produces_manufacturer_specific_frame`): `handle_set` runs
-  through a real `CoordinatorHandle` over an in-memory ZNP duplex, and the fake
-  device asserts the exact `AF_DATA_REQUEST` payload (cluster, endpoint, ZCL
-  header/manufacturer code/TSN/parameters, APS trans id) before answering a
-  success SRSP. It covers a write and a manufacturer-specific command; read
-  operations and error/SRSP-failure paths are not asserted yet.
+- Bridge-level coverage (`convert_set_write_produces_exact_af_frame`,
+  `convert_set_command_produces_manufacturer_specific_frame`,
+  `convert_set_read_op_sends_read_and_awaits_response`,
+  `convert_set_write_srsp_failure_does_not_wedge_the_link`): `handle_set` runs
+  through a real `CoordinatorHandle` over an in-memory ZNP duplex with a running
+  event pump. The fake device asserts the exact `AF_DATA_REQUEST` payload
+  (cluster, endpoint, ZCL header/manufacturer code/TSN/parameters, APS trans id),
+  answers SRSPs, and returns an AF read response for the converter read path.
+  One test rejects the first AF_DATA_REQUEST (status 0x01) and proves the next
+  send still succeeds, so a rejected request does not wedge the queue.
+- `coordinator::znp::fake_serial_send_zcl_propagates_coordinator_rejection`:
+  `send_zcl` now returns an error with the hexadecimal status instead of only
+  logging, matching upstream's rejection behavior.
 - No live device/converter-package run, no Home Assistant, no HIL; CONVERTER-019
   stays `IN_PROGRESS`.

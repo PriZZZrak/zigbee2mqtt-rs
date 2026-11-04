@@ -626,13 +626,18 @@ where
     Err(last_error.unwrap_or(Error::Timeout))
 }
 
-/// Test-only construction of a handle over an in-memory duplex transport.
+/// Test-only handle plus a running event pump, so `request_zcl` can resolve
+/// responses delivered as AF incoming frames.
 #[cfg(test)]
-pub(crate) fn test_handle(transport: ZnpTransport) -> ZnpHandle {
-    ZnpHandle {
-        transport,
-        waiters: Arc::new(Mutex::new(ZclWaiters::default())),
-    }
+pub(crate) fn test_handle_with_pump(
+    transport: ZnpTransport,
+    events: mpsc::Receiver<ZnpEvent>,
+) -> (ZnpHandle, mpsc::Receiver<CoordinatorEvent>) {
+    let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+    let pump_waiters = Arc::clone(&waiters);
+    let (event_tx, event_rx) = mpsc::channel(64);
+    tokio::spawn(event_pump(events, event_tx, pump_waiters));
+    (ZnpHandle { transport, waiters }, event_rx)
 }
 
 pub struct ZnpHandle {
@@ -710,10 +715,15 @@ impl ZnpHandle {
                 dst_addr, dst_ep, 1, cluster_id, trans_id, payload,
             ))
             .await?;
-        if rsp.data.first().copied() != Some(0) {
-            warn!("AF_DATA_REQUEST status: {:?}", rsp.data);
+        match rsp.data.first().copied() {
+            Some(0) => Ok(()),
+            Some(status) => Err(Error::Znp(format!(
+                "AF_DATA_REQUEST rejected with status 0x{status:02X}"
+            ))),
+            None => Err(Error::Znp(
+                "AF_DATA_REQUEST returned an empty response".into(),
+            )),
         }
-        Ok(())
     }
 
     /// Send a ZCL frame and wait for the correlated device response.
@@ -1071,6 +1081,33 @@ mod fake_serial_e2e_tests {
             .unwrap()
             .expect("temperature values");
         assert_eq!(parsed.values["temperature"], serde_json::json!(22.5));
+        device.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn fake_serial_send_zcl_propagates_coordinator_rejection() {
+        let (mut wire, handle) = fake_handle();
+        let device = tokio::spawn(async move {
+            let request = wire.next().await.unwrap().unwrap();
+            assert_eq!(request.subsystem, frame::Subsystem::Af);
+            wire.send(frame::ZnpFrame::new(
+                frame::FrameType::SRsp,
+                frame::Subsystem::Af,
+                0x01,
+                vec![0xE9],
+            ))
+            .await
+            .unwrap();
+        });
+        let error = handle
+            .send_zcl(0x1234, 1, 0x0006, 7, vec![0x01, 7, 0x00])
+            .await
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("rejected"),
+            "unexpected error: {error}"
+        );
+        assert!(error.to_string().contains("0xE9"));
         device.await.unwrap();
     }
 

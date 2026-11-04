@@ -1903,17 +1903,53 @@ impl Bridge {
                 continue;
             };
             *trans_id = trans_id.wrapping_add(1);
-            if let Err(e) = coord
+            let mut acknowledged = true;
+            if cluster == crate::zigbee::zcl::clusters::door_lock::CLUSTER_ID {
+                // Door Lock responses carry a status; only update optimistic
+                // state when the device acknowledges the command.
+                let expected = zcl_payload.get(2).copied();
+                match coord
+                    .request_zcl_expected(
+                        nwk_addr,
+                        ep,
+                        cluster,
+                        *trans_id,
+                        zcl_payload,
+                        Duration::from_secs(3),
+                        2,
+                        expected,
+                    )
+                    .await
+                {
+                    Ok(response) => {
+                        match crate::zigbee::zcl::clusters::door_lock::parse_response(
+                            &response.data,
+                        ) {
+                            Some((_, 0)) => {}
+                            other => {
+                                warn!("Lock command response not successful: {other:?}");
+                                acknowledged = false;
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        warn!("Lock command failed: {error}");
+                        acknowledged = false;
+                    }
+                }
+            } else if let Err(e) = coord
                 .send_zcl(nwk_addr, ep, cluster, *trans_id, zcl_payload)
                 .await
             {
                 warn!("Failed to send state command (cluster 0x{cluster:04X}): {e}");
             }
-            let key = match &suffix {
-                Some(suffix) => format!("state_{suffix}"),
-                None => "state".to_string(),
-            };
-            optimistic.insert(key, json!(state_str.to_uppercase()));
+            if acknowledged {
+                let key = match &suffix {
+                    Some(suffix) => format!("state_{suffix}"),
+                    None => "state".to_string(),
+                };
+                optimistic.insert(key, json!(state_str.to_uppercase()));
+            }
         }
 
         // Handle cover position/tilt (written as percentage attributes).
@@ -4610,6 +4646,13 @@ const definitions = [
                 },
             },
             {
+                key: ["read_temperature"],
+                convertSet: async (entity, key, value, meta) => {
+                    await entity.read("msTemperatureMeasurement", ["measuredValue"]);
+                    return {state: {}};
+                },
+            },
+            {
                 key: ["vendor_timed"],
                 convertSet: async (entity, key, value, meta) => {
                     await entity.command(
@@ -4657,6 +4700,11 @@ module.exports = {definitions};
                                 {"name": "offwaittime", "type": 33}
                             ]}
                         }
+                    },
+                    "1026": {
+                        "name": "msTemperatureMeasurement",
+                        "attributes": {"0": {"name": "measuredValue", "type": 41}},
+                        "commands": {}
                     }
                 }
             })
@@ -4726,14 +4774,14 @@ module.exports = {definitions};
     ) {
         use tokio_util::codec::Framed;
         let (client, server) = tokio::io::duplex(8192);
-        let (transport, _events) = crate::coordinator::znp::transport::spawn_test_transport(
+        let (transport, events) = crate::coordinator::znp::transport::spawn_test_transport(
             Framed::new(server, crate::coordinator::znp::frame::ZnpCodec),
         );
-        let (_event_tx, event_rx) = tokio::sync::mpsc::channel(8);
+        let (handle, event_rx) = crate::coordinator::znp::test_handle_with_pump(transport, events);
         (
             Framed::new(client, crate::coordinator::znp::frame::ZnpCodec),
             CoordinatorHandle {
-                inner: Arc::new(Mutex::new(crate::coordinator::znp::test_handle(transport))),
+                inner: Arc::new(Mutex::new(handle)),
                 events: event_rx,
                 info: crate::coordinator::CoordinatorInfo {
                     ieee_addr: IeeeAddr::from_hex("0x00124b00120144ae"),
@@ -4742,6 +4790,72 @@ module.exports = {definitions};
                 },
             },
         )
+    }
+
+    fn success_srsp() -> crate::coordinator::znp::frame::ZnpFrame {
+        crate::coordinator::znp::frame::ZnpFrame::new(
+            crate::coordinator::znp::frame::FrameType::SRsp,
+            crate::coordinator::znp::frame::Subsystem::Af,
+            0x01,
+            vec![0x00],
+        )
+    }
+
+    /// Spawn a fake device that records `count` AF_DATA_REQUEST frames and
+    /// replies with the frames produced by `respond` (SRSP before AF responses).
+    fn spawn_af_device<F>(
+        mut wire: tokio_util::codec::Framed<
+            tokio::io::DuplexStream,
+            crate::coordinator::znp::frame::ZnpCodec,
+        >,
+        count: usize,
+        respond: F,
+    ) -> tokio::task::JoinHandle<Vec<SentZcl>>
+    where
+        F: Fn(&SentZcl) -> Vec<crate::coordinator::znp::frame::ZnpFrame> + Send + 'static,
+    {
+        use futures::SinkExt;
+        use tokio_stream::StreamExt;
+        tokio::spawn(async move {
+            let mut frames = Vec::new();
+            for _ in 0..count {
+                let frame = tokio::time::timeout(Duration::from_secs(5), wire.next())
+                    .await
+                    .expect("bridge did not send a ZCL frame")
+                    .expect("serial link closed")
+                    .expect("invalid ZNP frame");
+                let sent = SentZcl {
+                    endpoint: frame.data[2],
+                    cluster: u16::from_le_bytes([frame.data[4], frame.data[5]]),
+                    af_trans_id: frame.data[6],
+                    payload: frame.data[10..].to_vec(),
+                };
+                for response in respond(&sent) {
+                    wire.send(response).await.unwrap();
+                }
+                frames.push(sent);
+            }
+            frames
+        })
+    }
+
+    fn af_incoming_frame(
+        cluster: u16,
+        src: u16,
+        src_ep: u8,
+        zcl: Vec<u8>,
+    ) -> crate::coordinator::znp::frame::ZnpFrame {
+        use crate::coordinator::znp::frame::{FrameType, Subsystem, ZnpFrame};
+        let mut raw = vec![0u8; 17];
+        raw[2..4].copy_from_slice(&cluster.to_le_bytes());
+        raw[4..6].copy_from_slice(&src.to_le_bytes());
+        raw[6] = src_ep;
+        raw[7] = 1;
+        raw[9] = 200;
+        raw[15] = 9;
+        raw[16] = zcl.len() as u8;
+        raw.extend(zcl);
+        ZnpFrame::new(FrameType::AReq, Subsystem::Af, 0x81, raw)
     }
 
     async fn convert_set_devices() -> (DeviceRegistry, IeeeAddr) {
@@ -4755,6 +4869,23 @@ module.exports = {definitions};
             profile_id: 0x0104,
             device_id: 0,
             input_clusters: vec![0x0000, 0x0006],
+            output_clusters: vec![],
+        });
+        let devices = DeviceRegistry::new();
+        devices.add(device);
+        (devices, ieee)
+    }
+
+    async fn lock_devices() -> (DeviceRegistry, IeeeAddr) {
+        let ieee = IeeeAddr::from_hex("0x00158d0001a2b3c4").unwrap();
+        let mut device = Device::new(ieee, 0x2345);
+        device.friendly_name = "front_door".into();
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x000a,
+            input_clusters: vec![0x0000, 0x0101],
             output_clusters: vec![],
         });
         let devices = DeviceRegistry::new();
@@ -4858,6 +4989,184 @@ module.exports = {definitions};
             vec![0x15, 0x37, 0x10, 0x00, 0x42, 0x00, 0x0A, 0x00, 0x05, 0x00]
         );
         assert_eq!(frames[0].af_trans_id, 1);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn convert_set_read_op_sends_read_and_awaits_response() {
+        let (dir, external) = convert_set_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = convert_set_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |sent| {
+            let tsn = sent.payload[1];
+            vec![
+                success_srsp(),
+                af_incoming_frame(
+                    1026,
+                    0x1234,
+                    1,
+                    vec![0x18, tsn, 0x01, 0x00, 0x00, 0x00, 0x29, 0xCA, 0x08],
+                ),
+            ]
+        });
+
+        Bridge::handle_set(
+            &devices,
+            &external,
+            &coord,
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            "plug",
+            Some(1),
+            &json!({"read_temperature": true}),
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames[0].cluster, 1026);
+        // ZCL Read Attributes (0x00) for measuredValue (0x0000).
+        assert_eq!(frames[0].endpoint, 1);
+        assert_eq!(frames[0].payload[0], 0x10);
+        assert_eq!(frames[0].payload[2], 0x00);
+        assert_eq!(&frames[0].payload[3..], &[0x00, 0x00]);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn convert_set_write_srsp_failure_does_not_wedge_the_link() {
+        let (dir, external) = convert_set_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = convert_set_devices().await;
+        let mut trans_id = 0u8;
+        // First request is rejected by the coordinator (status 0x01); the
+        // follow-up request succeeds, proving the link/queue is still usable.
+        let collector = spawn_af_device(wire, 2, |sent| {
+            if sent.af_trans_id == 1 {
+                vec![crate::coordinator::znp::frame::ZnpFrame::new(
+                    crate::coordinator::znp::frame::FrameType::SRsp,
+                    crate::coordinator::znp::frame::Subsystem::Af,
+                    0x01,
+                    vec![0x01],
+                )]
+            } else {
+                vec![success_srsp()]
+            }
+        });
+
+        Bridge::handle_set(
+            &devices,
+            &external,
+            &coord,
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            "plug",
+            Some(1),
+            &json!({"window_detection": "ON"}),
+        )
+        .await;
+
+        let follow_up = coord
+            .send_zcl(0x1234, 1, 0x0006, 9, vec![0x01, 9, 0x00])
+            .await;
+        assert!(
+            follow_up.is_ok(),
+            "a rejected AF request must not wedge subsequent sends: {follow_up:?}"
+        );
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0].cluster, 0x0006);
+        assert_eq!(frames[1].af_trans_id, 9);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn lock_command_acknowledgement_updates_state() {
+        let (dir, external) = convert_set_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = lock_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |sent| {
+            let tsn = sent.payload[1];
+            vec![
+                success_srsp(),
+                af_incoming_frame(0x0101, 0x2345, 1, vec![0x18, tsn, 0x00, 0x00]),
+            ]
+        });
+
+        Bridge::handle_set(
+            &devices,
+            &external,
+            &coord,
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            "front_door",
+            Some(1),
+            &json!({"state": "LOCK"}),
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames[0].cluster, 0x0101);
+        assert_eq!(frames[0].payload, vec![0x01, 0x00, 0x00]);
+        assert_eq!(
+            devices
+                .find_by_name("front_door")
+                .unwrap()
+                .state
+                .get("state"),
+            Some(&json!("LOCK"))
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn lock_command_failed_acknowledgement_keeps_state_unchanged() {
+        let (dir, external) = convert_set_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = lock_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |sent| {
+            let tsn = sent.payload[1];
+            vec![
+                success_srsp(),
+                // Lock Door Response with status 0x01 (failure).
+                af_incoming_frame(0x0101, 0x2345, 1, vec![0x18, tsn, 0x00, 0x01]),
+            ]
+        });
+
+        Bridge::handle_set(
+            &devices,
+            &external,
+            &coord,
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            "front_door",
+            Some(1),
+            &json!({"state": "LOCK"}),
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames.len(), 1);
+        assert!(
+            devices
+                .find_by_name("front_door")
+                .unwrap()
+                .state
+                .get("state")
+                .is_none(),
+            "failed lock acknowledgement must not publish optimistic state"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 }

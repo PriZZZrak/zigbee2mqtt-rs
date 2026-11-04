@@ -49,7 +49,10 @@ Pinned app `344b6e03b43644c97154a72ca9eae17193c553a2`:
   template, non-endpoint locks use `<base>/<friendly>/set` with dot-notation.
 - Door Lock cluster (0x0101): `LOCK`→Lock Door, `UNLOCK`→Unlock Door; the bridge
   `state` handler now selects OnOff → Cover → Lock based on the endpoint's input
-  clusters, so a lock endpoint receives the right command.
+  clusters, so a lock endpoint receives the right command. Lock commands are
+  **acknowledged**: the bridge awaits the Lock/Unlock Door Response for the same
+  TSN, parses the status and only updates optimistic state when it is `0x00`
+  (a failed or timed-out acknowledgement leaves state unchanged).
 - Cover templates: structured `CoverFeatures` (state/position/tilt/running/motor)
   with exact upstream `running` and `motor_state` template strings, lookup-based
   `state_opening`/`state_closing`/`state_stopped`, and unsuffixed placeholders
@@ -70,6 +73,8 @@ New tests:
 - `cover_running_template_reports_movement_direction` — exact template string.
 - `cover_motor_state_template_matches_lookup_values` — states + template parts.
 - `door_lock::tests` — command payloads and response status parsing.
+- Bridge fake-coordinator: exact lock frame, success ack → optimistic `LOCK`,
+  failure ack → state unchanged.
 - Socket event loop (`socket_event_loop_receives_commands_and_publishes_retained_cleanup`)
   now also asserts `set/window_detection` → `{window_detection: "ON"}` and
   `l1/set/state_l1` → endpoint 1 with `{state_l1: "LOCK"}` over a real TCP
@@ -81,8 +86,10 @@ New tests:
   runs the converter, encodes the recorded writes/commands with the published
   `zcl-commands.json` type table and sends them. The generator run, complex ZCL
   types and a bridge-level fake-coordinator assertion are still missing.
-- Lock writes are fire-and-forget (`send_zcl`); the Lock Door response status is
-  parsed by the codec but not awaited, and no lock-specific attributes are read.
+- Lock acknowledgements are covered by bridge fake-coordinator tests
+  (`lock_command_acknowledgement_updates_state`,
+  `lock_command_failed_acknowledgement_keeps_state_unchanged`); no lock-specific
+  attributes (lock state, door state) are read, and no real lock was tested.
 - `object_id`/`default_entity_id` follow this project's existing naming
   convention rather than z2m's friendly-name-derived `default_entity_id`
   (unchanged contract, documented in earlier rows).

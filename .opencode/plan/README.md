@@ -101,8 +101,10 @@ R1 — явно ограниченный релиз для проверенно�
   Generator/Node не запускался; composite/Buffalo-типы (array/struct/time/date/
   IEEE/lists/zoneinfo/buffer/selector/BE-u24) добавлены, context-dependent типы
   отклоняются явно. Bridge fake-coordinator E2E проверяет точный AF-кадр для
-  write и manufacturer command; опции (transition/executeIfOff/
-  readAfterWriteTime) и read-путь не покрыты.
+  write, manufacturer command и read; отклонённый AF-запрос не блокирует очередь,
+  `send_zcl` возвращает ошибку со статусом. Lock-команды ждут Lock/Unlock Door
+  Response, optimistic state обновляется только при status 0. Опции
+  (transition/executeIfOff/readAfterWriteTime) и timeout/retry не покрыты.
 - **HA config switches/locks частично**: `SWITCH_DIFFERENT`-свойства дают
   config-switch с `command_topic_postfix`, lock discovery (0x0101) и cover
   `running`/`motor_state` шаблоны портированы с golden-тестами. Значения
