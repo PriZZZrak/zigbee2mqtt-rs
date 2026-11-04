@@ -10,6 +10,10 @@ use crate::zigbee::zcl::clusters::ota::{self, OtaImage, OtaTransfer};
 
 const OTA_MAGIC: u32 = 0x0BEE_F11E;
 
+/// Upstream default OTA image index.
+pub const DEFAULT_INDEX_URL: &str =
+    "https://raw.githubusercontent.com/Koenkk/zigbee-OTA/master/index.json";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OtaImageInfo {
     pub manufacturer_code: u16,
@@ -668,6 +672,32 @@ impl OtaManager {
     }
 }
 
+/// Handle an incoming QueryNextImageRequest for automatic update checking.
+///
+/// Parses the device query, applies the model/manufacturer constraints and uses
+/// the manager scheduler so repeated requests are throttled.
+pub fn auto_check_from_query(
+    manager: &mut OtaManager,
+    provider: &OtaIndexProvider,
+    ieee: &str,
+    raw_query: &[u8],
+    model_id: Option<&str>,
+    manufacturer_name: Option<&str>,
+    now: Instant,
+) -> Result<Option<OtaIndexEntry>, String> {
+    let (_, request) = ota::parse_query_next_image_request(raw_query)
+        .ok_or_else(|| "not a QueryNextImageRequest".to_string())?;
+    let identity = OtaQueryIdentity {
+        manufacturer_code: request.manufacturer_code,
+        image_type: request.image_type,
+        file_version: request.file_version,
+        hardware_version: request.hardware_version,
+        model_id,
+        manufacturer_name,
+    };
+    manager.check_for_update(provider, ieee, &identity, now)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -981,5 +1011,81 @@ mod tests {
         };
         let provider = OtaIndexProvider::new("https://main/index.json", None, Box::new(fetcher));
         assert!(provider.load_entries().is_err());
+    }
+
+    #[test]
+    fn auto_check_query_selects_then_throttles() {
+        let fetcher = FakeFetcher {
+            responses: HashMap::from([(
+                "https://main/index.json".to_string(),
+                index_body(4, "new.ota"),
+            )]),
+            failures: std::collections::HashSet::new(),
+        };
+        let provider = OtaIndexProvider::new("https://main/index.json", None, Box::new(fetcher));
+        let mut manager = OtaManager::default();
+        manager.set_check_interval(Duration::from_secs(60));
+        let query = vec![
+            0x01, 0x01, 0x01, 0x01, 0x37, 0x10, 0x01, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00, 0x00,
+        ];
+        let now = Instant::now();
+        let selected = auto_check_from_query(
+            &mut manager,
+            &provider,
+            "0xec1bbdfffeaa66db",
+            &query,
+            Some("M"),
+            Some("Vendor"),
+            now,
+        )
+        .unwrap()
+        .expect("first query selects image");
+        assert_eq!(selected.file_version, 4);
+        assert_eq!(selected.url, "new.ota");
+
+        assert!(auto_check_from_query(
+            &mut manager,
+            &provider,
+            "0xec1bbdfffeaa66db",
+            &query,
+            Some("M"),
+            Some("Vendor"),
+            now + Duration::from_secs(30),
+        )
+        .unwrap()
+        .is_none());
+
+        let later = auto_check_from_query(
+            &mut manager,
+            &provider,
+            "0xec1bbdfffeaa66db",
+            &query,
+            Some("M"),
+            Some("Vendor"),
+            now + Duration::from_secs(61),
+        )
+        .unwrap();
+        assert!(later.is_some());
+    }
+
+    #[test]
+    fn auto_check_query_rejects_non_query_frames() {
+        let fetcher = FakeFetcher {
+            responses: HashMap::new(),
+            failures: std::collections::HashSet::new(),
+        };
+        let provider = OtaIndexProvider::new("https://main/index.json", None, Box::new(fetcher));
+        let mut manager = OtaManager::default();
+        let error = auto_check_from_query(
+            &mut manager,
+            &provider,
+            "0x01",
+            &[0x01, 1, 0x03],
+            None,
+            None,
+            Instant::now(),
+        )
+        .unwrap_err();
+        assert!(error.contains("QueryNextImageRequest"));
     }
 }

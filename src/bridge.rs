@@ -130,6 +130,7 @@ pub struct Bridge {
     db_write_pending: Arc<Mutex<bool>>,
     external: Arc<ExternalConverter>,
     ota: Arc<Mutex<crate::ota::OtaManager>>,
+    ota_provider: crate::ota::OtaIndexProvider,
 }
 
 /// Resolve when the service manager or user asks the bridge to stop.
@@ -238,6 +239,11 @@ impl Bridge {
             db_write_pending: Arc::new(Mutex::new(false)),
             external: Arc::new(external),
             ota: Arc::new(Mutex::new(crate::ota::OtaManager::default())),
+            ota_provider: crate::ota::OtaIndexProvider::new(
+                crate::ota::DEFAULT_INDEX_URL,
+                None,
+                Box::new(crate::ota::CommandFetcher),
+            ),
         }
     }
 
@@ -684,11 +690,53 @@ impl Bridge {
                                     } else {
                                         data.get(1).copied().unwrap_or(0)
                                     };
-                                    let action = self
-                                        .ota
-                                        .lock()
-                                        .await
-                                        .handle_zcl(&ieee.as_hex(), &data, tsn);
+                                    let mut manager = self.ota.lock().await;
+                                    let action = manager.handle_zcl(&ieee.as_hex(), &data, tsn);
+                                    let auto_update = if action.is_none() {
+                                        let (model_id, manufacturer_name) = devices
+                                            .get_by_nwk(src_addr)
+                                            .map(|device| {
+                                                (device.model.clone(), device.manufacturer.clone())
+                                            })
+                                            .unwrap_or((None, None));
+                                        crate::ota::auto_check_from_query(
+                                            &mut manager,
+                                            &self.ota_provider,
+                                            &ieee.as_hex(),
+                                            &data,
+                                            model_id.as_deref(),
+                                            manufacturer_name.as_deref(),
+                                            std::time::Instant::now(),
+                                        )
+                                        .ok()
+                                        .flatten()
+                                    } else {
+                                        None
+                                    };
+                                    drop(manager);
+                                    if let Some(entry) = auto_update {
+                                        if let Some(mut device) = devices.get_mut_by_nwk(src_addr) {
+                                            device.state.insert(
+                                                "update".into(),
+                                                json!({
+                                                    "state": "available",
+                                                    "latest_version": entry.file_version,
+                                                    "latest_source": entry.url,
+                                                    "latest_release_notes": entry.release_notes,
+                                                }),
+                                            );
+                                            let state = serde_json::Value::Object(device.state.clone());
+                                            let name = device.friendly_name.clone();
+                                            drop(device);
+                                            Self::publish_state(
+                                                &mqtt,
+                                                self.cfg.advanced.output,
+                                                &name,
+                                                &state,
+                                            )
+                                            .await;
+                                        }
+                                    }
                                     if let Some(action) = action {
                                         if let Err(error) = coord
                                             .send_zcl(
