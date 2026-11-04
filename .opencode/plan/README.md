@@ -78,6 +78,10 @@ R1 — явно ограниченный релиз для проверенно�
 - **CV-08 частично**: async `convertGet` исполняется с Boa job queue и возвращает
   запрошенные чтения; stub поддерживает только `read`, endpoint всегда 1,
   timers/другие host methods не реализованы.
+- **HA cleanup частично**: retained discovery configs удаляются пустым payload
+  (`retain=true`, QoS1) при remove; rename очищает старые configs и публикует
+  новые. Golden-тесты покрывают exact topics/payload; live-broker/HA migration
+  и группа discovery не проверены.
 - **FEAT-01 groups частично**: membership add/remove/remove_all отправляются
   реальными ZCL Groups-командами (0x0004) с ожиданием ответа и обновляют
   локальное состояние только после success; remove_all исправлен на

@@ -928,10 +928,21 @@ impl Bridge {
                                         let resp = mk_resp("error", json!({}), Some("Invalid payload".into()));
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else if let Some(ieee) = devices.find_by_name(from).map(|d| d.ieee_addr).or_else(|| crate::zigbee::IeeeAddr::from_hex(from)) {
+                                        let old_device = devices.get_by_ieee(&ieee).map(|device| device.clone());
                                         devices.rename(&ieee, to.clone());
+                                        let ha_rename = self.cfg.homeassistant.enabled();
+                                        if let (true, Some(old_device)) = (ha_rename, old_device) {
+                                            let info = crate::converters::external::ExternalDeviceInfo::from_device(&old_device);
+                                            let model = old_device.model.clone().unwrap_or_default();
+                                            let exposes = self.external.exposes(&model, &info).unwrap_or_default();
+                                            homeassistant::cleanup_discovery(&mqtt, &old_device, &exposes).await;
+                                            if let Some(new_device) = devices.get_by_ieee(&ieee).map(|device| device.clone()) {
+                                                self.publish_device_discovery(&mqtt, &new_device, &base_topic, &coordinator_ieee).await;
+                                            }
+                                        }
                                         Self::publish_device_list_static(&devices, &mqtt).await;
                                         self.persist_database(coord.info.ieee_addr).await;
-                                        let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": false}), None);
+                                        let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": ha_rename}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else {
                                         let resp = mk_resp("error", json!({}), Some("entity not found".into()));
@@ -959,6 +970,14 @@ impl Bridge {
                                     let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or(payload.as_str().unwrap_or(""));
                                     let ieee_opt = crate::zigbee::IeeeAddr::from_hex(id).or_else(|| devices.find_by_name(id).map(|d| d.ieee_addr));
                                     if let Some(ieee) = ieee_opt {
+                                        if self.cfg.homeassistant.enabled() {
+                                            if let Some(device) = devices.get_by_ieee(&ieee).map(|device| device.clone()) {
+                                                let info = crate::converters::external::ExternalDeviceInfo::from_device(&device);
+                                                let model = device.model.clone().unwrap_or_default();
+                                                let exposes = self.external.exposes(&model, &info).unwrap_or_default();
+                                                homeassistant::cleanup_discovery(&mqtt, &device, &exposes).await;
+                                            }
+                                        }
                                         devices.remove_by_ieee(&ieee);
                                         Self::publish_device_list_static(&devices, &mqtt).await;
                                         self.persist_database(coord.info.ieee_addr).await;

@@ -560,6 +560,86 @@ pub(crate) fn configs_from_exposes(
     configs
 }
 
+/// Discovery topics for a device, using exposes when available and the same
+/// cluster rules as the fallback publisher otherwise.
+pub(crate) fn discovery_topics(device: &Device, exposes: &[Value]) -> Vec<(String, String)> {
+    if !exposes.is_empty() {
+        let mut topics: Vec<(String, String)> =
+            configs_from_exposes(device, exposes, "zigbee2mqtt", "")
+                .into_iter()
+                .map(|(component, object_id, _)| (component, object_id))
+                .collect();
+        topics.sort();
+        topics.dedup();
+        return topics;
+    }
+    let clusters = device.all_input_clusters();
+    let mut topics = Vec::new();
+    let mut push = |component: &str, object_id: &str| {
+        topics.push((component.to_string(), object_id.to_string()));
+    };
+    if clusters.contains(&0x0006) {
+        if clusters.contains(&0x0008) || clusters.contains(&0x0300) {
+            push("light", "light");
+        } else {
+            push("switch", "switch");
+        }
+    }
+    if clusters.contains(&0x0201) {
+        push("climate", "climate");
+    }
+    if clusters.contains(&0x0B04) {
+        for field in ["current", "power", "energy", "fault_reason"] {
+            push("sensor", field);
+        }
+    }
+    if clusters.contains(&0x000F) {
+        push("binary_sensor", "contact");
+    }
+    if clusters.contains(&0x0012) {
+        push("sensor", "action");
+    }
+    if clusters.contains(&0x0500) {
+        let (field, _, _) =
+            crate::zigbee::zcl::clusters::ias_zone::ha_binary_sensor_fields(device.zone_type);
+        push("binary_sensor", field);
+    }
+    for (cluster, field) in [
+        (0x0402, "temperature"),
+        (0x0405, "humidity"),
+        (0x0400, "illuminance"),
+        (0x0001, "battery"),
+    ] {
+        if clusters.contains(&cluster) {
+            push("sensor", field);
+        }
+    }
+    if clusters.contains(&0x0406) {
+        push("binary_sensor", "occupancy");
+    }
+    let has_action_output = device
+        .all_output_clusters()
+        .iter()
+        .any(|cluster| matches!(cluster, 0x0005 | 0x0006 | 0x0008));
+    if has_action_output {
+        push("sensor", "action");
+    }
+    push("sensor", "linkquality");
+    topics.sort();
+    topics.dedup();
+    topics
+}
+
+/// Remove retained discovery configs for a device.
+pub async fn cleanup_discovery(mqtt: &MqttBridge, device: &Device, exposes: &[Value]) {
+    let ieee = device.ieee_addr.as_hex();
+    for (component, object_id) in discovery_topics(device, exposes) {
+        if let Err(error) = mqtt.clear_ha_discovery(&component, &ieee, &object_id).await {
+            warn!("HA discovery cleanup error for {component}/{ieee}/{object_id}: {error}");
+        }
+    }
+}
+
 /// Publish discovery derived from upstream exposes.
 pub async fn publish_exposes_discovery(
     mqtt: &MqttBridge,
@@ -1158,5 +1238,62 @@ mod tests {
         assert_eq!(configs.len(), 1);
         assert_eq!(configs[0].0, "sensor");
         assert_eq!(configs[0].1, "temperature");
+    }
+
+    #[test]
+    fn discovery_cleanup_topics_follow_cluster_fallback() {
+        let dev = make_light();
+        let topics = discovery_topics(&dev, &[]);
+        assert_eq!(
+            topics,
+            vec![
+                ("light".to_string(), "light".to_string()),
+                ("sensor".to_string(), "linkquality".to_string())
+            ]
+        );
+
+        let mut sensor = make_light();
+        sensor.friendly_name = "sensor".into();
+        sensor.endpoints[0].input_clusters = vec![0x0001, 0x000F, 0x0402, 0x0405, 0x0406];
+        let topics = discovery_topics(&sensor, &[]);
+        assert!(topics.contains(&("sensor".to_string(), "temperature".to_string())));
+        assert!(topics.contains(&("sensor".to_string(), "humidity".to_string())));
+        assert!(topics.contains(&("sensor".to_string(), "battery".to_string())));
+        assert!(topics.contains(&("binary_sensor".to_string(), "contact".to_string())));
+        assert!(topics.contains(&("binary_sensor".to_string(), "occupancy".to_string())));
+        assert!(topics.contains(&("sensor".to_string(), "linkquality".to_string())));
+        let mut sorted = topics.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(topics, sorted, "topics must be sorted and unique");
+    }
+
+    #[test]
+    fn discovery_cleanup_topics_follow_exposes() {
+        let dev = make_light();
+        let exposes = vec![
+            json!({"type": "numeric", "name": "temperature", "property": "temperature", "access": 1, "unit": "°C"}),
+            json!({"type": "binary", "name": "contact", "property": "contact", "access": 1, "value_on": false, "value_off": true}),
+            json!({"type": "switch", "name": "state", "property": "state", "access": 7, "value_on": "ON", "value_off": "OFF"}),
+            json!({"type": "light", "name": "light", "features": [{"name": "brightness"}]}),
+        ];
+        assert_eq!(
+            discovery_topics(&dev, &exposes),
+            vec![
+                ("binary_sensor".to_string(), "contact".to_string()),
+                ("light".to_string(), "light".to_string()),
+                ("sensor".to_string(), "temperature".to_string()),
+                ("switch".to_string(), "state".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn discovery_cleanup_topic_and_payload_are_exact() {
+        assert_eq!(
+            crate::mqtt::ha_discovery_topic("sensor", "0xec1bbdfffeaa66db", "temperature"),
+            "homeassistant/sensor/0xec1bbdfffeaa66db/temperature/config"
+        );
+        assert!(crate::mqtt::ha_clear_payload().is_empty());
     }
 }

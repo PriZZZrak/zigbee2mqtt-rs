@@ -78,6 +78,17 @@ pub(crate) fn parse_device_command(
     })
 }
 
+/// Topic for a Home Assistant discovery config.
+pub(crate) fn ha_discovery_topic(component: &str, node_id: &str, object_id: &str) -> String {
+    format!("homeassistant/{component}/{node_id}/{object_id}/config")
+}
+
+/// Empty payload clears a retained discovery topic.
+#[must_use]
+pub(crate) fn ha_clear_payload() -> Vec<u8> {
+    Vec::new()
+}
+
 /// Topic for a bridge request response.
 pub(crate) fn bridge_response_topic(base_topic: &str, request: &str) -> String {
     format!("{base_topic}/bridge/response/{request}")
@@ -297,6 +308,20 @@ impl MqttBridge {
         self.publish_retained(&topic, &bytes).await
     }
 
+    /// Delete a retained Home Assistant discovery config (empty payload).
+    pub async fn clear_ha_discovery(
+        &self,
+        component: &str,
+        node_id: &str,
+        object_id: &str,
+    ) -> Result<()> {
+        let topic = ha_discovery_topic(component, node_id, object_id);
+        self.client
+            .publish(&topic, QoS::AtLeastOnce, true, ha_clear_payload())
+            .await
+            .map_err(Error::Mqtt)
+    }
+
     /// Publish a Home Assistant MQTT discovery config.
     pub async fn publish_ha_discovery(
         &self,
@@ -305,7 +330,7 @@ impl MqttBridge {
         object_id: &str,
         config: &serde_json::Value,
     ) -> Result<()> {
-        let topic = format!("homeassistant/{component}/{node_id}/{object_id}/config");
+        let topic = ha_discovery_topic(component, node_id, object_id);
         tracing::debug!("HA discovery → {topic}");
         let payload = serde_json::to_vec(config)?;
         self.client
