@@ -159,8 +159,28 @@ async fn main() {
         .get("data")
         .and_then(|value| value.as_object())
         .cloned();
-    let frame = match data {
-        Some(data) => {
+    let raw_payload: Option<Vec<u8>> = input
+        .get("raw_payload")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_u64())
+                .filter_map(|value| u8::try_from(value).ok())
+                .collect()
+        });
+    let frame = match (raw_payload, data) {
+        (Some(raw), _) => {
+            let command = input
+                .get("command_id")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u8::try_from(value).ok())
+                .unwrap_or_else(|| fail("fixture is missing 'command_id'"));
+            let mut frame = vec![0x15, 0x02, 0x10, 0x01, command];
+            frame.extend_from_slice(&raw);
+            frame
+        }
+        (None, Some(data)) => {
             // Cluster-specific command payloads: control, TSN, command.
             let command = input
                 .get("command_id")
@@ -171,7 +191,7 @@ async fn main() {
             frame.extend_from_slice(&encode_cluster_command(&data));
             frame
         }
-        None => {
+        (None, None) => {
             let attribute = input
                 .get("attribute")
                 .and_then(|value| value.as_str())
@@ -219,8 +239,11 @@ async fn main() {
     .await;
 
     let topic = format!("{base_topic}/{friendly_name}");
+    let expect_no_publish =
+        input.get("expect").and_then(|value| value.as_str()) == Some("no_publish");
     let mut published = None;
-    for _ in 0..250 {
+    let attempts = if expect_no_publish { 25 } else { 250 };
+    for _ in 0..attempts {
         if let Some(item) = broker
             .publishes()
             .into_iter()
@@ -231,14 +254,15 @@ async fn main() {
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    let Some(published) = published else {
-        fail(format!(
+    let payload = match published {
+        Some(published) => serde_json::from_slice(&published.payload)
+            .unwrap_or_else(|error| fail(format!("published payload is not JSON: {error}"))),
+        None if expect_no_publish => Value::Null,
+        None => fail(format!(
             "no state publish on {topic}; saw {:?}",
             broker.publishes()
-        ));
+        )),
     };
-    let payload: Value = serde_json::from_slice(&published.payload)
-        .unwrap_or_else(|error| fail(format!("published payload is not JSON: {error}")));
     println!(
         "{}",
         serde_json::to_string(&json!({"topic": topic, "payload": payload}))

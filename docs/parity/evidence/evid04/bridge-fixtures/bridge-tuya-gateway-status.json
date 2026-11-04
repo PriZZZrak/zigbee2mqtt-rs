@@ -1,0 +1,38 @@
+{
+  "id": "bridge-tuya-gateway-status",
+  "mode": "bridge",
+  "input": {
+    "mode": "bridge",
+    "model": "TS0601",
+    "manufacturer_name": "_TZE200_b6wax7g0",
+    "ieee_addr": "0x00124b0000000002",
+    "nwk_addr": 14589,
+    "friendly_name": "trv",
+    "base_topic": "zigbee2mqtt",
+    "cluster_id": 61184,
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {},
+    "endpoints": [
+      {
+        "id": 1,
+        "input_clusters": [
+          0,
+          61184
+        ]
+      }
+    ],
+    "msg_type": "commandMcuGatewayConnectionStatus",
+    "command_id": 37,
+    "data": {
+      "payloadSize": 1,
+      "payload": 1
+    },
+    "raw_payload": [
+      1,
+      0,
+      1
+    ],
+    "expect": "no_publish"
+  }
+}

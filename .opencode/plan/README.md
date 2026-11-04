@@ -32,7 +32,7 @@ R1 — явно ограниченный релиз для проверенно�
 
 - **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 475 952 B,
   sha256 `b9571660…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
-  (5 565 658 B, sha256 `2d26d5b3…`, installed 11 919 360 B с app-resolved Windfront 2.15.0,
+  (5 562 053 B, sha256 `59989b7a…`, installed 11 929 600 B с app-resolved Windfront 2.15.0,
   `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
@@ -43,11 +43,13 @@ R1 — явно ограниченный релиз для проверенно�
   frontend differential. Bridge **теперь конвертирует Tuya commandDataReport/
   commandDataResponse** через persistent session (CONVERTER-005): парсер
   `seq+dpValues`, fake-broker тесты проверяют опубликованный state, битый
-  datapoint ничего не публикует. Добавлен **bridge-level differential**: 3
-  фикстуры (Tuya, TS0002 multi-endpoint, SNZB-02) сравнивают topic/payload
-  реального bridge с pinned Node reference — 3/3 PASS. Differential нашёл и
-  исправил двойной endpoint-суффикс и boolean-атрибуты, уходившие в конвертер
-  как `true/false` вместо 0/1. Time-sync/OTA/weather команды остаются raw.
+  datapoint ничего не публикует. Tuya time-sync/gateway/weather теперь тоже
+  структурированы (`payloadSize/payload`, Buffer для weather), OTA-команды
+  явно отклоняются. **Bridge-level differential**: 7 фикстур (Tuya report,
+  TS0002, SNZB-02 + time-sync/gateway/weather/OTA no-publish) сравнивают
+  topic/payload реального bridge с pinned Node reference — 7/7 PASS.
+  Differential нашёл и исправил двойной endpoint-суффикс и boolean-атрибуты.
+  Ответные команды конвертеров (time sync/weather) пока не отправляются.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

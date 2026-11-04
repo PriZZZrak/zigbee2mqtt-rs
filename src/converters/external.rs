@@ -833,7 +833,14 @@ const __norm = (v) => {{
                 meta.device = device;
                 msg.endpoint.getDevice = () => device;
                 msg.endpoint.constructor = {{name: "Endpoint"}};
+                // Some fromZigbee converters answer a frame (Tuya time sync,
+                // gateway status, weather). The response command is not
+                // forwarded yet; resolve so the converter still completes.
+                msg.endpoint.command = () => Promise.resolve();
                 msg.device = device;
+                if ((msg.type === "commandTuyaWeatherRequest" || msg.type === "commandTuyaWeatherSync") && Array.isArray(msg.data.payload)) {{
+                    msg.data.payload = Buffer.from(msg.data.payload);
+                }}
                 device.constructor = {{name: "Device"}};
                 const __debug = {debug};
                 let __matched = 0;
@@ -1095,7 +1102,14 @@ const __norm = (v) => {{
                 meta.device = device;
                 msg.endpoint.getDevice = () => device;
                 msg.endpoint.constructor = {{name: "Endpoint"}};
+                // Some fromZigbee converters answer a frame (Tuya time sync,
+                // gateway status, weather). The response command is not
+                // forwarded yet; resolve so the converter still completes.
+                msg.endpoint.command = () => Promise.resolve();
                 msg.device = device;
+                if ((msg.type === "commandTuyaWeatherRequest" || msg.type === "commandTuyaWeatherSync") && Array.isArray(msg.data.payload)) {{
+                    msg.data.payload = Buffer.from(msg.data.payload);
+                }}
                 device.constructor = {{name: "Device"}};
                 globalThis.__dispatchDone = false;
                 globalThis.__dispatchError = null;

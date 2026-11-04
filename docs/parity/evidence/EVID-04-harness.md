@@ -113,12 +113,14 @@ seeding, and `convert_from_zigbee_with_data` for cluster-command payloads.
 
 A second mode drives the **real bridge message path** with an in-process broker
 and compares the published topic/payload against the pinned Node reference:
-`docs/parity/evidence/evid04/bridge-fixtures` (3 fixtures: Tuya TRV report,
-TS0002 endpoint 2 with cached state, SNZB-02 report with cached battery).
+`docs/parity/evidence/evid04/bridge-fixtures` (7 fixtures: Tuya TRV report,
+TS0002 endpoint 2 with cached state, SNZB-02 report with cached battery, and
+Tuya time-sync/gateway-status/weather-request/OTA frames that must publish no
+state).
 Reference output is converter output + upstream
 `postProcessConvertedFromZigbeeMessage` + cached state + `linkquality` +
 `last_seen`; only `payload.last_seen` is ignored.
-`docs/parity/reports/evid04-bridge.json` → **3 passed, 0 failed**, all pins
+`docs/parity/reports/evid04-bridge.json` → **7 passed, 0 failed**, all pins
 MATCH. Details and the two defects it found (double endpoint suffix, boolean
 attributes sent as `true` instead of 0/1) are in
 `docs/parity/evidence/EVID-04-bridge.md`.
@@ -135,9 +137,9 @@ attributes sent as `true` instead of 0/1) are in
 
 ## Gaps
 
-- Nine fixtures: six converter-level (`fromZigbee`, `convertSet`) and three
-  bridge-level MQTT topic/payload comparisons; no ZCL-wire, storage, groups, OTA
-  or frontend differentials yet.
+- Thirteen fixtures: six converter-level (`fromZigbee`, `convertSet`) and seven
+  bridge-level MQTT topic/payload comparisons (including explicit no-publish
+  cases); no ZCL-wire, storage, groups or frontend differentials yet.
 - Cluster-command payload conversion (`msg.data`) is now wired into the bridge
   runtime for Tuya datapoint commands (CONVERTER-005); tests with an in-process
   broker assert the published state. Other Tuya commands (time sync, OTA,

@@ -1711,6 +1711,52 @@ impl Bridge {
         .await;
     }
 
+    /// Build the `msg.data` JSON shape for a parsed Tuya command.
+    fn tuya_command_data(
+        parsed: &crate::zigbee::zcl::clusters::tuya::CommandPayload,
+    ) -> serde_json::Map<String, serde_json::Value> {
+        use crate::zigbee::zcl::clusters::tuya::CommandPayload;
+        match parsed {
+            CommandPayload::DataPoints { sequence, points } => {
+                let values: Vec<serde_json::Value> = points
+                    .iter()
+                    .map(|point| {
+                        json!({
+                            "dp": point.dp,
+                            "datatype": point.datatype,
+                            "data": point.data,
+                        })
+                    })
+                    .collect();
+                serde_json::Map::from_iter([
+                    ("seq".to_string(), json!(sequence)),
+                    ("dpValues".to_string(), json!(values)),
+                ])
+            }
+            CommandPayload::McuVersion { sequence, version } => serde_json::Map::from_iter([
+                ("seq".to_string(), json!(sequence)),
+                ("version".to_string(), json!(version)),
+            ]),
+            CommandPayload::TimeSync {
+                payload_size,
+                payload,
+            } => serde_json::Map::from_iter([
+                ("payloadSize".to_string(), json!(payload_size)),
+                ("payload".to_string(), json!(payload)),
+            ]),
+            CommandPayload::GatewayStatus {
+                payload_size,
+                payload,
+            } => serde_json::Map::from_iter([
+                ("payloadSize".to_string(), json!(payload_size)),
+                ("payload".to_string(), json!(payload)),
+            ]),
+            CommandPayload::Weather { payload } => {
+                serde_json::Map::from_iter([("payload".to_string(), json!(payload))])
+            }
+        }
+    }
+
     /// Apply one incoming ZCL frame: native cluster parsing plus definition
     /// conversion, merged and published exactly once.
     #[allow(clippy::too_many_arguments)]
@@ -1804,14 +1850,16 @@ impl Bridge {
             } else if header.frame_type == zcl::frame::FrameType::ClusterSpecific
                 && cluster_id == crate::zigbee::zcl::clusters::tuya::CLUSTER_ID
             {
-                // Tuya datapoints are cluster-specific commands, not
-                // attribute reports. Convert them through the same
-                // definition path with a structured msg.data.
+                // Tuya commands are cluster-specific and carry structured
+                // payloads instead of attribute reports.
                 if let Some(msg_type) =
                     crate::zigbee::zcl::clusters::tuya::message_type(header.command_id)
                 {
-                    match crate::zigbee::zcl::clusters::tuya::parse_datapoints(&data[offset..]) {
-                        Ok((sequence, points)) => {
+                    match crate::zigbee::zcl::clusters::tuya::parse_command(
+                        header.command_id,
+                        &data[offset..],
+                    ) {
+                        Ok(Some(parsed)) => {
                             if let Some((model, info, state)) = prepared.as_ref() {
                                 if external.ensure_device_files(model, info).await.is_some() {
                                     let message =
@@ -1820,20 +1868,7 @@ impl Bridge {
                                             linkquality: link_quality,
                                             group_id: 0,
                                         };
-                                    let dp_values: Vec<serde_json::Value> = points
-                                        .iter()
-                                        .map(|point| {
-                                            json!({
-                                                "dp": point.dp,
-                                                "datatype": point.datatype,
-                                                "data": point.data,
-                                            })
-                                        })
-                                        .collect();
-                                    let data_map = serde_json::Map::from_iter([
-                                        ("seq".to_string(), json!(sequence)),
-                                        ("dpValues".to_string(), json!(dp_values)),
-                                    ]);
+                                    let data_map = Self::tuya_command_data(&parsed);
                                     if let Some(converted) = external
                                         .convert_from_zigbee_session_with_data(
                                             model, cluster_id, msg_type, &data_map, info, &message,
@@ -1846,6 +1881,12 @@ impl Bridge {
                                     debug!("external converter: no candidates for model {model:?}");
                                 }
                             }
+                        }
+                        Ok(None) => {
+                            debug!(
+                                "Tuya command 0x{:02X} has no structured payload",
+                                header.command_id
+                            );
                         }
                         Err(error) => {
                             warn!("Tuya command parse error: {error}");
@@ -5042,6 +5083,22 @@ const definitions = [
                     };
                 },
             },
+            {
+                cluster: "manuSpecificTuya",
+                type: ["commandMcuSyncTime"],
+                convert: (model, msg) => ({
+                    sync_size: msg.data.payloadSize,
+                    sync_first: msg.data.payload[0],
+                }),
+            },
+            {
+                cluster: "manuSpecificTuya",
+                type: ["commandTuyaWeatherRequest"],
+                convert: (model, msg) => ({
+                    weather_first: msg.data.payload[0],
+                    weather_len: msg.data.payload.length,
+                }),
+            },
         ],
     },
 ];
@@ -5514,6 +5571,95 @@ module.exports = {definitions};
         let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
         assert_eq!(state["local_temperature"], json!(14));
         assert_eq!(state["tuya_seq"], json!(0x1234));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    fn tuya_command_frame(command_id: u8, payload: &[u8]) -> Vec<u8> {
+        let mut frame = vec![0x15, 0x02, 0x10, 0x01, command_id];
+        frame.extend_from_slice(payload);
+        frame
+    }
+
+    #[tokio::test]
+    async fn tuya_time_sync_fields_reach_the_converter() {
+        let (dir, external) = tuya_fixture();
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = tuya_devices().await;
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            &mqtt,
+            OutputMode::Json,
+            0x5678,
+            1,
+            crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
+            42,
+            tuya_command_frame(0x24, &[0x08, 0x00, 0x11, 0x22, 0, 0, 0, 0, 0, 0]),
+        )
+        .await;
+
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/trv").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        assert_eq!(state["sync_size"], json!(8));
+        assert_eq!(state["sync_first"], json!(0x11));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn tuya_weather_request_payload_is_a_buffer() {
+        let (dir, external) = tuya_fixture();
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = tuya_devices().await;
+        let payload = [0x00, 0x00, 0x01, 0x00, 0x12, 0x05, 0x01, 0x00];
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            &mqtt,
+            OutputMode::Json,
+            0x5678,
+            1,
+            crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
+            42,
+            tuya_command_frame(0x60, &payload),
+        )
+        .await;
+
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/trv").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        assert_eq!(state["weather_first"], json!(0));
+        assert_eq!(state["weather_len"], json!(payload.len()));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn tuya_ota_command_is_rejected_without_publishing() {
+        let (dir, external) = tuya_fixture();
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = tuya_devices().await;
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            &mqtt,
+            OutputMode::Json,
+            0x5678,
+            1,
+            crate::zigbee::zcl::clusters::tuya::CLUSTER_ID,
+            42,
+            tuya_command_frame(0x13, &[0x00, 0x00, 0xAA]),
+        )
+        .await;
+
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(
+            !broker
+                .publishes()
+                .iter()
+                .any(|item| item.topic == "zigbee2mqtt/trv"),
+            "OTA payloads are explicitly rejected, not published"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 }

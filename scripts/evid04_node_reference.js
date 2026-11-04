@@ -102,7 +102,7 @@ function selectDefinition(input) {
     return load(best ? best.candidate : candidates[0]);
 }
 
-async function runFromZigbee({input, definition, meta, clusterName, clusterId, msgType, endpoint}) {
+async function runFromZigbee({input, definition, meta, clusterName, clusterId, msgType, endpoint, lenient = false}) {
     let data;
     if (input.data && typeof input.data === "object") {
         data = normalize(input.data);
@@ -110,6 +110,10 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
         if (typeof input.attribute !== "string") fail("fixture is missing 'attribute' or 'data'");
         if (input.value === undefined) fail("fixture is missing 'value'");
         data = {[input.attribute]: input.value};
+    }
+    // Herdsman delivers Tuya weather buffers as Buffer instances.
+    if (clusterName === "manuSpecificTuya" && Array.isArray(data.payload)) {
+        data.payload = Buffer.from(data.payload);
     }
     const msg = {
         cluster: clusterName,
@@ -138,10 +142,14 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
             const result = await converter.convert(definition, msg, (publish) => Object.assign(out, publish), {}, meta);
             if (result && typeof result === "object") Object.assign(out, result);
         } catch (error) {
-            fail(`converter threw: ${(error && error.stack) || error}`);
+            // z2m receive.ts catches converter exceptions and continues.
+            if (!lenient) fail(`converter threw: ${(error && error.stack) || error}`);
         }
     }
-    if (!matched) fail(`no fromZigbee converter matched ${clusterName}/${msgType}`);
+    if (!matched) {
+        if (lenient) return {};
+        fail(`no fromZigbee converter matched ${clusterName}/${msgType}`);
+    }
     return out;
 }
 
@@ -199,24 +207,27 @@ async function main() {
             clusterId,
             msgType,
             endpoint,
+            lenient: true,
         });
+        const baseTopic = input.base_topic || "zigbee2mqtt";
+        const friendlyName = input.friendly_name || "device";
+        const topic = `${baseTopic}/${friendlyName}`;
+        // With advanced.last_seen at its default `disable`, receive.ts only
+        // publishes when a converter produced at least one key.
+        if (Object.keys(out).length === 0) {
+            process.stdout.write(`${JSON.stringify({topic, payload: null})}\n`);
+            return;
+        }
         // Mirror receive.ts publish(): post-process, then the controller merges
-        // the converter payload into the cached state and adds linkquality plus
-        // last_seen (advanced.last_seen is assumed ISO_8601).
+        // the converter payload into the cached state and adds linkquality.
         zhc.postProcessConvertedFromZigbeeMessage(definition, out, {}, meta.device);
         const payload = {
             ...(input.state && typeof input.state === "object" ? input.state : {}),
             ...out,
             linkquality: input.linkquality === undefined ? 0 : input.linkquality,
-            last_seen: "1970-01-01T00:00:00.000Z",
         };
-        const baseTopic = input.base_topic || "zigbee2mqtt";
-        const friendlyName = input.friendly_name || "device";
         process.stdout.write(
-            `${JSON.stringify({
-                topic: `${baseTopic}/${friendlyName}`,
-                payload: normalize(payload),
-            })}\n`,
+            `${JSON.stringify({topic, payload: normalize(payload)})}\n`,
         );
         return;
     }

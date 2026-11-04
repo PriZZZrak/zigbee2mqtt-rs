@@ -1,0 +1,61 @@
+{
+  "id": "bridge-tuya-ota-block",
+  "mode": "bridge",
+  "input": {
+    "mode": "bridge",
+    "model": "TS0601",
+    "manufacturer_name": "_TZE200_b6wax7g0",
+    "ieee_addr": "0x00124b0000000002",
+    "nwk_addr": 14589,
+    "friendly_name": "trv",
+    "base_topic": "zigbee2mqtt",
+    "cluster_id": 61184,
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {},
+    "endpoints": [
+      {
+        "id": 1,
+        "input_clusters": [
+          0,
+          61184
+        ]
+      }
+    ],
+    "msg_type": "commandMcuOtaBlockDataRequest",
+    "command_id": 19,
+    "data": {
+      "payload": [
+        1,
+        2,
+        3
+      ]
+    },
+    "raw_payload": [
+      0,
+      0,
+      170,
+      187,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      2,
+      3
+    ],
+    "expect": "no_publish"
+  }
+}

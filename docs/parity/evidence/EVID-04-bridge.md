@@ -27,16 +27,21 @@ Pinned app `344b6e03b43644c97154a72ca9eae17193c553a2`, converters
 - Node reference (`mode: "bridge"`): resolves the definition via
   `models-index.json`, prepares it with upstream `prepareDefinition`, runs the
   matching `fromZigbee` converters, calls the real
-  `postProcessConvertedFromZigbeeMessage`, merges `input.state` (cache),
-  then adds `linkquality` and a placeholder `last_seen`
-  (`1970-01-01T00:00:00.000Z`, upstream `ISO_8601` mode). Output:
-  `{topic, payload}`.
+  `postProcessConvertedFromZigbeeMessage`, merges `input.state` (cache) and
+  adds `linkquality`. It models the upstream **default** `last_seen: disable`:
+  when the converter produces no keys, the reference publishes nothing
+  (`payload: null`). Output: `{topic, payload}`.
 - Rust candidate: builds the same ZCL frame from the fixture, registers a
   `Device`, starts the in-process MQTT broker, drives the real
   `Bridge::process_zcl_message` (the function the event loop calls) and prints
   the observed `{topic, payload}`.
-- The harness compares normalized JSON; each fixture ignores only
-  `payload.last_seen` (a wall-clock value). No other field is normalized.
+- Commands whose converters only answer the frame (time sync, gateway status,
+  weather request) or have no converter (OTA) compare `payload: null` on both
+  sides. For Tuya weather the reference and Rust host both hand the converter a
+  `Buffer`; time sync stays an array.
+- The harness compares normalized JSON; state fixtures ignore only
+  `payload.last_seen` (a wall-clock value, because Rust always adds it while the
+  reference uses upstream's default `disable`). No other field is normalized.
 
 ## Fixtures and result
 
@@ -45,6 +50,10 @@ Pinned app `344b6e03b43644c97154a72ca9eae17193c553a2`, converters
 | `bridge-tuya-trv-report` (`commandDataReport`, dp 3) | `{"local_temperature":14,"linkquality":42}` |
 | `bridge-multi-endpoint-ts0002` (endpoint 2, cached `state_l1`) | `{"state_l1":"OFF","state_l2":"ON","linkquality":42}` |
 | `bridge-snzb02-temperature` (cached `battery`) | `{"battery":90,"temperature":22.5,"linkquality":42}` |
+| `bridge-tuya-mcu-sync-time` | no state published (`payload: null`) |
+| `bridge-tuya-gateway-status` | no state published (`payload: null`) |
+| `bridge-tuya-weather-request` | no state published (`payload: null`) |
+| `bridge-tuya-ota-block` | no state published (`payload: null`; Rust logs explicit OTA rejection) |
 
 ```text
 $ python3 scripts/evid04_harness.py \
@@ -53,7 +62,7 @@ $ python3 scripts/evid04_harness.py \
         EVID04_REGISTRY=.../registry.json node scripts/evid04_node_reference.js" \
     --candidate-cmd "env EVID04_CACHE=... ./target/release/evid04_bridge_candidate" \
     --require-pins --report docs/parity/reports/evid04-bridge.json
-EVID-04: 3 passed, 0 failed,
+EVID-04: 7 passed, 0 failed,
 pins=[('zigbee2mqtt','MATCH'),('zigbee-herdsman','MATCH'),
       ('zigbee-herdsman-converters','MATCH'),('frontend','MATCH')]
 ```
@@ -79,6 +88,9 @@ Regression tests: `converter_attribute_json_uses_herdsman_numeric_booleans`,
 
 - `payload.last_seen` is ignored: the Rust bridge always includes it, while
   upstream defaults to `disable`. That divergence is known and not resolved here.
+- For time sync / gateway status / weather, the converter’s **response
+  command** (`msg.endpoint.command`) is resolved but not forwarded, so the
+  differential proves “no state publish”, not the device reply.
 - Not compared: retain/QoS flags, availability topic, Home Assistant
   `adjustMessageBeforePublish` mock properties, debounce/throttle, groups.
 - One frame per fixture, no persistence/restart, no live broker or HA.
