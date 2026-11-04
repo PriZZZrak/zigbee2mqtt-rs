@@ -23,7 +23,7 @@ Discovered: 109 eligible behaviors; 17 unmeasured rows.
 Stage 1 Z-Stack parity: **0/102 = 0.00%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
 Global upstream parity: **0/109 = 0.00%** [all adapter families].
 Stage 1 / global weighted parity: 0.00% / 0.00% (0/136, 0/150).
-Stage 1 / global scenarios: 0/279 = 0.00% and 0/279 = 0.00% [10/17 unmeasured rows].
+Stage 1 / global scenarios: 0/281 = 0.00% and 0/281 = 0.00% [10/17 unmeasured rows].
 Status breakdown: DISCOVERED 17, IMPLEMENTED_UNVERIFIED 56, IN_PROGRESS 27, PARTIAL 9 (109 total).
 Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, DRIFT-001, HA-001, HA-003, MQTT-001, MQTT-002 (+27 more)
 Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 0/97, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
@@ -31,7 +31,7 @@ Inventory audit: incomplete; no substantiated domain fraction, catalog total or 
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).
 Open upstream deltas: see upstream-changes.md; freshness DRIFT_DETECTED.
-Last test run (2026-11-04T13:54:41+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0.
+Last test run (2026-11-04T14:00:46+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0.
 Known exclusions: none approved; future adapters are deferred, not excluded.
 R1 acceptance is tracked separately in .opencode/plan/10-acceptance-matrix.md; these percentages are not R1 completion.
 Counting rule: only whole VERIFIED rows with existing evidence and test references contribute; newly discovered work increases denominators and is not counted as verified progress.

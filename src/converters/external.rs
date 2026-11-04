@@ -759,24 +759,34 @@ impl ExternalConverter {
 const TIMERS_JS: &str = r#"
 globalThis.__timers = globalThis.__timers || [];
 globalThis.__timerSeq = globalThis.__timerSeq || 0;
+globalThis.__now = Date.now();
 globalThis.setTimeout = function(fn, delay) {
     const id = ++globalThis.__timerSeq;
-    globalThis.__timers.push({id, due: Date.now() + (delay || 0), fn, cancelled: false});
+    globalThis.__timers.push({id, due: globalThis.__now + (delay || 0), fn, cancelled: false});
     return id;
 };
 globalThis.clearTimeout = function(id) {
     for (const timer of globalThis.__timers) if (timer.id === id) timer.cancelled = true;
 };
 globalThis.__runDueTimers = function(now) {
+    if (now > globalThis.__now) globalThis.__now = now;
     let executed = 0;
     for (const timer of globalThis.__timers) {
-        if (!timer.cancelled && timer.due <= now) {
+        if (!timer.cancelled && timer.due <= globalThis.__now) {
             timer.cancelled = true;
             try { timer.fn(); } catch (error) {}
             executed += 1;
         }
     }
     return executed;
+};
+globalThis.__pumpTimers = function(maxAdvance) {
+    const pending = globalThis.__timers.filter((timer) => !timer.cancelled).sort((a, b) => a.due - b.due);
+    if (pending.length === 0) return 0;
+    const next = pending[0];
+    if (next.due - globalThis.__now > maxAdvance) return 0;
+    globalThis.__now = Math.max(globalThis.__now, next.due);
+    return globalThis.__runDueTimers(globalThis.__now);
 };
 "#;
 
@@ -872,29 +882,39 @@ impl ExternalConverter {
                 device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
                 meta.device = device;
                 msg.endpoint.getDevice = () => device;
-                const __published = [];
-                const publish = (p) => {{ __published.push(p); }};
-                const out = {{}};
-                for (const c of (definition.fromZigbee || [])) {{
+                globalThis.__dispatchDone = false;
+                globalThis.__dispatchError = null;
+                globalThis.__dispatchOut = {{}};
+                (async function() {{
                     try {{
-                        const cl = c.cluster;
-                        const tys = Array.isArray(c.type) ? c.type : [c.type];
-                        if ((cl === msg.cluster || String(cl) === String({cluster_id})) && tys.includes(msg.type)) {{
-                            const r = c.convert(definition, msg, publish, {{}}, meta);
-                            if (r !== undefined && r !== null) {{
-                                const o = (typeof r === "object") ? r : {{}};
-                                for (const k of Object.keys(o)) out[k] = o[k];
+                        const __published = [];
+                        const publish = (p) => {{ __published.push(p); }};
+                        const out = {{}};
+                        for (const c of (definition.fromZigbee || [])) {{
+                            try {{
+                                const cl = c.cluster;
+                                const tys = Array.isArray(c.type) ? c.type : [c.type];
+                                if ((cl === msg.cluster || String(cl) === String({cluster_id})) && tys.includes(msg.type)) {{
+                                    const r = await c.convert(definition, msg, publish, {{}}, meta);
+                                    if (r !== undefined && r !== null) {{
+                                        const o = (typeof r === "object") ? r : {{}};
+                                        for (const k of Object.keys(o)) out[k] = o[k];
+                                    }}
+                                }}
+                            }} catch (e) {{}}
+                        }}
+                        for (const p of __published) {{
+                            if (p && typeof p === "object") {{
+                                for (const k of Object.keys(p)) out[k] = p[k];
                             }}
                         }}
-                    }} catch (e) {{}}
-                }}
-                for (const p of __published) {{
-                    if (p && typeof p === "object") {{
-                        for (const k of Object.keys(p)) out[k] = p[k];
+                        globalThis.__dispatchOut = out;
+                    }} catch (e) {{
+                        globalThis.__dispatchError = String(e);
                     }}
-                }}
-                __runDueTimers(Date.now());
-                return JSON.stringify(out);
+                    globalThis.__dispatchDone = true;
+                }})();
+                return "started";
             }})()"#,
             file = session.file,
             index = session.index,
@@ -902,7 +922,33 @@ impl ExternalConverter {
             meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
             cluster_id = cluster_id,
         );
-        let out_str = eval_string(&mut session.ctx, &script)?;
+        let _started = eval_string(&mut session.ctx, &script)?;
+        for _ in 0..1000 {
+            session.ctx.run_jobs();
+            let state = eval_string(
+                &mut session.ctx,
+                "JSON.stringify({done: !!globalThis.__dispatchDone, error: globalThis.__dispatchError || null})",
+            )?;
+            let state: serde_json::Value = serde_json::from_str(&state).ok()?;
+            if state.get("done").and_then(|value| value.as_bool()) == Some(true) {
+                if let Some(error) = state.get("error").and_then(|value| value.as_str()) {
+                    warn!("external converter session failed: {error}");
+                    return None;
+                }
+                // Service timers that became due during a synchronous converter.
+                let _ = eval_string(
+                    &mut session.ctx,
+                    "String(globalThis.__runDueTimers(globalThis.__now))",
+                );
+                break;
+            }
+            let pumped = eval_string(&mut session.ctx, "String(globalThis.__pumpTimers(60000))")?;
+            if pumped == "0" {
+                warn!("external converter session waiting on an unserviceable timer");
+                return None;
+            }
+        }
+        let out_str = eval_string(&mut session.ctx, "JSON.stringify(globalThis.__dispatchOut)")?;
         let out: serde_json::Value = serde_json::from_str(&out_str).ok()?;
         let map = out.as_object().cloned()?;
         if map.is_empty() {
@@ -2272,6 +2318,120 @@ module.exports = {definitions};
                 )
                 .expect("store frame");
             assert_eq!(out.get("store_count"), Some(&serde_json::json!(expected)));
+        }
+    }
+
+    const ASYNC_DEVICE_JS: &str = r#"
+let frames = 0;
+const definitions = [
+    {
+        model: "AsyncBulb",
+        vendor: "Fixture",
+        description: "async fz fixture",
+        fromZigbee: [
+            {
+                cluster: "msTemperatureMeasurement",
+                type: ["attributeReport"],
+                convert: async () => {
+                    await Promise.resolve();
+                    frames += 1;
+                    return {async_frames: frames};
+                },
+            },
+        ],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    const FUTURE_TIMER_DEVICE_JS: &str = r#"
+let fired = 0;
+const definitions = [
+    {
+        model: "FutureTimerBulb",
+        vendor: "Fixture",
+        description: "future timer fixture",
+        fromZigbee: [
+            {
+                cluster: "msTemperatureMeasurement",
+                type: ["attributeReport"],
+                convert: async () => {
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                    fired += 1;
+                    return {fired};
+                },
+            },
+        ],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    #[test]
+    fn async_from_zigbee_promises_are_awaited_across_frames() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("asyncdev.js"),
+            ASYNC_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"asyncbulb": [["asyncdev.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let mut async_device = device();
+        async_device.ieee_addr = "0x00000000000000cc".into();
+        for expected in [1, 2] {
+            let out = conv
+                .convert_from_zigbee_session(
+                    "AsyncBulb",
+                    1026,
+                    "attributeReport",
+                    &[(0, serde_json::json!(100))],
+                    &async_device,
+                    &IncomingMessageInfo::default(),
+                    &Default::default(),
+                )
+                .expect("async frame");
+            assert_eq!(out.get("async_frames"), Some(&serde_json::json!(expected)));
+        }
+    }
+
+    #[test]
+    fn future_timer_is_pumped_and_resolves_async_converter() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("futuretimedev.js"),
+            FUTURE_TIMER_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"futuretimerbulb": [["futuretimedev.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let mut timer_device = device();
+        timer_device.ieee_addr = "0x00000000000000dd".into();
+        for expected in [1, 2] {
+            let out = conv
+                .convert_from_zigbee_session(
+                    "FutureTimerBulb",
+                    1026,
+                    "attributeReport",
+                    &[(0, serde_json::json!(100))],
+                    &timer_device,
+                    &IncomingMessageInfo::default(),
+                    &Default::default(),
+                )
+                .expect("future timer frame");
+            assert_eq!(out.get("fired"), Some(&serde_json::json!(expected)));
         }
     }
 }

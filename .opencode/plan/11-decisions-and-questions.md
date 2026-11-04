@@ -86,10 +86,11 @@ Silent `mqtts`→plain TCP является дефектом, а не вариа
 сохраняются, timers выполняются после кадра. Fallback на per-call context при
 недоступном actor.
 
-**Ограничения:** async fz Promise не ожидается; timers с будущей задержкой не
-планируются самостоятельно; сессии не вытесняются (RAM не измерен); callback
-timers не публикует результат; shutdown/panic actor наблюдаются только как
-закрытый канал и 10s timeout. Это `IN_PROGRESS`, не parity evidence.
+**Ограничения:** async fz Promise ожидается и microtasks дренируются; timers
+продвигаются fake-clock pump (до 60 s), а не wall-clock; сессии не вытесняются
+(RAM не измерен); callback timers не публикует результат; shutdown/panic actor
+наблюдаются только как закрытый канал и 10s timeout. Это `IN_PROGRESS`, не parity
+evidence.
 
 ## Необходимые исходные данные (первый шаг OPS-01)
 

@@ -90,7 +90,8 @@ R1 — явно ограниченный релиз для проверенно�
   не реализованы. meta/configure/onEvent и publish-callback semantics ещё не готовы.
   Persistent Boa context/timers реализованы как dedicated converter actor thread
   (ADR-08 вариант 1): module state, device-keyed store и due-timers переживают
-  кадры. Async fz Promise, future-delay timers, eviction и RAM budget открыты.
+  кадры. Async fz Promise ожидается, future-delay timers продвигаются fake-clock
+  pump (до 60 s); wall-clock scheduling, eviction и RAM budget открыты.
 
 ## Документы
 

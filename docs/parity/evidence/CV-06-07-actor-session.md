@@ -40,16 +40,21 @@ Implemented option 1:
   second frame returns `frames=2, timerFired=1`.
 - `session_keeps_device_keyed_module_store`: a JS `Map` keyed by `meta.device`
   returns 1, 2, 3 over three frames.
-- Full suite: `cargo test --locked` → **339 passed** (307 library, 2 binary,
+- `async_from_zigbee_promises_are_awaited_across_frames`: an async converter
+  returns 1 then 2 only if its Promise is awaited.
+- `future_timer_is_pumped_and_resolves_async_converter`: an async converter awaits
+  `setTimeout(...,1000)`; the fake clock pumps the timer and frames return 1, 2.
+- Full suite: `cargo test --locked` → **341 passed** (309 library, 2 binary,
   30 compatibility); clippy exit 0 with five existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
 
-- Async `fromZigbee` converters are still invoked synchronously; a returned
-  Promise is not awaited, so this does not implement CV-06 async fz.
-- Timers with a future delay are not scheduled autonomously: they run only when a
-  later frame/job services the queue. Timer callbacks cannot emit `publish`
-  results to Rust; callback output is discarded.
+- Timers are not wall-clock scheduled: the fake clock advances immediately to the
+  next due timer during dispatch (max 60 s). Long or repeating timers beyond that
+  window are not serviced between frames.
+- Timer callbacks cannot emit `publish` results to Rust; callback output is
+  discarded.
+- Async converters that wait on network/external I/O still cannot progress.
 - Sessions are never evicted; memory grows with the number of
   devices × definitions. Per-device memory on the router is unmeasured.
 - Actor thread panic/shutdown is only observed as a closed channel; in-flight
