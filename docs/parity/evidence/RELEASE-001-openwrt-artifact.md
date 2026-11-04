@@ -48,9 +48,9 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: b95716605c0e1acce39ff5d96ce4395728cf6a2b9d9a8334a2ece5220ee15307 (5475952 bytes)
+binary sha256: 0217258f3d3a028063c0bf51ea48ed144b403a18c4a6abe5fdfb66eebf6e71be (5492480 bytes)
 archive sha256: 23a35514f0e482c468f5de52d9ac77f0e07021cff9957ea128672b2c84afd115 (5614965 bytes)
-manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=4149ebf..., rustc 1.99.1
+manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=42d5545..., rustc 1.99.1
 
 $ python3 -m unittest discover -s scripts/tests
 Ran 38 tests ... OK
@@ -70,10 +70,10 @@ $ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
 $ make defconfig
 $ make package/zigbee2mqtt-rs/compile
 ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
-        installed 11898880 B, data 5573724 B, binary 5474449 B, web 6266677 B
+        installed 11919360 B, data 5582494 B, binary 5490977 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
-sha256: 7558c9f8e4c5c61307231660f94ea91419066f62367f89df5552dc7bd605a938
-bytes:  5555247
+sha256: f47f4c4f92f8b1b47351f03e41abdbc47a0f20453aae1be1b400af0bee609dcb
+bytes:  5564984
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
@@ -94,7 +94,7 @@ The binary inside the `.ipk` is **not byte-identical** to
 (5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
 recorded here so the hash difference is not mistaken for a different build.
 Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
-(`7558c9f8…`), i.e. packaging is reproducible with the pinned SDK fed by the same
+(`f47f4c4f…`), i.e. packaging is reproducible with the pinned SDK fed by the same
 binary and frontend assets.
 
 `scripts/check_ipk.py` validates the outer/inner layout, control fields,
@@ -122,7 +122,7 @@ tag releases. **That job has not run yet.**
   SONOFF Dongle-P. `Depends: mosquitto, mosquitto-client` are not in the SDK
   base feed (warning during `make`), so the device needs the `packages` feed or
   a locally built broker before `opkg install` can succeed.
-- Measured installed size is **11 898 880 B (≈11.3 MiB)** including 6.27 MB of
+- Measured installed size is **11 919 360 B (≈11.4 MiB)** including 6.27 MB of
   frontend assets; free overlay space still must be measured on the router (54 MB
   is total storage, not free). RAM usage and the 5.47 MB binary on aarch64 remain
   unmeasured.
