@@ -3044,9 +3044,16 @@ fn encode_write_attributes(
             .ok_or_else(|| {
                 format!("no ZCL type metadata for attribute 0x{attribute_id:04X} (cluster 0x{cluster:04X})")
             })?;
+        // Attributes use real ZCL data types; Buffalo pseudo-types only occur in
+        // command parameters and cannot be written as an attribute type byte.
+        let attribute_type = u8::try_from(data_type).map_err(|_| {
+            format!(
+                "attribute 0x{attribute_id:04X} has non-ZCL type {data_type} (cluster 0x{cluster:04X})"
+            )
+        })?;
         let bytes = crate::converters::zcl_types::encode_value(data_type, value)
             .map_err(|error| error.to_string())?;
-        out.push((attribute_id, data_type, bytes));
+        out.push((attribute_id, attribute_type, bytes));
     }
     Ok(out)
 }
@@ -4571,5 +4578,286 @@ mod tests {
         let types = fixture_zcl_types();
         let error = encode_command_op(&types, 6, 99, &json!({})).unwrap_err();
         assert!(error.contains("no ZCL command metadata"));
+    }
+
+    /// Minimal converter package with two `convertSet` keys: a plain write and a
+    /// manufacturer-specific cluster command.
+    fn convert_set_fixture() -> (std::path::PathBuf, ExternalConverter) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "z2m-bridge-convertset-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("devices")).unwrap();
+        std::fs::write(
+            dir.join("devices").join("plug.js"),
+            r#"
+const definitions = [
+    {
+        model: "FixturePlug",
+        vendor: "Fixture",
+        description: "convertSet bridge fixture",
+        fromZigbee: [],
+        toZigbee: [
+            {
+                key: ["window_detection"],
+                convertSet: async (entity, key, value, meta) => {
+                    await entity.write("genOnOff", {onOff: value === "ON" ? 1 : 0});
+                    return {state: {[key]: value}};
+                },
+            },
+            {
+                key: ["vendor_timed"],
+                convertSet: async (entity, key, value, meta) => {
+                    await entity.command(
+                        "genOnOff",
+                        "onWithTimedOff",
+                        {ctrlbits: 0, ontime: 10, offwaittime: 5},
+                        {manufacturerCode: 0x1037, disableDefaultResponse: true},
+                    );
+                    return {state: {[key]: value}};
+                },
+            },
+        ],
+    },
+];
+module.exports = {definitions};
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("registry.json"),
+            serde_json::json!({
+                "lookup": {"fixtureplug": [["plug.js", 0]]},
+                "fingerprints": [],
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl.json"),
+            serde_json::json!({"clusters": {"6": "genOnOff"}, "manufacturerCodes": {}, "dataTypes": {}, "attributes": {}})
+                .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl-commands.json"),
+            serde_json::json!({
+                "clusters": {
+                    "6": {
+                        "name": "genOnOff",
+                        "attributes": {"0": {"name": "onOff", "type": 16}},
+                        "commands": {
+                            "66": {"name": "onWithTimedOff", "parameters": [
+                                {"name": "ctrlbits", "type": 32},
+                                {"name": "ontime", "type": 33},
+                                {"name": "offwaittime", "type": 33}
+                            ]}
+                        }
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let converter = ExternalConverter::new(&dir, "https://example.invalid/x");
+        (dir, converter)
+    }
+
+    struct SentZcl {
+        cluster: u16,
+        endpoint: u8,
+        af_trans_id: u8,
+        payload: Vec<u8>,
+    }
+
+    /// Spawn a fake device that collects the next `count` ZCL frames the bridge
+    /// sends and answers each AF_DATA_REQUEST with a success SRSP.
+    fn spawn_af_collector(
+        mut wire: tokio_util::codec::Framed<
+            tokio::io::DuplexStream,
+            crate::coordinator::znp::frame::ZnpCodec,
+        >,
+        count: usize,
+    ) -> tokio::task::JoinHandle<Vec<SentZcl>> {
+        use futures::SinkExt;
+        use tokio_stream::StreamExt;
+        tokio::spawn(async move {
+            let mut frames = Vec::new();
+            for _ in 0..count {
+                let frame = tokio::time::timeout(Duration::from_secs(5), wire.next())
+                    .await
+                    .expect("bridge did not send a ZCL frame")
+                    .expect("serial link closed")
+                    .expect("invalid ZNP frame");
+                assert_eq!(
+                    frame.subsystem,
+                    crate::coordinator::znp::frame::Subsystem::Af
+                );
+                assert_eq!(frame.cmd1, 0x01, "expected AF_DATA_REQUEST");
+                frames.push(SentZcl {
+                    endpoint: frame.data[2],
+                    cluster: u16::from_le_bytes([frame.data[4], frame.data[5]]),
+                    af_trans_id: frame.data[6],
+                    payload: frame.data[10..].to_vec(),
+                });
+                wire.send(crate::coordinator::znp::frame::ZnpFrame::new(
+                    crate::coordinator::znp::frame::FrameType::SRsp,
+                    crate::coordinator::znp::frame::Subsystem::Af,
+                    0x01,
+                    vec![0x00],
+                ))
+                .await
+                .unwrap();
+            }
+            frames
+        })
+    }
+
+    fn fake_coordinator() -> (
+        tokio_util::codec::Framed<
+            tokio::io::DuplexStream,
+            crate::coordinator::znp::frame::ZnpCodec,
+        >,
+        CoordinatorHandle,
+    ) {
+        use tokio_util::codec::Framed;
+        let (client, server) = tokio::io::duplex(8192);
+        let (transport, _events) = crate::coordinator::znp::transport::spawn_test_transport(
+            Framed::new(server, crate::coordinator::znp::frame::ZnpCodec),
+        );
+        let (_event_tx, event_rx) = tokio::sync::mpsc::channel(8);
+        (
+            Framed::new(client, crate::coordinator::znp::frame::ZnpCodec),
+            CoordinatorHandle {
+                inner: Arc::new(Mutex::new(crate::coordinator::znp::test_handle(transport))),
+                events: event_rx,
+                info: crate::coordinator::CoordinatorInfo {
+                    ieee_addr: IeeeAddr::from_hex("0x00124b00120144ae"),
+                    version: "test".into(),
+                    transport_rev: 2,
+                },
+            },
+        )
+    }
+
+    async fn convert_set_devices() -> (DeviceRegistry, IeeeAddr) {
+        let ieee = IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap();
+        let mut device = Device::new(ieee, 0x1234);
+        device.friendly_name = "plug".into();
+        device.model = Some("FixturePlug".into());
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0000, 0x0006],
+            output_clusters: vec![],
+        });
+        let devices = DeviceRegistry::new();
+        devices.add(device);
+        (devices, ieee)
+    }
+
+    async fn test_mqtt() -> (MqttBridge, crate::mqtt::fake_broker::FakeBroker) {
+        let broker = crate::mqtt::fake_broker::FakeBroker::start().await;
+        let cfg = crate::config::MqttConfig {
+            server: "127.0.0.1".into(),
+            port: broker.port,
+            base_topic: "zigbee2mqtt".into(),
+            client_id: format!("z2m-convertset-{}-{}", std::process::id(), rand_suffix()),
+            ..crate::config::MqttConfig::default()
+        };
+        let (mqtt, _commands) = MqttBridge::connect(&cfg)
+            .await
+            .expect("fake broker connect");
+        (mqtt, broker)
+    }
+
+    fn rand_suffix() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.subsec_nanos() as u64)
+            .unwrap_or(0)
+    }
+
+    #[tokio::test]
+    async fn convert_set_write_produces_exact_af_frame() {
+        let (dir, external) = convert_set_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = convert_set_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_collector(wire, 1);
+
+        Bridge::handle_set(
+            &devices,
+            &external,
+            &coord,
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            "plug",
+            Some(1),
+            &json!({"window_detection": "ON"}),
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames.len(), 1);
+        // write_attributes_payload(tsn=0) for genOnOff.onOff (BOOLEAN, id 0).
+        assert_eq!(frames[0].cluster, 0x0006);
+        assert_eq!(frames[0].endpoint, 1);
+        assert_eq!(
+            frames[0].payload,
+            vec![0x10, 0x00, 0x02, 0x00, 0x00, 0x10, 0x01]
+        );
+        assert_eq!(frames[0].af_trans_id, 1);
+        assert_eq!(
+            devices
+                .find_by_name("plug")
+                .unwrap()
+                .state
+                .get("window_detection"),
+            Some(&json!("ON"))
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn convert_set_command_produces_manufacturer_specific_frame() {
+        let (dir, external) = convert_set_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = convert_set_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_collector(wire, 1);
+
+        Bridge::handle_set(
+            &devices,
+            &external,
+            &coord,
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            "plug",
+            Some(1),
+            &json!({"vendor_timed": "ON"}),
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames[0].cluster, 0x0006);
+        // control=0x15 (cluster-specific + manufacturer + disable default rsp),
+        // mfr 0x1037, tsn 0, command 66, params uint8/uint16/uint16.
+        assert_eq!(
+            frames[0].payload,
+            vec![0x15, 0x37, 0x10, 0x00, 0x42, 0x00, 0x0A, 0x00, 0x05, 0x00]
+        );
+        assert_eq!(frames[0].af_trans_id, 1);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

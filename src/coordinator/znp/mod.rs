@@ -626,6 +626,15 @@ where
     Err(last_error.unwrap_or(Error::Timeout))
 }
 
+/// Test-only construction of a handle over an in-memory duplex transport.
+#[cfg(test)]
+pub(crate) fn test_handle(transport: ZnpTransport) -> ZnpHandle {
+    ZnpHandle {
+        transport,
+        waiters: Arc::new(Mutex::new(ZclWaiters::default())),
+    }
+}
+
 pub struct ZnpHandle {
     transport: ZnpTransport,
     waiters: Arc<Mutex<ZclWaiters>>,

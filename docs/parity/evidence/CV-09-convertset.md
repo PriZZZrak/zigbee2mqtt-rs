@@ -29,9 +29,20 @@ Pinned converters `9dabbe4e343573c5a3070605efd843a1b3a16058`:
 1. **Type metadata** (`zcl_types.rs`): parses `zcl-commands.json`
    (`clusters → {attributes: {id: {name, type}}, commands: {id: {name,
    parameters}}}`), resolves clusters/attributes/commands by id or name, and
-   encodes values for bool, u8/u16/u24/u32, i8/i16/i24/i32, enum8/16, bitmap8/16,
-   f32/f64 and short/long strings. Out-of-range integers, unrepresentable floats
-   and unknown data types are rejected (`Error::Zcl`) — no guessing.
+   encodes values for:
+   - integers/bitmaps/data enums from 8 to 64 bits, enum8/16, bool, f32/f64,
+     short/long strings;
+   - composite ZCL types: array/set/bag (`{elementType, elements}`), struct
+     (`[{elmType, elmVal}]`), time-of-day, date (year-1900), UTC/BAC-OID,
+     cluster/attribute ids, IEEE address and 16-byte security key;
+   - Buffalo parameter types from `BuffaloZclDataType`: LIST_UINT8/16/24/32,
+     LIST_ZONEINFO, EXTENSION_FIELD_SETS, BUFFER, STRUCTURED_SELECTOR and
+     BIG_ENDIAN_UINT24.
+   Context-dependent Buffalo types (USE_DATA_TYPE, LIST_THERMO_TRANSITIONS,
+   GPD_FRAME, LIST_TUYA_DATAPOINT_VALUES, LIST_MIBOXER_ZONES, MI_STRUCT) are
+   rejected with an explicit "needs command context" error. Out-of-range
+   integers, unrepresentable floats, wrong buffer lengths and unknown data types
+   are rejected (`Error::Zcl`) — no guessing.
 2. **Converter host** (`external.rs`): `dispatch_session_set` runs the matching
    `toZigbee.convertSet` inside the persistent per-device Boa session with an
    entity stub that records `write`/`command`/`read` operations (cluster name/id,
@@ -59,9 +70,11 @@ Pinned converters `9dabbe4e343573c5a3070605efd843a1b3a16058`:
 `cargo fmt --check` clean; clippy exit 0 with 5 pre-existing warnings; native
 release build succeeds; `python3 -m unittest discover -s scripts/tests` → 28.
 
-- `zcl_types::tests` (4): metadata resolution, primitive encoding with range
+- `zcl_types::tests` (8): metadata resolution, primitive encoding with range
   checks, command parameter order/missing-parameter rejection, float/long-string
-  encoding.
+  encoding, arrays/structs/time/date/IEEE/UTC/int64, Buffalo lists/zones/buffer/
+  selector/big-endian u24, context-dependent-type rejection, array/buffer
+  validation.
 - `external::tests` (4): `convert_set` records a write (`genOnOff.onOff=1`) and
   returns `{window_detection: "ON"}`; records `onWithTimedOff` command payload;
   unknown cluster → `Unsupported`; unknown key → `handled=false`.
@@ -78,16 +91,23 @@ release build succeeds; `python3 -m unittest discover -s scripts/tests` → 28.
   Node/pnpm here, so `zcl-commands.json` has only been exercised through a
   hand-written fixture. The GitHub workflow must build a package and run
   `check_package_layout.py` before this can be trusted.
-- Only primitive/string types are encoded. ZCL arrays, structs, time-of-day,
-  `BuffaloZCLDataType` (e.g. some Tuya/green-power payloads), per-attribute
-  manufacturer codes and `ListThermoTransitions` are rejected, so converters
-  using them still fail (logged, no frame sent).
+- Context-dependent Buffalo types are still rejected (green-power frames, Tuya
+  datapoint lists, Miboxer zones, thermostat transition lists, MI structs), so
+  converters using them still fail (logged, no frame sent). Per-attribute
+  manufacturer codes are not supported (one code per operation).
+- The `elementType`/`elmType` numbers come from the converter payload; they are
+  not cross-checked against allow-lists beyond the type-encoding rules.
 - `convertSet` option handling is partial: `manufacturerCode` and
   `disableDefaultResponse` are honoured; `transition`, `optimistic`, `publish`,
   `executeIfOff`, `direction` and `srcEndpoint` are not applied.
 - `readAfterWriteTime` is ignored; converter `publish()` callbacks and
   `result.state` attribute-name rewriting for endpoints are not fully modelled.
-- No bridge-level test drives `handle_set` with a fake coordinator, and the
-  socket test still asserts the MQTT command only (not the resulting AF frame).
+- Bridge-level coverage exists (`convert_set_write_produces_exact_af_frame`,
+  `convert_set_command_produces_manufacturer_specific_frame`): `handle_set` runs
+  through a real `CoordinatorHandle` over an in-memory ZNP duplex, and the fake
+  device asserts the exact `AF_DATA_REQUEST` payload (cluster, endpoint, ZCL
+  header/manufacturer code/TSN/parameters, APS trans id) before answering a
+  success SRSP. It covers a write and a manufacturer-specific command; read
+  operations and error/SRSP-failure paths are not asserted yet.
 - No live device/converter-package run, no Home Assistant, no HIL; CONVERTER-019
   stays `IN_PROGRESS`.
