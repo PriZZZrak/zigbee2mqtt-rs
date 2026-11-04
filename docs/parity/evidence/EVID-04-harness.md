@@ -88,15 +88,26 @@ pins=[('zigbee2mqtt','MATCH'),('zigbee-herdsman','MATCH'),
       ('zigbee-herdsman-converters','MATCH'),('frontend','MATCH')]
 ```
 
-Fixtures (SONOFF SNZB-02): `temperature` 2250 → `{"temperature":22.5}`,
-`humidity` 5020 → `{"humidity":50.2}`,
-`batteryPercentageRemaining` 180 → `{"battery":90}`. Both sides produced
-identical JSON; the report is checked in at `docs/parity/reports/evid04.json`.
+Broader corpus (6 fixtures, all passing on 2026-11-05):
 
-Provenance nuance: the converters package lock resolves **herdsman 10.9.5**,
-while the app baseline lock pins **10.10.0**. The reference above therefore uses
-the converters' own resolution for the converter call; the app-level 10.10.0
-runtime is not exercised. `upstream-lock.json` already records this distinction.
+| fixture | reference vs candidate |
+| --- | --- |
+| SNZB-02 temperature / humidity / battery (`attributeReport`) | `{"temperature":22.5}` / `{"humidity":50.2}` / `{"battery":90}` |
+| `TS0002` multi-endpoint switch `_TZ3000_ssup6h68`, endpoint 2 | `{"state_l2":"ON"}` |
+| Tuya TRV `TS0601` `_TZE200_b6wax7g0`, `commandDataReport` dp 3 | `{"local_temperature":14}` |
+| same Tuya TRV, `convertSet window_detection=ON` | `{"state":{},"ops":[{"op":"command","cluster":61184,"command":0,"payload":{"seq":0,"dpValues":[{"dp":8,"datatype":1,"data":[1]}]},...}]}` |
+
+The reference now runs against the **app-resolved** packages
+(`.upstream/zigbee2mqtt/node_modules`: herdsman **10.10.0**, converters
+26.115.1), removing the earlier 10.9.5 discrepancy. The candidate consumes a
+package staged by `gen-registry.mjs` from the same converters dist.
+
+Supporting host fixes found by these fixtures: `process`/`Buffer` runtime
+prelude, full `zigbee-herdsman/dist/zspec/zcl` enum exports, `prepareDefinition`
+meta/endpoint merging and generic toZigbee prepending, `msg.device` plus
+Device/Endpoint constructor names for the converter store, `converters/toZigbee`
+seeding, and `convert_from_zigbee_with_data` for cluster-command payloads.
+`docs/parity/reports/evid04.json` is the checked-in report.
 
 ## Validation in this environment
 
@@ -110,10 +121,14 @@ runtime is not exercised. `upstream-lock.json` already records this distinction.
 
 ## Gaps
 
-- Only one device model (SONOFF SNZB-02) with three attribute-report fixtures has
-  a real differential; no MQTT, ZCL wire, storage, groups, OTA or frontend
-  differentials yet.
-- The reference uses converters' herdsman 10.9.5, not the app's 10.10.0.
+- Six fixtures across two models (SNZB-02, TS0601/TS0002 Tuya) and two modes
+  (`fromZigbee`, `convertSet`); no MQTT, ZCL wire, storage, groups, OTA or
+  frontend differentials yet.
+- Cluster-command payload conversion (`msg.data`) is exercised by the candidate
+  API but the bridge still only dispatches global attribute reports; Tuya
+  `commandDataReport` frames are not yet converted in the running bridge.
+- Converter `publish()` side effects and `postProcessConvertedFromZigbeeMessage`
+  are not applied on either side of the differential.
 - Real runs need network + built checkouts; CI keeps only the fake smoke.
 - Report contains absolute paths from the capture environment.
 - The harness does not start a broker, coordinator or Home Assistant; it compares

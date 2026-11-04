@@ -1,0 +1,15 @@
+{
+  "id": "multi-endpoint-qa-ts0002-endpoint2",
+  "input": {
+    "model": "TS0002",
+    "manufacturer_name": "_TZ3000_ssup6h68",
+    "ieee_addr": "0x00124b0000000001",
+    "cluster_id": 6,
+    "attribute": "onOff",
+    "value": 1,
+    "msg_type": "attributeReport",
+    "endpoint": 2,
+    "endpoint_name": "l2",
+    "linkquality": 42
+  }
+}

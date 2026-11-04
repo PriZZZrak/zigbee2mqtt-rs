@@ -34,11 +34,10 @@ R1 — явно ограниченный релиз для проверенно�
   `cargo zigbuild` (zig 0.13.0), 5 450 608 B static aarch64, tarball 5 607 694 B;
   manifest с SHA-256/target/git SHA. CI-workflow сам не запускался, `.ipk`,
   install/upgrade, free-space бюджет и HIL не проверены.
-- **EVID-04 частично**: harness + Node/pnpm + pinned converters построены;
-  **реальный differential** на 3 фикстурах SNZB-02 (temperature/humidity/battery)
-  прошёл Node-vs-Rust, все 4 пина MATCH. Один производитель/модель, нет
-  MQTT/ZCL/storage/frontend differential; app-herdsman 10.10.0 не задействован
-  (converters lock даёт 10.9.5).
+- **EVID-04 частично**: **6 реальных differential-фикстур** (SNZB-02 x3,
+  TS0002 multi-endpoint, Tuya TRV report + convertSet) Node-vs-Rust проходят на
+  **app-resolved herdsman 10.10.0**, все 4 пина MATCH. Нет MQTT/ZCL-wire/storage/
+  frontend differential; bridge пока не конвертирует Tuya commandDataReport.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

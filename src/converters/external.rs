@@ -431,6 +431,18 @@ impl ExternalConverter {
     ///
     /// A missing file yields an empty table: `convertSet` still records the
     /// symbolic operations, but encoding refuses to guess data types.
+    /// Resolve the selected definition (`file`, `index`) for diagnostics and
+    /// differential tooling.
+    #[must_use]
+    pub fn definition_for(
+        &self,
+        model: &str,
+        device: &ExternalDeviceInfo,
+    ) -> Option<(String, usize)> {
+        let registry = self.load_registry()?;
+        select_definition(&registry, model, device)
+    }
+
     /// Public accessor used by the bridge to encode `convertSet` operations.
     #[must_use]
     pub fn zcl_types(&self) -> crate::converters::zcl_types::ZclTypesFile {
@@ -617,12 +629,13 @@ impl ExternalConverter {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn convert_from_zigbee_with_message(
+    #[allow(clippy::too_many_arguments)]
+    fn convert_with_data(
         &self,
         model: &str,
         cluster_id: u16,
         msg_type: &str,
-        reports: &[(u16, serde_json::Value)],
+        data_obj: serde_json::Map<String, serde_json::Value>,
         device: &ExternalDeviceInfo,
         message: &IncomingMessageInfo,
         state: &serde_json::Map<String, serde_json::Value>,
@@ -642,9 +655,15 @@ impl ExternalConverter {
         let bootstrap = format!(
             r#"
             const __sources = {sources};
+            if (__sources["__builtin__/runtime-prelude"]) new Function(__sources["__builtin__/runtime-prelude"])();
             const __modules = {{}};
             function __resolve(from, spec) {{
                 if (spec === "zigbee-herdsman" || spec.startsWith("zigbee-herdsman/")) return "__builtin__/" + spec;
+                if (spec.startsWith("converters/") || spec.startsWith("lib/")) {{
+                    let rel = spec;
+                    if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
+                    return rel;
+                }}
                 if (spec.startsWith("zigbee-herdsman-converters/")) {{
                     let rel = spec.slice("zigbee-herdsman-converters/".length);
                     if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
@@ -678,14 +697,20 @@ impl ExternalConverter {
                     if (!__modules[key]) {{
                         const module = {{exports: {{}}}};
                         __modules[key] = module;
-                        const fn_ = new Function("require", "module", "exports", __sources[key]);
-                        fn_(__require(key), module, module.exports);
+                        try {{
+                            const fn_ = new Function("require", "module", "exports", __sources[key]);
+                            fn_(__require(key), module, module.exports);
+                        }} catch (error) {{
+                            throw new Error("while loading '" + key + "': " + String(error));
+                        }}
                     }}
                     return __modules[key].exports;
                 }};
             }}
             function __prepareDefinition(definition) {{
                 if (!definition || !Array.isArray(definition.extend)) return definition;
+                let meta = definition.meta ? Object.assign({{}}, definition.meta) : undefined;
+                let endpoint = definition.endpoint;
                 const prepared = Object.assign({{}}, definition, {{
                     fromZigbee: [...(definition.fromZigbee || [])],
                     toZigbee: [...(definition.toZigbee || [])],
@@ -696,9 +721,22 @@ impl ExternalConverter {
                     if (!extend || !extend.isModernExtend) continue;
                     if (extend.fromZigbee) prepared.fromZigbee.push(...extend.fromZigbee);
                     if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
-                    if (extend.exposes) prepared.exposes.push(...extend.exposes);
+                    if (Array.isArray(prepared.exposes) && extend.exposes) prepared.exposes.push(...extend.exposes);
                     if (extend.options) prepared.options.push(...extend.options);
+                    // Upstream: Object.assign({{}}, ext.meta, meta) -> definition wins.
+                    if (extend.meta) meta = Object.assign({{}}, extend.meta, meta);
+                    if (extend.endpoint && !endpoint) endpoint = extend.endpoint;
                 }}
+                if (meta) prepared.meta = meta;
+                if (endpoint) prepared.endpoint = endpoint;
+                // Upstream prepends generic toZigbee converters before device-specific ones.
+                try {{
+                    const tz = __require("devices/__entry__.js")("converters/toZigbee.js");
+                    const generic = [tz.scene_store, tz.scene_recall, tz.scene_add, tz.scene_remove,
+                        tz.scene_remove_all, tz.scene_rename, tz.read, tz.write, tz.command,
+                        tz.factory_reset, tz.zcl_command].filter(Boolean);
+                    if (generic.length) prepared.toZigbee = generic.concat(prepared.toZigbee);
+                }} catch (error) {{}}
                 return prepared;
             }}
             "#,
@@ -713,28 +751,28 @@ impl ExternalConverter {
         // dispatch script below; here we only verify the module is loadable
         // by evaluating its source once (syntax + top-level side effects).
         let check = format!(
-            r#"__require("devices/__entry__.js")("./{file}")"#,
+            r#"(function() {{
+                try {{ __require("devices/__entry__.js")("./{file}"); return "ok"; }}
+                catch (error) {{
+                    return "ERR:" + String(error) + "\n" + String((error && error.stack) || "");
+                }}
+            }})()"#,
             file = file,
         );
-        if let Err(error) = ctx.eval(Source::from_bytes(check.as_bytes())) {
-            warn!("external converter: cannot load {file}: {error}");
-            return None;
+        match eval_string(&mut ctx, &check) {
+            Some(result) if result == "ok" => {}
+            Some(error) => {
+                warn!("external converter: cannot load {file}: {error}");
+                return None;
+            }
+            None => {
+                warn!("external converter: cannot load {file}: evaluation failed");
+                return None;
+            }
         }
 
         // Build msg + meta as JSON, then run dispatch fully inside JS so that
         // converter functions receive real objects (not strings).
-        let data_obj: serde_json::Map<String, serde_json::Value> = reports
-            .iter()
-            .map(|(id, v)| {
-                let name = zcl
-                    .attributes
-                    .get(&cluster_name)
-                    .and_then(|m| m.get(&id.to_string()))
-                    .cloned()
-                    .unwrap_or_else(|| format!("attr_{id}"));
-                (name, v.clone())
-            })
-            .collect();
         let msg = serde_json::json!({
             "cluster": cluster_name,
             "type": msg_type,
@@ -767,16 +805,29 @@ impl ExternalConverter {
         });
         let script = format!(
             r#"(function() {{
+              try {{
                 const defs = __require("devices/__entry__.js")("./{file}").definitions;
                 const definition = __prepareDefinition(defs[{index}]);
                 const msg = JSON.parse({msg});
                 const meta = JSON.parse({meta});
+const __norm = (v) => {{
+  if (v === null || v === undefined) return v;
+  if (ArrayBuffer.isView(v) || Array.isArray(v)) return Array.from(v, __norm);
+  if (typeof v === "object") {{ const o = {{}}; for (const k of Object.keys(v)) o[k] = __norm(v[k]); return o; }}
+  return v;
+}};
                 const incomingDevice = meta.device;
                 const device = globalThis.__device || (globalThis.__device = incomingDevice);
                 Object.assign(device, incomingDevice);
                 device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
                 meta.device = device;
                 msg.endpoint.getDevice = () => device;
+                msg.endpoint.constructor = {{name: "Endpoint"}};
+                msg.device = device;
+                device.constructor = {{name: "Device"}};
+                const __debug = {debug};
+                let __matched = 0;
+                const __errors = [];
                 const __published = [];
                 const publish = (p) => {{ __published.push(p); }};
                 const out = {{}};
@@ -785,6 +836,7 @@ impl ExternalConverter {
                         const cl = c.cluster;
                         const tys = Array.isArray(c.type) ? c.type : [c.type];
                         if ((cl === msg.cluster || String(cl) === String({cluster_id})) && tys.includes(msg.type)) {{
+                            __matched += 1;
                             const r = c.convert(definition, msg, publish, {{}}, meta);
                             if (r !== undefined && r !== null) {{
                                 const o = (typeof r === "object") ? r : {{}};
@@ -792,21 +844,27 @@ impl ExternalConverter {
                             }}
                         }}
                     }} catch (e) {{
-                        // One bad converter must not kill the frame; Rust logs below via returned __errors.
+                        // One bad converter must not kill the frame; surfaced in debug output.
+                        __errors.push(String(e && (e.stack || e.message) || e));
                     }}
                 }}
                 for (const p of __published) {{
                     if (p && typeof p === "object") {{
-                        for (const k of Object.keys(p)) out[k] = p[k];
+                        for (const k of Object.keys(p)) out[k] = __norm(p[k]);
                     }}
                 }}
+                if (__debug) out.__debug = {{matched: __matched, errors: __errors}};
                 return JSON.stringify(out);
+              }} catch (error) {{
+                return JSON.stringify({{__fatal: String((error && (error.stack || error.message)) || error)}});
+              }}
             }})()"#,
             file = file,
             index = index,
             msg = serde_json::to_string(&serde_json::to_string(&msg).unwrap()).unwrap(),
             meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
             cluster_id = cluster_id,
+            debug = std::env::var("EVID04_DEBUG").is_ok(),
         );
         let out_str = eval_string(&mut ctx, &script)?;
         let out: serde_json::Value = serde_json::from_str(&out_str).ok()?;
@@ -882,6 +940,62 @@ impl ExternalConverter {
     }
 
     #[allow(clippy::too_many_arguments)]
+    /// Convert a frame whose payload is described as attribute reports.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_with_message(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        reports: &[(u16, serde_json::Value)],
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let zcl = self.load_zcl()?;
+        let cluster_name = zcl.clusters.get(&cluster_id.to_string())?.clone();
+        let data_obj: serde_json::Map<String, serde_json::Value> = reports
+            .iter()
+            .map(|(id, value)| {
+                let name = zcl
+                    .attributes
+                    .get(&cluster_name)
+                    .and_then(|attributes| attributes.get(&id.to_string()))
+                    .cloned()
+                    .unwrap_or_else(|| format!("attr_{id}"));
+                (name, value.clone())
+            })
+            .collect();
+        self.convert_with_data(
+            model, cluster_id, msg_type, data_obj, device, message, state,
+        )
+    }
+
+    /// Convert a frame whose `msg.data` is already structured (cluster commands
+    /// such as Tuya data reports, which are not attribute reports).
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_with_data(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        data: &serde_json::Map<String, serde_json::Value>,
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        self.convert_with_data(
+            model,
+            cluster_id,
+            msg_type,
+            data.clone(),
+            device,
+            message,
+            state,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn dispatch_session(
         &self,
         session: &mut ConverterSession,
@@ -939,15 +1053,27 @@ impl ExternalConverter {
                 const definition = __prepareDefinition(defs[{index}]);
                 const msg = JSON.parse({msg});
                 const meta = JSON.parse({meta});
+const __norm = (v) => {{
+  if (v === null || v === undefined) return v;
+  if (ArrayBuffer.isView(v) || Array.isArray(v)) return Array.from(v, __norm);
+  if (typeof v === "object") {{ const o = {{}}; for (const k of Object.keys(v)) o[k] = __norm(v[k]); return o; }}
+  return v;
+}};
                 const incomingDevice = meta.device;
                 const device = globalThis.__device || (globalThis.__device = incomingDevice);
                 Object.assign(device, incomingDevice);
                 device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
                 meta.device = device;
                 msg.endpoint.getDevice = () => device;
+                msg.endpoint.constructor = {{name: "Endpoint"}};
+                msg.device = device;
+                device.constructor = {{name: "Device"}};
                 globalThis.__dispatchDone = false;
                 globalThis.__dispatchError = null;
                 globalThis.__dispatchOut = {{}};
+                const __debug = false;
+                let __matched = 0;
+                const __errors = [];
                 (async function() {{
                     try {{
                         const __published = [];
@@ -964,13 +1090,14 @@ impl ExternalConverter {
                                         for (const k of Object.keys(o)) out[k] = o[k];
                                     }}
                                 }}
-                            }} catch (e) {{}}
+                            }} catch (e) {{ __errors.push(String(e && (e.stack || e.message) || e)); }}
                         }}
                         for (const p of __published) {{
                             if (p && typeof p === "object") {{
-                                for (const k of Object.keys(p)) out[k] = p[k];
+                                for (const k of Object.keys(p)) out[k] = __norm(p[k]);
                             }}
                         }}
+                        if (__debug) out.__debug = {{matched: __matched, errors: __errors}};
                         globalThis.__dispatchOut = out;
                     }} catch (e) {{
                         globalThis.__dispatchError = String(e);
@@ -1075,6 +1202,12 @@ impl ExternalConverter {
                 meta.device = device;
                 const key = JSON.parse({key});
                 const value = JSON.parse({value});
+const __norm = (v) => {{
+  if (v === null || v === undefined) return v;
+  if (ArrayBuffer.isView(v) || Array.isArray(v)) return Array.from(v, __norm);
+  if (typeof v === "object") {{ const o = {{}}; for (const k of Object.keys(v)) o[k] = __norm(v[k]); return o; }}
+  return v;
+}};
                 const endpointId = {endpoint};
                 const endpointName = {endpoint_name};
                 const clusterNames = {cluster_names};
@@ -1105,15 +1238,15 @@ impl ExternalConverter {
                     getDevice: () => device,
                     getEndpoint: () => entity,
                     write: (cluster, attributes, options) => {{
-                        out.ops.push({{op: "write", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), attributes: attributes || {{}}, options: optionsOf(options)}});
+                        out.ops.push({{op: "write", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), attributes: __norm(attributes) || {{}}, options: optionsOf(options)}});
                         return Promise.resolve();
                     }},
                     command: (cluster, command, payload, options) => {{
-                        out.ops.push({{op: "command", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), command: typeof command === "string" ? command : String(command), payload: payload || {{}}, options: optionsOf(options)}});
+                        out.ops.push({{op: "command", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), command: typeof command === "string" ? command : String(command), payload: __norm(payload) || {{}}, options: optionsOf(options)}});
                         return Promise.resolve();
                     }},
                     read: (cluster, attributes) => {{
-                        out.ops.push({{op: "read", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), attributes: Array.isArray(attributes) ? attributes : [attributes]}});
+                        out.ops.push({{op: "read", cluster: clusterLabel(cluster), cluster_id: clusterId(cluster), attributes: __norm(Array.isArray(attributes) ? attributes : [attributes])}});
                         return Promise.resolve();
                     }},
                     configureReporting: () => Promise.resolve(),
@@ -1514,9 +1647,20 @@ impl ExternalConverter {
         let bootstrap = format!(
             r#"
             const __sources = {sources};
+            if (__sources["__builtin__/runtime-prelude"]) new Function(__sources["__builtin__/runtime-prelude"])();
             const __modules = {{}};
             function __resolve(from, spec) {{
                 if (spec === "zigbee-herdsman" || spec.startsWith("zigbee-herdsman/")) return "__builtin__/" + spec;
+            if (spec.startsWith("converters/") || spec.startsWith("lib/")) {{
+                let rel = spec;
+                if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
+                return rel;
+            }}
+                if (spec.startsWith("converters/") || spec.startsWith("lib/")) {{
+                    let rel = spec;
+                    if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
+                    return rel;
+                }}
                 if (spec.startsWith("zigbee-herdsman-converters/")) {{
                     let rel = spec.slice("zigbee-herdsman-converters/".length);
                     if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
@@ -1549,14 +1693,20 @@ impl ExternalConverter {
                     if (!__modules[key]) {{
                         const module = {{exports: {{}}}};
                         __modules[key] = module;
-                        const fn_ = new Function("require", "module", "exports", __sources[key]);
-                        fn_(__require(key), module, module.exports);
+                        try {{
+                            const fn_ = new Function("require", "module", "exports", __sources[key]);
+                            fn_(__require(key), module, module.exports);
+                        }} catch (error) {{
+                            throw new Error("while loading '" + key + "': " + String(error));
+                        }}
                     }}
                     return __modules[key].exports;
                 }};
             }}
             function __prepareDefinition(definition) {{
                 if (!definition || !Array.isArray(definition.extend)) return definition;
+                let meta = definition.meta ? Object.assign({{}}, definition.meta) : undefined;
+                let endpoint = definition.endpoint;
                 const prepared = Object.assign({{}}, definition, {{
                     fromZigbee: [...(definition.fromZigbee || [])],
                     toZigbee: [...(definition.toZigbee || [])],
@@ -1569,7 +1719,20 @@ impl ExternalConverter {
                     if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
                     if (extend.exposes) prepared.exposes.push(...extend.exposes);
                     if (extend.options) prepared.options.push(...extend.options);
+                    // Upstream: Object.assign({{}}, ext.meta, meta) -> definition wins.
+                    if (extend.meta) meta = Object.assign({{}}, extend.meta, meta);
+                    if (extend.endpoint && !endpoint) endpoint = extend.endpoint;
                 }}
+                if (meta) prepared.meta = meta;
+                if (endpoint) prepared.endpoint = endpoint;
+                // Upstream prepends generic toZigbee converters before device-specific ones.
+                try {{
+                    const tz = __require("devices/__entry__.js")("converters/toZigbee.js");
+                    const generic = [tz.scene_store, tz.scene_recall, tz.scene_add, tz.scene_remove,
+                        tz.scene_remove_all, tz.scene_rename, tz.read, tz.write, tz.command,
+                        tz.factory_reset, tz.zcl_command].filter(Boolean);
+                    if (generic.length) prepared.toZigbee = generic.concat(prepared.toZigbee);
+                }} catch (error) {{}}
                 return prepared;
             }}
             "#,
@@ -1729,9 +1892,15 @@ fn cjs_bootstrap(sources: &HashMap<String, String>, _zcl: &ZclMaps) -> String {
     format!(
         r#"
         const __sources = {sources};
+        if (__sources["__builtin__/runtime-prelude"]) new Function(__sources["__builtin__/runtime-prelude"])();
         const __modules = {{}};
         function __resolve(from, spec) {{
             if (spec === "zigbee-herdsman" || spec.startsWith("zigbee-herdsman/")) return "__builtin__/" + spec;
+            if (spec.startsWith("converters/") || spec.startsWith("lib/")) {{
+                let rel = spec;
+                if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
+                return rel;
+            }}
             if (spec.startsWith("zigbee-herdsman-converters/")) {{
                 let rel = spec.slice("zigbee-herdsman-converters/".length);
                 if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
@@ -1762,14 +1931,20 @@ fn cjs_bootstrap(sources: &HashMap<String, String>, _zcl: &ZclMaps) -> String {
                 if (!__modules[key]) {{
                     const module = {{exports: {{}}}};
                     __modules[key] = module;
-                    const fn_ = new Function("require", "module", "exports", __sources[key]);
-                    fn_(__require(key), module, module.exports);
+                    try {{
+                        const fn_ = new Function("require", "module", "exports", __sources[key]);
+                        fn_(__require(key), module, module.exports);
+                    }} catch (error) {{
+                        throw new Error("while loading '" + key + "': " + String(error));
+                    }}
                 }}
                 return __modules[key].exports;
             }};
         }}
         function __prepareDefinition(definition) {{
             if (!definition || !Array.isArray(definition.extend)) return definition;
+            let meta = definition.meta ? Object.assign({{}}, definition.meta) : undefined;
+            let endpoint = definition.endpoint;
             const prepared = Object.assign({{}}, definition, {{
                 fromZigbee: [...(definition.fromZigbee || [])],
                 toZigbee: [...(definition.toZigbee || [])],
@@ -1782,7 +1957,21 @@ fn cjs_bootstrap(sources: &HashMap<String, String>, _zcl: &ZclMaps) -> String {
                 if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
                 if (Array.isArray(prepared.exposes) && extend.exposes) prepared.exposes.push(...extend.exposes);
                 if (extend.options) prepared.options.push(...extend.options);
+                // Upstream: Object.assign({{}}, ext.meta, meta) -> definition wins.
+                if (extend.meta) meta = Object.assign({{}}, extend.meta, meta);
+                if (extend.endpoint && !endpoint) endpoint = extend.endpoint;
             }}
+            if (meta) prepared.meta = meta;
+            if (endpoint) prepared.endpoint = endpoint;
+            // Upstream prepends generic toZigbee converters (scene_*, read, write,
+            // command, factory_reset, zcl_command) before device-specific ones.
+            try {{
+                const tz = __require("devices/__entry__.js")("converters/toZigbee.js");
+                const generic = [tz.scene_store, tz.scene_recall, tz.scene_add, tz.scene_remove,
+                    tz.scene_remove_all, tz.scene_rename, tz.read, tz.write, tz.command,
+                    tz.factory_reset, tz.zcl_command].filter(Boolean);
+                if (generic.length) prepared.toZigbee = generic.concat(prepared.toZigbee);
+            }} catch (error) {{}}
             return prepared;
         }}
         "#,
@@ -1862,6 +2051,20 @@ fn collect_sources(
     let mut sources = HashMap::new();
     let mut stack = vec![format!("devices/{entry_file}")];
     sources.insert(format!("devices/{entry_file}"), entry_src.to_string());
+    // Upstream prepends the generic toZigbee converters; load that module even
+    // when the device file itself does not import it.
+    let generic_to_zigbee = dir.join("converters").join("toZigbee.js");
+    if generic_to_zigbee.is_file() {
+        match std::fs::read_to_string(&generic_to_zigbee) {
+            Ok(source) => {
+                sources.insert("converters/toZigbee.js".to_string(), source);
+                stack.push("converters/toZigbee.js".to_string());
+            }
+            Err(error) => {
+                warn!("external converter: cannot read converters/toZigbee.js: {error}");
+            }
+        }
+    }
     while let Some(path) = stack.pop() {
         let src = sources.get(&path)?.clone();
         for spec in required_specs(&src) {
@@ -1916,11 +2119,15 @@ fn inject_synthetic_modules(sources: &mut HashMap<String, String>, zcl: &ZclMaps
     );
     sources.insert(
         "__builtin__/zigbee-herdsman/dist/zspec/zcl".into(),
-        zcl_subpath_stub_source(),
+        zcl_subpath_stub_source(zcl),
     );
     sources.insert(
         "__builtin__/zigbee-herdsman/dist/zspec".into(),
         zspec_stub_source(),
+    );
+    sources.insert(
+        "__builtin__/runtime-prelude".into(),
+        RUNTIME_PRELUDE.to_string(),
     );
     sources.insert("__external__/node:assert".into(), ASSERT_STUB.to_string());
     sources.insert("__external__/node:buffer".into(), BUFFER_STUB.to_string());
@@ -2061,24 +2268,62 @@ fn enums_stub_source(zcl: &ZclMaps) -> String {
     )
 }
 
-/// `zigbee-herdsman/dist/zspec/zcl` replacement. Frame construction needs the
-/// full ZCL serializer, which is not ported; accessing it fails explicitly.
-fn zcl_subpath_stub_source() -> String {
-    r#"const __throw = (what) => { throw new Error("zigbee-herdsman stub: unsupported " + what); };
-    const Frame = new Proxy({}, { get: (t, p) => {
-        if (p === "__esModule" || p === "then") return undefined;
-        return __throw("Zcl.Frame." + String(p));
-    } });
-    module.exports = {
-        Frame,
-        FrameType: {GLOBAL: 0, SPECIFIC: 1},
-        Direction: {CLIENT_TO_SERVER: 0, SERVER_TO_CLIENT: 1},
-        Utils: new Proxy({}, { get: (t, p) => {
+/// `zigbee-herdsman/dist/zspec/zcl` replacement.
+///
+/// Real converter modules import enums and cluster metadata from this module
+/// path (`zcl_1.DataType`, `zcl_1.Clusters`). Frame construction is not ported
+/// and fails explicitly when used.
+fn zcl_subpath_stub_source(zcl: &ZclMaps) -> String {
+    let mfr = serde_json::to_string(&zcl.manufacturer_codes).unwrap_or_else(|_| "{}".into());
+    let dts = serde_json::to_string(&zcl.data_types).unwrap_or_else(|_| "{}".into());
+    let clusters: HashMap<&str, u16> = zcl
+        .clusters
+        .iter()
+        .filter_map(|(id, name)| id.parse::<u16>().ok().map(|id| (name.as_str(), id)))
+        .collect();
+    let cl = serde_json::to_string(&clusters).unwrap_or_else(|_| "{}".into());
+    format!(
+        r#"const __mfr = {mfr};
+        const __dt = {dts};
+        const __cl = {cl};
+        const __throw = (what) => {{ throw new Error("zigbee-herdsman stub: unsupported " + what); }};
+        const __proxy = (label) => new Proxy({{}}, {{ get: (t, p) => {{
             if (p === "__esModule" || p === "then") return undefined;
-            return __throw("Zcl.Utils." + String(p));
-        } }),
-    };"#
-    .to_string()
+            return __throw(label + "." + String(p));
+        }} }});
+        const Clusters = new Proxy({{}}, {{ get: (t, p) => {{
+            if (p === "__esModule" || p === "then") return undefined;
+            if (p in __cl) return {{ID: __cl[p], name: p}};
+            return __throw("Zcl.Clusters." + String(p));
+        }} }});
+        const Status = new Proxy({{SUCCESS: 0x00, FAILURE: 0x01, NOT_AUTHORIZED: 0x7E,
+            MALFORMED_COMMAND: 0x80, UNSUPPORTED_ATTRIBUTE: 0x86, INVALID_VALUE: 0x87,
+            READ_ONLY: 0x88, NOT_FOUND: 0x8B, INVALID_DATA_TYPE: 0x8D, WRITE_ONLY: 0x8F,
+            TIMEOUT: 0x94, NO_IMAGE_AVAILABLE: 0x98}}, {{ get: (t, p) => {{
+                if (p === "__esModule" || p === "then") return undefined;
+                if (p in t) return t[p];
+                return __throw("Zcl.Status." + String(p));
+            }} }});
+        module.exports = {{
+            Clusters, ManufacturerCode: __mfr, DataType: __dt, Status,
+            DataTypeClass: {{ANALOG: "ANALOG", DISCRETE: "DISCRETE"}},
+            BuffaloZclDataType: {{
+                USE_DATA_TYPE: 1000, LIST_UINT8: 1001, LIST_UINT16: 1002, LIST_UINT24: 1003,
+                LIST_UINT32: 1004, LIST_ZONEINFO: 1005, EXTENSION_FIELD_SETS: 1006,
+                LIST_THERMO_TRANSITIONS: 1007, BUFFER: 1008, GPD_FRAME: 1009,
+                STRUCTURED_SELECTOR: 1010, LIST_TUYA_DATAPOINT_VALUES: 1011,
+                LIST_MIBOXER_ZONES: 1012, BIG_ENDIAN_UINT24: 1013, MI_STRUCT: 1014
+            }},
+            FrameType: {{GLOBAL: 0, SPECIFIC: 1}},
+            Direction: {{CLIENT_TO_SERVER: 0, SERVER_TO_CLIENT: 1}},
+            StructuredIndicatorType: {{Whole: 0x00, WriteAdd: 0x10, WriteRemove: 0x20}},
+            Frame: __proxy("Zcl.Frame"), Header: __proxy("Zcl.Header"),
+            Utils: __proxy("Zcl.Utils"), Foundation: __proxy("Zcl.Foundation"),
+        }};"#,
+        mfr = mfr,
+        dts = dts,
+        cl = cl,
+    )
 }
 
 /// `zigbee-herdsman/dist/zspec` replacement.
@@ -2115,37 +2360,98 @@ module.exports = __assert;
 module.exports.default = __assert;
 module.exports.strict = __assert;"#;
 
-/// Minimal Buffer shim for compiled converters running inside Boa.
-const BUFFER_STUB: &str = r#"class __Buffer extends Uint8Array {
-    static from(value, encoding) {
-        if (typeof value === "string") {
-            if (encoding === "hex") {
-                const out = [];
-                for (let i = 0; i + 1 < value.length; i += 2) out.push(parseInt(value.substr(i, 2), 16));
-                return new __Buffer(out);
-            }
-            return __Buffer.from(Array.from(new TextEncoder().encode(value)));
-        }
-        if (Array.isArray(value)) return new __Buffer(value);
-        if (value instanceof Uint8Array) return new __Buffer(Array.from(value));
-        if (value && typeof value.length === "number") return new __Buffer(Array.from(value));
-        throw new Error("Buffer stub: unsupported source");
-    }
-    static alloc(size, fill = 0) { const out = new __Buffer(size); out.fill(fill); return out; }
-    static isBuffer(value) { return value instanceof Uint8Array; }
-    toString(encoding) {
-        if (encoding === "hex") return Array.from(this, (b) => b.toString(16).padStart(2, "0")).join("");
-        return new TextDecoder().decode(this);
-    }
-    equals(other) {
-        if (!other || other.length !== this.length) return false;
-        for (let i = 0; i < this.length; i++) if (this[i] !== other[i]) return false;
-        return true;
-    }
-    write(_text, _offset) { throw new Error("Buffer stub: write is unsupported"); }
+/// Runtime globals real converter modules assume from Node.
+///
+/// `process` and `Buffer` are used without an explicit `require` (e.g. Tuya
+/// helpers), so they must exist before any module is evaluated.
+const RUNTIME_PRELUDE: &str = r#"
+if (typeof globalThis.process === "undefined") {
+    globalThis.process = {
+        env: {}, platform: "linux", version: "v22", versions: {node: "22"},
+        argv: [], pid: 1, nextTick: (fn) => { try { fn(); } catch (e) {} },
+    };
 }
-if (typeof globalThis.Buffer === "undefined") globalThis.Buffer = __Buffer;
-module.exports = {Buffer: globalThis.Buffer, default: globalThis.Buffer};"#;
+if (typeof globalThis.__BufferShim === "undefined") {
+    class __BufferShim extends Uint8Array {
+        static from(value, encoding) {
+            if (typeof value === "string") {
+                if (encoding === "hex") {
+                    const out = [];
+                    for (let i = 0; i + 1 < value.length; i += 2) out.push(parseInt(value.substr(i, 2), 16));
+                    return new __BufferShim(out);
+                }
+                return __BufferShim.from(Array.from(new TextEncoder().encode(value)));
+            }
+            if (Array.isArray(value)) return new __BufferShim(value);
+            if (value instanceof Uint8Array) return new __BufferShim(Array.from(value));
+            if (value && typeof value.length === "number") return new __BufferShim(Array.from(value));
+            return new __BufferShim(0);
+        }
+        static alloc(size, fill = 0) { const out = new __BufferShim(size); out.fill(fill); return out; }
+        static concat(list) {
+            const total = list.reduce((sum, item) => sum + item.length, 0);
+            const out = new __BufferShim(total);
+            let offset = 0;
+            for (const item of list) { out.set(item, offset); offset += item.length; }
+            return out;
+        }
+        static isBuffer(value) { return value instanceof Uint8Array; }
+        static byteLength(value) { return value.length; }
+        toString(encoding) {
+            if (encoding === "hex") return Array.from(this, (b) => b.toString(16).padStart(2, "0")).join("");
+            if (encoding === "base64") {
+                let binary = "";
+                for (const b of this) binary += String.fromCharCode(b);
+                return btoa(binary);
+            }
+            return new TextDecoder().decode(this);
+        }
+        writeUInt8(value, offset) { this[offset] = value & 0xff; return offset + 1; }
+        writeUInt16BE(value, offset) { this[offset] = (value >> 8) & 0xff; this[offset + 1] = value & 0xff; return offset + 2; }
+        writeUInt16LE(value, offset) { this[offset] = value & 0xff; this[offset + 1] = (value >> 8) & 0xff; return offset + 2; }
+        writeUInt32BE(value, offset) { for (let i = 0; i < 4; i++) this[offset + i] = (value >>> (8 * (3 - i))) & 0xff; return offset + 4; }
+        writeUInt32LE(value, offset) { for (let i = 0; i < 4; i++) this[offset + i] = (value >>> (8 * i)) & 0xff; return offset + 4; }
+        writeInt16BE(value, offset) { return this.writeUInt16BE(value & 0xffff, offset); }
+        writeInt16LE(value, offset) { return this.writeUInt16LE(value & 0xffff, offset); }
+        readUInt8(offset) { return this[offset]; }
+        readUInt16BE(offset) { return (this[offset] << 8) | this[offset + 1]; }
+        readUInt16LE(offset) { return this[offset] | (this[offset + 1] << 8); }
+        readUInt32BE(offset) { return ((this[offset] << 24) | (this[offset + 1] << 16) | (this[offset + 2] << 8) | this[offset + 3]) >>> 0; }
+        readUInt32LE(offset) { return (this[offset] | (this[offset + 1] << 8) | (this[offset + 2] << 16) | (this[offset + 3] << 24)) >>> 0; }
+        readInt16BE(offset) { const v = this.readUInt16BE(offset); return v & 0x8000 ? v - 0x10000 : v; }
+        readInt16LE(offset) { const v = this.readUInt16LE(offset); return v & 0x8000 ? v - 0x10000 : v; }
+        write(text, offset = 0, length, encoding) {
+            const bytes = encoding === "hex"
+                ? __BufferShim.from(text, "hex")
+                : __BufferShim.from(Array.from(new TextEncoder().encode(String(text))));
+            const size = Math.min(length === undefined ? bytes.length : length, bytes.length);
+            for (let i = 0; i < size; i++) this[offset + i] = bytes[i];
+            return size;
+        }
+        copy(target, targetStart = 0, sourceStart = 0, sourceEnd = this.length) {
+            for (let i = sourceStart; i < sourceEnd; i++) target[targetStart + (i - sourceStart)] = this[i];
+            return sourceEnd - sourceStart;
+        }
+        equals(other) {
+            if (!other || other.length !== this.length) return false;
+            for (let i = 0; i < this.length; i++) if (this[i] !== other[i]) return false;
+            return true;
+        }
+        compare(other) {
+            for (let i = 0; i < Math.min(this.length, other.length); i++) {
+                if (this[i] !== other[i]) return this[i] - other[i];
+            }
+            return this.length - other.length;
+        }
+    }
+    globalThis.__BufferShim = __BufferShim;
+}
+if (typeof globalThis.Buffer === "undefined") globalThis.Buffer = globalThis.__BufferShim;
+"#;
+
+/// `node:buffer` module: the shim installed by the runtime prelude.
+const BUFFER_STUB: &str =
+    r#"module.exports = {Buffer: globalThis.__BufferShim, default: globalThis.__BufferShim};"#;
 
 const NODE_UTIL_STUB: &str = r#"module.exports = {
     inspect: (value) => { try { return JSON.stringify(value); } catch { return String(value); } },
@@ -2376,8 +2682,8 @@ module.exports = {uint16: enums.DataType.UINT16, listUint8: enums.BuffaloZclData
         let zcl = serde_json::json!({
             "manufacturerCodes": {"TEXAS_INSTRUMENTS": 7},
             "dataTypes": {"UINT16": 33},
-            "clusters": {"1026": "msTemperatureMeasurement"},
-            "attributes": {"msTemperatureMeasurement": {"0": "measuredValue"}},
+            "clusters": {"1026": "msTemperatureMeasurement", "6": "genOnOff"},
+            "attributes": {"msTemperatureMeasurement": {"0": "measuredValue"}, "genOnOff": {"0": "onOff"}},
         });
         std::fs::write(dir.join("zcl.json"), serde_json::to_string(&zcl).unwrap()).unwrap();
         let conv = ExternalConverter::new(&dir, "https://example.invalid/x");
@@ -3249,5 +3555,81 @@ module.exports = {definitions};
             .expect("convertSet outcome");
         assert!(!outcome.handled);
         assert!(outcome.ops.is_empty());
+    }
+
+    const EXTEND_META_DEVICE_JS: &str = r#"
+const definitions = [
+    {
+        model: "ExtendMetaBulb",
+        vendor: "Fixture",
+        description: "extend meta/endpoint fixture",
+        extend: [
+            {
+                isModernExtend: true,
+                meta: {multiEndpoint: true},
+                endpoint: (device) => ({l1: 1, l2: 2}),
+                fromZigbee: [
+                    {
+                        cluster: "genOnOff",
+                        type: ["attributeReport"],
+                        convert: (model, msg) => ({
+                            device_model: msg.device.modelID,
+                            device_ctor: msg.device.constructor.name,
+                            endpoint_ctor: msg.endpoint.constructor.name,
+                            endpoint_id: msg.endpoint.ID,
+                            multi_endpoint: !!(model.meta && model.meta.multiEndpoint),
+                            endpoint_name: model.endpoint ? (msg.endpoint.ID === 2 ? "l2" : "l1") : null,
+                        }),
+                    },
+                ],
+            },
+        ],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    #[test]
+    fn extend_meta_endpoint_and_message_device_are_available() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("extendmeta.js"),
+            EXTEND_META_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"extendmetabulb": [["extendmeta.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let out = conv
+            .convert_from_zigbee_with_message(
+                "ExtendMetaBulb",
+                6,
+                "attributeReport",
+                &[(0, serde_json::json!(1))],
+                &device(),
+                &IncomingMessageInfo {
+                    endpoint: 2,
+                    linkquality: 10,
+                    group_id: 0,
+                },
+                &Default::default(),
+            )
+            .expect("extend meta conversion");
+        assert_eq!(
+            out.get("device_model"),
+            Some(&serde_json::json!("FixtureBulb"))
+        );
+        assert_eq!(out.get("device_ctor"), Some(&serde_json::json!("Device")));
+        assert_eq!(
+            out.get("endpoint_ctor"),
+            Some(&serde_json::json!("Endpoint"))
+        );
+        assert_eq!(out.get("endpoint_id"), Some(&serde_json::json!(2)));
+        assert_eq!(out.get("multi_endpoint"), Some(&serde_json::json!(true)));
+        assert_eq!(out.get("endpoint_name"), Some(&serde_json::json!("l2")));
     }
 }

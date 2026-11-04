@@ -1,0 +1,13 @@
+{
+  "id": "tuya-trv-local-temperature",
+  "input": {
+    "model": "TS0601",
+    "manufacturer_name": "_TZE200_b6wax7g0",
+    "ieee_addr": "0x00124b0000000002",
+    "cluster_id": 61184,
+    "msg_type": "commandDataReport",
+    "endpoint": 1,
+    "data": {"dpValues": [{"dp": 3, "datatype": 2, "data": [0, 140]}]},
+    "linkquality": 42
+  }
+}

@@ -91,13 +91,18 @@ modules instead of failing silently. Registry loading now tolerates
 JSON-serialized `RegExp` fingerprints (`ieeeAddr: {}`) by treating them as
 non-matches.
 
-With the real package staged, `evid04_candidate` converts a SONOFF SNZB-02
-attribute report (`temperature`, `humidity`, `batteryPercentageRemaining`) to
-exactly the same JSON as the Node reference (see EVID-04).
+With the app-resolved package staged, `evid04_candidate` matches the Node
+reference on SNZB-02 attribute reports, a `TS0002` multi-endpoint report and a
+Tuya TRV `convertSet window_detection=ON` (identical recorded ZCL command ops).
+That run also drove these host fixes: `process`/`Buffer` globals, full
+`zspec/zcl` enum exports, upstream `processExtensions` semantics (extend
+`meta`/`endpoint`, generic toZigbee prepending), `msg.device` and
+Device/Endpoint constructor names for the converter store, and seeding
+`converters/toZigbee.js`.
 
 ## Tests and evidence
 
-`cargo test --locked` → **430 passed** (398 library, 2 binary, 30 compatibility);
+`cargo test --locked` → **431 passed** (399 library, 2 binary, 30 compatibility);
 `cargo fmt --check` clean; clippy exit 0 with 5 pre-existing warnings; native
 release build succeeds; `python3 -m unittest discover -s scripts/tests` → 28.
 

@@ -1,0 +1,14 @@
+{
+  "id": "tuya-trv-convertSet-window-detection",
+  "input": {
+    "mode": "convertSet",
+    "model": "TS0601",
+    "manufacturer_name": "_TZE200_b6wax7g0",
+    "ieee_addr": "0x00124b0000000002",
+    "cluster_id": 61184,
+    "endpoint": 1,
+    "key": "window_detection",
+    "value": "ON",
+    "state": {}
+  }
+}
