@@ -30,10 +30,13 @@ R1 — явно ограниченный релиз для проверенно�
 
 ## Состояние выполнения
 
-- **OPS-02 частично**: artifact **пересобран из текущего SHA** через
-  `cargo zigbuild` (zig 0.13.0), 5 450 608 B static aarch64, tarball 5 607 694 B;
-  manifest с SHA-256/target/git SHA. CI-workflow сам не запускался, `.ipk`,
-  install/upgrade, free-space бюджет и HIL не проверены.
+- **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 475 952 B,
+  sha256 `b9571660…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
+  (5 599 099 B, sha256 `93a1721a…`, installed 12 011 520 B с Windfront,
+  `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
+  тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
+  downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
+  free-space/RAM бюджет и HIL не проверены.
 - **EVID-04 частично**: **6 реальных differential-фикстур** (SNZB-02 x3,
   TS0002 multi-endpoint, Tuya TRV report + convertSet) Node-vs-Rust проходят на
   **app-resolved herdsman 10.10.0**, все 4 пина MATCH. Нет MQTT/ZCL-wire/storage/

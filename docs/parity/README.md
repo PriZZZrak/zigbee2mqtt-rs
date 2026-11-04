@@ -23,7 +23,7 @@ Discovered: 118 eligible behaviors; 16 unmeasured rows.
 Stage 1 Z-Stack parity: **0/111 = 0.00%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
 Global upstream parity: **0/118 = 0.00%** [all adapter families].
 Stage 1 / global weighted parity: 0.00% / 0.00% (0/154, 0/168).
-Stage 1 / global scenarios: 18/397 = 4.53% and 18/397 = 4.53% [9/16 unmeasured rows].
+Stage 1 / global scenarios: 18/400 = 4.50% and 18/400 = 4.50% [9/16 unmeasured rows].
 Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 56, IN_PROGRESS 37, PARTIAL 9 (118 total).
 Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, CONVERTER-019, DRIFT-001, EVID-004, HA-001, HA-003 (+30 more)
 Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 0/106, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
@@ -31,7 +31,7 @@ Inventory audit: incomplete; no substantiated domain fraction, catalog total or 
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).
 Open upstream deltas: see upstream-changes.md; freshness DRIFT_DETECTED.
-Last test run (2026-11-04T20:20:58+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0; `cargo zigbuild --release --locked --target aarch64-unknown-linux-musl` exit 0; `python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)` exit 0.
+Last test run (2026-11-04T20:58:20+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0; `cargo zigbuild --release --locked --target aarch64-unknown-linux-musl` exit 0; `python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)` exit 0; `scripts/build-openwrt-ipk.sh <SDK>/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64` exit 0.
 Known exclusions: none approved; future adapters are deferred, not excluded.
 R1 acceptance is tracked separately in .opencode/plan/10-acceptance-matrix.md; these percentages are not R1 completion.
 Counting rule: only whole VERIFIED rows with existing evidence and test references contribute; newly discovered work increases denominators and is not counted as verified progress.

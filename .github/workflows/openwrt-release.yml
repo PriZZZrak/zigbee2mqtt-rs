@@ -61,3 +61,72 @@ jobs:
         run: |
           gh release upload "${GITHUB_REF_NAME}" \
             dist/*.tar.gz dist/*.manifest.json --clobber
+
+  ipk:
+    # Builds the opkg package with the matching OpenWrt SDK. The SDK release
+    # also runs the frontend package so the .ipk carries the same Windfront
+    # assets as the local build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      OPENWRT_VERSION: "24.10.8"
+      OPENWRT_TARGET: "mediatek/filogic"
+      SDK_NAME: openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64
+      SDK_SHA256: d9fd074f281823a3023e8f6a73aaac598018c898ec9ac4d1c507b596930d7482
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.13.0
+      - run: cargo install cargo-zigbuild --locked
+
+      - name: Build static aarch64 binary
+        run: |
+          set -euo pipefail
+          cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
+          mkdir -p openwrt/files
+          cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
+
+      - name: Stage pinned Windfront frontend
+        run: |
+          set -euo pipefail
+          version="$(python3 -c "import json; print(json.load(open('docs/parity/upstream-lock.json'))['baseline']['frontend']['resolved_version'])")"
+          npm pack "zigbee2mqtt-windfront@${version}" --pack-destination /tmp
+          mkdir -p /tmp/windfront openwrt/files/windfront
+          tar -xzf "/tmp/zigbee2mqtt-windfront-${version}.tgz" -C /tmp/windfront
+          cp -R /tmp/windfront/package/dist/. openwrt/files/windfront/
+
+      - name: Download the pinned OpenWrt SDK
+        run: |
+          set -euo pipefail
+          url="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${OPENWRT_TARGET}/${SDK_NAME}.tar.zst"
+          curl -fsSL -o /tmp/sdk.tar.zst "$url"
+          echo "${SDK_SHA256}  /tmp/sdk.tar.zst" | sha256sum -c -
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+          mkdir -p /tmp/sdk
+          tar --zstd -xf /tmp/sdk.tar.zst -C /tmp/sdk
+
+      - name: Build and validate the .ipk
+        run: |
+          set -euo pipefail
+          scripts/build-openwrt-ipk.sh "/tmp/sdk/${SDK_NAME}" openwrt/files/zigbee2mqtt-rs dist
+          python3 scripts/check_ipk.py dist/*.ipk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-ipk
+          path: dist/*.ipk
+
+      - name: Attach .ipk to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/*.ipk --clobber

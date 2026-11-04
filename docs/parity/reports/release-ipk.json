@@ -1,0 +1,35 @@
+{
+  "captured_utc": "2026-11-04T20:58:20+00:00",
+  "git_sha": "4149ebf5df70204bcba1641131ba221c128b604f",
+  "sdk": {
+    "name": "openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64",
+    "sha256": "d9fd074f281823a3023e8f6a73aaac598018c898ec9ac4d1c507b596930d7482",
+    "openwrt_version": "24.10.8",
+    "target": "mediatek/filogic",
+    "architecture": "aarch64_cortex-a53"
+  },
+  "binary": {
+    "sha256": "b95716605c0e1acce39ff5d96ce4395728cf6a2b9d9a8334a2ece5220ee15307",
+    "bytes": 5475952,
+    "source": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl"
+  },
+  "ipk": {
+    "file": "zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk",
+    "sha256": "93a1721aeaca2f13b51afeecd17b23dd2e71e28949a2f1d91e4a8c47881b284b",
+    "bytes": 5599099,
+    "installed_size": 12011520,
+    "data_bytes": 5617531,
+    "payload_binary_bytes": 5474449,
+    "web_bytes": 6376277,
+    "package": "zigbee2mqtt-rs",
+    "version": "0.1.0-r1",
+    "depends": "libc, mosquitto, mosquitto-client",
+    "architecture": "aarch64_cortex-a53",
+    "conffiles": [
+      "/etc/zigbee2mqtt-rs/config.yaml"
+    ],
+    "payload_binary_note": "OpenWrt sstrip changes the payload hash/size relative to the staged ELF"
+  },
+  "reproducible_rebuild": true,
+  "install_status": "BLOCKED: requires Routerich AX3000 v1 (OpenWrt 24.10.8) and SONOFF Dongle-P; mosquitto packages are not in the SDK base feed"
+}

@@ -1,13 +1,46 @@
 {
-  "captured_utc": "2026-11-04T20:20:58+00:00",
+  "captured_utc": "2026-11-04T20:58:20+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent",
   "commands": [
-    {"command": "cargo fmt --all --check", "exit": 0, "result": "no formatting diff"},
-    {"command": "cargo test --locked", "exit": 0, "result": "399 library + 2 binary + 30 compatibility = 431 passed, 0 failed"},
-    {"command": "cargo clippy --all-targets --locked", "exit": 0, "result": "5 library warnings; -D warnings not enforced yet"},
-    {"command": "cargo build --release --locked", "exit": 0, "result": "native release build succeeded with 1 warning"},
-    {"command": "python3 -m unittest discover -s scripts/tests", "exit": 0, "result": "29 parity/layout/EVID-04/OpenWrt artifact tests passed"},
-    {"command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl", "exit": 0, "result": "static aarch64 ELF built from the current tree (sha256 b9571660..., size pending manifest)"},
-    {"command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)", "exit": 0, "result": "6 passed, 0 failed; pins zigbee2mqtt/herdsman/converters/frontend MATCH"}
+    {
+      "command": "cargo fmt --all --check",
+      "exit": 0,
+      "result": "no formatting diff"
+    },
+    {
+      "command": "cargo test --locked",
+      "exit": 0,
+      "result": "399 library + 2 binary + 30 compatibility = 431 passed, 0 failed"
+    },
+    {
+      "command": "cargo clippy --all-targets --locked",
+      "exit": 0,
+      "result": "5 library warnings; -D warnings not enforced yet"
+    },
+    {
+      "command": "cargo build --release --locked",
+      "exit": 0,
+      "result": "native release build succeeded with 1 warning"
+    },
+    {
+      "command": "python3 -m unittest discover -s scripts/tests",
+      "exit": 0,
+      "result": "38 parity/layout/EVID-04/OpenWrt artifact/IPK validation tests passed"
+    },
+    {
+      "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
+      "exit": 0,
+      "result": "static aarch64 ELF built from the current tree (sha256 b9571660..., size pending manifest)"
+    },
+    {
+      "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",
+      "exit": 0,
+      "result": "6 passed, 0 failed; pins zigbee2mqtt/herdsman/converters/frontend MATCH"
+    },
+    {
+      "command": "scripts/build-openwrt-ipk.sh <SDK>/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64",
+      "exit": 0,
+      "result": "SDK .ipk built and validated: 5,599,099 B, sha256 93a1721a..., installed 12,011,520 B incl. Windfront; identical hash on rebuild; install/upgrade BLOCKED on device"
+    }
   ]
 }

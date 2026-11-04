@@ -1,7 +1,8 @@
 # RELEASE-001 — reproducible OpenWrt release artifact
 
 Implementation: `scripts/build-openwrt-artifact.sh`,
-`scripts/tests/test_openwrt_artifact.py`,
+`scripts/build-openwrt-ipk.sh`, `scripts/check_ipk.py`,
+`scripts/tests/test_openwrt_artifact.py`, `scripts/tests/test_check_ipk.py`,
 `.github/workflows/openwrt-release.yml`, `openwrt/Makefile`, `.gitignore`.
 Behavior: RELEASE-001; plan OPS-02.
 
@@ -47,17 +48,58 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: 81bab3876e053b1a2e719f9a6adde87ac4b5fc954ac4c993c365794126c238fa (5461248 bytes)
-archive sha256: 744ca8cb6a0bf3569756e5cc626ba718306c08263bed9177d5ebf9978f29c1d4 (5613075 bytes)
-manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=57d9478..., rustc 1.99.1
+binary sha256: b95716605c0e1acce39ff5d96ce4395728cf6a2b9d9a8334a2ece5220ee15307 (5475952 bytes)
+archive sha256: 23a35514f0e482c468f5de52d9ac77f0e07021cff9957ea128672b2c84afd115 (5614965 bytes)
+manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=4149ebf..., rustc 1.99.1
 
 $ python3 -m unittest discover -s scripts/tests
-Ran 26 tests ... OK
+Ran 38 tests ... OK
 ```
 
 `test_openwrt_artifact.py` runs the packager on the committed aarch64 binary and
 asserts manifest fields, recomputed SHA-256, archive contents and rejection of a
 non-AArch64 binary.
+
+## OpenWrt `.ipk` (2026-11-05)
+
+SDK: `openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64`
+(`sha256 d9fd074f…`, target `mediatek/filogic`, `aarch64_cortex-a53`).
+
+```text
+$ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
+$ make defconfig
+$ make package/zigbee2mqtt-rs/compile
+ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
+        installed 12011520 B, data 5617531 B, binary 5474449 B, web 6376277 B
+ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
+sha256: 93a1721aeaca2f13b51afeecd17b23dd2e71e28949a2f1d91e4a8c47881b284b
+bytes:  5599099
+```
+
+Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
+`Depends: libc, mosquitto, mosquitto-client`, `Architecture:
+aarch64_cortex-a53`, `Installed-Size: 12011520`; `conffiles` contains
+`/etc/zigbee2mqtt-rs/config.yaml` (so upgrades keep the user's config).
+
+Data payload: `usr/bin/zigbee2mqtt-rs` (statically linked AArch64, executable),
+`etc/init.d/zigbee2mqtt-rs`, `etc/zigbee2mqtt-rs/config.yaml`,
+`etc/mosquitto/conf.d/99-zigbee2mqtt-rs.conf`, and the pinned Windfront frontend
+under `www/zigbee2mqtt` (6 376 277 uncompressed bytes).
+
+The binary inside the `.ipk` is **not byte-identical** to
+`openwrt/files/zigbee2mqtt-rs`: OpenWrt packs it with `sstrip`
+(5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
+recorded here so the hash difference is not mistaken for a different build.
+Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
+(`93a1721a…`), i.e. packaging is reproducible with the pinned SDK.
+
+`scripts/check_ipk.py` validates the outer/inner layout, control fields,
+`conffiles`, the required data paths, the ELF machine and static linkage;
+`scripts/tests/test_check_ipk.py` covers valid/missing-config/missing-binary/
+non-aarch64/dynamic-interpreter/missing-mosquitto paths (9 tests).
+`openwrt-release.yml` now has an `ipk` job that pins the SDK checksum, stages the
+pinned Windfront npm package, builds and validates the `.ipk`, and attaches it to
+tag releases. **That job has not run yet.**
 
 ## Gaps (not verified)
 
@@ -71,9 +113,17 @@ non-AArch64 binary.
   predated the Boa converter host). This is a concrete OPS-03 budget input:
   installed size + Windfront assets still needs measuring against the router's
   free overlay, not the reported 54 MB total.
-- The `.ipk` is still produced by the OpenWrt SDK outside this repository; the
-  tarball is not an opkg package, and the SDK build is unverified.
-- Installed size/RAM budgets, sysupgrade/conffiles retention, install/upgrade/
-  downgrade/uninstall on Routerich and the Dongle-P HIL run remain untested.
-- Binary provenance/licensing of the committed prebuilt binary is unknown and
-  must be replaced by a CI-built artifact before publishing.
+- The `.ipk` builds and validates, but **install/upgrade/downgrade/uninstall are
+  BLOCKED**: they require the Routerich AX3000 v1 (OpenWrt 24.10.8) and the
+  SONOFF Dongle-P. `Depends: mosquitto, mosquitto-client` are not in the SDK
+  base feed (warning during `make`), so the device needs the `packages` feed or
+  a locally built broker before `opkg install` can succeed.
+- Measured installed size is **12 011 520 B (≈11.5 MiB)** including 6.4 MB of
+  frontend assets; free overlay space still must be measured on the router (54 MB
+  is total storage, not free). RAM usage and the 5.47 MB binary on aarch64 remain
+  unmeasured.
+- The GitHub Actions workflow (both jobs) still has not run; the local SDK build
+  is the evidence here.
+- Binary provenance: the committed binary is a fresh zigbuild of the current
+  tree, but the release manifest is generated locally; CI must reproduce the
+  hash before publishing.
