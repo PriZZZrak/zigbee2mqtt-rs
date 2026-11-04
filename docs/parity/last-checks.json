@@ -30,7 +30,7 @@
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
       "exit": 0,
-      "result": "static aarch64 ELF built from the current tree (5492480 bytes, sha256 0217258f...)"
+      "result": "static aarch64 ELF built from the current tree (5492480 bytes, sha256 0217258f...); package tarball 5,553,253 B sha256 26150fec..., manifest git_dirty=false at fdd0832"
     },
     {
       "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",
