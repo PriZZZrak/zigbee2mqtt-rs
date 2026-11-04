@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use boa_engine::{Context, Source};
+use serde::Deserialize;
 use tracing::warn;
 
 /// On-demand external converters (zigbee-herdsman-converters dist JS).
@@ -35,18 +36,246 @@ pub struct ExternalDeviceInfo {
     pub manufacturer_name: Option<String>,
     pub ieee_addr: String,
     pub power_source: Option<String>,
+    pub device_type: Option<String>,
+    pub software_build_id: Option<String>,
+    pub application_version: Option<u16>,
+    pub date_code: Option<String>,
+    pub hardware_version: Option<u16>,
+    pub stack_version: Option<u8>,
+    pub zcl_version: Option<u8>,
+    pub endpoint_ids: Vec<u8>,
+}
+
+impl ExternalDeviceInfo {
+    /// Build the subset of device identity the bridge currently knows.
+    pub fn from_device(device: &crate::devices::Device) -> Self {
+        Self {
+            model_id: device.model.clone(),
+            manufacturer_id: device.manufacturer_id,
+            manufacturer_name: device.manufacturer.clone(),
+            ieee_addr: device.ieee_addr.as_hex(),
+            power_source: device.power_source.clone(),
+            device_type: Some(device.device_type().to_string()),
+            software_build_id: device.sw_build_id.clone(),
+            application_version: None,
+            date_code: None,
+            hardware_version: None,
+            stack_version: None,
+            zcl_version: None,
+            endpoint_ids: device
+                .endpoints
+                .iter()
+                .map(|endpoint| endpoint.endpoint)
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 struct RegistryFile {
     #[serde(default)]
     models: HashMap<String, RegistryModel>,
+    /// Normalized Zigbee modelID -> ordered `[file, index]` candidates.
+    #[serde(default)]
+    lookup: HashMap<String, Vec<(String, usize)>>,
+    #[serde(default)]
+    fingerprints: Vec<RegistryFingerprint>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 struct RegistryModel {
     file: String,
     index: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RegistryFingerprint {
+    file: String,
+    index: usize,
+    #[serde(default)]
+    fingerprint: Fingerprint,
+}
+
+/// Fingerprint fields used by the upstream selector. Unknown JSON fields are
+/// ignored; fields the Rust device model cannot provide are treated as a
+/// non-match, never as an implicit match.
+#[derive(Debug, Clone, Default, Deserialize)]
+struct Fingerprint {
+    #[serde(default, rename = "modelID")]
+    model_id: Option<String>,
+    #[serde(default, rename = "manufacturerName")]
+    manufacturer_name: Option<String>,
+    #[serde(default, rename = "manufacturerID")]
+    manufacturer_id: Option<u16>,
+    #[serde(default, rename = "powerSource")]
+    power_source: Option<String>,
+    #[serde(default, rename = "softwareBuildID")]
+    software_build_id: Option<String>,
+    #[serde(default, rename = "applicationVersion")]
+    application_version: Option<u16>,
+    #[serde(default, rename = "dateCode")]
+    date_code: Option<String>,
+    #[serde(default, rename = "hardwareVersion")]
+    hardware_version: Option<u16>,
+    #[serde(default, rename = "stackVersion")]
+    stack_version: Option<u8>,
+    #[serde(default, rename = "zclVersion")]
+    zcl_version: Option<u8>,
+    #[serde(default, rename = "type")]
+    device_type: Option<String>,
+    #[serde(default, rename = "ieeeAddr")]
+    ieee_addr: Option<String>,
+    #[serde(default)]
+    endpoints: Option<Vec<FingerprintEndpoint>>,
+    #[serde(default)]
+    priority: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct FingerprintEndpoint {
+    #[serde(rename = "ID")]
+    id: u8,
+}
+
+fn normalize_model_id(model: &str) -> String {
+    let end = model.find('\0').unwrap_or(model.len());
+    model[..end].trim().to_string()
+}
+
+fn lookup_candidates<'a>(
+    registry: &'a RegistryFile,
+    model: &str,
+) -> Option<&'a Vec<(String, usize)>> {
+    let key = if model.trim().is_empty() {
+        "null".to_string()
+    } else {
+        model.to_lowercase()
+    };
+    if let Some(candidates) = registry.lookup.get(&key) {
+        return Some(candidates);
+    }
+    registry.lookup.get(&normalize_model_id(&key))
+}
+
+fn expected_matches<T: PartialEq>(expected: &Option<T>, actual: Option<&T>) -> bool {
+    match expected {
+        None => true,
+        Some(expected) => actual == Some(expected),
+    }
+}
+
+fn fingerprint_matches(fingerprint: &Fingerprint, device: &ExternalDeviceInfo) -> bool {
+    // The upstream fingerprint allows a regex for ieeeAddr. Rust has no regex
+    // dependency here, so a fingerprint that requires one is not matched rather
+    // than being guessed.
+    if fingerprint.ieee_addr.is_some() {
+        return false;
+    }
+    if !expected_matches(&fingerprint.model_id, device.model_id.as_ref()) {
+        return false;
+    }
+    if !expected_matches(
+        &fingerprint.manufacturer_name,
+        device.manufacturer_name.as_ref(),
+    ) {
+        return false;
+    }
+    if !expected_matches(
+        &fingerprint.manufacturer_id,
+        device.manufacturer_id.as_ref(),
+    ) {
+        return false;
+    }
+    if !expected_matches(&fingerprint.power_source, device.power_source.as_ref()) {
+        return false;
+    }
+    if !expected_matches(
+        &fingerprint.software_build_id,
+        device.software_build_id.as_ref(),
+    ) {
+        return false;
+    }
+    if !expected_matches(
+        &fingerprint.application_version,
+        device.application_version.as_ref(),
+    ) {
+        return false;
+    }
+    if !expected_matches(&fingerprint.date_code, device.date_code.as_ref()) {
+        return false;
+    }
+    if !expected_matches(
+        &fingerprint.hardware_version,
+        device.hardware_version.as_ref(),
+    ) {
+        return false;
+    }
+    if !expected_matches(&fingerprint.stack_version, device.stack_version.as_ref()) {
+        return false;
+    }
+    if !expected_matches(&fingerprint.zcl_version, device.zcl_version.as_ref()) {
+        return false;
+    }
+    if !expected_matches(&fingerprint.device_type, device.device_type.as_ref()) {
+        return false;
+    }
+    if let Some(endpoints) = &fingerprint.endpoints {
+        let expected: Vec<u8> = endpoints.iter().map(|endpoint| endpoint.id).collect();
+        if expected != device.endpoint_ids {
+            return false;
+        }
+    }
+    true
+}
+
+/// Select `[file, index]` exactly as `findDefinition` does for the identity
+/// fields available to the Rust runtime.
+fn select_definition(
+    registry: &RegistryFile,
+    model: &str,
+    device: &ExternalDeviceInfo,
+) -> Option<(String, usize)> {
+    let candidates = match lookup_candidates(registry, model) {
+        Some(candidates) => candidates,
+        None => {
+            // Legacy registry layout (pre-lookup) keyed product model strings.
+            // Only used when the whole registry has no lookup index; falling
+            // back per-key would reintroduce the product-model/modelID mixup.
+            if !registry.lookup.is_empty() {
+                return None;
+            }
+            let entry = registry.models.get(&model.to_lowercase())?;
+            return Some((entry.file.clone(), entry.index));
+        }
+    };
+    if candidates.len() == 1 {
+        return candidates.first().cloned();
+    }
+    let mut best: Option<(i32, (String, usize))> = None;
+    for candidate in candidates {
+        for fingerprint in &registry.fingerprints {
+            if fingerprint.file != candidate.0 || fingerprint.index != candidate.1 {
+                continue;
+            }
+            if !fingerprint_matches(&fingerprint.fingerprint, device) {
+                continue;
+            }
+            let priority = fingerprint.fingerprint.priority.unwrap_or(0);
+            if best
+                .as_ref()
+                .is_none_or(|(best_priority, _)| priority > *best_priority)
+            {
+                best = Some((priority, candidate.clone()));
+            }
+        }
+    }
+    if let Some((_, selected)) = best {
+        return Some(selected);
+    }
+    // Upstream then compares the candidate zigbeeModel with the lookup key,
+    // which cannot be re-read here. Every lookup candidate contains this key,
+    // so the first candidate is the source-equivalent fallback.
+    candidates.first().cloned()
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -162,11 +391,14 @@ impl ExternalConverter {
     /// Ensure the device module plus its transitive relative dependencies
     /// and zcl.json are present locally (bounded: max 80 files). Returns the
     /// dist-relative device file (e.g. `devices/lytko.js`) on success.
-    pub async fn ensure_device_files(&self, model: &str) -> Option<String> {
+    pub async fn ensure_device_files(
+        &self,
+        model: &str,
+        device: &ExternalDeviceInfo,
+    ) -> Option<String> {
         let registry = self.load_registry()?;
-        let key = model.to_lowercase();
-        let entry = registry.models.get(&key)?;
-        let mut pending = vec![format!("devices/{}", entry.file)];
+        let (file, _) = select_definition(&registry, model, device)?;
+        let mut pending = vec![format!("devices/{file}")];
         let mut seen = std::collections::HashSet::new();
         let mut fetched = 0;
         while let Some(path) = pending.pop() {
@@ -208,7 +440,7 @@ impl ExternalConverter {
                 return None;
             }
         }
-        Some(format!("devices/{}", entry.file))
+        Some(format!("devices/{file}"))
     }
 
     /// Real fromZigbee dispatch for one received frame.
@@ -230,20 +462,17 @@ impl ExternalConverter {
         state: &serde_json::Map<String, serde_json::Value>,
     ) -> Option<serde_json::Map<String, serde_json::Value>> {
         let registry = self.load_registry()?;
-        let key = model.to_lowercase();
-        let entry = registry.models.get(&key)?;
+        let (file, index) = select_definition(&registry, model, device)?;
         let zcl = self.load_zcl()?;
         let cluster_name = zcl.clusters.get(&cluster_id.to_string())?.clone();
 
-        let module_src = self
-            .load_js(&format!("devices/{}", entry.file))
-            .or_else(|| {
-                // Legacy flat mirror (pre-layout change).
-                self.load_js(&entry.file)
-            })?;
+        let module_src = self.load_js(&format!("devices/{file}")).or_else(|| {
+            // Legacy flat mirror (pre-layout change).
+            self.load_js(&file)
+        })?;
 
         let mut ctx = Context::default();
-        let sources = collect_sources(&self.dir, &module_src, &entry.file)?;
+        let sources = collect_sources(&self.dir, &module_src, &file)?;
         let bootstrap = format!(
             r#"
             const __sources = {sources};
@@ -302,10 +531,10 @@ impl ExternalConverter {
         // by evaluating its source once (syntax + top-level side effects).
         let check = format!(
             r#"__require("devices/__entry__.js")("./{file}")"#,
-            file = entry.file,
+            file = file,
         );
         if ctx.eval(Source::from_bytes(check.as_bytes())).is_err() {
-            warn!("external converter: cannot load {}", entry.file);
+            warn!("external converter: cannot load {file}");
             return None;
         }
 
@@ -338,6 +567,14 @@ impl ExternalConverter {
                 "manufacturerName": device.manufacturer_name,
                 "ieeeAddr": device.ieee_addr,
                 "powerSource": device.power_source,
+                "type": device.device_type,
+                "softwareBuildID": device.software_build_id,
+                "applicationVersion": device.application_version,
+                "dateCode": device.date_code,
+                "hardwareVersion": device.hardware_version,
+                "stackVersion": device.stack_version,
+                "zclVersion": device.zcl_version,
+                "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
             },
             "options": {},
         });
@@ -372,8 +609,8 @@ impl ExternalConverter {
                 }}
                 return JSON.stringify(out);
             }})()"#,
-            file = entry.file,
-            index = entry.index,
+            file = file,
+            index = index,
             msg = serde_json::to_string(&serde_json::to_string(&msg).unwrap()).unwrap(),
             meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
             cluster_id = cluster_id,
@@ -617,6 +854,11 @@ module.exports = {double};
             "models": {
                 "fixturebulb": {"file": "fakedev.js", "index": 0, "vendor": "Fixture", "model": "FixtureBulb"},
             },
+            "lookup": {
+                "fixturebulb": [["fakedev.js", 0]],
+                "null": [["fakedev.js", 0]],
+            },
+            "fingerprints": [],
         });
         std::fs::write(
             dir.join("registry.json"),
@@ -641,6 +883,9 @@ module.exports = {double};
             manufacturer_name: Some("Fixture".into()),
             ieee_addr: "0x0011223344556677".into(),
             power_source: Some("Mains (single phase)".into()),
+            device_type: Some("Router".into()),
+            endpoint_ids: vec![1],
+            ..Default::default()
         }
     }
 
@@ -713,6 +958,156 @@ module.exports = {double};
         // Direct eval of TS must fail loudly instead of producing a value.
         let mut ctx = Context::default();
         assert!(ctx.eval(Source::from_bytes(ts.as_bytes())).is_err());
+    }
+
+    const OTHER_DEVICE_JS: &str = r#"
+const definitions = [
+    {
+        model: "OtherBulb",
+        vendor: "Fixture",
+        description: "second fixture",
+        fromZigbee: [
+            {
+                cluster: "msTemperatureMeasurement",
+                type: ["attributeReport", "readResponse"],
+                convert: () => ({temperature: 999}),
+            },
+        ],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    fn write_registry(conv: &ExternalConverter, value: serde_json::Value) {
+        std::fs::write(
+            conv.dir.join("registry.json"),
+            serde_json::to_string(&value).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn fingerprint_priority_selects_the_matching_definition() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("otherdev.js"),
+            OTHER_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"fixturebulb": [["fakedev.js", 0], ["otherdev.js", 0]]},
+                "fingerprints": [
+                    {"file": "fakedev.js", "index": 0, "fingerprint": {"manufacturerName": "Fixture", "priority": 0}},
+                    {"file": "otherdev.js", "index": 0, "fingerprint": {"manufacturerName": "Fixture", "modelID": "FixtureBulb", "priority": 10}},
+                ],
+            }),
+        );
+        let out = conv
+            .convert_from_zigbee(
+                "FixtureBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .expect("priority candidate should match");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(999)));
+    }
+
+    #[test]
+    fn unmatched_fingerprint_falls_back_to_first_candidate() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("otherdev.js"),
+            OTHER_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"fixturebulb": [["fakedev.js", 0], ["otherdev.js", 0]]},
+                "fingerprints": [
+                    {"file": "otherdev.js", "index": 0, "fingerprint": {"manufacturerName": "Another Vendor", "priority": 100}},
+                ],
+            }),
+        );
+        let out = conv
+            .convert_from_zigbee(
+                "FixtureBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .expect("first candidate should match");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(40)));
+    }
+
+    #[test]
+    fn empty_model_uses_null_lookup_bucket_and_nul_suffix_is_trimmed() {
+        let (_tmp, conv) = fixture_dir();
+        let out = conv
+            .convert_from_zigbee(
+                "",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .expect("null bucket should match");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(40)));
+
+        let out = conv
+            .convert_from_zigbee(
+                "FixtureBulb\0garbage",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .expect("normalized model should match lookup");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(40)));
+    }
+
+    #[test]
+    fn product_model_map_is_not_used_when_lookup_index_exists() {
+        let (_tmp, conv) = fixture_dir();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"some-other-model": [["fakedev.js", 0]]},
+                "models": {"fixturebulb": {"file": "fakedev.js", "index": 0}},
+            }),
+        );
+        assert!(conv
+            .convert_from_zigbee(
+                "FixtureBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(2000))],
+                &device(),
+                &Default::default(),
+            )
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn ensure_device_files_resolves_by_lookup_and_reports_misses() {
+        let (_tmp, conv) = fixture_dir();
+        assert_eq!(
+            conv.ensure_device_files("FixtureBulb", &device())
+                .await
+                .as_deref(),
+            Some("devices/fakedev.js")
+        );
+        assert!(conv.ensure_device_files("Nope", &device()).await.is_none());
     }
 
     #[test]

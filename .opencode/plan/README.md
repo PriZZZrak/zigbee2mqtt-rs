@@ -49,6 +49,10 @@ R1 — явно ограниченный релиз для проверенно�
   несовпадающим subsystem сохранена. Добавлены in-memory duplex tests. Расхождение
   с upstream concurrency 2/16, 10s deadline, serial recovery и HIL ещё не закрыты.
   ZB-01/03/04 не начаты.
+- **CV-03 начат**: registry lookup по Zigbee modelID, bucket `null`, NUL-нормализация
+  и fingerprint priority реализованы; product `models` больше не используется как
+  ключ. Неизвестные fingerprint-поля, реальный пакет и Node oracle ещё не проверены;
+  CV-01/02 (layout публикации) и CV-04..08 не начаты.
 
 ## Документы
 

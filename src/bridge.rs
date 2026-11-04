@@ -624,46 +624,42 @@ impl Bridge {
                                         let pairs = owned;
                                         if !pairs.is_empty() {
                                             if let Some(dev) = devices.get_by_nwk(src_addr) {
-                                                let key = dev.model.clone().unwrap_or_else(|| {
-                                                    dev.manufacturer.clone().unwrap_or_default()
-                                                });
-                                                if !key.is_empty() {
-                                                    // On-demand: fetch device module + transitive
-                                                    // deps + zcl.json before dispatching.
-                                                    if external.ensure_device_files(&key).await.is_none() {
-                                                        warn!("external converter: missing files for model {key}");
-                                                    } else {
-                                                    let info = crate::converters::external::ExternalDeviceInfo {
-                                                        model_id: dev.model.clone(),
-                                                        manufacturer_id: dev.manufacturer_id,
-                                                        manufacturer_name: dev.manufacturer.clone(),
-                                                        ieee_addr: dev.ieee_addr.as_hex(),
-                                                        power_source: dev.power_source.clone(),
-                                                    };
-                                                    let state = dev.state.clone();
-                                                    drop(dev);
-                                                    if let Some(merged) = external.convert_from_zigbee(
-                                                        &key,
-                                                        cluster_id,
-                                                        msg_type,
-                                                        &pairs,
-                                                        &info,
-                                                        &state,
-                                                    ) {
-                                                        if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
-                                                            for (k, v) in merged {
-                                                                dev.state.insert(k, v);
-                                                            }
-                                                            dev.state.insert("linkquality".into(), json!(link_quality));
-                                                            dev.state.insert("last_seen".into(), json!(now_iso8601()));
-                                                            let state = serde_json::Value::Object(dev.state.clone());
-                                                            let name = dev.friendly_name.clone();
-                                                            Self::strip_transient_action_fields(&mut dev.state);
-                                                            drop(dev);
-                                                            Self::publish_state(&mqtt, self.cfg.advanced.output, &name, &state).await;
-                                                            let _ = mqtt.publish_availability(&name, true).await;
+                                                // Upstream looks up the Zigbee modelID
+                                                // (including the "null" bucket); the
+                                                // manufacturer name is not a fallback key.
+                                                let key = dev.model.clone().unwrap_or_default();
+                                                let info =
+                                                    crate::converters::external::ExternalDeviceInfo::from_device(&dev);
+                                                let state = dev.state.clone();
+                                                drop(dev);
+                                                // On-demand: fetch device module + transitive
+                                                // deps + zcl.json before dispatching.
+                                                if external
+                                                    .ensure_device_files(&key, &info)
+                                                    .await
+                                                    .is_none()
+                                                {
+                                                    debug!("external converter: no candidates for model {key:?}");
+                                                } else if let Some(merged) = external.convert_from_zigbee(
+                                                    &key,
+                                                    cluster_id,
+                                                    msg_type,
+                                                    &pairs,
+                                                    &info,
+                                                    &state,
+                                                ) {
+                                                    if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
+                                                        for (k, v) in merged {
+                                                            dev.state.insert(k, v);
                                                         }
-                                                    }
+                                                        dev.state.insert("linkquality".into(), json!(link_quality));
+                                                        dev.state.insert("last_seen".into(), json!(now_iso8601()));
+                                                        let state = serde_json::Value::Object(dev.state.clone());
+                                                        let name = dev.friendly_name.clone();
+                                                        Self::strip_transient_action_fields(&mut dev.state);
+                                                        drop(dev);
+                                                        Self::publish_state(&mqtt, self.cfg.advanced.output, &name, &state).await;
+                                                        let _ = mqtt.publish_availability(&name, true).await;
                                                     }
                                                 }
                                             }
