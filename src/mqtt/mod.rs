@@ -29,11 +29,15 @@ pub enum MqttCommand {
         /// Endpoint selected by a multi-endpoint command topic
         /// (`<base>/<name>/l1/set`), or `None` for the whole device.
         endpoint: Option<u8>,
+        /// Attribute from `<base>/<name>/set/<attribute>`.
+        attribute: Option<String>,
     },
     GetDevice {
         friendly_name: String,
         /// Requested keys (JSON object) or null/empty for all readable keys.
         payload: serde_json::Value,
+        /// Endpoint selected by `<base>/<name>/<endpoint>/get`.
+        endpoint: Option<u8>,
     },
     BridgeRequest {
         request: String,
@@ -50,55 +54,72 @@ pub(crate) fn parse_device_command(
     topic: &str,
     payload: &[u8],
 ) -> Option<MqttCommand> {
-    let is_set = topic.ends_with("/set");
-    let is_get = topic.ends_with("/get");
-    if !is_set && !is_get {
+    // Mirrors z2m's `^<base>/(?!bridge)(.+?)/(get|set)(?:/(.+))?$`:
+    // the first `get`/`set` segment splits the entity path from the optional
+    // attribute. Entity paths may themselves contain '/'.
+    let rest = topic.strip_prefix(base_topic)?.strip_prefix('/')?;
+    let mut segments: Vec<&str> = rest.split('/').collect();
+    let position = segments
+        .iter()
+        .position(|segment| *segment == "set" || *segment == "get")?;
+    let is_set = segments[position] == "set";
+    let attribute = if segments.len() > position + 1 {
+        let joined = segments[position + 1..].join("/");
+        (!joined.is_empty()).then_some(joined)
+    } else {
+        None
+    };
+    segments.truncate(position);
+    if segments.is_empty() || segments.iter().any(|segment| segment.is_empty()) {
         return None;
     }
-    let suffix = if is_set { "/set" } else { "/get" };
-    let path = topic
-        .strip_prefix(base_topic)
-        .and_then(|rest| rest.strip_prefix('/'))
-        .and_then(|rest| rest.strip_suffix(suffix));
-    // `<base>/<friendly>/l<N>/set` selects one endpoint; `<base>/<friendly>/set`
-    // addresses the whole device. Friendly names may contain '/', so only a
-    // trailing `l<N>` segment is treated as an endpoint selector.
-    let (friendly_name, endpoint) = match path {
-        Some(rest) => match rest.rsplit_once('/') {
-            Some((name, selector)) if !name.is_empty() => match endpoint_index(selector) {
-                Some(endpoint) => (name.to_string(), Some(endpoint)),
-                None => (rest.to_string(), None),
-            },
-            _ => (rest.to_string(), None),
-        },
-        None => (friendly_name_from_topic(topic, base_topic, suffix), None),
-    };
-    let json_value = if is_get && payload.is_empty() {
-        serde_json::Value::Null
-    } else {
-        serde_json::from_slice::<serde_json::Value>(payload).unwrap_or_else(|_| {
+    // A trailing endpoint selector is the last entity-path segment.
+    let endpoint = segments.last().and_then(|last| endpoint_index(last));
+    if endpoint.is_some() {
+        segments.pop();
+    }
+    if segments.is_empty() {
+        return None;
+    }
+    let friendly_name = segments.join("/");
+
+    let json_value = match &attribute {
+        // `<...>/set/<attribute>`: the payload is the attribute value.
+        Some(attribute) => {
+            let value = serde_json::from_slice::<serde_json::Value>(payload).unwrap_or_else(|_| {
+                match std::str::from_utf8(payload) {
+                    Ok(text) => json!(text.trim()),
+                    Err(_) => serde_json::Value::Null,
+                }
+            });
+            json!({ attribute.as_str(): value })
+        }
+        None if !is_set && payload.is_empty() => serde_json::Value::Null,
+        None => serde_json::from_slice::<serde_json::Value>(payload).unwrap_or_else(|_| {
             if let Ok(text) = std::str::from_utf8(payload) {
                 json!({ "state": text.trim() })
             } else {
                 serde_json::Value::Null
             }
-        })
+        }),
     };
+
     Some(if is_set {
         MqttCommand::SetDevice {
             friendly_name,
             payload: json_value,
             endpoint,
+            attribute,
         }
     } else {
         MqttCommand::GetDevice {
             friendly_name,
             payload: json_value,
+            endpoint,
         }
     })
 }
 
-/// Topic for a Home Assistant discovery config.
 pub(crate) type MqttFuture<'a, T> =
     std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send + 'a>>;
 
@@ -154,6 +175,7 @@ impl MqttPublishIo for MqttBridge {
     }
 }
 
+/// Topic for a Home Assistant discovery config.
 pub(crate) fn ha_discovery_topic(component: &str, node_id: &str, object_id: &str) -> String {
     format!("homeassistant/{component}/{node_id}/{object_id}/config")
 }
@@ -184,6 +206,29 @@ pub(crate) fn parse_bridge_request(
     let payload =
         serde_json::from_slice::<serde_json::Value>(payload).unwrap_or(serde_json::Value::Null);
     Some((request, payload))
+}
+
+/// Per-endpoint state topic used for stripped multi-gang snapshots.
+pub(crate) fn endpoint_state_topic(
+    base_topic: &str,
+    friendly_name: &str,
+    endpoint: &str,
+) -> String {
+    format!("{base_topic}/{friendly_name}/{endpoint}")
+}
+
+/// Map a multi-endpoint selector (`l1`, `l2`, ... or `button`) to an endpoint.
+///
+/// This is the cluster-fallback naming used by the bridge; definitions that
+/// provide explicit endpoint names are handled by the exposes path.
+pub(crate) fn endpoint_index(selector: &str) -> Option<u8> {
+    if selector == "button" {
+        return Some(3);
+    }
+    selector
+        .strip_prefix('l')
+        .and_then(|digits| digits.parse::<u8>().ok())
+        .filter(|endpoint| *endpoint > 0)
 }
 
 // ── MqttBridge ────────────────────────────────────────────────────────────────
@@ -538,6 +583,7 @@ fn next_backoff(current: Duration) -> Duration {
 /// Subscriptions are always "{base_topic}/+/set" or ".../get", so this always
 /// matches for topics reaching this function; falls back to the raw topic on
 /// any unexpected shape.
+#[cfg(test)]
 fn friendly_name_from_topic(topic: &str, base_topic: &str, suffix: &str) -> String {
     topic
         .strip_prefix(base_topic)
@@ -547,44 +593,13 @@ fn friendly_name_from_topic(topic: &str, base_topic: &str, suffix: &str) -> Stri
         .to_string()
 }
 
-/// Per-endpoint state topic used for stripped multi-gang snapshots.
-pub(crate) fn endpoint_state_topic(
-    base_topic: &str,
-    friendly_name: &str,
-    endpoint: &str,
-) -> String {
-    format!("{base_topic}/{friendly_name}/{endpoint}")
-}
-
-/// Map a multi-endpoint selector (`l1`, `l2`, ... or `button`) to an endpoint.
-///
-/// This is the cluster-fallback naming used by the bridge; definitions that
-/// provide explicit endpoint names are handled by the exposes path.
-pub(crate) fn endpoint_index(selector: &str) -> Option<u8> {
-    if selector == "button" {
-        return Some(3);
-    }
-    selector
-        .strip_prefix('l')
-        .and_then(|digits| digits.parse::<u8>().ok())
-        .filter(|endpoint| *endpoint > 0)
-}
-
 async fn subscribe_topics(client: &AsyncClient, base_topic: &str) -> bool {
-    let set_wildcard = format!("{}/+/set", base_topic);
-    let get_wildcard = format!("{}/+/get", base_topic);
-    // Multi-endpoint command topics: `<base>/<friendly>/l1/set`.
-    let endpoint_set_wildcard = format!("{}/+/+/set", base_topic);
-    let endpoint_get_wildcard = format!("{}/+/+/get", base_topic);
+    // z2m subscribes to `<base>/#` and filters locally; this covers nested
+    // friendly names, endpoint selectors and per-attribute set topics.
+    let wildcard = format!("{}/#", base_topic);
     let bridge_req_wildcard = format!("{}/bridge/request/#", base_topic);
 
-    for topic in &[
-        &set_wildcard,
-        &get_wildcard,
-        &endpoint_set_wildcard,
-        &endpoint_get_wildcard,
-        &bridge_req_wildcard,
-    ] {
+    for topic in &[&wildcard, &bridge_req_wildcard] {
         if let Err(e) = client.subscribe(*topic, QoS::AtLeastOnce).await {
             error!("MQTT subscribe error for {topic}: {e}");
             return false;
@@ -618,6 +633,206 @@ fn parse_permit_join_payload(payload: &[u8]) -> u8 {
         .ok()
         .and_then(|s| s.trim().parse::<u8>().ok())
         .unwrap_or(0)
+}
+
+/// Minimal in-process MQTT 3.1.1 broker used only by tests.
+///
+/// Supports CONNECT/CONNACK, SUBSCRIBE/SUBACK, PUBLISH both directions,
+/// PUBACK and PINGREQ/PINGRESP — enough to drive the real rumqttc event loop
+/// over a TCP socket without an external broker.
+#[cfg(test)]
+pub(crate) mod fake_broker {
+    use std::sync::{Arc, Mutex};
+
+    use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::sync::mpsc;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Published {
+        pub topic: String,
+        pub payload: Vec<u8>,
+        pub qos: u8,
+        pub retain: bool,
+    }
+
+    pub struct Outbound {
+        pub topic: String,
+        pub payload: Vec<u8>,
+    }
+
+    pub struct FakeBroker {
+        pub port: u16,
+        pub publishes: Arc<Mutex<Vec<Published>>>,
+        outbound: mpsc::Sender<Outbound>,
+    }
+
+    impl FakeBroker {
+        /// Start the broker; returns once it has bound its port.
+        pub async fn start() -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let publishes = Arc::new(Mutex::new(Vec::new()));
+            let (outbound, outbound_rx) = mpsc::channel(16);
+            let recorded = Arc::clone(&publishes);
+            tokio::spawn(async move {
+                let Ok((stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let (mut reader, mut writer) = tokio::io::split(stream);
+                let mut outbound_rx = outbound_rx;
+                loop {
+                    tokio::select! {
+                        packet = read_packet(&mut reader) => {
+                            let Ok((header, body)) = packet else {
+                                break;
+                            };
+                            let kind = header >> 4;
+                            match kind {
+                                1 => {
+                                    // CONNECT -> CONNACK
+                                    let _ = writer.write_all(&[0x20, 0x02, 0x00, 0x00]).await;
+                                }
+                                8 => {
+                                    // SUBSCRIBE -> SUBACK with one QoS1 code per filter
+                                    let mut pos = 2;
+                                    let mut codes = Vec::new();
+                                    while pos + 2 <= body.len() {
+                                        let len =
+                                            u16::from_be_bytes([body[pos], body[pos + 1]]) as usize;
+                                        pos += 2 + len + 1;
+                                        codes.push(0x01u8);
+                                    }
+                                    let mut response = vec![
+                                        0x90,
+                                        (2 + codes.len()) as u8,
+                                        body[0],
+                                        body[1],
+                                    ];
+                                    response.extend_from_slice(&codes);
+                                    let _ = writer.write_all(&response).await;
+                                }
+                                12 => {
+                                    // PINGREQ -> PINGRESP
+                                    let _ = writer.write_all(&[0xD0, 0x00]).await;
+                                }
+                                3 => {
+                                    // PUBLISH from client
+                                    let qos = (header >> 1) & 0x03;
+                                    let retain = header & 0x01 != 0;
+                                    let topic_len =
+                                        u16::from_be_bytes([body[0], body[1]]) as usize;
+                                    let topic = String::from_utf8_lossy(
+                                        &body[2..2 + topic_len],
+                                    )
+                                    .to_string();
+                                    let mut pos = 2 + topic_len;
+                                    let mut packet_id = Vec::new();
+                                    if qos > 0 {
+                                        packet_id =
+                                            body[pos..pos + 2].to_vec();
+                                        pos += 2;
+                                    }
+                                    recorded.lock().unwrap().push(Published {
+                                        topic,
+                                        payload: body[pos..].to_vec(),
+                                        qos,
+                                        retain,
+                                    });
+                                    if qos == 1 {
+                                        let _ = writer
+                                            .write_all(&[
+                                                0x40,
+                                                0x02,
+                                                packet_id[0],
+                                                packet_id[1],
+                                            ])
+                                            .await;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        message = outbound_rx.recv() => {
+                            let Some(Outbound { topic, payload }) = message else {
+                                break;
+                            };
+                            let _ = writer.write_all(&encode_publish(&topic, &payload)).await;
+                        }
+                    }
+                }
+            });
+            Self {
+                port,
+                publishes,
+                outbound,
+            }
+        }
+
+        /// Send a QoS0 PUBLISH to the connected client.
+        pub async fn send(&self, topic: &str, payload: &[u8]) {
+            let _ = self
+                .outbound
+                .send(Outbound {
+                    topic: topic.to_string(),
+                    payload: payload.to_vec(),
+                })
+                .await;
+        }
+
+        pub fn publishes(&self) -> Vec<Published> {
+            self.publishes.lock().unwrap().clone()
+        }
+    }
+
+    async fn read_packet<R: AsyncRead + Unpin>(reader: &mut R) -> std::io::Result<(u8, Vec<u8>)> {
+        let mut first = [0u8; 1];
+        reader.read_exact(&mut first).await?;
+        let mut multiplier = 1usize;
+        let mut length = 0usize;
+        loop {
+            let mut byte = [0u8; 1];
+            reader.read_exact(&mut byte).await?;
+            length += (byte[0] as usize & 0x7F) * multiplier;
+            multiplier *= 128;
+            if byte[0] & 0x80 == 0 {
+                break;
+            }
+            if multiplier > 128 * 128 * 128 {
+                return Err(std::io::Error::other("malformed remaining length"));
+            }
+        }
+        let mut body = vec![0u8; length];
+        reader.read_exact(&mut body).await?;
+        Ok((first[0], body))
+    }
+
+    fn remaining_length(mut length: usize) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        loop {
+            let mut byte = (length % 128) as u8;
+            length /= 128;
+            if length > 0 {
+                byte |= 0x80;
+            }
+            bytes.push(byte);
+            if length == 0 {
+                break;
+            }
+        }
+        bytes
+    }
+
+    fn encode_publish(topic: &str, payload: &[u8]) -> Vec<u8> {
+        let mut body = Vec::new();
+        body.extend_from_slice(&(topic.len() as u16).to_be_bytes());
+        body.extend_from_slice(topic.as_bytes());
+        body.extend_from_slice(payload);
+        let mut packet = vec![0x30];
+        packet.extend_from_slice(&remaining_length(body.len()));
+        packet.extend_from_slice(&body);
+        packet
+    }
 }
 
 #[cfg(test)]
@@ -720,6 +935,7 @@ mod tests {
             Some(MqttCommand::GetDevice {
                 friendly_name,
                 payload,
+                ..
             }) => {
                 assert_eq!(friendly_name, "kitchen");
                 assert!(payload.is_null());
@@ -778,6 +994,7 @@ mod tests {
                 friendly_name,
                 endpoint,
                 payload,
+                ..
             }) => {
                 assert_eq!(friendly_name, "two_gang");
                 assert_eq!(endpoint, Some(2));
@@ -811,5 +1028,154 @@ mod tests {
             endpoint_state_topic("zigbee2mqtt", "two_gang", "l1"),
             "zigbee2mqtt/two_gang/l1"
         );
+    }
+
+    #[test]
+    fn per_attribute_set_topics_wrap_the_value() {
+        match parse_device_command("zigbee2mqtt", "zigbee2mqtt/curtain/set/position", b"40") {
+            Some(MqttCommand::SetDevice {
+                friendly_name,
+                payload,
+                endpoint,
+                attribute,
+            }) => {
+                assert_eq!(friendly_name, "curtain");
+                assert_eq!(endpoint, None);
+                assert_eq!(attribute.as_deref(), Some("position"));
+                assert_eq!(payload, json!({"position": 40}));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        // Endpoint + attribute: `<base>/<name>/l2/set/tilt`.
+        match parse_device_command("zigbee2mqtt", "zigbee2mqtt/curtain/l2/set/tilt", b"15") {
+            Some(MqttCommand::SetDevice {
+                friendly_name,
+                payload,
+                endpoint,
+                attribute,
+            }) => {
+                assert_eq!(friendly_name, "curtain");
+                assert_eq!(endpoint, Some(2));
+                assert_eq!(attribute.as_deref(), Some("tilt"));
+                assert_eq!(payload, json!({"tilt": 15}));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        // JSON object values are parsed, raw strings kept as strings.
+        match parse_device_command("zigbee2mqtt", "zigbee2mqtt/curtain/set/tilt", br#"{"x":1}"#) {
+            Some(MqttCommand::SetDevice { payload, .. }) => {
+                assert_eq!(payload["tilt"], json!({"x": 1}));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn per_attribute_get_topic_requests_one_key() {
+        match parse_device_command("zigbee2mqtt", "zigbee2mqtt/curtain/get/position", b"") {
+            Some(MqttCommand::GetDevice {
+                friendly_name,
+                payload,
+                endpoint,
+            }) => {
+                assert_eq!(friendly_name, "curtain");
+                assert_eq!(endpoint, None);
+                assert_eq!(payload, json!({"position": ""}));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bridge_topics_are_not_parsed_as_device_commands() {
+        assert!(parse_device_command(
+            "zigbee2mqtt",
+            "zigbee2mqtt/bridge/request/device/remove",
+            b"{}"
+        )
+        .is_none());
+        assert!(parse_device_command("zigbee2mqtt", "zigbee2mqtt/bulb", b"{}").is_none());
+    }
+
+    async fn wait_for_publish(
+        broker: &fake_broker::FakeBroker,
+        predicate: impl Fn(&fake_broker::Published) -> bool,
+    ) -> fake_broker::Published {
+        for _ in 0..250 {
+            if let Some(found) = broker.publishes().into_iter().find(|item| predicate(item)) {
+                return found;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("publish not observed; saw {:?}", broker.publishes());
+    }
+
+    #[tokio::test]
+    async fn socket_event_loop_receives_commands_and_publishes_retained_cleanup() {
+        let broker = fake_broker::FakeBroker::start().await;
+        let cfg = MqttConfig {
+            server: "127.0.0.1".into(),
+            port: broker.port,
+            base_topic: "zigbee2mqtt".into(),
+            client_id: format!("z2m-test-{}", std::process::id()),
+            ..MqttConfig::default()
+        };
+        let (mqtt, mut commands) = MqttBridge::connect(&cfg)
+            .await
+            .expect("connect to the in-process broker");
+
+        // Broker -> client: endpoint set topic.
+        broker
+            .send("zigbee2mqtt/two_gang/l2/set", br#"{"state":"ON"}"#)
+            .await;
+        match tokio::time::timeout(Duration::from_secs(5), commands.recv())
+            .await
+            .expect("set command timing out")
+            .expect("command channel")
+        {
+            MqttCommand::SetDevice {
+                friendly_name,
+                payload,
+                endpoint,
+                attribute,
+            } => {
+                assert_eq!(friendly_name, "two_gang");
+                assert_eq!(endpoint, Some(2));
+                assert_eq!(attribute, None);
+                assert_eq!(payload["state"], "ON");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        // Broker -> client: per-attribute get topic.
+        broker.send("zigbee2mqtt/curtain/get/position", b"").await;
+        match tokio::time::timeout(Duration::from_secs(5), commands.recv())
+            .await
+            .expect("get command timing out")
+            .expect("command channel")
+        {
+            MqttCommand::GetDevice {
+                friendly_name,
+                payload,
+                endpoint,
+            } => {
+                assert_eq!(friendly_name, "curtain");
+                assert_eq!(endpoint, None);
+                assert_eq!(payload, json!({"position": ""}));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        // Client -> broker: retained discovery cleanup over the real socket.
+        mqtt.clear_ha_topic("homeassistant/cover/0x9a1122334455667f/cover_l1/config")
+            .await
+            .expect("cleanup publish");
+        let cleanup = wait_for_publish(&broker, |item| {
+            item.topic == "homeassistant/cover/0x9a1122334455667f/cover_l1/config"
+        })
+        .await;
+        assert!(cleanup.payload.is_empty());
+        assert_eq!(cleanup.qos, 1);
+        assert!(cleanup.retain);
     }
 }

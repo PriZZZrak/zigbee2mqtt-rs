@@ -1,6 +1,7 @@
 pub mod basic;
 pub mod binary_input;
 pub mod color;
+pub mod cover;
 pub mod electrical_measurement;
 pub mod groups;
 pub mod humidity;

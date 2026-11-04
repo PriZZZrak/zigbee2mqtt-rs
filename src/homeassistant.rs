@@ -99,6 +99,99 @@ fn endpoint_on_off_configs(
     configs
 }
 
+fn cover_features(expose: &Value) -> (bool, bool) {
+    let features = expose
+        .get("features")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let has = |name: &str| {
+        features
+            .iter()
+            .any(|feature| feature.get("name").and_then(|value| value.as_str()) == Some(name))
+    };
+    (has("position"), has("tilt"))
+}
+
+/// Cover discovery entry (also used by the cluster fallback).
+fn cover_discovery_config(
+    device: &Device,
+    base_topic: &str,
+    coordinator_ieee: &str,
+    endpoint: Option<&str>,
+    position: bool,
+    tilt: bool,
+) -> (String, Value) {
+    let ieee_hex = device.ieee_addr.as_hex();
+    let state_topic = format!("{}/{}", base_topic, device.friendly_name);
+    let (endpoint_state_topic, command_topic, object_id, unique_id) = match endpoint {
+        Some(endpoint) => (
+            format!("{state_topic}/{endpoint}"),
+            format!("{state_topic}/{endpoint}/set"),
+            format!("cover_{endpoint}"),
+            format!("{ieee_hex}_cover_{endpoint}_{base_topic}"),
+        ),
+        None => (
+            state_topic.clone(),
+            format!("{state_topic}/set"),
+            "cover".to_string(),
+            format!("{ieee_hex}_cover_{base_topic}"),
+        ),
+    };
+    // Endpoint covers read the stripped snapshot topic, so the template uses
+    // the unsuffixed property; the main topic carries `state_lN`.
+    let value_template = "{{ value_json[\"state\"] }}";
+    let mut config = json!({
+        "availability": availability_block(base_topic),
+        "command_topic": command_topic,
+        "state_topic": endpoint_state_topic,
+        "object_id": object_id,
+        "unique_id": unique_id,
+        "device": device_block(device, base_topic, coordinator_ieee),
+        "value_template": value_template,
+        "state_open": "OPEN",
+        "state_closed": "CLOSE",
+        "state_stopped": "STOP",
+    });
+    if position {
+        config["position_template"] = json!("{{ value_json[\"position\"] }}");
+        config["set_position_template"] = json!("{ \"position\": {{ position }} }");
+        config["set_position_topic"] = json!(command_topic);
+        config["position_topic"] = json!(endpoint_state_topic);
+    }
+    if tilt {
+        config["tilt_command_topic"] = json!(format!("{command_topic}/tilt"));
+        config["tilt_status_topic"] = json!(endpoint_state_topic);
+        config["tilt_status_template"] = json!("{{ value_json[\"tilt\"] }}");
+    }
+    (object_id, config)
+}
+
+/// Per-endpoint cover configs for a multi-endpoint covering device.
+fn endpoint_cover_configs(
+    device: &Device,
+    base_topic: &str,
+    coordinator_ieee: &str,
+) -> Vec<(String, String, Value)> {
+    device
+        .endpoints
+        .iter()
+        .filter(|endpoint| endpoint.input_clusters.contains(&0x0102))
+        .map(|endpoint| {
+            let suffix = format!("l{}", endpoint.endpoint);
+            let (object_id, config) = cover_discovery_config(
+                device,
+                base_topic,
+                coordinator_ieee,
+                Some(&suffix),
+                true,
+                false,
+            );
+            ("cover".to_string(), object_id, config)
+        })
+        .collect()
+}
+
 /// Publish all HA discovery messages for a device.
 pub async fn publish_discovery(
     mqtt: &MqttBridge,
@@ -161,6 +254,25 @@ pub async fn publish_discovery(
             });
             publish(mqtt, "switch", &ieee_hex, "switch", &config).await;
         }
+    }
+
+    // ── Cover (window covering) ───────────────────────────────────────────
+    let cover_endpoints: Vec<u8> = device
+        .endpoints
+        .iter()
+        .filter(|endpoint| endpoint.input_clusters.contains(&0x0102))
+        .map(|endpoint| endpoint.endpoint)
+        .collect();
+    if cover_endpoints.len() > 1 {
+        for (component, object_id, config) in
+            endpoint_cover_configs(device, base_topic, coordinator_ieee)
+        {
+            publish(mqtt, &component, &ieee_hex, &object_id, &config).await;
+        }
+    } else if !cover_endpoints.is_empty() {
+        let (object_id, config) =
+            cover_discovery_config(device, base_topic, coordinator_ieee, None, true, false);
+        publish(mqtt, "cover", &ieee_hex, &object_id, &config).await;
     }
 
     // ── Climate (thermostat) ─────────────────────────────────────────────
@@ -657,6 +769,18 @@ pub(crate) fn configs_from_exposes(
                     }),
                 ));
             }
+            "cover" => {
+                let (position, tilt) = cover_features(expose);
+                let (object_id, config) = cover_discovery_config(
+                    device,
+                    base_topic,
+                    coordinator_ieee,
+                    endpoint.as_deref(),
+                    position,
+                    tilt,
+                );
+                configs.push(("cover".to_string(), object_id, config));
+            }
             "light" => {
                 let features = expose
                     .get("features")
@@ -741,6 +865,12 @@ pub(crate) fn discovery_topics(device: &Device, exposes: &[Value]) -> Vec<(Strin
         return topics;
     }
     let clusters = device.all_input_clusters();
+    let cover_endpoints: Vec<u8> = device
+        .endpoints
+        .iter()
+        .filter(|endpoint| endpoint.input_clusters.contains(&0x0102))
+        .map(|endpoint| endpoint.endpoint)
+        .collect();
     let mut topics = Vec::new();
     let mut push = |component: &str, object_id: &str| {
         topics.push((component.to_string(), object_id.to_string()));
@@ -755,6 +885,13 @@ pub(crate) fn discovery_topics(device: &Device, exposes: &[Value]) -> Vec<(Strin
         } else {
             push("switch", "switch");
         }
+    }
+    if cover_endpoints.len() > 1 {
+        for (component, object_id, _) in endpoint_cover_configs(device, "zigbee2mqtt", "") {
+            push(&component, &object_id);
+        }
+    } else if !cover_endpoints.is_empty() {
+        push("cover", "cover");
     }
     if clusters.contains(&0x0201) {
         push("climate", "climate");
@@ -1620,5 +1757,118 @@ mod tests {
         assert_eq!(switch.2["object_id"], "two_gang_l2");
         assert_eq!(switch.2["value_template"], "{{ value_json[\"state_l2\"] }}");
         assert_eq!(switch.2["command_topic"], format!("{BASE}/two_gang/l2/set"));
+    }
+
+    fn make_cover() -> Device {
+        let mut dev = Device::new(
+            IeeeAddr([0x9a, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]),
+            0x3456,
+        );
+        dev.friendly_name = "curtain".to_string();
+        dev.interview_complete = true;
+        dev.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0202,
+            input_clusters: vec![0x0000, 0x0102],
+            output_clusters: vec![],
+        });
+        dev
+    }
+
+    #[test]
+    fn cover_discovery_maps_position_and_tilt() {
+        let dev = make_cover();
+        let exposes = vec![json!({
+            "type": "cover",
+            "name": "cover",
+            "features": [{"name": "state"}, {"name": "position"}, {"name": "tilt"}]
+        })];
+        let configs = configs_from_exposes(&dev, &exposes, BASE, COORD_IEEE);
+        assert_eq!(configs.len(), 1);
+        let (component, object_id, config) = &configs[0];
+        assert_eq!(component, "cover");
+        assert_eq!(object_id, "cover");
+        assert_eq!(config["state_topic"], format!("{BASE}/curtain"));
+        assert_eq!(config["command_topic"], format!("{BASE}/curtain/set"));
+        assert_eq!(
+            config["unique_id"],
+            format!("{}_cover_{BASE}", dev.ieee_addr.as_hex())
+        );
+        assert_eq!(config["value_template"], "{{ value_json[\"state\"] }}");
+        assert_eq!(config["state_open"], "OPEN");
+        assert_eq!(config["state_closed"], "CLOSE");
+        assert_eq!(config["state_stopped"], "STOP");
+        assert_eq!(
+            config["position_template"],
+            "{{ value_json[\"position\"] }}"
+        );
+        assert_eq!(
+            config["set_position_template"],
+            "{ \"position\": {{ position }} }"
+        );
+        assert_eq!(config["set_position_topic"], format!("{BASE}/curtain/set"));
+        assert_eq!(config["position_topic"], format!("{BASE}/curtain"));
+        assert_eq!(
+            config["tilt_command_topic"],
+            format!("{BASE}/curtain/set/tilt")
+        );
+        assert_eq!(config["tilt_status_topic"], format!("{BASE}/curtain"));
+        assert_eq!(config["tilt_status_template"], "{{ value_json[\"tilt\"] }}");
+    }
+
+    #[test]
+    fn cover_without_position_or_tilt_omits_optional_topics() {
+        let dev = make_cover();
+        let exposes =
+            vec![json!({"type": "cover", "name": "cover", "features": [{"name": "state"}]})];
+        let configs = configs_from_exposes(&dev, &exposes, BASE, COORD_IEEE);
+        let config = &configs[0].2;
+        assert!(config.get("position_template").is_none());
+        assert!(config.get("tilt_command_topic").is_none());
+    }
+
+    #[test]
+    fn multi_endpoint_cover_uses_postfix_state_topic() {
+        let mut dev = make_cover();
+        dev.endpoints.push(EndpointDesc {
+            endpoint: 2,
+            profile_id: 0x0104,
+            device_id: 0x0202,
+            input_clusters: vec![0x0102],
+            output_clusters: vec![],
+        });
+        let configs = endpoint_cover_configs(&dev, BASE, COORD_IEEE);
+        assert_eq!(configs.len(), 2);
+        let (component, object_id, config) = &configs[0];
+        assert_eq!(component, "cover");
+        assert_eq!(object_id, "cover_l1");
+        assert_eq!(config["state_topic"], format!("{BASE}/curtain/l1"));
+        assert_eq!(config["command_topic"], format!("{BASE}/curtain/l1/set"));
+        assert_eq!(
+            config["unique_id"],
+            format!("{}_cover_l1_{BASE}", dev.ieee_addr.as_hex())
+        );
+        assert_eq!(configs[1].1, "cover_l2");
+        assert_eq!(
+            configs[1].2["command_topic"],
+            format!("{BASE}/curtain/l2/set")
+        );
+    }
+
+    #[test]
+    fn cover_cleanup_topics_include_all_endpoints() {
+        let mut dev = make_cover();
+        dev.endpoints.push(EndpointDesc {
+            endpoint: 2,
+            profile_id: 0x0104,
+            device_id: 0x0202,
+            input_clusters: vec![0x0102],
+            output_clusters: vec![],
+        });
+        let topics = discovery_topics(&dev, &[]);
+        assert!(topics.contains(&("cover".to_string(), "cover_l1".to_string())));
+        assert!(topics.contains(&("cover".to_string(), "cover_l2".to_string())));
+        assert!(topics.contains(&("sensor".to_string(), "linkquality".to_string())));
     }
 }

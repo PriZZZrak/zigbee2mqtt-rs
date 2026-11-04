@@ -19,19 +19,19 @@ Compatibility baseline: zigbee2mqtt `344b6e03b43644c97154a72ca9eae17193c553a2` (
 Frontend baseline: **BLOCKED** — the app resolves Windfront 2.15.0; the historical lock pins 2.15.1. See upstream-lock.json.
 Latest upstream: app `3c841fdfd66c`, herdsman `eb80ba1f1cb3`, converters `367100282578`, Windfront `b32226926e4d`, documentation `14acd6165880` (checked 2026-11-04T09:08:33.742736+00:00).
 Freshness: **DRIFT_DETECTED**
-Discovered: 114 eligible behaviors; 16 unmeasured rows.
-Stage 1 Z-Stack parity: **0/107 = 0.00%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
-Global upstream parity: **0/114 = 0.00%** [all adapter families].
-Stage 1 / global weighted parity: 0.00% / 0.00% (0/145, 0/159).
-Stage 1 / global scenarios: 0/332 = 0.00% and 0/332 = 0.00% [9/16 unmeasured rows].
-Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 56, IN_PROGRESS 33, PARTIAL 9 (114 total).
-Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, DRIFT-001, EVID-004, HA-001, HA-003, MQTT-001 (+28 more)
-Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 0/102, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
+Discovered: 116 eligible behaviors; 16 unmeasured rows.
+Stage 1 Z-Stack parity: **0/109 = 0.00%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
+Global upstream parity: **0/116 = 0.00%** [all adapter families].
+Stage 1 / global weighted parity: 0.00% / 0.00% (0/149, 0/163).
+Stage 1 / global scenarios: 0/346 = 0.00% and 0/346 = 0.00% [9/16 unmeasured rows].
+Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 56, IN_PROGRESS 35, PARTIAL 9 (116 total).
+Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, DRIFT-001, EVID-004, HA-001, HA-003, MQTT-001 (+29 more)
+Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 0/104, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
 Inventory audit: incomplete; no substantiated domain fraction, catalog total or converter denominator.
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).
 Open upstream deltas: see upstream-changes.md; freshness DRIFT_DETECTED.
-Last test run (2026-11-04T16:37:40+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0.
+Last test run (2026-11-04T17:11:15+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64 linker unavailable (aarch64-unknown-linux-musl target installed but /usr/bin/ld rejects --fix-cortex-a53-843419)): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0; `scripts/build-openwrt-artifact.sh` exit 0.
 Known exclusions: none approved; future adapters are deferred, not excluded.
 R1 acceptance is tracked separately in .opencode/plan/10-acceptance-matrix.md; these percentages are not R1 completion.
 Counting rule: only whole VERIFIED rows with existing evidence and test references contribute; newly discovered work increases denominators and is not counted as verified progress.

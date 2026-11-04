@@ -925,19 +925,28 @@ impl Bridge {
                                 });
                             }
                         }
-                        Some(MqttCommand::SetDevice { friendly_name, payload, endpoint }) => {
+                        Some(MqttCommand::SetDevice {
+                            friendly_name,
+                            payload,
+                            endpoint,
+                            attribute: _,
+                        }) => {
                             info!("MQTT set: {friendly_name} (endpoint {endpoint:?}) -> {payload}");
                             Self::handle_set(
                                 &devices, &coord, &mqtt, self.cfg.advanced.output, &mut trans_id,
                                 &friendly_name, endpoint, &payload,
                             ).await;
                         }
-                        Some(MqttCommand::GetDevice { friendly_name, payload }) => {
+                        Some(MqttCommand::GetDevice {
+                            friendly_name,
+                            payload,
+                            endpoint: get_endpoint,
+                        }) => {
                             debug!("MQTT get: {friendly_name}");
                             Self::handle_get(
                                 &devices, &self.external, &coord, &mqtt,
                                 self.cfg.advanced.output, &mut trans_id,
-                                &friendly_name, &payload,
+                                &friendly_name, get_endpoint, &payload,
                             ).await;
                         }
                         Some(MqttCommand::BridgeRequest { request, payload }) => {
@@ -1620,6 +1629,7 @@ impl Bridge {
         output: OutputMode,
         trans_id: &mut u8,
         name: &str,
+        endpoint: Option<u8>,
         payload: &serde_json::Value,
     ) {
         const DEFAULT_KEYS: &[&str] = &[
@@ -1665,7 +1675,10 @@ impl Bridge {
             requested.iter().map(String::as_str).collect()
         };
 
-        let targets = build_get_targets(&endpoints, &wanted);
+        let mut targets = build_get_targets(&endpoints, &wanted);
+        if let Some(endpoint) = endpoint {
+            targets.retain(|(target_endpoint, _), _| *target_endpoint == endpoint);
+        }
         if targets.is_empty() {
             debug!("Get for {name}: no readable attributes for the requested keys");
             return;
@@ -1709,7 +1722,15 @@ impl Bridge {
             if !converter_keys.is_empty() {
                 let reads = external.convert_get(&model, &converter_keys, &info, &cached_state);
                 for read in reads {
-                    let Some(endpoint) = find_ep_with_cluster(&endpoints, read.cluster_id) else {
+                    let Some(target_endpoint) = endpoint
+                        .filter(|requested| {
+                            endpoints.iter().any(|candidate| {
+                                candidate.endpoint == *requested
+                                    && candidate.input_clusters.contains(&read.cluster_id)
+                            })
+                        })
+                        .or_else(|| find_ep_with_cluster(&endpoints, read.cluster_id))
+                    else {
                         debug!(
                             "Get for {name}: convertGet requested cluster 0x{:04X} not on any endpoint",
                             read.cluster_id
@@ -1723,7 +1744,7 @@ impl Bridge {
                     match coord
                         .request_zcl(
                             nwk_addr,
-                            endpoint,
+                            target_endpoint,
                             read.cluster_id,
                             tsn,
                             request,
@@ -1851,21 +1872,111 @@ impl Bridge {
             }
         }
         for (suffix, ep, state_str) in state_targets {
-            let Some(zcl_payload) = on_off::set_state_payload(*trans_id, &state_str) else {
+            let Some(endpoint_desc) = endpoints.iter().find(|candidate| candidate.endpoint == ep)
+            else {
+                continue;
+            };
+            // On/Off devices take OnOff commands; covering devices take
+            // UpOpen/DownClose/Stop from OPEN/CLOSE/STOP.
+            let (cluster, zcl_payload) = if endpoint_desc.input_clusters.contains(&0x0006) {
+                let Some(payload) = on_off::set_state_payload(*trans_id, &state_str) else {
+                    continue;
+                };
+                (0x0006, payload)
+            } else if endpoint_desc.input_clusters.contains(&0x0102) {
+                let Some(payload) =
+                    crate::zigbee::zcl::clusters::cover::state_payload(*trans_id, &state_str)
+                else {
+                    continue;
+                };
+                (0x0102, payload)
+            } else {
                 continue;
             };
             *trans_id = trans_id.wrapping_add(1);
             if let Err(e) = coord
-                .send_zcl(nwk_addr, ep, 0x0006, *trans_id, zcl_payload)
+                .send_zcl(nwk_addr, ep, cluster, *trans_id, zcl_payload)
                 .await
             {
-                warn!("Failed to send on/off command: {e}");
+                warn!("Failed to send state command (cluster 0x{cluster:04X}): {e}");
             }
             let key = match &suffix {
                 Some(suffix) => format!("state_{suffix}"),
                 None => "state".to_string(),
             };
             optimistic.insert(key, json!(state_str.to_uppercase()));
+        }
+
+        // Handle cover position/tilt (written as percentage attributes).
+        let mut cover_targets: Vec<(Option<String>, u8, &'static str, u64)> = Vec::new();
+        let mut push_cover_target =
+            |payload: &serde_json::Map<String, serde_json::Value>,
+             key: &'static str,
+             suffix: Option<String>,
+             endpoint_hint: Option<u8>| {
+                let value = suffix
+                    .as_ref()
+                    .and_then(|suffix| payload.get(&format!("{key}_{suffix}")))
+                    .or_else(|| payload.get(key));
+                let Some(value) = value.and_then(|value| value.as_u64()) else {
+                    return;
+                };
+                let target = suffix
+                    .as_deref()
+                    .and_then(|suffix| {
+                        crate::mqtt::endpoint_index(suffix)
+                            .or_else(|| endpoint_named(&endpoints, suffix))
+                    })
+                    .or(endpoint_hint)
+                    .or_else(|| find_ep_with_cluster(&endpoints, 0x0102));
+                if let Some(endpoint) = target {
+                    let is_cover = endpoints.iter().any(|candidate| {
+                        candidate.endpoint == endpoint && candidate.input_clusters.contains(&0x0102)
+                    });
+                    if is_cover {
+                        cover_targets.push((suffix, endpoint, key, value));
+                    }
+                }
+            };
+        if let Some(object) = payload.as_object() {
+            push_cover_target(object, "position", None, endpoint);
+            push_cover_target(object, "tilt", None, endpoint);
+            let mut suffixes: Vec<String> = object
+                .keys()
+                .filter_map(|key| parse_endpoint_key(key).map(|(_, suffix)| suffix))
+                .collect();
+            suffixes.sort();
+            suffixes.dedup();
+            for suffix in suffixes {
+                push_cover_target(object, "position", Some(suffix.clone()), endpoint);
+                push_cover_target(object, "tilt", Some(suffix), endpoint);
+            }
+        }
+        for (suffix, ep, key, value) in cover_targets {
+            let tsn = *trans_id;
+            *trans_id = trans_id.wrapping_add(1);
+            let zcl_payload = if key == "position" {
+                crate::zigbee::zcl::clusters::cover::position_payload(tsn, value)
+            } else {
+                crate::zigbee::zcl::clusters::cover::tilt_payload(tsn, value)
+            };
+            if let Err(e) = coord
+                .send_zcl(
+                    nwk_addr,
+                    ep,
+                    crate::zigbee::zcl::clusters::cover::CLUSTER_ID,
+                    tsn,
+                    zcl_payload,
+                )
+                .await
+            {
+                warn!("Failed to send cover {key} command: {e}");
+            }
+            let optimistic_key = match &suffix {
+                Some(suffix) => format!("{key}_{suffix}"),
+                None => key.to_string(),
+            };
+            optimistic.insert(optimistic_key, json!(value.min(100)));
         }
 
         // Handle brightness, including per-endpoint `brightness_lN` keys.
@@ -2779,7 +2890,16 @@ fn build_get_targets(
     let mut targets: std::collections::BTreeMap<(u8, u16), Vec<u16>> =
         std::collections::BTreeMap::new();
     for key in wanted {
-        let Some((cluster_id, attributes)) = read_target(key) else {
+        let mut target = read_target(key);
+        // A covering device has no OnOff cluster; its `state` is derived from
+        // the lift position attribute instead.
+        if *key == "state"
+            && find_ep_with_cluster(endpoints, 0x0006).is_none()
+            && find_ep_with_cluster(endpoints, 0x0102).is_some()
+        {
+            target = Some((0x0102, &[0x0008][..]));
+        }
+        let Some((cluster_id, attributes)) = target else {
             continue;
         };
         let Some(endpoint) = find_ep_with_cluster(endpoints, cluster_id) else {
@@ -2809,6 +2929,8 @@ fn read_target(key: &str) -> Option<(u16, &'static [u16])> {
         "battery_voltage" => (0x0001, &[0x0021][..]),
         "occupancy" => (0x0406, &[0x0000][..]),
         "contact" | "tamper" => (0x0500, &[0x0002][..]),
+        "position" => (0x0102, &[0x0008][..]),
+        "tilt" => (0x0102, &[0x0009][..]),
         _ => return None,
     })
 }
@@ -3094,8 +3216,10 @@ mod tests {
     }
 
     #[test]
-    fn read_targets_cover_native_keys() {
+    fn read_targets_for_native_keys() {
         assert_eq!(read_target("state"), Some((0x0006, &[0x0000][..])));
+        assert_eq!(read_target("position"), Some((0x0102, &[0x0008][..])));
+        assert_eq!(read_target("tilt"), Some((0x0102, &[0x0009][..])));
         assert_eq!(read_target("temperature"), Some((0x0402, &[0x0000][..])));
         assert_eq!(read_target("contact"), Some((0x0500, &[0x0002][..])));
         assert_eq!(read_target("unknown_key"), None);
@@ -3482,6 +3606,7 @@ mod tests {
             MqttCommand::GetDevice {
                 friendly_name,
                 payload,
+                ..
             } => (friendly_name, payload),
             other => panic!("unexpected command: {other:?}"),
         };
@@ -3989,5 +4114,101 @@ mod tests {
             endpoint_suffix(&action_device, 3).as_deref(),
             Some("button")
         );
+    }
+
+    #[test]
+    fn cover_state_get_targets_lift_position() {
+        let endpoints = vec![EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0202,
+            input_clusters: vec![0x0102],
+            output_clusters: vec![],
+        }];
+        let targets = build_get_targets(&endpoints, &["state", "position"]);
+        assert_eq!(targets.get(&(1, 0x0102)), Some(&vec![0x0008]));
+        assert_eq!(targets.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn device_remove_over_real_socket_publishes_retained_cleanup_and_response() {
+        let broker = crate::mqtt::fake_broker::FakeBroker::start().await;
+        let cfg = crate::config::MqttConfig {
+            server: "127.0.0.1".into(),
+            port: broker.port,
+            base_topic: "zigbee2mqtt".into(),
+            client_id: format!("z2m-remove-socket-{}", std::process::id()),
+            ..crate::config::MqttConfig::default()
+        };
+        let (mqtt, _commands) = MqttBridge::connect(&cfg)
+            .await
+            .expect("connect to the in-process broker");
+
+        let devices = DeviceRegistry::new();
+        let ieee = IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap();
+        let mut device = Device::new(ieee, 0x1234);
+        device.friendly_name = "socket_bulb".into();
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0006, 0x0008],
+            output_clusters: vec![],
+        });
+        devices.add(device);
+        let external = ExternalConverter::new(
+            std::env::temp_dir().join("z2m-remove-socket-cache"),
+            "https://example.invalid",
+        );
+
+        let removed = process_device_remove(
+            &devices,
+            &external,
+            true,
+            &mqtt,
+            "device/remove",
+            &json!({"id": "0xec1bbdfffeaa66db"}),
+            Some("tx-socket"),
+        )
+        .await;
+        assert!(removed);
+
+        let mut cleanup_seen = 0;
+        for _ in 0..250 {
+            let publishes = broker.publishes();
+            cleanup_seen = publishes
+                .iter()
+                .filter(|item| {
+                    item.topic.starts_with("homeassistant/")
+                        && item.payload.is_empty()
+                        && item.retain
+                        && item.qos == 1
+                })
+                .count();
+            if cleanup_seen >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(cleanup_seen, 2, "light + linkquality retained cleanups");
+
+        let mut response = None;
+        for _ in 0..250 {
+            if let Some(found) = broker
+                .publishes()
+                .into_iter()
+                .find(|item| item.topic == "zigbee2mqtt/bridge/response/device/remove")
+            {
+                response = Some(found);
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let response = response.expect("device/remove response on the socket");
+        let payload: serde_json::Value = serde_json::from_slice(&response.payload).unwrap();
+        assert_eq!(payload["status"], "ok");
+        assert_eq!(payload["transaction"], "tx-socket");
+        assert!(devices.get_by_ieee(&ieee).is_none());
     }
 }

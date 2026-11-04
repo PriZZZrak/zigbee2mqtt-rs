@@ -1,0 +1,63 @@
+name: OpenWrt release artifact
+
+# Builds a static aarch64 OpenWrt package artifact from this repository and
+# uploads it with a hash/provenance manifest. The packaging script is tested in
+# rust-ci; this workflow is the only place that compiles the target binary.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  artifact:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      # zigbuild supplies the aarch64 musl linker; the application itself stays
+      # pure Rust and the produced ELF is statically linked.
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.13.0
+      - run: cargo install cargo-zigbuild --locked
+
+      - name: Build static aarch64 binary
+        run: |
+          set -euo pipefail
+          cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
+          mkdir -p openwrt/files
+          cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
+
+      - name: Stage artifact with manifest
+        run: scripts/build-openwrt-artifact.sh openwrt/files/zigbee2mqtt-rs dist
+
+      - name: Native dependency audit (target tree)
+        run: |
+          set -euo pipefail
+          file dist/../openwrt/files/zigbee2mqtt-rs
+          ! readelf -l openwrt/files/zigbee2mqtt-rs | grep -q INTERP
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-aarch64
+          path: |
+            dist/*.tar.gz
+            dist/*.manifest.json
+
+      - name: Attach artifacts to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            dist/*.tar.gz dist/*.manifest.json --clobber

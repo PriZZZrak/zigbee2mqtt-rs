@@ -30,6 +30,11 @@ R1 — явно ограниченный релиз для проверенно�
 
 ## Состояние выполнения
 
+- **OPS-02 частично**: `scripts/build-openwrt-artifact.sh` собирает tarball и
+  manifest с SHA-256/размерами/target/git SHA, отвергает non-aarch64 и
+  dynamic-ELF; добавлен `openwrt-release.yml` c zigbuild и upload. В этой среде
+  нет aarch64-linker, поэтому artifact собран из закоммиченного prebuilt binary,
+  а CI-workflow не запускался; `.ipk`, install/upgrade и HIL не проверены.
 - **EVID-04 частично**: harness поддерживает pinned-source проверку, fixture
   schema, явную нормализацию, JSON report и CI smoke. Проверен fake reference;
   реальные Node-прогоны и corpus fixtures отсутствуют.
@@ -90,6 +95,11 @@ R1 — явно ограниченный релиз для проверенно�
   QueryNextImage запускает auto-check и публикует `available` с throttling;
   bridge-level helper проверен fake index/device fixture. Полный Message loop,
   настраиваемый override, реальный HTTPS/cache и HIL отсутствуют.
+- **HA cover/postfix частично**: cover discovery (single/`cover_lN`), OPEN/
+  CLOSE/STOP + position/tilt, per-attribute `set/<attr>` и `get/<attr>`,
+  подписка `<base>/#`. Добавлен in-process MQTT broker: два теста гоняют
+  реальный rumqttc event loop по TCP (команды + retained cleanup). Остаются
+  SWITCH_DIFFERENT/lock postfix, cover quirks, live broker/HA и HIL.
 - **HA multi-endpoint частично**: устройство с несколькими OnOff endpoint
   публикует `light_lN`/`switch_lN`, команды идут на `<friendly>/lN/set`,
   `state_lN`/`brightness_lN` разбираются, а stripped-снимок публикуется на

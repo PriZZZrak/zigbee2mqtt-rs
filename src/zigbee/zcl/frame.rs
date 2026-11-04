@@ -82,6 +82,7 @@ impl ZclFrameHeader {
 pub mod global {
     pub const READ_ATTRIBUTES: u8 = 0x00;
     pub const READ_ATTRIBUTES_RSP: u8 = 0x01;
+    pub const WRITE_ATTRIBUTES: u8 = 0x02;
     pub const CONFIGURE_REPORTING: u8 = 0x06;
     pub const CONFIGURE_REPORTING_RSP: u8 = 0x07;
     pub const READ_REPORTING_CONFIG: u8 = 0x08;
