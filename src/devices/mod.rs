@@ -203,6 +203,14 @@ impl DeviceRegistry {
         self.by_ieee.get_mut(addr)
     }
 
+    /// Persist the database record id assigned during synchronization so the
+    /// same id is reused on the next sync instead of allocating a new one.
+    pub fn set_database_id(&self, ieee: &IeeeAddr, id: u32) {
+        if let Some(mut device) = self.by_ieee.get_mut(ieee) {
+            device.database_id = Some(id);
+        }
+    }
+
     pub fn get_mut_by_nwk(
         &self,
         addr: NwkAddr,

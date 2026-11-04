@@ -28,6 +28,20 @@ Timestamps сохранены без подмены даты. Источники
 R1 — явно ограниченный релиз для проверенной сети. Его нельзя называть drop-in
 заменой для любого пользователя, «90% Windfront» или «поддержкой 5426 устройств».
 
+## Состояние выполнения
+
+- **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
+  зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
+  переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и
+  Rust/parity workflow. GitHub Actions ещё не запускался.
+- **PR-02 — частично выполнено**: STORE-01 (lossless YAML merge, unknown
+  options, referenced files) и STORE-02 (стабильные group/device database ID,
+  epList/interviewState/swBuildId) реализованы с локальными regression tests.
+  STORE-03 (durability/ENOSPC/SIGTERM flush) и STORE-04 (migration kit) не начаты.
+  Node/differential oracle и hardware evidence отсутствуют, поэтому строки имеют
+  статус `IN_PROGRESS`, а не `VERIFIED`.
+- Следующий шаг: STORE-03, затем STORE-04 и reference harness (EVID-04).
+
 ## Документы
 
 | Документ | Назначение |

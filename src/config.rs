@@ -489,8 +489,77 @@ impl Config {
         let actual: serde_json::Value =
             serde_yml::from_str(&actual_content).unwrap_or(serde_json::Value::Null);
         let config_dir = path.parent().unwrap_or(Path::new("."));
-        let mut to_write = serde_json::to_value(self)
+        let typed = serde_json::to_value(self)
             .map_err(|e| Error::Config(format!("cannot serialize config: {e}")))?;
+        // Start from the persisted document and overlay only the typed fields we
+        // actually manage. Serializing the typed struct alone silently deleted
+        // unknown sections and options; runtime changes must not rewrite fields
+        // the application does not model.
+        let mut to_write = if actual.is_object() {
+            actual.clone()
+        } else {
+            typed.clone()
+        };
+        if let Some(document) = to_write.as_object_mut() {
+            for (key, value) in typed.as_object().into_iter().flatten() {
+                if key == "devices" || key == "groups" {
+                    continue;
+                }
+                // These sections are not mutated at runtime; keep the original
+                // representation (including mqtt URIs and !secret references).
+                document.entry(key.clone()).or_insert_with(|| value.clone());
+            }
+        }
+
+        // Merge entity maps per entry so unknown device/group options survive a
+        // rename or membership change. Referenced files are read as the base,
+        // since the typed struct does not model their extra fields.
+        let read_entity_file = |name: &str| -> serde_json::Map<String, serde_json::Value> {
+            std::fs::read_to_string(config_dir.join(name))
+                .ok()
+                .and_then(|content| {
+                    serde_yml::from_str::<HashMap<String, serde_json::Value>>(&content).ok()
+                })
+                .map(|map| map.into_iter().collect())
+                .unwrap_or_default()
+        };
+        for key in ["devices", "groups"] {
+            let mut base = serde_json::Map::new();
+            if let Some(value) = actual.get(key) {
+                if let Some(single) = value.as_str() {
+                    base.extend(read_entity_file(single));
+                } else if let Some(files) = value.as_array() {
+                    for file in files.iter().filter_map(|x| x.as_str()) {
+                        base.extend(read_entity_file(file));
+                    }
+                } else if let Some(inline) = value.as_object() {
+                    base.extend(inline.clone());
+                }
+            }
+            let mut merged = serde_json::Map::new();
+            if let Some(entities) = typed.get(key).and_then(|x| x.as_object()) {
+                for (entity, fields) in entities {
+                    let mut entry = base
+                        .get(entity)
+                        .and_then(|x| x.as_object())
+                        .cloned()
+                        .unwrap_or_default();
+                    if let Some(fields) = fields.as_object() {
+                        for (field, value) in fields {
+                            // `None` options serialize as null; they mean "not
+                            // set" and must not erase an existing option.
+                            if !value.is_null() {
+                                entry.insert(field.clone(), value.clone());
+                            }
+                        }
+                    }
+                    merged.insert(entity.clone(), serde_json::Value::Object(entry));
+                }
+            }
+            if let Some(document) = to_write.as_object_mut() {
+                document.insert(key.to_string(), serde_json::Value::Object(merged));
+            }
+        }
 
         // Handle !secret refs for mqtt/server, mqtt/user, mqtt/password, advanced/network_key, frontend/auth_token
         for (ns, key) in [
@@ -505,7 +574,13 @@ impl Config {
                 .and_then(|v| v.get(key).and_then(|x| x.as_str()))
             {
                 if let Some((fname, ref_key)) = parse_value_ref(actual_ns) {
-                    if let Some(new_val) = to_write.get(ns).and_then(|v| v.get(key)).cloned() {
+                    // Resolve from the typed view; `to_write` still contains the
+                    // literal reference and must not be written into the secret
+                    // file as its own value.
+                    if let Some(new_val) = typed.get(ns).and_then(|v| v.get(key)).cloned() {
+                        if new_val.as_str() == Some(actual_ns) {
+                            continue;
+                        }
                         // Write the actual value to the referenced file
                         let secret_path = config_dir.join(&fname);
                         let mut secret_content: serde_json::Value =
@@ -688,5 +763,108 @@ mod tests {
         assert_eq!(cfg.advanced.channel, 11);
         assert_eq!(cfg.advanced.output, OutputMode::Json);
         cfg.validate().expect("example config must pass validation");
+    }
+
+    #[test]
+    fn save_preserves_unknown_configuration_and_entity_options() {
+        let dir = std::env::temp_dir().join(format!("z2m_config_lossless_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("configuration.yaml");
+        std::fs::write(
+            &path,
+            r#"serial:
+  port: /dev/ttyUSB0
+  unknown_serial_option: keep
+mqtt:
+  server: mqtts://broker.example:8883
+  user: alice
+  password: secret
+  extra_mqtt_option: keep
+homeassistant:
+  enabled: true
+  discovery_topic: custom/discovery
+frontend:
+  auth_token: token
+  extra_frontend_option: keep
+devices:
+  '0xec1bbdfffeaa66db':
+    friendly_name: old_name
+    retain: true
+    custom_device_option: 42
+groups:
+  '1':
+    friendly_name: old_group
+    custom_group_option: keep
+"#,
+        )
+        .unwrap();
+
+        let mut cfg = Config::load(&path).unwrap();
+        cfg.devices
+            .get_mut("0xec1bbdfffeaa66db")
+            .unwrap()
+            .friendly_name = Some("new_name".to_string());
+        cfg.groups.get_mut("1").unwrap().friendly_name = Some("new_group".to_string());
+        cfg.save(&path).unwrap();
+
+        let saved_text = std::fs::read_to_string(&path).unwrap();
+        let saved: serde_json::Value = serde_yml::from_str(&saved_text).unwrap();
+        assert_eq!(
+            saved["devices"]["0xec1bbdfffeaa66db"]["friendly_name"],
+            "new_name"
+        );
+        assert_eq!(saved["devices"]["0xec1bbdfffeaa66db"]["retain"], true);
+        assert_eq!(
+            saved["devices"]["0xec1bbdfffeaa66db"]["custom_device_option"],
+            42
+        );
+        assert_eq!(saved["groups"]["1"]["friendly_name"], "new_group");
+        assert_eq!(saved["groups"]["1"]["custom_group_option"], "keep");
+        assert_eq!(saved["mqtt"]["server"], "mqtts://broker.example:8883");
+        assert_eq!(saved["mqtt"]["user"], "alice");
+        assert_eq!(saved["mqtt"]["extra_mqtt_option"], "keep");
+        assert_eq!(
+            saved["homeassistant"]["discovery_topic"],
+            "custom/discovery"
+        );
+        assert_eq!(saved["serial"]["unknown_serial_option"], "keep");
+        assert_eq!(saved["frontend"]["extra_frontend_option"], "keep");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn save_preserves_device_options_in_referenced_file() {
+        let dir = std::env::temp_dir().join(format!("z2m_config_split_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("configuration.yaml");
+        std::fs::write(&path, "devices: devices.yaml\nmqtt:\n  server: localhost\n").unwrap();
+        std::fs::write(
+            dir.join("devices.yaml"),
+            r#"'0xec1bbdfffeaa66db':
+  friendly_name: old_name
+  custom_device_option: keep
+"#,
+        )
+        .unwrap();
+
+        let mut cfg = Config::load(&path).unwrap();
+        cfg.devices
+            .get_mut("0xec1bbdfffeaa66db")
+            .unwrap()
+            .friendly_name = Some("new_name".to_string());
+        cfg.save(&path).unwrap();
+
+        let main: serde_json::Value =
+            serde_yml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(main["devices"], "devices.yaml");
+        let devices: serde_json::Value =
+            serde_yml::from_str(&std::fs::read_to_string(dir.join("devices.yaml")).unwrap())
+                .unwrap();
+        assert_eq!(devices["0xec1bbdfffeaa66db"]["friendly_name"], "new_name");
+        assert_eq!(
+            devices["0xec1bbdfffeaa66db"]["custom_device_option"],
+            "keep"
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

@@ -121,9 +121,17 @@ impl Bridge {
         {
             let devices = self.devices.all_devices();
             let groups = self.groups.all();
-            let mut db = self.database.lock().await;
-            db.sync_devices(&devices, coordinator_ieee);
-            db.sync_groups(&groups);
+            let assigned = {
+                let mut db = self.database.lock().await;
+                let assigned = db.sync_devices(&devices, coordinator_ieee);
+                db.sync_groups(&groups);
+                assigned
+            };
+            // Keep the assigned ids on the live entities so the next
+            // synchronization does not allocate a fresh record for them.
+            for (ieee, id) in assigned {
+                self.devices.set_database_id(&ieee, id);
+            }
         }
         let mut pending = self.db_write_pending.lock().await;
         if *pending {

@@ -287,17 +287,19 @@ impl PersistentDatabase {
         Ok(())
     }
 
-    pub fn sync_devices(&mut self, devices: &[Device], coordinator_ieee: Option<IeeeAddr>) {
-        self.sync_devices_inner(devices, coordinator_ieee, true);
-    }
-
-    fn sync_devices_inner(
+    /// Synchronize device records and return the id assigned to each device.
+    ///
+    /// Callers must persist the returned ids in their device registry. Without
+    /// this write-back a device that did not come from database.db would be
+    /// assigned a fresh id on every synchronization, churning records instead
+    /// of keeping a stable identity (upstream keeps `databaseID` on the entity).
+    pub fn sync_devices(
         &mut self,
         devices: &[Device],
         coordinator_ieee: Option<IeeeAddr>,
-        preserve_extra: bool,
-    ) {
+    ) -> Vec<(IeeeAddr, u32)> {
         // Preserve Coordinator, Group and GreenPower entries, update/insert devices
+        let mut assigned = Vec::with_capacity(devices.len());
         let mut to_keep: HashMap<u32, serde_json::Value> = HashMap::new();
         for (id, v) in &self.entries {
             if let Some(t) = v.get("type").and_then(|x| x.as_str()) {
@@ -325,10 +327,11 @@ impl PersistentDatabase {
                 nid
             });
             used_ids.insert(id);
+            assigned.push((dev.ieee_addr, id));
             if id > self.max_id {
                 self.max_id = id;
             }
-            let ep_list: Vec<u8> = dev.endpoints.iter().map(|e| e.endpoint).collect();
+            let mut ep_list: Vec<u8> = dev.endpoints.iter().map(|e| e.endpoint).collect();
             let mut endpoints = serde_json::Map::new();
             for ep in &dev.endpoints {
                 endpoints.insert(
@@ -448,6 +451,29 @@ impl PersistentDatabase {
                     }
                 }
             }
+            // Keep the persisted endpoint list in sync with the preserved endpoint
+            // map. Rebuilding it only from the live registry silently dropped
+            // endpoints (notably 242) that are intentionally kept in the record.
+            if let Some(orig_list) = orig
+                .and_then(|v| v.get("epList"))
+                .and_then(|x| x.as_array())
+            {
+                for endpoint in orig_list.iter().filter_map(|x| x.as_u64()).map(|x| x as u8) {
+                    if !ep_list.contains(&endpoint) {
+                        ep_list.push(endpoint);
+                    }
+                }
+            }
+            // An in-progress interview must not be rewritten as FAILED: preserve
+            // the persisted state until the interview actually completes.
+            let interview_state = if dev.interview_complete {
+                "SUCCESSFUL".to_string()
+            } else {
+                orig.and_then(|v| v.get("interviewState"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("FAILED")
+                    .to_string()
+            };
             let mut entry = serde_json::json!({
                 "id": id,
                 "type": orig_type,
@@ -460,11 +486,20 @@ impl PersistentDatabase {
                 "epList": ep_list,
                 "endpoints": endpoints_preserved,
                 "interviewCompleted": dev.interview_complete,
-                "interviewState": if dev.interview_complete { "SUCCESSFUL" } else { "FAILED" },
+                "interviewState": interview_state,
                 "meta": meta,
                 "lastSeen": last_seen
             });
             // Preserve version fields if orig has them
+            if let Some(sw_build_id) = dev.sw_build_id.clone().or_else(|| {
+                orig.and_then(|v| {
+                    v.get("swBuildId")
+                        .and_then(|x| x.as_str())
+                        .map(str::to_string)
+                })
+            }) {
+                entry["swBuildId"] = json!(sw_build_id);
+            }
             if !app_version.is_null() {
                 entry["appVersion"] = app_version;
             }
@@ -526,28 +561,51 @@ impl PersistentDatabase {
             }
         }
         self.entries = to_keep;
+        assigned
     }
 
     pub fn sync_groups(&mut self, groups: &[Group]) {
-        // Remove old Group entries and re-add from registry
+        // Capture group identities before removing the records. The previous
+        // implementation retained only non-group entries and then searched for
+        // the old groupID, so it could never find one and allocated a new id on
+        // every synchronization.
+        let mut previous: HashMap<u16, serde_json::Value> = HashMap::new();
+        for value in self.entries.values() {
+            if value.get("type").and_then(|x| x.as_str()) != Some("Group") {
+                continue;
+            }
+            if let Some(group_id) = value
+                .get("groupID")
+                .and_then(|x| x.as_u64())
+                .map(|x| x as u16)
+            {
+                previous.entry(group_id).or_insert_with(|| value.clone());
+            }
+        }
         self.entries
             .retain(|_, v| v.get("type").and_then(|x| x.as_str()) != Some("Group"));
+
+        let mut used_ids: std::collections::HashSet<u32> = self.entries.keys().copied().collect();
         for g in groups {
-            // Find existing entry by groupID or create new id
-            let existing_id = self
-                .entries
-                .iter()
-                .find(|(_, v)| {
-                    v.get("groupID").and_then(|x| x.as_u64()).map(|x| x as u16) == Some(g.id)
-                })
-                .map(|(k, _)| *k);
-            let id = existing_id.unwrap_or_else(|| {
-                let mut nid = self.max_id + 1;
-                while self.entries.contains_key(&nid) {
-                    nid += 1;
-                }
-                nid
-            });
+            // Reuse the whole record when possible so `meta` and unknown fields
+            // survive a rename or membership change.
+            let mut entry = previous
+                .get(&g.id)
+                .cloned()
+                .unwrap_or_else(|| json!({"meta": {}}));
+            let id = entry
+                .get("id")
+                .and_then(|x| x.as_u64())
+                .map(|x| x as u32)
+                .filter(|id| !used_ids.contains(id))
+                .unwrap_or_else(|| {
+                    let mut nid = self.max_id + 1;
+                    while used_ids.contains(&nid) {
+                        nid += 1;
+                    }
+                    nid
+                });
+            used_ids.insert(id);
             if id > self.max_id {
                 self.max_id = id;
             }
@@ -556,13 +614,13 @@ impl PersistentDatabase {
                 .iter()
                 .map(|m| serde_json::json!({"ieeeAddr": m.ieee_address, "endpoint": m.endpoint}))
                 .collect();
-            let entry = serde_json::json!({
-                "id": id,
-                "type": "Group",
-                "groupID": g.id,
-                "members": members,
-                "meta": {}
-            });
+            entry["id"] = json!(id);
+            entry["type"] = json!("Group");
+            entry["groupID"] = json!(g.id);
+            entry["members"] = json!(members);
+            if !entry.get("meta").is_some_and(|meta| meta.is_object()) {
+                entry["meta"] = json!({});
+            }
             self.entries.insert(id, entry);
         }
     }
@@ -761,6 +819,111 @@ mod tests {
         assert!(parse_ieee("not_hex").is_none());
     }
 
+    fn temp_db(name: &str, content: &str) -> PathBuf {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static CTR: AtomicU32 = AtomicU32::new(0);
+        let n = CTR.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("z2m_sync_{name}_{n}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("database.db");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn sync_groups_reuses_database_id_and_meta() {
+        use crate::groups::{Group, GroupMember};
+        let path = temp_db(
+            "groups",
+            r#"{"id":10,"type":"Group","groupID":1,"members":[],"meta":{"custom":true}}"#,
+        );
+        let mut db = PersistentDatabase::open(&path);
+        let group = Group {
+            id: 1,
+            friendly_name: "group_1".to_string(),
+            members: vec![GroupMember {
+                ieee_address: "0xec1bbdfffeaa66db".to_string(),
+                endpoint: 1,
+            }],
+        };
+
+        db.sync_groups(std::slice::from_ref(&group));
+        db.sync_groups(std::slice::from_ref(&group));
+
+        assert_eq!(db.entries.len(), 1);
+        let entry = db
+            .entries
+            .get(&10)
+            .expect("original group id must be reused");
+        assert_eq!(entry["groupID"], 1);
+        assert_eq!(entry["meta"]["custom"], true);
+        assert_eq!(entry["members"][0]["ieeeAddr"], "0xec1bbdfffeaa66db");
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn sync_devices_returns_ids_that_stay_stable_after_write_back() {
+        let path = temp_db(
+            "devices",
+            r#"{"id":1,"type":"Coordinator","ieeeAddr":"0x00124b00120144ae","nwkAddr":0,"epList":[1],"endpoints":{},"interviewCompleted":true,"meta":{}}"#,
+        );
+        let mut db = PersistentDatabase::open(&path);
+        let mut device = Device::new(parse_ieee("0xec1bbdfffeaa66db").unwrap(), 0x1234);
+
+        let first = db.sync_devices(std::slice::from_ref(&device), None);
+        assert_eq!(first.len(), 1);
+        let (_, id) = first[0];
+        assert!(id > 1, "must not reuse the coordinator record id");
+
+        // Simulate the bridge persisting the assigned id on the live entity.
+        device.database_id = Some(id);
+        let second = db.sync_devices(std::slice::from_ref(&device), None);
+        assert_eq!(second[0].1, id);
+        assert_eq!(db.entries.len(), 2);
+        assert_eq!(
+            db.entries.get(&id).unwrap()["ieeeAddr"],
+            "0xec1bbdfffeaa66db"
+        );
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn sync_devices_preserves_ep_list_interview_state_and_sw_build_id() {
+        let path = temp_db(
+            "fidelity",
+            r#"{"id":2,"type":"EndDevice","ieeeAddr":"0xcc86ecfffe9fd1b1","nwkAddr":1,"epList":[1,242],"endpoints":{"1":{"profId":260,"epId":1,"devId":0,"inClusterList":[0,1026],"outClusterList":[],"clusters":{},"binds":[],"configuredReportings":[],"meta":{}},"242":{"profId":41440,"epId":242,"devId":97,"inClusterList":[],"outClusterList":[],"clusters":{},"binds":[],"configuredReportings":[],"meta":{}}},"interviewState":"IN_PROGRESS","swBuildId":"1.2.3","meta":{}}"#,
+        );
+        let mut db = PersistentDatabase::open(&path);
+        let mut device = Device::new(parse_ieee("0xcc86ecfffe9fd1b1").unwrap(), 2);
+        device.database_id = Some(2);
+        device.sw_build_id = Some("9.9.9".to_string());
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 260,
+            device_id: 0,
+            input_clusters: vec![0, 1026],
+            output_clusters: vec![],
+        });
+
+        db.sync_devices(std::slice::from_ref(&device), None);
+
+        let entry = db.entries.get(&2).unwrap();
+        assert_eq!(entry["swBuildId"], "9.9.9");
+        assert_eq!(entry["interviewState"], "IN_PROGRESS");
+        let ep_list: Vec<u64> = entry["epList"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_u64().unwrap())
+            .collect();
+        assert!(
+            ep_list.contains(&242),
+            "preserved endpoint missing from epList"
+        );
+        assert!(entry["endpoints"].get("242").is_some());
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
     #[test]
     fn empty_database_returns_empty() {
         let dir = std::env::temp_dir().join(format!("z2m_empty_db_{}", std::process::id()));
@@ -813,7 +976,7 @@ mod tests {
             0x1234,
         );
         // dev.interview_complete false by default -> should write FAILED
-        db.sync_devices(&[dev.clone()], None);
+        db.sync_devices(std::slice::from_ref(&dev), None);
         db.write().unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("\"interviewCompleted\":false"));
