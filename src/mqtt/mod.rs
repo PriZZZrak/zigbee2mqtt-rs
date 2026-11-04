@@ -38,6 +38,46 @@ pub enum MqttCommand {
     },
 }
 
+/// Build a device command from an MQTT topic/payload pair.
+///
+/// Kept separate from the event loop so the MQTT command contract can be tested
+/// without a broker.
+pub(crate) fn parse_device_command(
+    base_topic: &str,
+    topic: &str,
+    payload: &[u8],
+) -> Option<MqttCommand> {
+    let is_set = topic.ends_with("/set");
+    let is_get = topic.ends_with("/get");
+    if !is_set && !is_get {
+        return None;
+    }
+    let suffix = if is_set { "/set" } else { "/get" };
+    let friendly_name = friendly_name_from_topic(topic, base_topic, suffix);
+    let json_value = if is_get && payload.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_slice::<serde_json::Value>(payload).unwrap_or_else(|_| {
+            if let Ok(text) = std::str::from_utf8(payload) {
+                json!({ "state": text.trim() })
+            } else {
+                serde_json::Value::Null
+            }
+        })
+    };
+    Some(if is_set {
+        MqttCommand::SetDevice {
+            friendly_name,
+            payload: json_value,
+        }
+    } else {
+        MqttCommand::GetDevice {
+            friendly_name,
+            payload: json_value,
+        }
+    })
+}
+
 // ── MqttBridge ────────────────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -296,34 +336,7 @@ async fn run_event_loop(
                 let topic = &pub_msg.topic;
                 let payload = &pub_msg.payload;
 
-                if topic.ends_with("/set") || topic.ends_with("/get") {
-                    let is_set = topic.ends_with("/set");
-                    let suffix = if is_set { "/set" } else { "/get" };
-                    let name = friendly_name_from_topic(topic, base_topic, suffix);
-
-                    let json_value = if !is_set && payload.is_empty() {
-                        serde_json::Value::Null
-                    } else {
-                        serde_json::from_slice::<serde_json::Value>(payload).unwrap_or_else(|_| {
-                            if let Ok(s) = std::str::from_utf8(payload) {
-                                json!({ "state": s.trim() })
-                            } else {
-                                serde_json::Value::Null
-                            }
-                        })
-                    };
-
-                    let cmd = if is_set {
-                        MqttCommand::SetDevice {
-                            friendly_name: name,
-                            payload: json_value,
-                        }
-                    } else {
-                        MqttCommand::GetDevice {
-                            friendly_name: name,
-                            payload: json_value,
-                        }
-                    };
+                if let Some(cmd) = parse_device_command(base_topic, topic, payload) {
                     let _ = cmd_tx.send(cmd).await;
                 } else if topic.contains("bridge/request") {
                     // Extract full request path after "<base_topic>/bridge/request/"
@@ -523,5 +536,42 @@ mod tests {
         };
         assert!(error.to_string().contains("TLS"));
         assert!(error.to_string().contains("plain TCP"));
+    }
+
+    #[test]
+    fn mqtt_get_command_preserves_requested_keys_and_empty_payload() {
+        let command = parse_device_command("zigbee2mqtt", "zigbee2mqtt/kitchen/get", b"");
+        match command {
+            Some(MqttCommand::GetDevice {
+                friendly_name,
+                payload,
+            }) => {
+                assert_eq!(friendly_name, "kitchen");
+                assert!(payload.is_null());
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        let command = parse_device_command(
+            "zigbee2mqtt",
+            "zigbee2mqtt/kitchen/get",
+            br#"{"temperature":""}"#,
+        );
+        match command {
+            Some(MqttCommand::GetDevice { payload, .. }) => {
+                assert!(payload.get("temperature").is_some());
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mqtt_set_command_keeps_raw_state_fallback() {
+        match parse_device_command("zigbee2mqtt", "zigbee2mqtt/kitchen/set", b"ON") {
+            Some(MqttCommand::SetDevice { payload, .. }) => {
+                assert_eq!(payload["state"], "ON");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        assert!(parse_device_command("zigbee2mqtt", "zigbee2mqtt/kitchen", b"").is_none());
     }
 }

@@ -70,7 +70,9 @@ R1 — явно ограниченный релиз для проверенно�
   реальные ответы; cache не выдаётся за ответ. Для не-native ключей исполняется
   upstream `convertGet` (Boa + read recording), его reads отправляются через
   `request_zcl`. Reporting read/configure реализованы через ZCL 0x08/0x09 и
-  0x06/0x07. Broker E2E, timers/полный host API и HIL отсутствуют.
+  0x06/0x07, успешные configs сохраняются в `configuredReportings`. Broker-free
+  тесты покрывают MQTT-команду, target mapping и read/parse/merge через fake
+  read; реальный broker/reply, timers и HIL отсутствуют.
 - **CV-08 частично**: async `convertGet` исполняется с Boa job queue и возвращает
   запрошенные чтения; stub поддерживает только `read`, endpoint всегда 1,
   timers/другие host methods не реализованы.

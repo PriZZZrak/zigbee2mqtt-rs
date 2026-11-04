@@ -583,6 +583,64 @@ impl PersistentDatabase {
         assigned
     }
 
+    /// Insert or replace a configured-reporting record on a device endpoint.
+    ///
+    /// Mirrors the herdsman endpoint record fields (`cluster`, `attrId`,
+    /// `minRepIntval`, `maxRepIntval`, `repChange`) so a later rewrite of
+    /// `database.db` preserves the configuration. Returns true when the device
+    /// and endpoint record were found.
+    pub fn set_configured_reporting(
+        &mut self,
+        ieee_addr: &str,
+        endpoint: u8,
+        reporting: serde_json::Value,
+    ) -> bool {
+        let Some(cluster) = reporting.get("cluster").and_then(|value| value.as_u64()) else {
+            return false;
+        };
+        let Some(attribute) = reporting.get("attrId").and_then(|value| value.as_u64()) else {
+            return false;
+        };
+        for entry in self.entries.values_mut() {
+            let matches_ieee = entry
+                .get("ieeeAddr")
+                .and_then(|value| value.as_str())
+                .is_some_and(|value| value.eq_ignore_ascii_case(ieee_addr));
+            if !matches_ieee {
+                continue;
+            }
+            let Some(endpoints) = entry
+                .get_mut("endpoints")
+                .and_then(|value| value.as_object_mut())
+            else {
+                return false;
+            };
+            let Some(ep) = endpoints.get_mut(&endpoint.to_string()) else {
+                return false;
+            };
+            let Some(object) = ep.as_object_mut() else {
+                return false;
+            };
+            let list = object
+                .entry("configuredReportings")
+                .or_insert_with(|| serde_json::json!([]));
+            let Some(list) = list.as_array_mut() else {
+                object.insert("configuredReportings".into(), serde_json::json!([]));
+                return self.set_configured_reporting(ieee_addr, endpoint, reporting);
+            };
+            let existing = list.iter().position(|entry| {
+                entry.get("cluster").and_then(|value| value.as_u64()) == Some(cluster)
+                    && entry.get("attrId").and_then(|value| value.as_u64()) == Some(attribute)
+            });
+            match existing {
+                Some(index) => list[index] = reporting,
+                None => list.push(reporting),
+            }
+            return true;
+        }
+        false
+    }
+
     pub fn sync_groups(&mut self, groups: &[Group]) {
         // Capture group identities before removing the records. The previous
         // implementation retained only non-group entries and then searched for
@@ -1039,6 +1097,35 @@ mod tests {
             reopened.entries.get(&assigned[0].1).unwrap()["ieeeAddr"],
             "0xec1bbdfffeaa66db"
         );
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn configured_reporting_is_inserted_and_replaced() {
+        let path = temp_db(
+            "reporting",
+            r#"{"id":2,"type":"Router","ieeeAddr":"0xec1bbdfffeaa66db","endpoints":{"1":{"profId":260,"epId":1,"devId":0,"inClusterList":[1026],"outClusterList":[],"clusters":{},"binds":[],"configuredReportings":[],"meta":{}}},"meta":{}}"#,
+        );
+        let mut db = PersistentDatabase::open(&path);
+        let reporting = serde_json::json!({
+            "cluster": 1026, "attrId": 0, "minRepIntval": 10, "maxRepIntval": 300, "repChange": 50
+        });
+        assert!(db.set_configured_reporting("0xec1bbdfffeaa66db", 1, reporting));
+        let updated = serde_json::json!({
+            "cluster": 1026, "attrId": 0, "minRepIntval": 5, "maxRepIntval": 600, "repChange": 100
+        });
+        assert!(db.set_configured_reporting("0xec1bbdfffeaa66db", 1, updated));
+        let reports = db.entries[&2]["endpoints"]["1"]["configuredReportings"]
+            .as_array()
+            .unwrap();
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0]["minRepIntval"], 5);
+        assert_eq!(reports[0]["maxRepIntval"], 600);
+        assert!(!db.set_configured_reporting(
+            "0xffffffffffffffff",
+            1,
+            serde_json::json!({"cluster": 1, "attrId": 1})
+        ));
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 }

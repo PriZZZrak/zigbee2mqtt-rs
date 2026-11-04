@@ -37,6 +37,9 @@ attributes present in the published `zcl.json`.
   types (e.g. variable-length strings, semi-float) are rejected rather than
   encoded incorrectly.
 - Both operations return MQTT `error` instead of a fake `ok` on failure.
+- Successful read/configure responses are persisted into the endpoint record as
+  `configuredReportings` (`cluster`, `attrId`, `minRepIntval`, `maxRepIntval`,
+  `repChange`) and the database is written immediately.
 
 ## Tests and evidence
 
@@ -44,6 +47,9 @@ attributes present in the published `zcl.json`.
 - `parses_reporting_configuration_response` (success + unsupported status).
 - `codecs_reportable_change_for_analog_and_discrete_types` (u16/u8, discrete,
   float, unsupported string).
+- `configured_reporting_is_inserted_and_replaced` (database record insert,
+  replace by cluster/attribute, unknown device).
+- `reporting_change_values_decode_integer_and_float`.
 - Full suite: `cargo test --locked` → **313 passed**.
 
 ## Divergences and gaps (not verified)
@@ -55,6 +61,7 @@ attributes present in the published `zcl.json`.
 - Bind is sent but its ZDO response is not awaited; a bind failure may surface
   only later.
 - Manufacturer-specific reporting (`manufacturer_code`) is ignored.
-- `configuredReportings` are not persisted into `database.db`/endpoint records.
+- Persistence is covered at the database layer; no fake-coordinator test drives
+  the bridge handler into it.
 - `options` in the configure payload are ignored.
 - No HIL; WINDFRONT-018/019 stay `IN_PROGRESS`.

@@ -46,13 +46,21 @@ New tests:
 - `bridge::tests`: native key→attribute mapping; combining/deduplicating
   color/color_temp, per-endpoint routing, unknown key handling, and skipping
   clusters the device does not expose.
+- Broker-free get pipeline (`execute_get_reads` with a fake read closure): a
+  synthetic readRsp for temperature is parsed and merged (22.5 °C), the TSN is
+  allocated once; a failed read is counted without producing fake state.
+- MQTT command contract: empty `.../get` payload becomes `GetDevice` with null
+  payload, a JSON key object is preserved, raw `.../set` keeps the `{state:...}`
+  fallback, and unrelated topics produce no command.
 
 Existing transaction tests cover response matching, default response, confirm,
 expiry and the event-pump replay.
 
 ## Divergences and gaps (not verified)
 
-- No broker integration test; MQTT parse → handle_get is not exercised end to end.
+- No broker integration test and no published-reply assertion; the MQTT command
+  parser and the read/parse/merge pipeline are tested separately rather than
+  through a live broker.
 - Upstream `convertGet` (including manufacturer-specific reads) is not executed;
   only native keys are refreshed.
 - Reads are sequential and can block the bridge loop for up to attempts × timeout

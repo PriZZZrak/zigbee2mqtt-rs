@@ -929,8 +929,8 @@ impl Bridge {
                                 }
                                 "device/reporting/read" | "device/reporting/configure" => {
                                     match Self::handle_reporting(
-                                        &devices, &self.external, &coord, &request, &payload,
-                                        &mut trans_id,
+                                        &devices, &self.external, &coord, &self.database,
+                                        &request, &payload, &mut trans_id,
                                     ).await {
                                         Ok(data) => {
                                             let resp = mk_resp("ok", data, None);
@@ -1068,10 +1068,12 @@ impl Bridge {
         let _ = mqtt.publish_bridge_extensions().await;
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn handle_reporting(
         devices: &DeviceRegistry,
         external: &ExternalConverter,
         coord: &CoordinatorHandle,
+        database: &Arc<Mutex<PersistentDatabase>>,
         request: &str,
         payload: &serde_json::Value,
         trans_id: &mut u8,
@@ -1151,6 +1153,27 @@ impl Bridge {
                 ));
             }
             let configs = crate::zigbee::zcl::parse_reporting_config_rsp(&response.data[offset..]);
+            for config in &configs {
+                if config.status != 0 {
+                    continue;
+                }
+                let record = json!({
+                    "cluster": cluster,
+                    "attrId": config.attribute,
+                    "minRepIntval": config.minimum_interval.unwrap_or(0),
+                    "maxRepIntval": config.maximum_interval.unwrap_or(0),
+                    "repChange": reportable_change_value(
+                        config.data_type.unwrap_or(0),
+                        config.reportable_change.as_deref().unwrap_or(&[]),
+                    ),
+                });
+                let mut db = database.lock().await;
+                if !db.set_configured_reporting(&device.ieee_addr.as_hex(), endpoint, record) {
+                    warn!("Reporting read: cannot persist config for {id} endpoint {endpoint}");
+                } else if let Err(error) = db.write() {
+                    warn!("Reporting read: cannot write database: {error}");
+                }
+            }
             let configs: Vec<serde_json::Value> = configs
                 .into_iter()
                 .map(|config| {
@@ -1283,6 +1306,21 @@ impl Bridge {
         if status != 0 {
             return Err(format!("configure reporting status 0x{status:02X}"));
         }
+        {
+            let record = json!({
+                "cluster": cluster,
+                "attrId": attribute,
+                "minRepIntval": minimum,
+                "maxRepIntval": maximum,
+                "repChange": reportable_change.unwrap_or(0.0),
+            });
+            let mut db = database.lock().await;
+            if !db.set_configured_reporting(&device.ieee_addr.as_hex(), endpoint, record) {
+                warn!("Reporting configure: cannot persist config for {id} endpoint {endpoint}");
+            } else if let Err(error) = db.write() {
+                warn!("Reporting configure: cannot write database: {error}");
+            }
+        }
         Ok(json!({
             "id": id,
             "endpoint": endpoint,
@@ -1305,8 +1343,6 @@ impl Bridge {
         name: &str,
         payload: &serde_json::Value,
     ) {
-        const GET_TIMEOUT: Duration = Duration::from_secs(3);
-        const GET_ATTEMPTS: u8 = 2;
         const DEFAULT_KEYS: &[&str] = &[
             "state",
             "brightness",
@@ -1356,50 +1392,32 @@ impl Bridge {
             return;
         }
 
-        let mut merged = serde_json::Map::new();
-        let mut failed = 0;
-        for ((endpoint, cluster_id), attributes) in targets {
-            *trans_id = trans_id.wrapping_add(1);
-            let tsn = *trans_id;
-            let zcl_payload = crate::zigbee::zcl::frame::read_attributes_payload(tsn, &attributes);
-            match coord
-                .request_zcl(
-                    nwk_addr,
-                    endpoint,
-                    cluster_id,
-                    tsn,
-                    zcl_payload,
-                    GET_TIMEOUT,
-                    GET_ATTEMPTS,
-                )
-                .await
-            {
-                Ok(response) => {
-                    match zcl::parse_message(cluster_id, &response.data, zone_type, None) {
-                        Ok(Some(message)) => {
-                            for (key, value) in message.values {
-                                merged.insert(key, value);
-                            }
-                        }
-                        Ok(None) => {
-                            debug!(
-                                "Get for {name}: cluster 0x{cluster_id:04X} response had no mapped values"
-                            );
-                        }
-                        Err(error) => {
-                            failed += 1;
-                            warn!(
-                                "Get for {name}: cannot parse cluster 0x{cluster_id:04X}: {error}"
-                            );
-                        }
-                    }
+        let inner = Arc::clone(&coord.inner);
+        let (mut merged, mut failed) = execute_get_reads(
+            name,
+            &targets,
+            trans_id,
+            zone_type,
+            move |endpoint, cluster_id, tsn, payload| {
+                let inner = Arc::clone(&inner);
+                async move {
+                    inner
+                        .lock()
+                        .await
+                        .request_zcl(
+                            nwk_addr,
+                            endpoint,
+                            cluster_id,
+                            tsn,
+                            payload,
+                            GET_ZCL_TIMEOUT,
+                            GET_ZCL_ATTEMPTS,
+                        )
+                        .await
                 }
-                Err(error) => {
-                    failed += 1;
-                    warn!("Get for {name}: read cluster 0x{cluster_id:04X} failed: {error}");
-                }
-            }
-        }
+            },
+        )
+        .await;
 
         // Fallback for keys the native map does not cover: execute the upstream
         // definition's convertGet and perform the reads it requests.
@@ -1430,8 +1448,8 @@ impl Bridge {
                             read.cluster_id,
                             tsn,
                             request,
-                            GET_TIMEOUT,
-                            GET_ATTEMPTS,
+                            GET_ZCL_TIMEOUT,
+                            GET_ZCL_ATTEMPTS,
                         )
                         .await
                     {
@@ -1974,6 +1992,76 @@ impl Bridge {
 const BASIC_CLUSTER_METADATA_KEYS: [&str; 4] =
     ["manufacturer", "model", "power_source", "sw_build_id"];
 
+const GET_ZCL_TIMEOUT: Duration = Duration::from_secs(3);
+const GET_ZCL_ATTEMPTS: u8 = 2;
+
+/// Execute one read per endpoint/cluster and merge the parsed responses.
+///
+/// The read closure is the seam used by the broker-free test; production passes
+/// the coordinator's ZCL transaction service.
+async fn execute_get_reads<F, Fut>(
+    name: &str,
+    targets: &std::collections::BTreeMap<(u8, u16), Vec<u16>>,
+    trans_id: &mut u8,
+    zone_type: Option<u16>,
+    mut read: F,
+) -> (serde_json::Map<String, serde_json::Value>, usize)
+where
+    F: FnMut(u8, u16, u8, Vec<u8>) -> Fut,
+    Fut: std::future::Future<
+        Output = crate::error::Result<crate::coordinator::znp::transaction::ZclIncoming>,
+    >,
+{
+    let mut merged = serde_json::Map::new();
+    let mut failed = 0;
+    for (&(endpoint, cluster_id), attributes) in targets {
+        *trans_id = trans_id.wrapping_add(1);
+        let tsn = *trans_id;
+        let payload = crate::zigbee::zcl::frame::read_attributes_payload(tsn, attributes);
+        match read(endpoint, cluster_id, tsn, payload).await {
+            Ok(response) => {
+                match zcl::parse_message(cluster_id, &response.data, zone_type, None) {
+                    Ok(Some(message)) => {
+                        for (key, value) in message.values {
+                            merged.insert(key, value);
+                        }
+                    }
+                    Ok(None) => {
+                        debug!("Get for {name}: cluster 0x{cluster_id:04X} response had no mapped values");
+                    }
+                    Err(error) => {
+                        failed += 1;
+                        warn!("Get for {name}: cannot parse cluster 0x{cluster_id:04X}: {error}");
+                    }
+                }
+            }
+            Err(error) => {
+                failed += 1;
+                warn!("Get for {name}: read cluster 0x{cluster_id:04X} failed: {error}");
+            }
+        }
+    }
+    (merged, failed)
+}
+
+fn reportable_change_value(data_type: u8, bytes: &[u8]) -> serde_json::Value {
+    match data_type {
+        0x39 if bytes.len() >= 4 => {
+            json!(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as f64)
+        }
+        0x3A if bytes.len() >= 8 => json!(f64::from_le_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]
+        ])),
+        _ => {
+            let mut raw = [0u8; 8];
+            for (index, byte) in bytes.iter().take(8).enumerate() {
+                raw[index] = *byte;
+            }
+            json!(u64::from_le_bytes(raw))
+        }
+    }
+}
+
 fn find_device_for_id(devices: &DeviceRegistry, id: &str) -> Option<Device> {
     devices.find_by_name(id).or_else(|| {
         IeeeAddr::from_hex(id)
@@ -2353,5 +2441,75 @@ mod tests {
             Some(1.5f32.to_le_bytes().to_vec())
         );
         assert_eq!(encode_reportable_change(0x42, Some(1.0)), None);
+    }
+
+    #[tokio::test]
+    async fn get_pipeline_reads_parses_and_merges_device_response() {
+        let endpoints = vec![EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0402],
+            output_clusters: vec![],
+        }];
+        let targets = build_get_targets(&endpoints, &["temperature"]);
+        let mut trans_id = 0;
+        let (merged, failed) = execute_get_reads(
+            "sensor",
+            &targets,
+            &mut trans_id,
+            None,
+            |_endpoint, _cluster, tsn, _payload| async move {
+                Ok(crate::coordinator::znp::transaction::ZclIncoming {
+                    nwk_addr: 0x1234,
+                    endpoint: 1,
+                    cluster_id: 0x0402,
+                    trans_seq: tsn,
+                    frame_type: 0x00,
+                    direction: 1,
+                    command: 0x01,
+                    // readRsp: attr 0x0000, status 0, int16 2250 = 22.50 C
+                    data: vec![0x18, tsn, 0x01, 0x00, 0x00, 0x00, 0x29, 0xCA, 0x08],
+                })
+            },
+        )
+        .await;
+        assert_eq!(failed, 0);
+        assert_eq!(trans_id, 1);
+        assert_eq!(merged.get("temperature"), Some(&json!(22.5)));
+    }
+
+    #[tokio::test]
+    async fn get_pipeline_counts_failed_reads_without_fake_state() {
+        let endpoints = vec![EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0402],
+            output_clusters: vec![],
+        }];
+        let targets = build_get_targets(&endpoints, &["temperature"]);
+        let mut trans_id = 0;
+        let (merged, failed) = execute_get_reads(
+            "sensor",
+            &targets,
+            &mut trans_id,
+            None,
+            |_endpoint, _cluster, _tsn, _payload| async { Err(crate::error::Error::Timeout) },
+        )
+        .await;
+        assert_eq!(failed, 1);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn reporting_change_values_decode_integer_and_float() {
+        assert_eq!(reportable_change_value(0x21, &[0x64, 0x00]), json!(100));
+        assert_eq!(reportable_change_value(0x20, &[0x01]), json!(1));
+        assert_eq!(
+            reportable_change_value(0x39, &1.5f32.to_le_bytes()),
+            json!(1.5)
+        );
+        assert_eq!(reportable_change_value(0x42, &[]), json!(0));
     }
 }
