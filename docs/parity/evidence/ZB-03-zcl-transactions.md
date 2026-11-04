@@ -58,8 +58,8 @@ Transaction tests (10):
 
 ## Divergences and gaps (not verified)
 
-- No hardware/ZNP stream; the `request_zcl` send/retry path is not tested against
-  a fake transport (the registry and event pump are replayed).
+- No hardware/ZNP stream; `request_zcl`'s flow is tested with a fake sender
+  (`request_flow_tests`), not against real serial I/O or timing.
 - `AF_DATA_CONFIRM` carries no destination address, so confirmation correlates by
   TSN only; a late confirm from a previous retry can affect a new attempt with the
   same TSN. Upstream has the same wire limitation and uses queue/recovery logic.
@@ -69,6 +69,6 @@ Transaction tests (10):
   (upstream returns the payload; app-level quirks decide).
 - Frame-type matching from DRIFT-001 is not yet applied; matching uses the
   direction/command/default-rsp fields available in the pinned baseline.
-- Bridge/converters still call fire-and-forget `send_zcl`; `request_zcl` is not
-  yet used by `convertGet`, reporting or configure paths.
+- MQTT `get` now uses `request_zcl` for native reads; set/configure/reporting and
+  upstream `convertGet` still use fire-and-forget or remain unimplemented.
 - No HIL evidence; ADAPTER-005 stays `IN_PROGRESS`.

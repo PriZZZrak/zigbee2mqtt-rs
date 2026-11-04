@@ -29,6 +29,8 @@ pub enum MqttCommand {
     },
     GetDevice {
         friendly_name: String,
+        /// Requested keys (JSON object) or null/empty for all readable keys.
+        payload: serde_json::Value,
     },
     BridgeRequest {
         request: String,
@@ -299,14 +301,17 @@ async fn run_event_loop(
                     let suffix = if is_set { "/set" } else { "/get" };
                     let name = friendly_name_from_topic(topic, base_topic, suffix);
 
-                    let json_value = serde_json::from_slice::<serde_json::Value>(payload)
-                        .unwrap_or_else(|_| {
+                    let json_value = if !is_set && payload.is_empty() {
+                        serde_json::Value::Null
+                    } else {
+                        serde_json::from_slice::<serde_json::Value>(payload).unwrap_or_else(|_| {
                             if let Ok(s) = std::str::from_utf8(payload) {
                                 json!({ "state": s.trim() })
                             } else {
                                 serde_json::Value::Null
                             }
-                        });
+                        })
+                    };
 
                     let cmd = if is_set {
                         MqttCommand::SetDevice {
@@ -316,6 +321,7 @@ async fn run_event_loop(
                     } else {
                         MqttCommand::GetDevice {
                             friendly_name: name,
+                            payload: json_value,
                         }
                     };
                     let _ = cmd_tx.send(cmd).await;

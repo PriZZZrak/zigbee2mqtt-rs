@@ -733,15 +733,12 @@ impl Bridge {
                                 &friendly_name, &payload,
                             ).await;
                         }
-                        Some(MqttCommand::GetDevice { friendly_name, .. }) => {
+                        Some(MqttCommand::GetDevice { friendly_name, payload }) => {
                             debug!("MQTT get: {friendly_name}");
-                            if let Some(dev) = devices.find_by_name(&friendly_name) {
-                                let state = serde_json::Value::Object(dev.state);
-                                Self::publish_state(&mqtt, self.cfg.advanced.output, &friendly_name, &state).await;
-                                let _ = mqtt.publish_availability(&friendly_name, true).await;
-                            } else {
-                                warn!("Get command for unknown device: {friendly_name}");
-                            }
+                            Self::handle_get(
+                                &devices, &coord, &mqtt, self.cfg.advanced.output, &mut trans_id,
+                                &friendly_name, &payload,
+                            ).await;
                         }
                         Some(MqttCommand::BridgeRequest { request, payload }) => {
                             let transaction = payload.get("transaction").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -1057,6 +1054,126 @@ impl Bridge {
         self.publish_device_list(mqtt).await;
         let _ = mqtt.publish_bridge_groups(&self.groups).await;
         let _ = mqtt.publish_bridge_extensions().await;
+    }
+
+    async fn handle_get(
+        devices: &DeviceRegistry,
+        coord: &CoordinatorHandle,
+        mqtt: &MqttBridge,
+        output: OutputMode,
+        trans_id: &mut u8,
+        name: &str,
+        payload: &serde_json::Value,
+    ) {
+        const GET_TIMEOUT: Duration = Duration::from_secs(3);
+        const GET_ATTEMPTS: u8 = 2;
+        const DEFAULT_KEYS: &[&str] = &[
+            "state",
+            "brightness",
+            "color_temp",
+            "color",
+            "temperature",
+            "humidity",
+            "illuminance",
+            "battery",
+            "battery_voltage",
+            "occupancy",
+            "contact",
+        ];
+
+        let Some(dev) = devices.find_by_name(name) else {
+            warn!("Get command for unknown device: {name}");
+            return;
+        };
+        if dev.nwk_addr == 0 || !dev.interview_complete {
+            warn!(
+                "Get for {name} skipped: device not available (nwk=0x{:04X}, interviewed={})",
+                dev.nwk_addr, dev.interview_complete
+            );
+            return;
+        }
+        let nwk_addr = dev.nwk_addr;
+        let endpoints = dev.endpoints.clone();
+        let zone_type = dev.zone_type;
+        drop(dev);
+
+        let requested: Vec<String> = payload
+            .as_object()
+            .map(|object| object.keys().cloned().collect())
+            .unwrap_or_default();
+        let wanted: Vec<&str> = if requested.is_empty() {
+            DEFAULT_KEYS.to_vec()
+        } else {
+            requested.iter().map(String::as_str).collect()
+        };
+
+        let targets = build_get_targets(&endpoints, &wanted);
+        if targets.is_empty() {
+            debug!("Get for {name}: no readable attributes for the requested keys");
+            return;
+        }
+
+        let mut merged = serde_json::Map::new();
+        let mut failed = 0;
+        for ((endpoint, cluster_id), attributes) in targets {
+            *trans_id = trans_id.wrapping_add(1);
+            let tsn = *trans_id;
+            let zcl_payload = crate::zigbee::zcl::frame::read_attributes_payload(tsn, &attributes);
+            match coord
+                .request_zcl(
+                    nwk_addr,
+                    endpoint,
+                    cluster_id,
+                    tsn,
+                    zcl_payload,
+                    GET_TIMEOUT,
+                    GET_ATTEMPTS,
+                )
+                .await
+            {
+                Ok(response) => {
+                    match zcl::parse_message(cluster_id, &response.data, zone_type, None) {
+                        Ok(Some(message)) => {
+                            for (key, value) in message.values {
+                                merged.insert(key, value);
+                            }
+                        }
+                        Ok(None) => {
+                            debug!(
+                                "Get for {name}: cluster 0x{cluster_id:04X} response had no mapped values"
+                            );
+                        }
+                        Err(error) => {
+                            failed += 1;
+                            warn!(
+                                "Get for {name}: cannot parse cluster 0x{cluster_id:04X}: {error}"
+                            );
+                        }
+                    }
+                }
+                Err(error) => {
+                    failed += 1;
+                    warn!("Get for {name}: read cluster 0x{cluster_id:04X} failed: {error}");
+                }
+            }
+        }
+
+        if merged.is_empty() {
+            // Do not republish cached state as if the device had answered.
+            warn!("Get for {name}: no device response (failed reads: {failed})");
+            return;
+        }
+        if let Some(mut dev) = devices.get_mut_by_nwk(nwk_addr) {
+            for (key, value) in merged {
+                dev.state.insert(key, value);
+            }
+            dev.state.insert("last_seen".into(), json!(now_iso8601()));
+            let state = serde_json::Value::Object(dev.state.clone());
+            let friendly_name = dev.friendly_name.clone();
+            drop(dev);
+            Self::publish_state(mqtt, output, &friendly_name, &state).await;
+            let _ = mqtt.publish_availability(&friendly_name, true).await;
+        }
     }
 
     async fn handle_set(
@@ -1536,6 +1653,48 @@ impl Bridge {
 const BASIC_CLUSTER_METADATA_KEYS: [&str; 4] =
     ["manufacturer", "model", "power_source", "sw_build_id"];
 
+/// Combine requested keys into one attribute read per endpoint/cluster.
+fn build_get_targets(
+    endpoints: &[EndpointDesc],
+    wanted: &[&str],
+) -> std::collections::BTreeMap<(u8, u16), Vec<u16>> {
+    let mut targets: std::collections::BTreeMap<(u8, u16), Vec<u16>> =
+        std::collections::BTreeMap::new();
+    for key in wanted {
+        let Some((cluster_id, attributes)) = read_target(key) else {
+            continue;
+        };
+        let Some(endpoint) = find_ep_with_cluster(endpoints, cluster_id) else {
+            continue;
+        };
+        let entry = targets.entry((endpoint, cluster_id)).or_default();
+        for attribute in attributes {
+            if !entry.contains(attribute) {
+                entry.push(*attribute);
+            }
+        }
+    }
+    targets
+}
+
+/// Attributes to read for a native state key.
+fn read_target(key: &str) -> Option<(u16, &'static [u16])> {
+    Some(match key {
+        "state" => (0x0006, &[0x0000][..]),
+        "brightness" => (0x0008, &[0x0000][..]),
+        "color" => (0x0300, &[0x0003, 0x0004, 0x0007, 0x0008][..]),
+        "color_temp" => (0x0300, &[0x0007][..]),
+        "temperature" => (0x0402, &[0x0000][..]),
+        "humidity" => (0x0405, &[0x0000][..]),
+        "illuminance" => (0x0400, &[0x0000][..]),
+        "battery" => (0x0001, &[0x0020][..]),
+        "battery_voltage" => (0x0001, &[0x0021][..]),
+        "occupancy" => (0x0406, &[0x0000][..]),
+        "contact" | "tamper" => (0x0500, &[0x0002][..]),
+        _ => return None,
+    })
+}
+
 fn find_ep_with_cluster(endpoints: &[EndpointDesc], cluster_id: u16) -> Option<u8> {
     endpoints
         .iter()
@@ -1772,5 +1931,58 @@ mod tests {
         // later re-identification (for example after another NWK change).
         tracker.identified(0x1234);
         assert!(tracker.should_identify(0x1234));
+    }
+
+    #[test]
+    fn read_targets_cover_native_keys() {
+        assert_eq!(read_target("state"), Some((0x0006, &[0x0000][..])));
+        assert_eq!(read_target("temperature"), Some((0x0402, &[0x0000][..])));
+        assert_eq!(read_target("contact"), Some((0x0500, &[0x0002][..])));
+        assert_eq!(read_target("unknown_key"), None);
+    }
+
+    #[test]
+    fn build_get_targets_combines_and_deduplicates() {
+        let endpoints = vec![
+            EndpointDesc {
+                endpoint: 1,
+                profile_id: 0x0104,
+                device_id: 0,
+                input_clusters: vec![0x0006, 0x0300],
+                output_clusters: vec![],
+            },
+            EndpointDesc {
+                endpoint: 2,
+                profile_id: 0x0104,
+                device_id: 0,
+                input_clusters: vec![0x0402],
+                output_clusters: vec![],
+            },
+        ];
+        let targets = build_get_targets(
+            &endpoints,
+            &["state", "color", "color_temp", "temperature", "bogus"],
+        );
+        assert_eq!(targets.get(&(1, 0x0006)), Some(&vec![0x0000]));
+        assert_eq!(
+            targets.get(&(1, 0x0300)),
+            Some(&vec![0x0003, 0x0004, 0x0007, 0x0008])
+        );
+        assert_eq!(targets.get(&(2, 0x0402)), Some(&vec![0x0000]));
+        assert_eq!(targets.len(), 3);
+    }
+
+    #[test]
+    fn build_get_targets_skips_unavailable_clusters() {
+        let endpoints = vec![EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0006],
+            output_clusters: vec![],
+        }];
+        let targets = build_get_targets(&endpoints, &["temperature", "state"]);
+        assert_eq!(targets.len(), 1);
+        assert!(targets.contains_key(&(1, 0x0006)));
     }
 }

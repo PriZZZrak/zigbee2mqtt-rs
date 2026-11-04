@@ -12,6 +12,7 @@ use tokio::sync::{mpsc, Mutex};
 use tracing::{info, warn};
 
 use commands::*;
+use frame::ZnpFrame;
 use transport::{ZnpEvent, ZnpTransport};
 
 use crate::config::Config;
@@ -560,6 +561,71 @@ async fn event_pump(
 
 // ── ZnpHandle (send-side) ─────────────────────────────────────────────────────
 
+/// Transport-independent part of `request_zcl` (tested with a fake sender).
+async fn request_zcl_flow<F, Fut>(
+    waiters: &Mutex<ZclWaiters>,
+    request: ZclRequest,
+    timeout: Duration,
+    attempts: u8,
+    mut send: F,
+) -> Result<ZclIncoming>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<ZnpFrame>>,
+{
+    let attempts = attempts.max(1);
+    let mut last_error: Option<Error> = None;
+    for attempt in 0..attempts {
+        let (id, mut reply) = {
+            let mut waiters = waiters.lock().await;
+            waiters.register(request.clone(), timeout)
+        };
+        let rsp = match send().await {
+            Ok(rsp) => rsp,
+            Err(error) => {
+                waiters.lock().await.remove(id);
+                return Err(error);
+            }
+        };
+        if rsp.data.first().copied() != Some(0) {
+            waiters.lock().await.remove(id);
+            return Err(Error::Znp(format!(
+                "AF_DATA_REQUEST rejected with status {:?}",
+                rsp.data.first()
+            )));
+        }
+        match tokio::time::timeout(timeout, &mut reply).await {
+            Ok(Ok(Ok(incoming))) => return Ok(incoming),
+            Ok(Ok(Err(error))) => last_error = Some(error),
+            Ok(Err(_)) => last_error = Some(Error::ChannelClosed),
+            Err(_) => {
+                let removed = waiters.lock().await.remove(id);
+                if !removed {
+                    match reply.await {
+                        Ok(Ok(incoming)) => return Ok(incoming),
+                        Ok(Err(error)) => last_error = Some(error),
+                        Err(_) => last_error = Some(Error::ChannelClosed),
+                    }
+                } else {
+                    last_error = Some(Error::Timeout);
+                }
+            }
+        }
+        if attempt + 1 < attempts {
+            warn!(
+                "ZCL request 0x{:04X}:{} cluster 0x{:04X} TSN {} attempt {}/{} failed, retrying",
+                request.nwk_addr,
+                request.endpoint,
+                request.cluster_id,
+                request.trans_seq,
+                attempt + 1,
+                attempts
+            );
+        }
+    }
+    Err(last_error.unwrap_or(Error::Timeout))
+}
+
 pub struct ZnpHandle {
     transport: ZnpTransport,
     waiters: Arc<Mutex<ZclWaiters>>,
@@ -666,70 +732,17 @@ impl ZnpHandle {
                 "ZCL command does not expect a response; use send_zcl".into(),
             ));
         }
-        let attempts = attempts.max(1);
-        let mut last_error: Option<Error> = None;
-        for attempt in 0..attempts {
-            let (id, mut reply) = {
-                let mut waiters = self.waiters.lock().await;
-                waiters.register(request.clone(), timeout)
-            };
-            let rsp = self
-                .transport
-                .request(af_data_request(
-                    dst_addr,
-                    dst_ep,
-                    1,
-                    cluster_id,
-                    trans_id,
-                    payload.clone(),
-                ))
-                .await;
-            let rsp = match rsp {
-                Ok(rsp) => rsp,
-                Err(error) => {
-                    self.waiters.lock().await.remove(id);
-                    return Err(error);
-                }
-            };
-            if rsp.data.first().copied() != Some(0) {
-                self.waiters.lock().await.remove(id);
-                return Err(Error::Znp(format!(
-                    "AF_DATA_REQUEST rejected with status {:?}",
-                    rsp.data.first()
-                )));
-            }
-
-            match tokio::time::timeout(timeout, &mut reply).await {
-                Ok(Ok(Ok(incoming))) => return Ok(incoming),
-                Ok(Ok(Err(error))) => last_error = Some(error),
-                Ok(Err(_)) => last_error = Some(Error::ChannelClosed),
-                Err(_) => {
-                    let removed = self.waiters.lock().await.remove(id);
-                    if !removed {
-                        // The response won the race with the timeout.
-                        match reply.await {
-                            Ok(Ok(incoming)) => return Ok(incoming),
-                            Ok(Err(error)) => last_error = Some(error),
-                            Err(_) => last_error = Some(Error::ChannelClosed),
-                        }
-                    } else {
-                        last_error = Some(Error::Timeout);
-                    }
-                }
-            }
-            if attempt + 1 < attempts {
-                warn!(
-                    "ZCL request {}:{} cluster 0x{:04X} TSN {} attempt {}/{} failed, retrying",
-                    dst_addr,
-                    dst_ep,
-                    cluster_id,
-                    trans_id,
-                    attempt + 1,
-                    attempts
-                );
-            }
-        }
-        Err(last_error.unwrap_or(Error::Timeout))
+        request_zcl_flow(&self.waiters, request, timeout, attempts, || {
+            self.transport.request(af_data_request(
+                dst_addr,
+                dst_ep,
+                1,
+                cluster_id,
+                trans_id,
+                payload.clone(),
+            ))
+        })
+        .await
     }
 }
 
@@ -822,5 +835,116 @@ mod transaction_integration_tests {
             "success confirm must not resolve"
         );
         assert_eq!(waiters.lock().await.pending(), 1);
+    }
+}
+
+#[cfg(test)]
+mod request_flow_tests {
+    use super::*;
+
+    fn read_request() -> ZclRequest {
+        ZclRequest::from_payload(0x1234, 1, 0x0402, &[0x00, 7, 0x00, 0x00, 0x00]).unwrap()
+    }
+
+    fn success_frame() -> ZnpFrame {
+        ZnpFrame::new(
+            frame::FrameType::SRsp,
+            frame::Subsystem::Af,
+            0x00,
+            vec![0x00],
+        )
+    }
+
+    fn response() -> ZclIncoming {
+        ZclIncoming {
+            nwk_addr: 0x1234,
+            endpoint: 1,
+            cluster_id: 0x0402,
+            trans_seq: 7,
+            frame_type: 0x00,
+            direction: 1,
+            command: 0x01,
+            data: vec![0x18, 7, 0x01, 0x00, 0x00, 0x00, 0x20, 0x01],
+        }
+    }
+
+    #[tokio::test]
+    async fn fake_transport_delivers_response_on_first_attempt() {
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let mut calls = 0;
+        let result = request_zcl_flow(&waiters, read_request(), Duration::from_secs(1), 3, || {
+            calls += 1;
+            let waiters = Arc::clone(&waiters);
+            let response = response();
+            async move {
+                waiters.lock().await.deliver(&response);
+                Ok(success_frame())
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(result.command, 0x01);
+        assert_eq!(calls, 1);
+        assert_eq!(waiters.lock().await.pending(), 0);
+    }
+
+    #[tokio::test]
+    async fn fake_transport_times_out_and_retries_then_errors() {
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let mut calls = 0;
+        let result = request_zcl_flow(
+            &waiters,
+            read_request(),
+            Duration::from_millis(1),
+            2,
+            || {
+                calls += 1;
+                async { Ok(success_frame()) }
+            },
+        )
+        .await;
+        assert!(matches!(result, Err(Error::Timeout)));
+        assert_eq!(calls, 2);
+        assert_eq!(waiters.lock().await.pending(), 0);
+    }
+
+    #[tokio::test]
+    async fn fake_transport_propagates_af_request_rejection() {
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let mut calls = 0;
+        let result = request_zcl_flow(&waiters, read_request(), Duration::from_secs(1), 3, || {
+            calls += 1;
+            async {
+                Ok(ZnpFrame::new(
+                    frame::FrameType::SRsp,
+                    frame::Subsystem::Af,
+                    0x00,
+                    vec![0x01],
+                ))
+            }
+        })
+        .await;
+        assert!(result.unwrap_err().to_string().contains("rejected"));
+        assert_eq!(calls, 1);
+        assert_eq!(waiters.lock().await.pending(), 0);
+    }
+
+    #[tokio::test]
+    async fn fake_transport_propagates_af_confirm_failure() {
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let result = request_zcl_flow(&waiters, read_request(), Duration::from_secs(1), 3, || {
+            let waiters = Arc::clone(&waiters);
+            async move {
+                waiters.lock().await.confirm(&AfDataConfirm {
+                    status: 0xE9,
+                    endpoint: 1,
+                    trans_seq: 7,
+                });
+                Ok(success_frame())
+            }
+        })
+        .await;
+        assert!(result.unwrap_err().to_string().contains("0xE9"));
+        assert_eq!(waiters.lock().await.pending(), 0);
     }
 }

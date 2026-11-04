@@ -64,6 +64,11 @@ R1 — явно ограниченный релиз для проверенно�
 - **RT-03 частично**: `mqtts://` больше не превращается молча в plain TCP —
   конфигурация помечает TLS-требование, connect возвращает явную ошибку; URI
   сохраняется lossless. TLS provider и `mqtt.user` auth не реализованы.
+- **RT-04 частично**: MQTT `get` теперь выполняет native ZCL reads через
+  `request_zcl` (state/brightness/color/temperature/humidity/illuminance/battery/
+  occupancy/contact), объединяет атрибуты по endpoint/cluster и публикует только
+  реальные ответы; cache не выдаётся за ответ. `convertGet`, reporting и broker E2E
+  ещё не подключены.
 
 ## Документы
 
