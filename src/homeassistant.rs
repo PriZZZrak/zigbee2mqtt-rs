@@ -640,6 +640,21 @@ pub async fn cleanup_discovery(mqtt: &MqttBridge, device: &Device, exposes: &[Va
     }
 }
 
+/// Cleanup loop with a pluggable publisher (used by broker-free tests).
+pub(crate) async fn cleanup_with<F, Fut>(device: &Device, exposes: &[Value], mut clear: F)
+where
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<Output = crate::error::Result<()>>,
+{
+    let ieee = device.ieee_addr.as_hex();
+    for (component, object_id) in discovery_topics(device, exposes) {
+        let topic = crate::mqtt::ha_discovery_topic(&component, &ieee, &object_id);
+        if let Err(error) = clear(topic.clone()).await {
+            warn!("HA discovery cleanup error for {topic}: {error}");
+        }
+    }
+}
+
 /// Publish discovery derived from upstream exposes.
 pub async fn publish_exposes_discovery(
     mqtt: &MqttBridge,
@@ -1293,6 +1308,32 @@ mod tests {
         assert_eq!(
             crate::mqtt::ha_discovery_topic("sensor", "0xec1bbdfffeaa66db", "temperature"),
             "homeassistant/sensor/0xec1bbdfffeaa66db/temperature/config"
+        );
+        assert!(crate::mqtt::ha_clear_payload().is_empty());
+    }
+
+    #[tokio::test]
+    async fn cleanup_publishes_empty_retained_configs_to_all_topics() {
+        let dev = make_light();
+        let exposures = Vec::new();
+        let mut cleared = Vec::new();
+        cleanup_with(&dev, &exposures, |topic| {
+            cleared.push(topic);
+            async { Ok(()) }
+        })
+        .await;
+        assert_eq!(
+            cleared,
+            vec![
+                format!(
+                    "homeassistant/light/{}/light/config",
+                    dev.ieee_addr.as_hex()
+                ),
+                format!(
+                    "homeassistant/sensor/{}/linkquality/config",
+                    dev.ieee_addr.as_hex()
+                ),
+            ]
         );
         assert!(crate::mqtt::ha_clear_payload().is_empty());
     }

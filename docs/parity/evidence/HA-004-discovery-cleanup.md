@@ -37,13 +37,15 @@ retained discovery config is deleted by publishing an **empty payload** with
   exact component/object pairs.
 - `discovery_cleanup_topic_and_payload_are_exact`: topic
   `homeassistant/sensor/<ieee>/temperature/config` and empty payload.
-- Full suite: `cargo test --locked` → **346 passed** (314 library, 2 binary,
+- `cleanup_publishes_empty_retained_configs_to_all_topics`: a recording publisher
+  captures every exact cleanup topic and the empty payload contract.
+- Full suite: `cargo test --locked` → **366 passed** (334 library, 2 binary,
   30 compatibility); clippy exit 0 with 5 existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
 
-- No fake/live MQTT test asserts the actual retained flag and empty bytes on the
-  wire; topic/payload formulas are golden-tested only.
+- A recording publisher verifies every topic and the empty payload, but no fake
+  MQTT client/event loop asserts the retained flag/QoS on the wire.
 - The cluster-fallback topic list duplicates publish conditions and can drift;
   it should be generated from one entity list.
 - Rename cleanup/republish is tested only through helpers; bridge E2E and HA

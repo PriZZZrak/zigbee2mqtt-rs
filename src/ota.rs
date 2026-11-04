@@ -1,6 +1,7 @@
 /// OTA orchestration: parse an OTA image file and drive a transfer from ZCL
 /// queries/blocks to the upgrade end.
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -252,6 +253,58 @@ pub struct OtaIndexEntry {
 
 pub fn parse_index(json: &str) -> Result<Vec<OtaIndexEntry>, String> {
     serde_json::from_str(json).map_err(|error| format!("invalid OTA index: {error}"))
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectedImage {
+    pub info: OtaImageInfo,
+    pub url: String,
+    pub resolved_path: PathBuf,
+    pub release_notes: Option<String>,
+    pub file_name: Option<String>,
+}
+
+/// Load a local OTA index JSON file.
+pub fn load_index_file(path: &Path) -> Result<Vec<OtaIndexEntry>, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("cannot read OTA index {}: {error}", path.display()))?;
+    parse_index(&text)
+}
+
+/// Select a matching entry from a local index, resolve its local image path,
+/// verify sha512 when present and return the validated image bytes.
+pub fn select_local_image(
+    index_path: &Path,
+    base_dir: &Path,
+    identity: &OtaQueryIdentity<'_>,
+) -> Result<(SelectedImage, Vec<u8>), String> {
+    let entries = load_index_file(index_path)?;
+    let entry = select_image(&entries, identity)
+        .ok_or_else(|| "no matching OTA image in index".to_string())?;
+    let resolved_path = if Path::new(&entry.url).is_absolute() {
+        PathBuf::from(&entry.url)
+    } else {
+        base_dir.join(&entry.url)
+    };
+    let raw = std::fs::read(&resolved_path)
+        .map_err(|error| format!("cannot read OTA image {}: {error}", resolved_path.display()))?;
+    let stripped = validate_firmware(&raw, entry.sha512.as_deref())?;
+    let image = parse_image(&stripped).ok_or_else(|| "invalid OTA image header".to_string())?;
+    Ok((
+        SelectedImage {
+            info: OtaImageInfo {
+                manufacturer_code: image.manufacturer_code,
+                image_type: image.image_type,
+                file_version: image.file_version,
+                size: image.bytes.len() as u32,
+            },
+            url: entry.url.clone(),
+            resolved_path,
+            release_notes: entry.release_notes.clone(),
+            file_name: entry.file_name.clone(),
+        },
+        stripped,
+    ))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -650,5 +703,59 @@ mod tests {
         assert_eq!(retry.attempts(), 2);
         retry.reset();
         assert!(retry.can_attempt(now));
+    }
+
+    #[test]
+    fn local_index_selects_image_and_verifies_sha512() {
+        let dir = std::env::temp_dir().join(format!(
+            "z2m_ota_index_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let image = image_bytes();
+        std::fs::write(dir.join("fixture.ota"), &image).unwrap();
+        let index = serde_json::json!([{
+            "fileName": "fixture.ota",
+            "fileVersion": 0x01020304u32,
+            "url": "fixture.ota",
+            "sha512": sha512_hex(&image),
+            "manufacturerCode": 0x1037,
+            "imageType": 1,
+            "releaseNotes": "test release",
+        }]);
+        let index_path = dir.join("index.json");
+        std::fs::write(&index_path, serde_json::to_vec(&index).unwrap()).unwrap();
+        let identity = OtaQueryIdentity {
+            manufacturer_code: 0x1037,
+            image_type: 1,
+            file_version: 0x01020303,
+            hardware_version: None,
+            model_id: None,
+            manufacturer_name: None,
+        };
+        let (selected, bytes) = select_local_image(&index_path, &dir, &identity).unwrap();
+        assert_eq!(selected.info.file_version, 0x01020304);
+        assert_eq!(selected.release_notes.as_deref(), Some("test release"));
+        assert_eq!(bytes, image);
+
+        let mut broken = index.clone();
+        broken[0]["sha512"] = serde_json::json!("00");
+        std::fs::write(&index_path, serde_json::to_vec(&broken).unwrap()).unwrap();
+        assert!(select_local_image(&index_path, &dir, &identity)
+            .unwrap_err()
+            .contains("checksum"));
+
+        let wrong = OtaQueryIdentity {
+            manufacturer_code: 0xFFFF,
+            ..identity
+        };
+        assert!(select_local_image(&index_path, &dir, &wrong)
+            .unwrap_err()
+            .contains("no matching"));
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

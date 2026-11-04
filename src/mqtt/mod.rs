@@ -316,8 +316,13 @@ impl MqttBridge {
         object_id: &str,
     ) -> Result<()> {
         let topic = ha_discovery_topic(component, node_id, object_id);
+        self.clear_ha_topic(&topic).await
+    }
+
+    /// Clear one retained discovery topic by exact topic name.
+    pub async fn clear_ha_topic(&self, topic: &str) -> Result<()> {
         self.client
-            .publish(&topic, QoS::AtLeastOnce, true, ha_clear_payload())
+            .publish(topic, QoS::AtLeastOnce, true, ha_clear_payload())
             .await
             .map_err(Error::Mqtt)
     }

@@ -1219,8 +1219,12 @@ impl Bridge {
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 _ if request.starts_with("device/ota_update/") => {
+                                    let base_dir = self
+                                        .config_path
+                                        .parent()
+                                        .unwrap_or_else(|| std::path::Path::new("."));
                                     match handle_ota_request(
-                                        &self.ota, &devices, &request, &payload,
+                                        &self.ota, base_dir, &devices, &request, &payload,
                                     ).await {
                                         Ok(outcome) => {
                                             if let Some((ieee, update)) = outcome.state_update {
@@ -2339,8 +2343,53 @@ fn ota_update_state(progress: f64, completed: bool) -> serde_json::Value {
     })
 }
 
+fn select_index_from_payload(
+    base_dir: &std::path::Path,
+    device: &Device,
+    payload: &serde_json::Value,
+) -> std::result::Result<Option<(crate::ota::SelectedImage, Vec<u8>)>, String> {
+    let Some(index) = payload.get("index").and_then(|value| value.as_str()) else {
+        return Ok(None);
+    };
+    let index_path = if std::path::Path::new(index).is_absolute() {
+        std::path::PathBuf::from(index)
+    } else {
+        base_dir.join(index)
+    };
+    let manufacturer_code = payload
+        .get("manufacturer_code")
+        .and_then(|value| value.as_u64())
+        .map(|value| value as u16)
+        .or(device.manufacturer_id)
+        .ok_or_else(|| "index selection requires a manufacturer code".to_string())?;
+    let image_type = payload
+        .get("image_type")
+        .and_then(|value| value.as_u64())
+        .map(|value| value as u16)
+        .ok_or_else(|| "index selection requires image_type".to_string())?;
+    let file_version = payload
+        .get("file_version")
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0) as u32;
+    let hardware_version = payload
+        .get("hardware_version")
+        .and_then(|value| value.as_u64())
+        .map(|value| value as u16);
+    let identity = crate::ota::OtaQueryIdentity {
+        manufacturer_code,
+        image_type,
+        file_version,
+        hardware_version,
+        model_id: device.model.as_deref(),
+        manufacturer_name: device.manufacturer.as_deref(),
+    };
+    let (selected, bytes) = crate::ota::select_local_image(&index_path, base_dir, &identity)?;
+    Ok(Some((selected, bytes)))
+}
+
 async fn handle_ota_request(
     ota: &Mutex<crate::ota::OtaManager>,
+    base_dir: &std::path::Path,
     devices: &DeviceRegistry,
     request: &str,
     payload: &serde_json::Value,
@@ -2363,15 +2412,25 @@ async fn handle_ota_request(
         .and_then(|data| hex::decode(data).ok());
     match suffix {
         "check" | "check/downgrade" => {
-            let bytes = image_bytes.ok_or_else(|| "missing or invalid hex image".to_string())?;
-            let info = ota.lock().await.check_checked(&bytes, expected_sha512)?;
+            let (info, source, release_notes) =
+                match select_index_from_payload(base_dir, &device, payload)? {
+                    Some((selected, _bytes)) => {
+                        (selected.info, Some(selected.url), selected.release_notes)
+                    }
+                    None => {
+                        let bytes = image_bytes
+                            .ok_or_else(|| "missing or invalid hex image".to_string())?;
+                        let info = ota.lock().await.check_checked(&bytes, expected_sha512)?;
+                        (info, None, None)
+                    }
+                };
             Ok(OtaRequestOutcome {
                 data: json!({
                     "id": id,
                     "update_available": true,
                     "downgrade": suffix.ends_with("downgrade"),
-                    "source": null,
-                    "release_notes": null,
+                    "source": source,
+                    "release_notes": release_notes,
                     "manufacturer_code": info.manufacturer_code,
                     "image_type": info.image_type,
                     "file_version": info.file_version,
@@ -2381,8 +2440,23 @@ async fn handle_ota_request(
             })
         }
         "update" | "update/downgrade" => {
-            let bytes = image_bytes.ok_or_else(|| "missing or invalid hex image".to_string())?;
-            let info = ota.lock().await.start(&device.ieee_addr.as_hex(), &bytes)?;
+            let (info, source, release_notes) =
+                match select_index_from_payload(base_dir, &device, payload)? {
+                    Some((selected, bytes)) => {
+                        let info = ota.lock().await.start(&device.ieee_addr.as_hex(), &bytes)?;
+                        (info, Some(selected.url), selected.release_notes)
+                    }
+                    None => {
+                        let bytes = image_bytes
+                            .ok_or_else(|| "missing or invalid hex image".to_string())?;
+                        let info = ota.lock().await.start_checked(
+                            &device.ieee_addr.as_hex(),
+                            &bytes,
+                            expected_sha512,
+                        )?;
+                        (info, None, None)
+                    }
+                };
             Ok(OtaRequestOutcome {
                 data: json!({
                     "id": id,
@@ -2390,6 +2464,8 @@ async fn handle_ota_request(
                     "image_type": info.image_type,
                     "file_version": info.file_version,
                     "image_size": info.size,
+                    "source": source,
+                    "release_notes": release_notes,
                 }),
                 state_update: Some((device.ieee_addr.as_hex(), ota_update_state(0.0, false))),
             })
@@ -3250,26 +3326,44 @@ mod tests {
             "sha512": crate::ota::sha512_hex(&fixture),
         });
 
-        let check = handle_ota_request(&ota, &devices, "device/ota_update/check", &payload)
-            .await
-            .expect("check");
+        let check = handle_ota_request(
+            &ota,
+            std::path::Path::new("."),
+            &devices,
+            "device/ota_update/check",
+            &payload,
+        )
+        .await
+        .expect("check");
         assert_eq!(check.data["update_available"], true);
         assert_eq!(check.data["manufacturer_code"], 0x1037);
         assert_eq!(check.data["image_size"], 64);
         assert!(check.state_update.is_none());
 
-        let update = handle_ota_request(&ota, &devices, "device/ota_update/update", &payload)
-            .await
-            .expect("update");
+        let update = handle_ota_request(
+            &ota,
+            std::path::Path::new("."),
+            &devices,
+            "device/ota_update/update",
+            &payload,
+        )
+        .await
+        .expect("update");
         assert_eq!(update.data["file_version"], 0x01020304);
         let (ieee, state) = update.state_update.expect("update state");
         assert_eq!(ieee, "0xec1bbdfffeaa66db");
         assert_eq!(state["state"], "updating");
         assert_eq!(state["progress"], 0);
 
-        let abort = handle_ota_request(&ota, &devices, "device/ota_update/update/abort", &payload)
-            .await
-            .expect("abort");
+        let abort = handle_ota_request(
+            &ota,
+            std::path::Path::new("."),
+            &devices,
+            "device/ota_update/update/abort",
+            &payload,
+        )
+        .await
+        .expect("abort");
         assert_eq!(abort.data["aborted"], true);
         assert_eq!(abort.state_update.unwrap().1["state"], "idle");
     }
@@ -3280,28 +3374,40 @@ mod tests {
         let ota = Mutex::new(crate::ota::OtaManager::default());
 
         let unknown = json!({"id": "0xffffffffffffffff", "hex": {"data": "00"}});
-        assert!(
-            handle_ota_request(&ota, &devices, "device/ota_update/update", &unknown)
-                .await
-                .unwrap_err()
-                .contains("does not exist")
-        );
+        assert!(handle_ota_request(
+            &ota,
+            std::path::Path::new("."),
+            &devices,
+            "device/ota_update/update",
+            &unknown
+        )
+        .await
+        .unwrap_err()
+        .contains("does not exist"));
 
         let invalid = json!({"id": "0xec1bbdfffeaa66db", "hex": {"data": "zzzz"}});
-        assert!(
-            handle_ota_request(&ota, &devices, "device/ota_update/check", &invalid)
-                .await
-                .unwrap_err()
-                .contains("invalid hex")
-        );
+        assert!(handle_ota_request(
+            &ota,
+            std::path::Path::new("."),
+            &devices,
+            "device/ota_update/check",
+            &invalid
+        )
+        .await
+        .unwrap_err()
+        .contains("invalid hex"));
 
         let unsupported = json!({"id": "0xec1bbdfffeaa66db"});
-        assert!(
-            handle_ota_request(&ota, &devices, "device/ota_update/schedule", &unsupported)
-                .await
-                .unwrap_err()
-                .contains("Unsupported")
-        );
+        assert!(handle_ota_request(
+            &ota,
+            std::path::Path::new("."),
+            &devices,
+            "device/ota_update/schedule",
+            &unsupported
+        )
+        .await
+        .unwrap_err()
+        .contains("Unsupported"));
     }
 
     #[test]
@@ -3314,5 +3420,61 @@ mod tests {
             ota_update_state(1.0, true),
             json!({"state": "idle", "progress": 100})
         );
+    }
+
+    #[tokio::test]
+    async fn ota_bridge_local_index_metadata_and_checksum() {
+        let dir = std::env::temp_dir().join(format!(
+            "z2m_ota_bridge_index_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let image = ota_fixture_image();
+        std::fs::write(dir.join("fixture.ota"), &image).unwrap();
+        let index = json!([{
+            "fileName": "fixture.ota",
+            "fileVersion": 0x01020304u32,
+            "url": "fixture.ota",
+            "sha512": crate::ota::sha512_hex(&image),
+            "manufacturerCode": 0x1037,
+            "imageType": 1,
+            "releaseNotes": "bridge release",
+        }]);
+        std::fs::write(dir.join("index.json"), serde_json::to_vec(&index).unwrap()).unwrap();
+
+        let devices = ota_test_devices();
+        let ota = Mutex::new(crate::ota::OtaManager::default());
+        let payload = json!({
+            "id": "0xec1bbdfffeaa66db",
+            "index": "index.json",
+            "manufacturer_code": 0x1037,
+            "image_type": 1,
+            "file_version": 0x01020303u32,
+        });
+        let check = handle_ota_request(&ota, &dir, &devices, "device/ota_update/check", &payload)
+            .await
+            .expect("index check");
+        assert_eq!(check.data["source"], "fixture.ota");
+        assert_eq!(check.data["release_notes"], "bridge release");
+        assert_eq!(check.data["file_version"], 0x01020304);
+
+        let update = handle_ota_request(&ota, &dir, &devices, "device/ota_update/update", &payload)
+            .await
+            .expect("index update");
+        assert_eq!(update.data["source"], "fixture.ota");
+        assert_eq!(update.state_update.unwrap().1["progress"], 0);
+
+        let mut broken = index.clone();
+        broken[0]["sha512"] = json!("00");
+        std::fs::write(dir.join("index.json"), serde_json::to_vec(&broken).unwrap()).unwrap();
+        let error = handle_ota_request(&ota, &dir, &devices, "device/ota_update/check", &payload)
+            .await
+            .unwrap_err();
+        assert!(error.contains("checksum"));
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

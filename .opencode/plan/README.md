@@ -81,13 +81,14 @@ R1 — явно ограниченный релиз для проверенно�
 - **FEAT-02 OTA частично**: ZCL 0x0019 codecs, `OtaTransfer` и OTA manager
   (hex image header, bridge check/update/abort, incoming query/block/end,
   progress) покрыты fake-coordinator replay. Bridge request E2E для
-  check/update/abort и progress payload добавлен; checksum SHA-512, index
-  selection и schedule/retry policy покрыты unit-тестами, но ещё не подключены к
-  сети/bridge автоматике. URL metadata/cache, broker и HIL отсутствуют.
+  check/update/abort и progress payload добавлен; checksum SHA-512 и локальный
+  index/sha512 подключены к bridge check/update, schedule/retry policy покрыты
+  unit-тестами. HTTP index, автоматическая scheduler-интеграция, broker и HIL
+  отсутствуют.
 - **HA cleanup частично**: retained discovery configs удаляются пустым payload
   (`retain=true`, QoS1) при remove; rename очищает старые configs и публикует
-  новые. Golden-тесты покрывают exact topics/payload; live-broker/HA migration
-  и группа discovery не проверены.
+  новые. Golden-тесты и recording publisher покрывают exact topics/payload;
+  fake MQTT event loop, live broker/HA migration и группа discovery не проверены.
 - **FEAT-01 groups частично**: membership add/remove/remove_all отправляются
   реальными ZCL Groups-командами (0x0004) с ожиданием ответа и обновляют
   локальное состояние только после success; remove_all исправлен на

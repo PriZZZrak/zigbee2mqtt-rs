@@ -30,6 +30,10 @@ Pinned app/herdsman:
   attempts with backoff.
 - Bridge check/update accept an optional `sha512` field and validate it before
   parsing/starting; a wrong checksum returns an `error` response.
+- Local index files are wired into the bridge: `index` + `image_type` (and
+  optional manufacturer/file/hardware fields) select an entry, resolve its local
+  URL relative to the config directory, verify `sha512`, and use the selected
+  image for check/update. Responses include `source` and `release_notes`.
 
 ## Bridge/metadata integration
 
@@ -77,7 +81,7 @@ OTA/manager tests plus three bridge-request tests:
 - `ota_progress_payload_matches_state_contract`: 0.5 → 50 while updating and
   completion → idle/100.
 
-`cargo test --locked` → **363 passed** (331 library, 2 binary, 30 compatibility);
+`cargo test --locked` → **366 passed** (334 library, 2 binary, 30 compatibility);
 clippy exit 0 with five existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
@@ -87,10 +91,11 @@ clippy exit 0 with five existing warnings; release build OK.
   as payload fields, not on the wire.
 - `check` reports any valid image as available; it does not compare device
   identity or query the device first.
-- The index parser/selector and scheduler/retry are unit-tested but not wired to
-  the bridge or network; only hex payloads (optionally with `sha512`) are
-  accepted. URL download, override index, persistence and downgrade selection
-  are missing.
+- Only **local** index/image files are wired; HTTP(S) download, main index URLs,
+  override index precedence, persistence and automatic downgrade selection are
+  missing. The local bridge path requires explicit manufacturer/image metadata
+  until the device query is used for selection.
+- The scheduler/retry policy is unit-tested but not wired to automatic checks.
 - The SHA-512 implementation is new code and needs independent review/fuzzing
   before security-sensitive use.
 - No image file checksum/signature validation, manufacturer/hardware applicability
