@@ -42,9 +42,10 @@ VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/Cargo.toml" | head -n1)"
 [[ -n "$VERSION" ]] || die "cannot read version from Cargo.toml"
 GIT_SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 GIT_DIRTY="false"
-if [[ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null || true)" ]]; then
+if [[ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null || true)" ]]; then
   GIT_DIRTY="true"
 fi
+GIT_UNTRACKED="$(git -C "$ROOT" status --porcelain --untracked-files=normal 2>/dev/null | grep -c '^??' || true)"
 RUSTC_VERSION="$(rustc --version 2>/dev/null || echo unknown)"
 BUILD_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -90,6 +91,7 @@ cat > "$OUTPUT_DIR/${NAME}.manifest.json" <<JSON
   "rustc": "${RUSTC_VERSION}",
   "git_sha": "${GIT_SHA}",
   "git_dirty": ${GIT_DIRTY},
+  "git_untracked_files": ${GIT_UNTRACKED},
   "built_utc": "${BUILD_UTC}",
   "provenance": "compiled-binary-supplied-to-packager",
   "notes": [

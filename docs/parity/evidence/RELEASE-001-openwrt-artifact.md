@@ -14,6 +14,10 @@ carry service/config files that survive upgrades.
 
 ## What this change does
 
+The manifest distinguishes tracked modifications (`git_dirty`, sources changed)
+from untracked files (`git_untracked_files`), so an unrelated untracked file no
+longer makes a build look source-dirty.
+
 `scripts/build-openwrt-artifact.sh [BINARY] [OUTPUT_DIR]`:
 
 - rejects non-AArch64 ELF (`e_machine` read from bytes 18–19) and a binary with a
@@ -43,9 +47,9 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: fcfdbe4c5cee7693db609da00a21c816b4b983c4f45f9417fe579a66eba9a7a9 (5450608 bytes)
-archive sha256: ca6fdbd0f0246a71b2b57de08e7562663c96177dc82ba3862625fcc9526b037d (5607694 bytes)
-manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=f79a7b5..., rustc 1.99.1
+binary sha256: 81bab3876e053b1a2e719f9a6adde87ac4b5fc954ac4c993c365794126c238fa (5461248 bytes)
+archive sha256: 744ca8cb6a0bf3569756e5cc626ba718306c08263bed9177d5ebf9978f29c1d4 (5613075 bytes)
+manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=57d9478..., rustc 1.99.1
 
 $ python3 -m unittest discover -s scripts/tests
 Ran 26 tests ... OK
