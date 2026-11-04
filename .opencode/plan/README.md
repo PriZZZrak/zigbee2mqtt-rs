@@ -58,6 +58,9 @@ R1 — явно ограниченный релиз для проверенно�
   генерирует manifest с SHA-256 и валидирует пакет перед публикацией; добавлены
   Python layout tests. GitHub Actions и Node staged smoke ещё не выполнялись,
   live `latest` до следующего запуска остаётся в старом layout.
+- **CV-04 частично**: registry-пути проверяются на traversal/absolute/backslash,
+  загрузка ограничена 8 MiB. Digest/ETag, timeout, versioned cache и atomic
+  promotion ещё не реализованы.
 - **RT-03 частично**: `mqtts://` больше не превращается молча в plain TCP —
   конфигурация помечает TLS-требование, connect возвращает явную ошибку; URI
   сохраняется lossless. TLS provider и `mqtt.user` auth не реализованы.

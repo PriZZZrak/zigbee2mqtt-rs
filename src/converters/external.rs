@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use boa_engine::{Context, Source};
 use serde::Deserialize;
@@ -328,10 +328,33 @@ impl ExternalConverter {
         serde_json::from_str(&text).ok()
     }
 
+    /// Resolve a registry-provided relative path inside the cache.
+    ///
+    /// Registry/fingerprint metadata is untrusted input: absolute paths and any
+    /// `..` component must never escape the converter cache directory.
+    fn cache_path(&self, file: &str) -> Option<PathBuf> {
+        if file.is_empty() || file.contains('\\') {
+            return None;
+        }
+        let relative = Path::new(file);
+        if relative.is_absolute()
+            || relative.components().any(|component| {
+                matches!(
+                    component,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
+            })
+        {
+            return None;
+        }
+        Some(self.dir.join(relative))
+    }
+
     fn load_js(&self, file: &str) -> Option<String> {
         // `file` is a dist-relative path like `devices/lytko.js` or a bare
         // basename for the legacy flat layout.
-        for candidate in [self.dir.join(file), self.dir.join("devices").join(file)] {
+        let cached = self.cache_path(file)?;
+        for candidate in [cached, self.dir.join("devices").join(file)] {
             if let Ok(src) = std::fs::read_to_string(&candidate) {
                 return Some(src);
             }
@@ -378,9 +401,9 @@ impl ExternalConverter {
         if let Some(cached) = self.load_js(file) {
             return Some(cached);
         }
+        let dest = self.cache_path(file)?;
         let url = format!("{}/{}", self.root_url(), file.trim_start_matches('/'));
         let text = fetch_url(&url).await?;
-        let dest = self.dir.join(file);
         if let Some(parent) = dest.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -760,6 +783,8 @@ fn eval_string(ctx: &mut Context, script: &str) -> Option<String> {
     v.as_string().map(|s| s.to_std_string_escaped())
 }
 
+const MAX_FETCH_BYTES: usize = 8 * 1024 * 1024;
+
 async fn fetch_url(url: &str) -> Option<String> {
     for prog in ["curl", "wget", "uclient-fetch"] {
         let out = match prog {
@@ -784,6 +809,13 @@ async fn fetch_url(url: &str) -> Option<String> {
         };
         if let Some(o) = out {
             if o.status.success() {
+                if o.stdout.len() > MAX_FETCH_BYTES {
+                    warn!(
+                        "refusing oversized download from {url}: {} bytes",
+                        o.stdout.len()
+                    );
+                    return None;
+                }
                 if let Ok(text) = String::from_utf8(o.stdout) {
                     return Some(text);
                 }
@@ -1117,5 +1149,24 @@ module.exports = {definitions};
         let map = collect_sources(conv.dir.as_path(), &src, "fakedev.js").expect("collect");
         assert!(map.contains_key("devices/fakedev.js"));
         assert!(map.contains_key("devices/helpers/util.js"));
+    }
+
+    #[test]
+    fn cache_path_rejects_traversal_and_absolute_paths() {
+        let (_tmp, conv) = fixture_dir();
+        assert!(conv.cache_path("../evil.js").is_none());
+        assert!(conv.cache_path("devices/../../evil.js").is_none());
+        assert!(conv.cache_path("/etc/passwd").is_none());
+        assert!(conv.cache_path(r"devices\evil.js").is_none());
+        assert!(conv.cache_path("").is_none());
+        let valid = conv.cache_path("devices/fakedev.js").expect("valid path");
+        assert!(valid.starts_with(conv.dir.as_path()));
+        assert!(conv.load_js("../outside").is_none());
+    }
+
+    #[tokio::test]
+    async fn fetch_js_rejects_traversal_before_network() {
+        let (_tmp, conv) = fixture_dir();
+        assert!(conv.fetch_js("../../etc/passwd").await.is_none());
     }
 }
