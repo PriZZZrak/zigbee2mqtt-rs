@@ -70,28 +70,32 @@ $ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
 $ make defconfig
 $ make package/zigbee2mqtt-rs/compile
 ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
-        installed 12011520 B, data 5617531 B, binary 5474449 B, web 6376277 B
+        installed 11898880 B, data 5573724 B, binary 5474449 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
-sha256: 93a1721aeaca2f13b51afeecd17b23dd2e71e28949a2f1d91e4a8c47881b284b
-bytes:  5599099
+sha256: 7558c9f8e4c5c61307231660f94ea91419066f62367f89df5552dc7bd605a938
+bytes:  5555247
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
 `Depends: libc, mosquitto, mosquitto-client`, `Architecture:
-aarch64_cortex-a53`, `Installed-Size: 12011520`; `conffiles` contains
+aarch64_cortex-a53`, `Installed-Size: 11898880`; `conffiles` contains
 `/etc/zigbee2mqtt-rs/config.yaml` (so upgrades keep the user's config).
 
 Data payload: `usr/bin/zigbee2mqtt-rs` (statically linked AArch64, executable),
 `etc/init.d/zigbee2mqtt-rs`, `etc/zigbee2mqtt-rs/config.yaml`,
 `etc/mosquitto/conf.d/99-zigbee2mqtt-rs.conf`, and the pinned Windfront frontend
-under `www/zigbee2mqtt` (6 376 277 uncompressed bytes).
+under `www/zigbee2mqtt` (6 266 677 uncompressed bytes). The assets are copied
+from the **app-resolved** `zigbee2mqtt-windfront@2.15.0` `dist`
+(`index.html` sha256 `da527869…`); the historical frontend repo tag (`2.15.1`,
+commit `fbe6e2d`) is recorded separately in `upstream-lock.json` and differs.
 
 The binary inside the `.ipk` is **not byte-identical** to
 `openwrt/files/zigbee2mqtt-rs`: OpenWrt packs it with `sstrip`
 (5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
 recorded here so the hash difference is not mistaken for a different build.
 Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
-(`93a1721a…`), i.e. packaging is reproducible with the pinned SDK.
+(`7558c9f8…`), i.e. packaging is reproducible with the pinned SDK fed by the same
+binary and frontend assets.
 
 `scripts/check_ipk.py` validates the outer/inner layout, control fields,
 `conffiles`, the required data paths, the ELF machine and static linkage;
@@ -118,10 +122,13 @@ tag releases. **That job has not run yet.**
   SONOFF Dongle-P. `Depends: mosquitto, mosquitto-client` are not in the SDK
   base feed (warning during `make`), so the device needs the `packages` feed or
   a locally built broker before `opkg install` can succeed.
-- Measured installed size is **12 011 520 B (≈11.5 MiB)** including 6.4 MB of
+- Measured installed size is **11 898 880 B (≈11.3 MiB)** including 6.27 MB of
   frontend assets; free overlay space still must be measured on the router (54 MB
   is total storage, not free). RAM usage and the 5.47 MB binary on aarch64 remain
   unmeasured.
+- The earlier local `.ipk` had staged assets that were **not** the app-resolved
+  Windfront build; it was rebuilt from `zigbee2mqtt-windfront@2.15.0` `dist`. The
+  previous hashes are superseded and must not be published.
 - The GitHub Actions workflow (both jobs) still has not run; the local SDK build
   is the evidence here.
 - Binary provenance: the committed binary is a fresh zigbuild of the current

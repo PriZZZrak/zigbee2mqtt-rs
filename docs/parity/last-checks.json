@@ -40,7 +40,7 @@
     {
       "command": "scripts/build-openwrt-ipk.sh <SDK>/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64",
       "exit": 0,
-      "result": "SDK .ipk built and validated: 5,599,099 B, sha256 93a1721a..., installed 12,011,520 B incl. Windfront; identical hash on rebuild; install/upgrade BLOCKED on device"
+      "result": "SDK .ipk built and validated: 5,555,247 B, sha256 7558c9f8..., installed 11,898,880 B incl. app-resolved Windfront 2.15.0; identical hash on rebuild; install/upgrade BLOCKED on device"
     }
   ]
 }

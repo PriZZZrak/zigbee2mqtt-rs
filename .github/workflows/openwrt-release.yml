@@ -97,7 +97,9 @@ jobs:
       - name: Stage pinned Windfront frontend
         run: |
           set -euo pipefail
-          version="$(python3 -c "import json; print(json.load(open('docs/parity/upstream-lock.json'))['baseline']['frontend']['resolved_version'])")"
+          # Use the version the pinned app actually resolves, not the historical
+          # frontend repository tag (upstream-lock records both).
+          version="$(python3 -c "import json; print(json.load(open('docs/parity/upstream-lock.json'))['app_resolved_frontends']['zigbee2mqtt-windfront']['resolved_version'])")"
           npm pack "zigbee2mqtt-windfront@${version}" --pack-destination /tmp
           mkdir -p /tmp/windfront openwrt/files/windfront
           tar -xzf "/tmp/zigbee2mqtt-windfront-${version}.tgz" -C /tmp/windfront
