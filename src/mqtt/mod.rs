@@ -47,6 +47,12 @@ pub struct MqttBridge {
 impl MqttBridge {
     /// Connect to the broker, subscribe to command topics, and spawn the event loop.
     pub async fn connect(cfg: &MqttConfig) -> Result<(Self, mpsc::Receiver<MqttCommand>)> {
+        if cfg.tls_required {
+            return Err(Error::Config(
+                "mqtts:// requires TLS, which this build does not support; refusing to fall back to plain TCP"
+                    .to_string(),
+            ));
+        }
         let mut opts = MqttOptions::new(&cfg.client_id, &cfg.server, cfg.port);
         opts.set_keep_alive(Duration::from_secs(cfg.keepalive as u64));
         opts.set_clean_session(true);
@@ -497,5 +503,19 @@ mod tests {
             friendly_name_from_topic("zigbee2mqtt/room/light/set", "zigbee2mqtt", "/set"),
             "room/light"
         );
+    }
+
+    #[tokio::test]
+    async fn mqtts_is_rejected_instead_of_downgrading_to_plain_tcp() {
+        let cfg = MqttConfig {
+            tls_required: true,
+            ..MqttConfig::default()
+        };
+        let error = match MqttBridge::connect(&cfg).await {
+            Ok(_) => panic!("mqtts must not fall back to plain TCP"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("TLS"));
+        assert!(error.to_string().contains("plain TCP"));
     }
 }

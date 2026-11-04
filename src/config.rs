@@ -208,6 +208,11 @@ pub struct MqttConfig {
     pub password: Option<String>,
     pub keepalive: u16,
     pub reject_unauthorized: bool,
+    /// Set from a `mqtts://` server URI. Runtime-only: never written back to
+    /// YAML. TLS transport is not implemented, so connecting must fail loudly
+    /// instead of silently using plain TCP.
+    #[serde(skip)]
+    pub tls_required: bool,
 }
 
 impl std::fmt::Debug for MqttConfig {
@@ -221,6 +226,7 @@ impl std::fmt::Debug for MqttConfig {
             .field("password", &self.password.as_ref().map(|_| "<redacted>"))
             .field("keepalive", &self.keepalive)
             .field("reject_unauthorized", &self.reject_unauthorized)
+            .field("tls_required", &self.tls_required)
             .finish()
     }
 }
@@ -307,6 +313,7 @@ impl Default for MqttConfig {
             password: None,
             keepalive: 60,
             reject_unauthorized: true,
+            tls_required: false,
         }
     }
 }
@@ -435,12 +442,14 @@ impl Config {
         }
         // Accept zigbee2mqtt-style URLs like "mqtt://localhost:1883" in mqtt.server.
         let raw = config.mqtt.server.trim().to_string();
+        let tls_requested = raw.to_ascii_lowercase().starts_with("mqtts://");
         let stripped = raw
             .strip_prefix("mqtt://")
             .or_else(|| raw.strip_prefix("mqtts://"))
             .unwrap_or(&raw)
             .trim()
             .to_string();
+        config.mqtt.tls_required = tls_requested;
         let colon_count = stripped.matches(':').count();
         let bracketed = stripped.starts_with('[');
         if let Some((host, port)) = stripped.rsplit_once(':') {
@@ -865,6 +874,31 @@ groups:
             devices["0xec1bbdfffeaa66db"]["custom_device_option"],
             "keep"
         );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn mqtts_scheme_marks_tls_required_without_rewriting_the_uri() {
+        let dir = std::env::temp_dir().join(format!("z2m_mqtts_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("configuration.yaml");
+        std::fs::write(
+            &path,
+            "serial:\n  port: /dev/ttyUSB0\nmqtt:\n  server: mqtts://broker.example:8883\n  base_topic: zigbee2mqtt\n",
+        )
+        .unwrap();
+        let cfg = Config::load(&path).unwrap();
+        assert!(cfg.mqtt.tls_required);
+        assert_eq!(cfg.mqtt.server, "broker.example");
+        assert_eq!(cfg.mqtt.port, 8883);
+
+        cfg.save(&path).unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            !saved.contains("tls_required"),
+            "runtime flag must not be persisted"
+        );
+        assert!(saved.contains("mqtts://broker.example:8883"));
         std::fs::remove_dir_all(&dir).ok();
     }
 }
