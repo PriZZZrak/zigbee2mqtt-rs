@@ -7,5 +7,6 @@ pub mod devices;
 pub mod error;
 pub mod groups;
 pub mod homeassistant;
+pub mod migration;
 pub mod mqtt;
 pub mod zigbee;

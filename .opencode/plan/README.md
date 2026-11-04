@@ -38,10 +38,11 @@ R1 — явно ограниченный релиз для проверенно�
   options, referenced files), STORE-02 (стабильные group/device database ID,
   epList/interviewState/swBuildId) и STORE-03 (SIGTERM-handler, принудительный
   flush, fsync каталога, видимые ошибки записи) реализованы с локальными
-  regression tests. STORE-04 (migration kit) не начат; SIGTERM/ENOSPC/power-loss
-  и Node/differential oracle отсутствуют, поэтому строки `IN_PROGRESS`, а не
-  `VERIFIED`.
-- Следующий шаг: STORE-04 (migration/preflight/rollback), затем reference harness
+  regression tests. STORE-04 начат: offline `--inspect` и проверяемый
+  `--snapshot-dir`; автоматический restore/rollback и реальный HIL-перенос ещё
+  не сделаны. SIGTERM/ENOSPC/power-loss и Node/differential oracle отсутствуют,
+  поэтому строки `IN_PROGRESS`, а не `VERIFIED`.
+- Следующий шаг: завершить STORE-04 (restore/rollback), затем reference harness
   (EVID-04) и Z-Stack resume (ZB-01).
 
 ## Документы

@@ -462,7 +462,7 @@ impl Config {
         Ok(config)
     }
 
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         if self.advanced.channel < 11 || self.advanced.channel > 26 {
             return Err(Error::Config(format!(
                 "Zigbee channel must be 11-26, got {}",

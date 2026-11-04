@@ -228,6 +228,25 @@ strategy have identified gaps. Follow the
 [storage/migration plan](.opencode/plan/03-storage-and-config.md) for the planned
 reference, rollback and hardware acceptance procedure.
 
+Before changing a live installation, an offline preflight and a snapshot are
+available:
+
+```bash
+# Read config/database/referenced files without opening the coordinator.
+# Prints JSON; exit 1 means a blocker was found.
+zigbee2mqtt-rs --inspect -c /path/to/configuration.yaml
+
+# Also copy config, references, secrets, database, backup and state into a new
+# timestamped directory outside the application directory.
+zigbee2mqtt-rs --inspect --snapshot-dir /outside/the/data/dir \
+  -c /path/to/configuration.yaml
+```
+
+The snapshot manifest contains integrity checksums and the directory is written
+with restricted permissions on Unix. This does **not** verify coordinator NV or
+network-key/PAN/channel consistency, and automatic restore is not implemented;
+those remain migration gates.
+
 The bridge auto-discovers `database.db` in these locations:
 - Same directory as `configuration.yaml`
 - `data/` subdirectory
