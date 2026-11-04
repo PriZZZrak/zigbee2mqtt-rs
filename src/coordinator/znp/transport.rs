@@ -37,6 +37,7 @@ pub enum ZnpEvent {
     EndDeviceAnnceInd(Vec<u8>),
     LeaveInd(Vec<u8>),
     AfIncomingMsg(Vec<u8>),
+    AfDataConfirm(Vec<u8>),
     ActiveEpRsp(Vec<u8>),
     SimpleDescRsp(Vec<u8>),
     NodeDescRsp(Vec<u8>),
@@ -207,6 +208,7 @@ where
             (Subsystem::Zdo, 0xC1) => ZnpEvent::EndDeviceAnnceInd(frame.data),
             (Subsystem::Zdo, 0xC9) => ZnpEvent::LeaveInd(frame.data),
             (Subsystem::Zdo, 0xCA) => ZnpEvent::TcDevInd(frame.data),
+            (Subsystem::Af, 0x80) => ZnpEvent::AfDataConfirm(frame.data),
             (Subsystem::Af, 0x81) => ZnpEvent::AfIncomingMsg(frame.data),
             _ => ZnpEvent::Other,
         };

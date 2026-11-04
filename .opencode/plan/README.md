@@ -44,11 +44,12 @@ R1 — явно ограниченный релиз для проверенно�
   поэтому строки `IN_PROGRESS`, а не `VERIFIED`.
 - Следующий шаг: завершить STORE-04 (restore/rollback), затем reference harness
   (EVID-04) и Z-Stack resume (ZB-01).
-- **PR-03 начат (ZB-01, ZB-02, ZB-04)**: SREQ сериализуются FIFO, отмена
-  освобождает очередь; unknown NWK идентифицируется один раз за сессию; startup
-  strategy resume/restore/commissioning портирован с NV probe, `resume` больше не
-  перезаписывает NV. Restore явно отказан, aligned NIB/SAPI-1.2 и hardware tests
-  остаются. ZB-03 не начат.
+- **PR-03 начат (ZB-01, ZB-02, ZB-03, ZB-04)**: SREQ сериализуются FIFO;
+  startup strategy resume/restore/commissioning с NV probe (resume не перезаписывает
+  NV, restore отклонён); unknown NWK дедуплицируется; ZCL-транзакции получили waiter
+  registry с match по адресу/endpoint/cluster/TSN/command, AF confirm, timeout и
+  retry, но `request_zcl` ещё не используется bridge/converters. Recovery, route
+  discovery и hardware tests отсутствуют.
 - **CV-03 начат**: registry lookup по Zigbee modelID, bucket `null`, NUL-нормализация
   и fingerprint priority реализованы; product `models` больше не используется как
   ключ. Неизвестные fingerprint-поля, реальный пакет и Node oracle ещё не проверены;

@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod frame;
 pub mod strategy;
+pub mod transaction;
 pub mod transport;
 
 use std::path::Path;
@@ -21,6 +22,7 @@ use strategy::{
     determine_strategy, load_backup, parse_has_configured, parse_key_descriptor, parse_nib,
     AdapterNvState, BackupNetwork, NetworkOptions, StartupStrategy, ZnpVersion,
 };
+use transaction::{ZclIncoming, ZclRequest, ZclWaiters};
 
 pub struct ZnpCoordinator {
     transport: ZnpTransport,
@@ -104,14 +106,17 @@ impl ZnpCoordinator {
 
         let (coord_event_tx, coord_event_rx) = mpsc::channel::<CoordinatorEvent>(64);
         let transport_clone = self.transport.clone();
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let pump_waiters = Arc::clone(&waiters);
 
         tokio::spawn(async move {
-            event_pump(self.event_rx, coord_event_tx).await;
+            event_pump(self.event_rx, coord_event_tx, pump_waiters).await;
         });
 
         Ok(CoordinatorHandle {
             inner: Arc::new(Mutex::new(ZnpHandle {
                 transport: transport_clone,
+                waiters,
             })),
             events: coord_event_rx,
             info: coord_info,
@@ -459,7 +464,11 @@ impl ZnpCoordinator {
 
 // ── Event pump (AREQ → CoordinatorEvent) ─────────────────────────────────────
 
-async fn event_pump(mut znp_rx: mpsc::Receiver<ZnpEvent>, out: mpsc::Sender<CoordinatorEvent>) {
+async fn event_pump(
+    mut znp_rx: mpsc::Receiver<ZnpEvent>,
+    out: mpsc::Sender<CoordinatorEvent>,
+    waiters: Arc<Mutex<ZclWaiters>>,
+) {
     while let Some(ev) = znp_rx.recv().await {
         let coord_event = match ev {
             ZnpEvent::EndDeviceAnnceInd(data) => {
@@ -473,7 +482,16 @@ async fn event_pump(mut znp_rx: mpsc::Receiver<ZnpEvent>, out: mpsc::Sender<Coor
                     ieee_addr: IeeeAddr(d.ieee_addr),
                 })
             }
+            ZnpEvent::AfDataConfirm(data) => {
+                if let Some(confirm) = AfDataConfirm::parse(&data) {
+                    waiters.lock().await.confirm(&confirm);
+                }
+                None
+            }
             ZnpEvent::AfIncomingMsg(data) => {
+                if let Some(incoming) = ZclIncoming::parse_af(&data) {
+                    waiters.lock().await.deliver(&incoming);
+                }
                 AfIncomingMsg::parse(&data).map(|m| CoordinatorEvent::Message {
                     src_addr: m.src_addr,
                     src_ep: m.src_ep,
@@ -544,6 +562,7 @@ async fn event_pump(mut znp_rx: mpsc::Receiver<ZnpEvent>, out: mpsc::Sender<Coor
 
 pub struct ZnpHandle {
     transport: ZnpTransport,
+    waiters: Arc<Mutex<ZclWaiters>>,
 }
 
 impl ZnpHandle {
@@ -620,5 +639,188 @@ impl ZnpHandle {
             warn!("AF_DATA_REQUEST status: {:?}", rsp.data);
         }
         Ok(())
+    }
+
+    /// Send a ZCL frame and wait for the correlated device response.
+    ///
+    /// AF_DATA_REQUEST acceptance is not delivery and AF_DATA_CONFIRM success is
+    /// not a ZCL response, so this waits for the actual response matched by
+    /// address/endpoint/cluster/TSN/command. A failed AF confirmation, timeout
+    /// or closed reply channel is returned as an error; timeouts are retried up
+    /// to `attempts` with the same TSN.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn request_zcl(
+        &self,
+        dst_addr: u16,
+        dst_ep: u8,
+        cluster_id: u16,
+        trans_id: u8,
+        payload: Vec<u8>,
+        timeout: Duration,
+        attempts: u8,
+    ) -> Result<ZclIncoming> {
+        let request = ZclRequest::from_payload(dst_addr, dst_ep, cluster_id, &payload)
+            .ok_or_else(|| Error::Zcl("cannot parse outgoing ZCL header".into()))?;
+        if !request.expects_response() {
+            return Err(Error::Zcl(
+                "ZCL command does not expect a response; use send_zcl".into(),
+            ));
+        }
+        let attempts = attempts.max(1);
+        let mut last_error: Option<Error> = None;
+        for attempt in 0..attempts {
+            let (id, mut reply) = {
+                let mut waiters = self.waiters.lock().await;
+                waiters.register(request.clone(), timeout)
+            };
+            let rsp = self
+                .transport
+                .request(af_data_request(
+                    dst_addr,
+                    dst_ep,
+                    1,
+                    cluster_id,
+                    trans_id,
+                    payload.clone(),
+                ))
+                .await;
+            let rsp = match rsp {
+                Ok(rsp) => rsp,
+                Err(error) => {
+                    self.waiters.lock().await.remove(id);
+                    return Err(error);
+                }
+            };
+            if rsp.data.first().copied() != Some(0) {
+                self.waiters.lock().await.remove(id);
+                return Err(Error::Znp(format!(
+                    "AF_DATA_REQUEST rejected with status {:?}",
+                    rsp.data.first()
+                )));
+            }
+
+            match tokio::time::timeout(timeout, &mut reply).await {
+                Ok(Ok(Ok(incoming))) => return Ok(incoming),
+                Ok(Ok(Err(error))) => last_error = Some(error),
+                Ok(Err(_)) => last_error = Some(Error::ChannelClosed),
+                Err(_) => {
+                    let removed = self.waiters.lock().await.remove(id);
+                    if !removed {
+                        // The response won the race with the timeout.
+                        match reply.await {
+                            Ok(Ok(incoming)) => return Ok(incoming),
+                            Ok(Err(error)) => last_error = Some(error),
+                            Err(_) => last_error = Some(Error::ChannelClosed),
+                        }
+                    } else {
+                        last_error = Some(Error::Timeout);
+                    }
+                }
+            }
+            if attempt + 1 < attempts {
+                warn!(
+                    "ZCL request {}:{} cluster 0x{:04X} TSN {} attempt {}/{} failed, retrying",
+                    dst_addr,
+                    dst_ep,
+                    cluster_id,
+                    trans_id,
+                    attempt + 1,
+                    attempts
+                );
+            }
+        }
+        Err(last_error.unwrap_or(Error::Timeout))
+    }
+}
+
+#[cfg(test)]
+mod transaction_integration_tests {
+    use super::*;
+
+    fn af_frame(payload: Vec<u8>) -> Vec<u8> {
+        let mut raw = vec![0u8; 17];
+        raw[2..4].copy_from_slice(&0x0402u16.to_le_bytes());
+        raw[4..6].copy_from_slice(&0x1234u16.to_le_bytes());
+        raw[6] = 1;
+        raw[7] = 1;
+        raw[9] = 200;
+        raw[15] = 9;
+        raw[16] = payload.len() as u8;
+        raw.extend(payload);
+        raw
+    }
+
+    fn read_request() -> ZclRequest {
+        // global frame, client->server, TSN 7, read attributes
+        ZclRequest::from_payload(0x1234, 1, 0x0402, &[0x00, 7, 0x00, 0x00, 0x00]).unwrap()
+    }
+
+    #[tokio::test]
+    async fn event_pump_resolves_zcl_waiter_from_af_incoming() {
+        let (znp_tx, znp_rx) = mpsc::channel(4);
+        let (out_tx, _out_rx) = mpsc::channel(4);
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let (_, reply) = {
+            let mut waiters = waiters.lock().await;
+            waiters.register(read_request(), Duration::from_secs(1))
+        };
+        tokio::spawn(event_pump(znp_rx, out_tx, Arc::clone(&waiters)));
+
+        // readRsp: global, server->client, TSN 7, command 0x01
+        znp_tx
+            .send(ZnpEvent::AfIncomingMsg(af_frame(vec![
+                0x18, 7, 0x01, 0x00, 0x00, 0x00, 0x20, 0x01,
+            ])))
+            .await
+            .unwrap();
+
+        let incoming = reply.await.unwrap().unwrap();
+        assert_eq!(incoming.command, 0x01);
+        assert_eq!(incoming.nwk_addr, 0x1234);
+        assert_eq!(incoming.cluster_id, 0x0402);
+        assert_eq!(waiters.lock().await.pending(), 0);
+    }
+
+    #[tokio::test]
+    async fn event_pump_propagates_failed_af_confirm() {
+        let (znp_tx, znp_rx) = mpsc::channel(4);
+        let (out_tx, _out_rx) = mpsc::channel(4);
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let (_, reply) = {
+            let mut waiters = waiters.lock().await;
+            waiters.register(read_request(), Duration::from_secs(1))
+        };
+        tokio::spawn(event_pump(znp_rx, out_tx, Arc::clone(&waiters)));
+
+        znp_tx
+            .send(ZnpEvent::AfDataConfirm(vec![0xE9, 1, 7]))
+            .await
+            .unwrap();
+
+        let error = reply.await.unwrap().unwrap_err();
+        assert!(error.to_string().contains("0xE9"));
+        assert_eq!(waiters.lock().await.pending(), 0);
+    }
+
+    #[tokio::test]
+    async fn successful_af_confirm_does_not_complete_the_command() {
+        let (znp_tx, znp_rx) = mpsc::channel(4);
+        let (out_tx, _out_rx) = mpsc::channel(4);
+        let waiters = Arc::new(Mutex::new(ZclWaiters::default()));
+        let (_, mut reply) = {
+            let mut waiters = waiters.lock().await;
+            waiters.register(read_request(), Duration::from_secs(1))
+        };
+        tokio::spawn(event_pump(znp_rx, out_tx, Arc::clone(&waiters)));
+
+        znp_tx
+            .send(ZnpEvent::AfDataConfirm(vec![0x00, 1, 7]))
+            .await
+            .unwrap();
+        assert!(
+            reply.try_recv().is_err(),
+            "success confirm must not resolve"
+        );
+        assert_eq!(waiters.lock().await.pending(), 1);
     }
 }

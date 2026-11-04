@@ -19,19 +19,19 @@ Compatibility baseline: zigbee2mqtt `344b6e03b43644c97154a72ca9eae17193c553a2` (
 Frontend baseline: **BLOCKED** — the app resolves Windfront 2.15.0; the historical lock pins 2.15.1. See upstream-lock.json.
 Latest upstream: app `3c841fdfd66c`, herdsman `eb80ba1f1cb3`, converters `367100282578`, Windfront `b32226926e4d`, documentation `14acd6165880` (checked 2026-11-04T09:08:33.742736+00:00).
 Freshness: **DRIFT_DETECTED**
-Discovered: 103 eligible behaviors; 22 unmeasured rows.
+Discovered: 103 eligible behaviors; 21 unmeasured rows.
 Stage 1 Z-Stack parity: **0/96 = 0.00%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
 Global upstream parity: **0/103 = 0.00%** [all adapter families].
 Stage 1 / global weighted parity: 0.00% / 0.00% (0/124, 0/138).
-Stage 1 / global scenarios: 0/223 = 0.00% and 0/223 = 0.00% [15/22 unmeasured rows].
-Status breakdown: DISCOVERED 22, IMPLEMENTED_UNVERIFIED 58, IN_PROGRESS 14, PARTIAL 9 (103 total).
+Stage 1 / global scenarios: 0/231 = 0.00% and 0/231 = 0.00% [14/21 unmeasured rows].
+Status breakdown: DISCOVERED 21, IMPLEMENTED_UNVERIFIED 58, IN_PROGRESS 15, PARTIAL 9 (103 total).
 Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, DRIFT-001, HA-001, MQTT-001, MQTT-002, MQTT-003, MQTT-004, MQTT-006, MQTT-010 (+23 more)
 Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 0/91, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
 Inventory audit: incomplete; no substantiated domain fraction, catalog total or converter denominator.
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).
 Open upstream deltas: see upstream-changes.md; freshness DRIFT_DETECTED.
-Last test run (2026-11-04T12:05:27+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0.
+Last test run (2026-11-04T12:19:22+00:00, Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable): `cargo fmt --all --check` exit 0; `cargo test --locked` exit 0; `cargo clippy --all-targets --locked` exit 0; `cargo build --release --locked` exit 0; `python3 -m unittest discover -s scripts/tests` exit 0.
 Known exclusions: none approved; future adapters are deferred, not excluded.
 R1 acceptance is tracked separately in .opencode/plan/10-acceptance-matrix.md; these percentages are not R1 completion.
 Counting rule: only whole VERIFIED rows with existing evidence and test references contribute; newly discovered work increases denominators and is not counted as verified progress.

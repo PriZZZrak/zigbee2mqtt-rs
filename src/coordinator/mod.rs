@@ -7,6 +7,7 @@ use tokio::sync::{mpsc, Mutex};
 use crate::config::{AdapterType, Config};
 use crate::error::Result;
 use crate::zigbee::IeeeAddr;
+use znp::transaction::ZclIncoming;
 use znp::{ZnpCoordinator, ZnpHandle};
 
 #[derive(Debug, Clone)]
@@ -84,6 +85,27 @@ impl CoordinatorHandle {
             .lock()
             .await
             .send_zcl(dst_addr, dst_ep, cluster_id, trans_id, payload)
+            .await
+    }
+
+    /// Send a ZCL frame and wait for the device response (see ZnpHandle).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn request_zcl(
+        &self,
+        dst_addr: u16,
+        dst_ep: u8,
+        cluster_id: u16,
+        trans_id: u8,
+        payload: Vec<u8>,
+        timeout: std::time::Duration,
+        attempts: u8,
+    ) -> Result<ZclIncoming> {
+        self.inner
+            .lock()
+            .await
+            .request_zcl(
+                dst_addr, dst_ep, cluster_id, trans_id, payload, timeout, attempts,
+            )
             .await
     }
 

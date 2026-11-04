@@ -200,6 +200,8 @@ pub struct AfIncomingMsg {
     pub cluster_id: u16,
     pub src_addr: u16,
     pub src_ep: u8,
+    pub dst_ep: u8,
+    pub trans_seq: u8,
     pub link_quality: u8,
     pub data: Vec<u8>,
 }
@@ -212,7 +214,9 @@ impl AfIncomingMsg {
         let cluster_id = u16::from_le_bytes([raw[2], raw[3]]);
         let src_addr = u16::from_le_bytes([raw[4], raw[5]]);
         let src_ep = raw[6];
+        let dst_ep = raw[7];
         let link_quality = raw[9];
+        let trans_seq = raw[15];
         let len = raw[16] as usize;
         if raw.len() < 17 + len {
             return None;
@@ -222,6 +226,8 @@ impl AfIncomingMsg {
             cluster_id,
             src_addr,
             src_ep,
+            dst_ep,
+            trans_seq,
             link_quality,
             data,
         })
@@ -378,6 +384,26 @@ impl LeaveInd {
         let mut ieee = [0u8; 8];
         ieee.copy_from_slice(&data[2..10]);
         Some(Self { ieee_addr: ieee })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AfDataConfirm {
+    pub status: u8,
+    pub endpoint: u8,
+    pub trans_seq: u8,
+}
+
+impl AfDataConfirm {
+    pub fn parse(raw: &[u8]) -> Option<Self> {
+        if raw.len() < 3 {
+            return None;
+        }
+        Some(Self {
+            status: raw[0],
+            endpoint: raw[1],
+            trans_seq: raw[2],
+        })
     }
 }
 
