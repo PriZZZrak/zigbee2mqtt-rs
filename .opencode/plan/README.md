@@ -95,6 +95,11 @@ R1 — явно ограниченный релиз для проверенно�
   QueryNextImage запускает auto-check и публикует `available` с throttling;
   bridge-level helper проверен fake index/device fixture. Полный Message loop,
   настраиваемый override, реальный HTTPS/cache и HIL отсутствуют.
+- **HA config switches/locks частично**: `SWITCH_DIFFERENT`-свойства дают
+  config-switch с `command_topic_postfix`, lock discovery (0x0101) и cover
+  `running`/`motor_state` шаблоны портированы с golden-тестами. Значения
+  config-switch требуют `toZigbee.convertSet`, lock-ответ не ожидается, live
+  broker/HA и HIL отсутствуют.
 - **HA cover/postfix частично**: cover discovery (single/`cover_lN`), OPEN/
   CLOSE/STOP + position/tilt, per-attribute `set/<attr>` и `get/<attr>`,
   подписка `<base>/#`. Добавлен in-process MQTT broker: два теста гоняют

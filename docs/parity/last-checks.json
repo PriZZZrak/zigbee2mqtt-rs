@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-04T17:11:15+00:00",
+  "captured_utc": "2026-11-04T17:28:32+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64 linker unavailable (aarch64-unknown-linux-musl target installed but /usr/bin/ld rejects --fix-cortex-a53-843419)",
   "commands": [
     {
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "363 library + 2 binary + 30 compatibility = 395 passed, 0 failed"
+      "result": "372 library + 2 binary + 30 compatibility = 404 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -26,11 +26,6 @@
       "command": "python3 -m unittest discover -s scripts/tests",
       "exit": 0,
       "result": "26 parity/layout/EVID-04/OpenWrt artifact tests passed"
-    },
-    {
-      "command": "scripts/build-openwrt-artifact.sh",
-      "exit": 0,
-      "result": "tarball + manifest produced from the committed prebuilt aarch64 binary; not a fresh cross-build"
     }
   ]
 }

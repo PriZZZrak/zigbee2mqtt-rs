@@ -1166,6 +1166,52 @@ mod tests {
             other => panic!("unexpected command: {other:?}"),
         }
 
+        // Broker -> client: config-switch per-attribute topic.
+        broker
+            .send("zigbee2mqtt/plug/set/window_detection", b"ON")
+            .await;
+        match tokio::time::timeout(Duration::from_secs(5), commands.recv())
+            .await
+            .expect("config switch command timing out")
+            .expect("command channel")
+        {
+            MqttCommand::SetDevice {
+                friendly_name,
+                payload,
+                endpoint,
+                attribute,
+            } => {
+                assert_eq!(friendly_name, "plug");
+                assert_eq!(endpoint, None);
+                assert_eq!(attribute.as_deref(), Some("window_detection"));
+                assert_eq!(payload, json!({"window_detection": "ON"}));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        // Broker -> client: endpoint lock with the suffixed attribute.
+        broker
+            .send("zigbee2mqtt/front_door/l1/set/state_l1", b"LOCK")
+            .await;
+        match tokio::time::timeout(Duration::from_secs(5), commands.recv())
+            .await
+            .expect("lock command timing out")
+            .expect("command channel")
+        {
+            MqttCommand::SetDevice {
+                friendly_name,
+                payload,
+                endpoint,
+                attribute,
+            } => {
+                assert_eq!(friendly_name, "front_door");
+                assert_eq!(endpoint, Some(1));
+                assert_eq!(attribute.as_deref(), Some("state_l1"));
+                assert_eq!(payload, json!({"state_l1": "LOCK"}));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
         // Client -> broker: retained discovery cleanup over the real socket.
         mqtt.clear_ha_topic("homeassistant/cover/0x9a1122334455667f/cover_l1/config")
             .await

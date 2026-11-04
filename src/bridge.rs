@@ -1890,6 +1890,13 @@ impl Bridge {
                     continue;
                 };
                 (0x0102, payload)
+            } else if endpoint_desc.input_clusters.contains(&0x0101) {
+                let Some(payload) =
+                    crate::zigbee::zcl::clusters::door_lock::state_payload(*trans_id, &state_str)
+                else {
+                    continue;
+                };
+                (0x0101, payload)
             } else {
                 continue;
             };

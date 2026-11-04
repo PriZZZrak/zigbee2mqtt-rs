@@ -96,10 +96,9 @@ path over a TCP socket:
 - No live mosquitto/Home Assistant instance; the broker is a test double and the
   client is the real library, so reconnect/auth/TLS and HA entity behaviour are
   still untested.
-- Cover semantics are generic: no `running`/`motor_state` templates, no device
-  quirks (calibration, inversion), no `set_position_template` per-device
-  property mapping beyond `position`, and `command_topic_postfix` is emitted only
-  for cover tilt, not for `SWITCH_DIFFERENT` switches or locks.
+- Cover `running`/`motor_state` templates, `SWITCH_DIFFERENT` config switches and
+  lock entities are implemented in HA-007; device quirks (calibration, inversion)
+  and group covers remain missing.
 - Cover writes are fire-and-forget (`send_zcl`), not confirmed via
   `request_zcl`.
 - Group covers, `cover` exposes with `endpoint` names other than `lN` in the
