@@ -640,8 +640,9 @@ fn parse_permit_join_payload(payload: &[u8]) -> u8 {
 /// Supports CONNECT/CONNACK, SUBSCRIBE/SUBACK, PUBLISH both directions,
 /// PUBACK and PINGREQ/PINGRESP — enough to drive the real rumqttc event loop
 /// over a TCP socket without an external broker.
-#[cfg(test)]
-pub(crate) mod fake_broker {
+#[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+pub mod fake_broker {
     use std::sync::{Arc, Mutex};
 
     use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};

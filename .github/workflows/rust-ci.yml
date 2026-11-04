@@ -25,6 +25,8 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --all-targets --locked
+      - name: Harness feature build
+        run: cargo check --locked --all-targets --features test-support
       - name: Test
         run: cargo test --locked
       - name: Native release build

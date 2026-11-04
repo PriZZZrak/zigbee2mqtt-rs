@@ -102,6 +102,49 @@ function selectDefinition(input) {
     return load(best ? best.candidate : candidates[0]);
 }
 
+async function runFromZigbee({input, definition, meta, clusterName, clusterId, msgType, endpoint}) {
+    let data;
+    if (input.data && typeof input.data === "object") {
+        data = normalize(input.data);
+    } else {
+        if (typeof input.attribute !== "string") fail("fixture is missing 'attribute' or 'data'");
+        if (input.value === undefined) fail("fixture is missing 'value'");
+        data = {[input.attribute]: input.value};
+    }
+    const msg = {
+        cluster: clusterName,
+        type: msgType,
+        data,
+        endpoint: {ID: endpoint},
+        linkquality: input.linkquality === undefined ? 0 : input.linkquality,
+        groupID: 0,
+    };
+    msg.endpoint.constructor = {name: "Endpoint"};
+    Object.assign(msg.endpoint, {
+        command: () => Promise.resolve(),
+        read: () => Promise.resolve(),
+        write: () => Promise.resolve(),
+    });
+    meta.device.constructor = {name: "Device"};
+    msg.device = meta.device;
+    const out = {};
+    let matched = false;
+    for (const converter of definition.fromZigbee || []) {
+        const types = Array.isArray(converter.type) ? converter.type : [converter.type];
+        if (converter.cluster !== clusterName && String(converter.cluster) !== String(clusterId)) continue;
+        if (!types.includes(msgType)) continue;
+        matched = true;
+        try {
+            const result = await converter.convert(definition, msg, (publish) => Object.assign(out, publish), {}, meta);
+            if (result && typeof result === "object") Object.assign(out, result);
+        } catch (error) {
+            fail(`converter threw: ${(error && error.stack) || error}`);
+        }
+    }
+    if (!matched) fail(`no fromZigbee converter matched ${clusterName}/${msgType}`);
+    return out;
+}
+
 async function main() {
     const input = await readInput();
     if (typeof input.model !== "string") fail("fixture is missing 'model'");
@@ -134,46 +177,47 @@ async function main() {
 
     const mode = input.mode || "fromZigbee";
     if (mode === "fromZigbee") {
-        let data;
-        if (input.data && typeof input.data === "object") {
-            data = normalize(input.data);
-        } else {
-            if (typeof input.attribute !== "string") fail("fixture is missing 'attribute' or 'data'");
-            if (input.value === undefined) fail("fixture is missing 'value'");
-            data = {[input.attribute]: input.value};
-        }
-        const msg = {
-            cluster: clusterName,
-            type: msgType,
-            data,
-            endpoint: {ID: endpoint},
-            linkquality: input.linkquality === undefined ? 0 : input.linkquality,
-            groupID: 0,
-        };
-        msg.endpoint.constructor = {name: "Endpoint"};
-        Object.assign(msg.endpoint, {
-            command: () => Promise.resolve(),
-            read: () => Promise.resolve(),
-            write: () => Promise.resolve(),
+        const out = await runFromZigbee({
+            input,
+            definition,
+            meta,
+            clusterName,
+            clusterId,
+            msgType,
+            endpoint,
         });
-        meta.device.constructor = {name: "Device"};
-        msg.device = meta.device;
-        const out = {};
-        let matched = false;
-        for (const converter of definition.fromZigbee || []) {
-            const types = Array.isArray(converter.type) ? converter.type : [converter.type];
-            if (converter.cluster !== clusterName && String(converter.cluster) !== String(clusterId)) continue;
-            if (!types.includes(msgType)) continue;
-            matched = true;
-            try {
-                const result = await converter.convert(definition, msg, (publish) => Object.assign(out, publish), {}, meta);
-                if (result && typeof result === "object") Object.assign(out, result);
-            } catch (error) {
-                fail(`converter threw: ${(error && error.stack) || error}`);
-            }
-        }
-        if (!matched) fail(`no fromZigbee converter matched ${clusterName}/${msgType}`);
         process.stdout.write(`${JSON.stringify(normalize(out))}\n`);
+        return;
+    }
+
+    if (mode === "bridge") {
+        const out = await runFromZigbee({
+            input,
+            definition,
+            meta,
+            clusterName,
+            clusterId,
+            msgType,
+            endpoint,
+        });
+        // Mirror receive.ts publish(): post-process, then the controller merges
+        // the converter payload into the cached state and adds linkquality plus
+        // last_seen (advanced.last_seen is assumed ISO_8601).
+        zhc.postProcessConvertedFromZigbeeMessage(definition, out, {}, meta.device);
+        const payload = {
+            ...(input.state && typeof input.state === "object" ? input.state : {}),
+            ...out,
+            linkquality: input.linkquality === undefined ? 0 : input.linkquality,
+            last_seen: "1970-01-01T00:00:00.000Z",
+        };
+        const baseTopic = input.base_topic || "zigbee2mqtt";
+        const friendlyName = input.friendly_name || "device";
+        process.stdout.write(
+            `${JSON.stringify({
+                topic: `${baseTopic}/${friendlyName}`,
+                payload: normalize(payload),
+            })}\n`,
+        );
         return;
     }
 

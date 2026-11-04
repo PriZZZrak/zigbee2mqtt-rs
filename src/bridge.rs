@@ -1682,6 +1682,35 @@ impl Bridge {
         }
     }
 
+    /// Harness entry point for the EVID-04 bridge differential.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn process_zcl_message_for_diff(
+        devices: &DeviceRegistry,
+        external: &ExternalConverter,
+        mqtt: &MqttBridge,
+        output: OutputMode,
+        src_addr: u16,
+        src_ep: u8,
+        cluster_id: u16,
+        link_quality: u8,
+        data: Vec<u8>,
+    ) {
+        Self::process_zcl_message(
+            devices,
+            external,
+            mqtt,
+            output,
+            src_addr,
+            src_ep,
+            cluster_id,
+            link_quality,
+            data,
+        )
+        .await;
+    }
+
     /// Apply one incoming ZCL frame: native cluster parsing plus definition
     /// conversion, merged and published exactly once.
     #[allow(clippy::too_many_arguments)]
@@ -1827,21 +1856,15 @@ impl Bridge {
         }
 
         let external_used = external_values.is_some();
+        // Only the native cluster fallback is suffixed here. Real definitions
+        // already apply `postfixWithEndpointName` in the converter; suffixing
+        // their output again would turn `state_l2` into `state_l2_l2`.
+        let suffix = devices
+            .get_by_nwk(src_addr)
+            .and_then(|d| endpoint_suffix(&d, src_ep));
+        apply_endpoint_suffix(&mut values, suffix.as_deref());
         values = merge_converted_values(values, external_values);
         if !values.is_empty() {
-            let suffix = devices
-                .get_by_nwk(src_addr)
-                .and_then(|d| endpoint_suffix(&d, src_ep));
-            if let Some(suffix) = &suffix {
-                let keys: Vec<String> = values.keys().cloned().collect();
-                let mut suffixed = serde_json::Map::new();
-                for key in keys {
-                    if let Some(value) = values.remove(&key) {
-                        suffixed.insert(format!("{key}_{suffix}"), value);
-                    }
-                }
-                values = suffixed;
-            }
             if let Some(mut dev) = devices.get_mut_by_nwk(src_addr) {
                 if let Some(direction_update) = arrow_update {
                     dev.arrow_hold_direction = direction_update;
@@ -2737,6 +2760,27 @@ const BASIC_CLUSTER_METADATA_KEYS: [&str; 4] =
 /// The device definition is authoritative for keys it produces; native values
 /// remain for keys the definition does not cover. Callers publish the result
 /// exactly once.
+/// Add the cluster-fallback endpoint suffix to native values.
+///
+/// Converter output is merged afterwards untouched: upstream definitions decide
+/// their own suffixes via `postfixWithEndpointName`.
+fn apply_endpoint_suffix(
+    values: &mut serde_json::Map<String, serde_json::Value>,
+    suffix: Option<&str>,
+) {
+    let Some(suffix) = suffix else {
+        return;
+    };
+    let keys: Vec<String> = values.keys().cloned().collect();
+    let mut suffixed = serde_json::Map::new();
+    for key in keys {
+        if let Some(value) = values.remove(&key) {
+            suffixed.insert(format!("{key}_{suffix}"), value);
+        }
+    }
+    *values = suffixed;
+}
+
 fn merge_converted_values(
     native: serde_json::Map<String, serde_json::Value>,
     external: Option<serde_json::Map<String, serde_json::Value>>,
@@ -3367,7 +3411,9 @@ fn attribute_json(
 ) -> Option<serde_json::Value> {
     use crate::zigbee::zcl::attribute::AttributeValue as V;
     match value {
-        V::Bool(b) => Some(serde_json::Value::Bool(*b)),
+        // Herdsman reads BOOLEAN/DATA8/BITMAP8/UINT8/ENUM8 via `readUInt8`,
+        // so converters receive 0/1, not a JS boolean.
+        V::Bool(b) => Some(json!(u8::from(*b))),
         V::U8(n) => Some(json!(*n)),
         V::U16(n) => Some(json!(*n)),
         V::U24(n) => Some(json!(*n)),
@@ -3580,6 +3626,30 @@ mod tests {
         // later re-identification (for example after another NWK change).
         tracker.identified(0x1234);
         assert!(tracker.should_identify(0x1234));
+    }
+
+    #[test]
+    fn endpoint_suffix_applies_only_to_native_values() {
+        let mut native: serde_json::Map<String, serde_json::Value> =
+            json!({"state": "ON"}).as_object().unwrap().clone();
+        apply_endpoint_suffix(&mut native, Some("l2"));
+        assert_eq!(native.get("state_l2"), Some(&json!("ON")));
+
+        // Converter output is already suffixed upstream and must not be touched.
+        let external: serde_json::Map<String, serde_json::Value> =
+            json!({"state_l2": "ON"}).as_object().unwrap().clone();
+        let merged = merge_converted_values(native, Some(external));
+        assert_eq!(merged.get("state_l2"), Some(&json!("ON")));
+        assert!(!merged.contains_key("state_l2_l2"));
+    }
+
+    #[test]
+    fn converter_attribute_json_uses_herdsman_numeric_booleans() {
+        use crate::zigbee::zcl::attribute::AttributeValue as V;
+        assert_eq!(attribute_json(&V::Bool(true)), Some(json!(1)));
+        assert_eq!(attribute_json(&V::Bool(false)), Some(json!(0)));
+        assert_eq!(attribute_json(&V::U8(7)), Some(json!(7)));
+        assert_eq!(attribute_json(&V::Invalid), None);
     }
 
     #[test]

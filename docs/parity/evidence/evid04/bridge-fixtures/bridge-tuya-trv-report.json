@@ -1,0 +1,44 @@
+{
+  "mode": "bridge",
+  "input": {
+    "model": "TS0601",
+    "manufacturer_name": "_TZE200_b6wax7g0",
+    "ieee_addr": "0x00124b0000000002",
+    "nwk_addr": 14589,
+    "friendly_name": "trv",
+    "base_topic": "zigbee2mqtt",
+    "cluster_id": 61184,
+    "msg_type": "commandDataReport",
+    "command_id": 2,
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {},
+    "endpoints": [
+      {
+        "id": 1,
+        "input_clusters": [
+          0,
+          61184
+        ]
+      }
+    ],
+    "data": {
+      "seq": 4660,
+      "dpValues": [
+        {
+          "dp": 3,
+          "datatype": 2,
+          "data": [
+            0,
+            140
+          ]
+        }
+      ]
+    },
+    "mode": "bridge"
+  },
+  "ignore": [
+    "payload.last_seen"
+  ],
+  "id": "bridge-tuya-trv-report"
+}

@@ -1,0 +1,40 @@
+{
+  "mode": "bridge",
+  "input": {
+    "model": "TS0002",
+    "manufacturer_name": "_TZ3000_ssup6h68",
+    "ieee_addr": "0x00124b0000000001",
+    "nwk_addr": 22136,
+    "friendly_name": "two_gang",
+    "base_topic": "zigbee2mqtt",
+    "cluster_id": 6,
+    "msg_type": "attributeReport",
+    "attribute": "onOff",
+    "value": 1,
+    "endpoint": 2,
+    "linkquality": 42,
+    "state": {
+      "state_l1": "OFF"
+    },
+    "endpoints": [
+      {
+        "id": 1,
+        "input_clusters": [
+          0,
+          6
+        ]
+      },
+      {
+        "id": 2,
+        "input_clusters": [
+          6
+        ]
+      }
+    ],
+    "mode": "bridge"
+  },
+  "ignore": [
+    "payload.last_seen"
+  ],
+  "id": "bridge-multi-endpoint-ts0002"
+}

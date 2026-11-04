@@ -13,6 +13,16 @@ path = "src/lib.rs"
 name = "zigbee2mqtt-rs"
 path = "src/main.rs"
 
+[[bin]]
+name = "evid04_bridge_candidate"
+path = "src/bin/evid04_bridge_candidate.rs"
+required-features = ["test-support"]
+
+[features]
+default = []
+# Harness-only surface (in-process MQTT broker and bridge diff hook).
+test-support = []
+
 [dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }

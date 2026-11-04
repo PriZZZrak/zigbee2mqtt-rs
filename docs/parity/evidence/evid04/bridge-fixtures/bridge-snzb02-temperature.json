@@ -1,0 +1,36 @@
+{
+  "mode": "bridge",
+  "input": {
+    "model": "SNZB-02",
+    "manufacturer_name": "eWeLink",
+    "ieee_addr": "0x00124b0024c1e2f3",
+    "nwk_addr": 4660,
+    "friendly_name": "sensor",
+    "base_topic": "zigbee2mqtt",
+    "cluster_id": 1026,
+    "msg_type": "attributeReport",
+    "attribute": "measuredValue",
+    "value": 2250,
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {
+      "battery": 90
+    },
+    "endpoints": [
+      {
+        "id": 1,
+        "input_clusters": [
+          0,
+          1,
+          1026,
+          1029
+        ]
+      }
+    ],
+    "mode": "bridge"
+  },
+  "ignore": [
+    "payload.last_seen"
+  ],
+  "id": "bridge-snzb02-temperature"
+}

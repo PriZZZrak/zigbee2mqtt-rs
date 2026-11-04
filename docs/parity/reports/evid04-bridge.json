@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-11-04T21:52:25.417985+00:00",
+  "reference_cmd": "env HC_CONVERTERS_DIST=/config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist EVID04_REGISTRY=/tmp/opencode/evid04/herdsman-converters/v26.115.1/registry.json node scripts/evid04_node_reference.js",
+  "candidate_cmd": "env EVID04_CACHE=/tmp/opencode/evid04/herdsman-converters/v26.115.1 ./target/release/evid04_bridge_candidate",
+  "fixtures": "docs/parity/evidence/evid04/bridge-fixtures",
+  "pins": [
+    {
+      "source": "zigbee2mqtt",
+      "expected": "344b6e03b43644c97154a72ca9eae17193c553a2",
+      "actual": "344b6e03b43644c97154a72ca9eae17193c553a2",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "zigbee-herdsman",
+      "expected": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
+      "actual": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "zigbee-herdsman-converters",
+      "expected": "9dabbe4e343573c5a3070605efd843a1b3a16058",
+      "actual": "9dabbe4e343573c5a3070605efd843a1b3a16058",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "frontend",
+      "expected": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
+      "actual": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
+      "status": "MATCH",
+      "reason": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "bridge-multi-endpoint-ts0002",
+      "status": "PASS",
+      "ignore": [
+        "payload.last_seen"
+      ],
+      "sort": []
+    },
+    {
+      "id": "bridge-snzb02-temperature",
+      "status": "PASS",
+      "ignore": [
+        "payload.last_seen"
+      ],
+      "sort": []
+    },
+    {
+      "id": "bridge-tuya-trv-report",
+      "status": "PASS",
+      "ignore": [
+        "payload.last_seen"
+      ],
+      "sort": []
+    }
+  ],
+  "passed": 3,
+  "failed": 0,
+  "status": "PASS"
+}
