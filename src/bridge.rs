@@ -1017,25 +1017,18 @@ impl Bridge {
                                     }
                                 }
                                 "device/remove" => {
-                                    let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or(payload.as_str().unwrap_or(""));
-                                    let ieee_opt = crate::zigbee::IeeeAddr::from_hex(id).or_else(|| devices.find_by_name(id).map(|d| d.ieee_addr));
-                                    if let Some(ieee) = ieee_opt {
-                                        if self.cfg.homeassistant.enabled() {
-                                            if let Some(device) = devices.get_by_ieee(&ieee).map(|device| device.clone()) {
-                                                let info = crate::converters::external::ExternalDeviceInfo::from_device(&device);
-                                                let model = device.model.clone().unwrap_or_default();
-                                                let exposes = self.external.exposes(&model, &info).unwrap_or_default();
-                                                homeassistant::cleanup_discovery(&mqtt, &device, &exposes).await;
-                                            }
-                                        }
-                                        devices.remove_by_ieee(&ieee);
-                                        Self::publish_device_list_static(&devices, &mqtt).await;
+                                    let removed = process_device_remove(
+                                        &devices,
+                                        &self.external,
+                                        self.cfg.homeassistant.enabled(),
+                                        &mqtt,
+                                        &request,
+                                        &payload,
+                                        transaction.as_deref(),
+                                    )
+                                    .await;
+                                    if removed {
                                         self.persist_database(coord.info.ieee_addr).await;
-                                        let resp = mk_resp("ok", json!({"id": id}), None);
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
-                                    } else {
-                                        let resp = mk_resp("error", json!({}), Some("entity not found".into()));
-                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     }
                                 }
                                 "group/remove" => {
@@ -2481,6 +2474,65 @@ async fn handle_ota_request(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+async fn process_device_remove(
+    devices: &DeviceRegistry,
+    external: &ExternalConverter,
+    ha_enabled: bool,
+    mqtt: &dyn crate::mqtt::MqttPublishIo,
+    request: &str,
+    payload: &serde_json::Value,
+    transaction: Option<&str>,
+) -> bool {
+    let id = payload
+        .get("id")
+        .and_then(|value| value.as_str())
+        .unwrap_or_else(|| payload.as_str().unwrap_or(""));
+    let Some(ieee) = devices
+        .find_by_name(id)
+        .map(|device| device.ieee_addr)
+        .or_else(|| {
+            IeeeAddr::from_hex(id).filter(|address| devices.get_by_ieee(address).is_some())
+        })
+    else {
+        let response = reporting_mqtt_response(Err("entity not found".into()), transaction);
+        let _ = mqtt.publish_response(request.to_string(), response).await;
+        return false;
+    };
+
+    if ha_enabled {
+        if let Some(device) = devices.get_by_ieee(&ieee).map(|device| device.clone()) {
+            let info = crate::converters::external::ExternalDeviceInfo::from_device(&device);
+            let model = device.model.clone().unwrap_or_default();
+            let exposes = external.exposes(&model, &info).unwrap_or_default();
+            for (component, object_id) in homeassistant::discovery_topics(&device, &exposes) {
+                let topic = crate::mqtt::ha_discovery_topic(
+                    &component,
+                    &device.ieee_addr.as_hex(),
+                    &object_id,
+                );
+                if let Err(error) = mqtt
+                    .publish(topic, crate::mqtt::ha_clear_payload(), 1, true)
+                    .await
+                {
+                    warn!("HA discovery cleanup publish failed: {error}");
+                }
+            }
+        }
+    }
+
+    devices.remove_by_ieee(&ieee);
+    let list: Vec<_> = devices
+        .all_devices()
+        .iter()
+        .map(|device| device.to_z2m_device_json())
+        .collect();
+    let _ = mqtt.publish_devices(json!(list)).await;
+    let response = reporting_mqtt_response(Ok(json!({"id": id})), transaction);
+    let _ = mqtt.publish_response(request.to_string(), response).await;
+    true
+}
+
 async fn send_group_command(
     coord: &CoordinatorHandle,
     nwk_addr: u16,
@@ -3476,5 +3528,135 @@ mod tests {
             .unwrap_err();
         assert!(error.contains("checksum"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    type FakePublish = (String, Vec<u8>, u8, bool);
+
+    #[derive(Default)]
+    struct FakeMqtt {
+        publishes: std::sync::Mutex<Vec<FakePublish>>,
+        responses: std::sync::Mutex<Vec<(String, serde_json::Value)>>,
+        devices: std::sync::Mutex<Vec<serde_json::Value>>,
+    }
+
+    impl crate::mqtt::MqttPublishIo for FakeMqtt {
+        fn publish<'a>(
+            &'a self,
+            topic: String,
+            payload: Vec<u8>,
+            qos: u8,
+            retain: bool,
+        ) -> crate::mqtt::MqttFuture<'a, ()> {
+            Box::pin(async move {
+                self.publishes
+                    .lock()
+                    .unwrap()
+                    .push((topic, payload, qos, retain));
+                Ok(())
+            })
+        }
+
+        fn publish_response<'a>(
+            &'a self,
+            request: String,
+            payload: serde_json::Value,
+        ) -> crate::mqtt::MqttFuture<'a, ()> {
+            Box::pin(async move {
+                self.responses.lock().unwrap().push((request, payload));
+                Ok(())
+            })
+        }
+
+        fn publish_devices<'a>(
+            &'a self,
+            devices: serde_json::Value,
+        ) -> crate::mqtt::MqttFuture<'a, ()> {
+            Box::pin(async move {
+                self.devices.lock().unwrap().push(devices);
+                Ok(())
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn device_remove_mqtt_e2e_clears_retained_discovery_and_replies() {
+        let devices = DeviceRegistry::new();
+        let ieee = IeeeAddr::from_hex("0xec1bbdfffeaa66db").unwrap();
+        let mut device = Device::new(ieee, 0x1234);
+        device.friendly_name = "bulb".into();
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0006, 0x0008],
+            output_clusters: vec![],
+        });
+        devices.add(device);
+        let external = ExternalConverter::new(
+            std::env::temp_dir().join("z2m-remove-e2e-cache"),
+            "https://example.invalid",
+        );
+        let fake = FakeMqtt::default();
+
+        let removed = process_device_remove(
+            &devices,
+            &external,
+            true,
+            &fake,
+            "device/remove",
+            &json!({"id": "0xec1bbdfffeaa66db"}),
+            Some("tx-remove"),
+        )
+        .await;
+        assert!(removed);
+        assert!(devices.get_by_ieee(&ieee).is_none());
+
+        let publishes = fake.publishes.lock().unwrap();
+        assert_eq!(publishes.len(), 2);
+        for (topic, payload, qos, retain) in publishes.iter() {
+            assert!(topic.starts_with("homeassistant/"));
+            assert!(payload.is_empty(), "cleanup payload must be empty");
+            assert_eq!(*qos, 1);
+            assert!(*retain);
+        }
+        let topics: Vec<&str> = publishes.iter().map(|(topic, ..)| topic.as_str()).collect();
+        assert!(topics.contains(&"homeassistant/light/0xec1bbdfffeaa66db/light/config"));
+        assert!(topics.contains(&"homeassistant/sensor/0xec1bbdfffeaa66db/linkquality/config"));
+        drop(publishes);
+
+        let responses = fake.responses.lock().unwrap();
+        assert_eq!(responses[0].0, "device/remove");
+        assert_eq!(responses[0].1["status"], "ok");
+        assert_eq!(responses[0].1["transaction"], "tx-remove");
+        assert_eq!(fake.devices.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn device_remove_mqtt_e2e_reports_unknown_entity() {
+        let devices = DeviceRegistry::new();
+        let external = ExternalConverter::new(
+            std::env::temp_dir().join("z2m-remove-e2e-cache"),
+            "https://example.invalid",
+        );
+        let fake = FakeMqtt::default();
+        let removed = process_device_remove(
+            &devices,
+            &external,
+            true,
+            &fake,
+            "device/remove",
+            &json!({"id": "0xffffffffffffffff"}),
+            None,
+        )
+        .await;
+        assert!(!removed);
+        assert!(fake.publishes.lock().unwrap().is_empty());
+        let responses = fake.responses.lock().unwrap();
+        assert_eq!(responses[0].1["status"], "error");
+        assert!(responses[0].1["error"]
+            .as_str()
+            .unwrap()
+            .contains("entity not found"));
     }
 }

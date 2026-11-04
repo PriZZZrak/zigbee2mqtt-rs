@@ -39,13 +39,20 @@ retained discovery config is deleted by publishing an **empty payload** with
   `homeassistant/sensor/<ieee>/temperature/config` and empty payload.
 - `cleanup_publishes_empty_retained_configs_to_all_topics`: a recording publisher
   captures every exact cleanup topic and the empty payload contract.
-- Full suite: `cargo test --locked` → **366 passed** (334 library, 2 binary,
+- `device_remove_mqtt_e2e_clears_retained_discovery_and_replies`: a fake
+  `MqttPublishIo` receives the device/remove command path; it asserts two exact
+  discovery topics, empty payloads, QoS 1, retain=true, the bridge devices
+  publication and the ok response with transaction.
+- `device_remove_mqtt_e2e_reports_unknown_entity`: no cleanup publishes and an
+  error response for an unregistered entity.
+- Full suite: `cargo test --locked` → **368 passed** (336 library, 2 binary,
   30 compatibility); clippy exit 0 with 5 existing warnings; release build OK.
 
 ## Divergences and gaps (not verified)
 
-- A recording publisher verifies every topic and the empty payload, but no fake
-  MQTT client/event loop asserts the retained flag/QoS on the wire.
+- The fake MQTT sink verifies topic, empty payload, QoS and retain at the publish
+  boundary and drives the remove handler; it does not run the full MQTT socket
+  event loop or a real broker.
 - The cluster-fallback topic list duplicates publish conditions and can drift;
   it should be generated from one entity list.
 - Rename cleanup/republish is tested only through helpers; bridge E2E and HA

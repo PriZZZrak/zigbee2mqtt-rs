@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-04T15:18:14+00:00",
+  "captured_utc": "2026-11-04T15:28:14+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable",
   "commands": [
     {
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "334 library + 2 binary + 30 compatibility = 366 passed, 0 failed"
+      "result": "336 library + 2 binary + 30 compatibility = 368 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -20,7 +20,7 @@
     {
       "command": "cargo build --release --locked",
       "exit": 0,
-      "result": "native release build succeeded with 2 warnings"
+      "result": "native release build succeeded with 1 warning"
     },
     {
       "command": "python3 -m unittest discover -s scripts/tests",

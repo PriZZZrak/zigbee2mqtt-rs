@@ -632,12 +632,10 @@ pub(crate) fn discovery_topics(device: &Device, exposes: &[Value]) -> Vec<(Strin
 
 /// Remove retained discovery configs for a device.
 pub async fn cleanup_discovery(mqtt: &MqttBridge, device: &Device, exposes: &[Value]) {
-    let ieee = device.ieee_addr.as_hex();
-    for (component, object_id) in discovery_topics(device, exposes) {
-        if let Err(error) = mqtt.clear_ha_discovery(&component, &ieee, &object_id).await {
-            warn!("HA discovery cleanup error for {component}/{ieee}/{object_id}: {error}");
-        }
-    }
+    cleanup_with(device, exposes, |topic| async move {
+        mqtt.clear_ha_topic(&topic).await
+    })
+    .await;
 }
 
 /// Cleanup loop with a pluggable publisher (used by broker-free tests).

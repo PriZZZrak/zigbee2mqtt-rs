@@ -79,6 +79,61 @@ pub(crate) fn parse_device_command(
 }
 
 /// Topic for a Home Assistant discovery config.
+pub(crate) type MqttFuture<'a, T> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send + 'a>>;
+
+/// Publishing seam used by bridge request handlers, allowing a recording fake in
+/// broker-free tests.
+pub(crate) trait MqttPublishIo {
+    fn publish<'a>(
+        &'a self,
+        topic: String,
+        payload: Vec<u8>,
+        qos: u8,
+        retain: bool,
+    ) -> MqttFuture<'a, ()>;
+    fn publish_response<'a>(
+        &'a self,
+        request: String,
+        payload: serde_json::Value,
+    ) -> MqttFuture<'a, ()>;
+    fn publish_devices<'a>(&'a self, devices: serde_json::Value) -> MqttFuture<'a, ()>;
+}
+
+impl MqttPublishIo for MqttBridge {
+    fn publish<'a>(
+        &'a self,
+        topic: String,
+        payload: Vec<u8>,
+        qos: u8,
+        retain: bool,
+    ) -> MqttFuture<'a, ()> {
+        Box::pin(async move {
+            let qos = match qos {
+                0 => QoS::AtMostOnce,
+                2 => QoS::ExactlyOnce,
+                _ => QoS::AtLeastOnce,
+            };
+            self.client
+                .publish(&topic, qos, retain, payload)
+                .await
+                .map_err(Error::Mqtt)
+        })
+    }
+
+    fn publish_response<'a>(
+        &'a self,
+        request: String,
+        payload: serde_json::Value,
+    ) -> MqttFuture<'a, ()> {
+        Box::pin(async move { self.publish_bridge_response(&request, &payload).await })
+    }
+
+    fn publish_devices<'a>(&'a self, devices: serde_json::Value) -> MqttFuture<'a, ()> {
+        Box::pin(async move { self.publish_bridge_devices(&devices).await })
+    }
+}
+
 pub(crate) fn ha_discovery_topic(component: &str, node_id: &str, object_id: &str) -> String {
     format!("homeassistant/{component}/{node_id}/{object_id}/config")
 }

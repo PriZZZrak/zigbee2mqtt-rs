@@ -87,8 +87,9 @@ R1 — явно ограниченный релиз для проверенно�
   отсутствуют.
 - **HA cleanup частично**: retained discovery configs удаляются пустым payload
   (`retain=true`, QoS1) при remove; rename очищает старые configs и публикует
-  новые. Golden-тесты и recording publisher покрывают exact topics/payload;
-  fake MQTT event loop, live broker/HA migration и группа discovery не проверены.
+  новые. Fake MQTT sink E2E проводит device/remove через publish path и проверяет
+  topics, пустой payload, QoS1/retain и response; полный socket event loop, live
+  broker/HA migration и группа discovery не проверены.
 - **FEAT-01 groups частично**: membership add/remove/remove_all отправляются
   реальными ZCL Groups-командами (0x0004) с ожиданием ответа и обновляют
   локальное состояние только после success; remove_all исправлен на
