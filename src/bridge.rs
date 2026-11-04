@@ -757,7 +757,7 @@ impl Bridge {
                                                             group_id: 0,
                                                         };
                                                     if let Some(converted) =
-                                                        external.convert_from_zigbee_with_message(
+                                                        external.convert_from_zigbee_session(
                                                             &model,
                                                             cluster_id,
                                                             msg_type,

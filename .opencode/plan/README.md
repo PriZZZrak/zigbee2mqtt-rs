@@ -88,8 +88,9 @@ R1 — явно ограниченный релиз для проверенно�
   Exposes API возвращает prepared array/function exposes и подключён к HA discovery
   для numeric/binary/switch/light (golden tests); climate/cover/lock/fan и cleanup
   не реализованы. meta/configure/onEvent и publish-callback semantics ещё не готовы.
-  Persistent Boa context/timers заблокированы ADR-08: Context не Send, нужен
-  выбор между converter actor thread и current_thread runtime.
+  Persistent Boa context/timers реализованы как dedicated converter actor thread
+  (ADR-08 вариант 1): module state, device-keyed store и due-timers переживают
+  кадры. Async fz Promise, future-delay timers, eviction и RAM budget открыты.
 
 ## Документы
 

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
 
 use boa_engine::{Context, Source};
 use serde::Deserialize;
@@ -26,6 +28,27 @@ use tracing::{debug, warn};
 pub struct ExternalConverter {
     dir: PathBuf,
     registry_url: String,
+    runtime: Arc<Mutex<Option<mpsc::Sender<ConverterJob>>>>,
+}
+
+enum ConverterJob {
+    Convert {
+        model: String,
+        cluster_id: u16,
+        msg_type: String,
+        reports: Vec<(u16, serde_json::Value)>,
+        device: ExternalDeviceInfo,
+        message: IncomingMessageInfo,
+        state: serde_json::Map<String, serde_json::Value>,
+        reply: mpsc::Sender<Option<serde_json::Map<String, serde_json::Value>>>,
+    },
+}
+
+struct ConverterSession {
+    ctx: Context,
+    file: String,
+    index: usize,
+    zcl: ZclMaps,
 }
 
 /// Minimal device identity for the `meta.device` stub.
@@ -313,6 +336,7 @@ impl ExternalConverter {
         Self {
             dir: dir.as_ref().to_path_buf(),
             registry_url: registry_url.into(),
+            runtime: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -685,8 +709,11 @@ impl ExternalConverter {
                 const definition = __prepareDefinition(defs[{index}]);
                 const msg = JSON.parse({msg});
                 const meta = JSON.parse({meta});
-                const device = meta.device;
+                const incomingDevice = meta.device;
+                const device = globalThis.__device || (globalThis.__device = incomingDevice);
+                Object.assign(device, incomingDevice);
                 device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
+                meta.device = device;
                 msg.endpoint.getDevice = () => device;
                 const __published = [];
                 const publish = (p) => {{ __published.push(p); }};
@@ -726,6 +753,261 @@ impl ExternalConverter {
             return None;
         }
         Some(map)
+    }
+}
+
+const TIMERS_JS: &str = r#"
+globalThis.__timers = globalThis.__timers || [];
+globalThis.__timerSeq = globalThis.__timerSeq || 0;
+globalThis.setTimeout = function(fn, delay) {
+    const id = ++globalThis.__timerSeq;
+    globalThis.__timers.push({id, due: Date.now() + (delay || 0), fn, cancelled: false});
+    return id;
+};
+globalThis.clearTimeout = function(id) {
+    for (const timer of globalThis.__timers) if (timer.id === id) timer.cancelled = true;
+};
+globalThis.__runDueTimers = function(now) {
+    let executed = 0;
+    for (const timer of globalThis.__timers) {
+        if (!timer.cancelled && timer.due <= now) {
+            timer.cancelled = true;
+            try { timer.fn(); } catch (error) {}
+            executed += 1;
+        }
+    }
+    return executed;
+};
+"#;
+
+impl ExternalConverter {
+    fn open_session(&self, model: &str, device: &ExternalDeviceInfo) -> Option<ConverterSession> {
+        let registry = self.load_registry()?;
+        let (file, index) = select_definition(&registry, model, device)?;
+        let zcl = self.load_zcl()?;
+        let module_src = self
+            .load_js(&format!("devices/{file}"))
+            .or_else(|| self.load_js(&file))?;
+        let sources = collect_sources(&self.dir, &module_src, &file)?;
+        let mut ctx = Context::default();
+        let bootstrap = format!("{}{}", cjs_bootstrap(&sources, &zcl), TIMERS_JS);
+        if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
+            warn!("external converter: session bootstrap failed");
+            return None;
+        }
+        let check = format!(r#"__require("devices/__entry__.js")("./{file}")"#);
+        if ctx.eval(Source::from_bytes(check.as_bytes())).is_err() {
+            warn!("external converter: cannot load {file}");
+            return None;
+        }
+        Some(ConverterSession {
+            ctx,
+            file,
+            index,
+            zcl,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn dispatch_session(
+        &self,
+        session: &mut ConverterSession,
+        cluster_id: u16,
+        msg_type: &str,
+        reports: &[(u16, serde_json::Value)],
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let cluster_name = session.zcl.clusters.get(&cluster_id.to_string())?.clone();
+        let data_obj: serde_json::Map<String, serde_json::Value> = reports
+            .iter()
+            .map(|(id, value)| {
+                let name = session
+                    .zcl
+                    .attributes
+                    .get(&cluster_name)
+                    .and_then(|attributes| attributes.get(&id.to_string()))
+                    .cloned()
+                    .unwrap_or_else(|| format!("attr_{id}"));
+                (name, value.clone())
+            })
+            .collect();
+        let msg = serde_json::json!({
+            "cluster": cluster_name,
+            "type": msg_type,
+            "data": data_obj,
+            "linkquality": message.linkquality,
+            "groupID": message.group_id,
+            "endpoint": {"ID": message.endpoint, "deviceIeeeAddress": device.ieee_addr},
+        });
+        let meta = serde_json::json!({
+            "state": state,
+            "device": {
+                "modelID": device.model_id,
+                "manufacturerID": device.manufacturer_id,
+                "manufacturerName": device.manufacturer_name,
+                "ieeeAddr": device.ieee_addr,
+                "powerSource": device.power_source,
+                "type": device.device_type,
+                "softwareBuildID": device.software_build_id,
+                "applicationVersion": device.application_version,
+                "dateCode": device.date_code,
+                "hardwareVersion": device.hardware_version,
+                "stackVersion": device.stack_version,
+                "zclVersion": device.zcl_version,
+                "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
+            },
+            "options": {},
+        });
+        let script = format!(
+            r#"(function() {{
+                const defs = __require("devices/__entry__.js")("./{file}").definitions;
+                const definition = __prepareDefinition(defs[{index}]);
+                const msg = JSON.parse({msg});
+                const meta = JSON.parse({meta});
+                const incomingDevice = meta.device;
+                const device = globalThis.__device || (globalThis.__device = incomingDevice);
+                Object.assign(device, incomingDevice);
+                device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id) || {{ID: id}};
+                meta.device = device;
+                msg.endpoint.getDevice = () => device;
+                const __published = [];
+                const publish = (p) => {{ __published.push(p); }};
+                const out = {{}};
+                for (const c of (definition.fromZigbee || [])) {{
+                    try {{
+                        const cl = c.cluster;
+                        const tys = Array.isArray(c.type) ? c.type : [c.type];
+                        if ((cl === msg.cluster || String(cl) === String({cluster_id})) && tys.includes(msg.type)) {{
+                            const r = c.convert(definition, msg, publish, {{}}, meta);
+                            if (r !== undefined && r !== null) {{
+                                const o = (typeof r === "object") ? r : {{}};
+                                for (const k of Object.keys(o)) out[k] = o[k];
+                            }}
+                        }}
+                    }} catch (e) {{}}
+                }}
+                for (const p of __published) {{
+                    if (p && typeof p === "object") {{
+                        for (const k of Object.keys(p)) out[k] = p[k];
+                    }}
+                }}
+                __runDueTimers(Date.now());
+                return JSON.stringify(out);
+            }})()"#,
+            file = session.file,
+            index = session.index,
+            msg = serde_json::to_string(&serde_json::to_string(&msg).unwrap()).unwrap(),
+            meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
+            cluster_id = cluster_id,
+        );
+        let out_str = eval_string(&mut session.ctx, &script)?;
+        let out: serde_json::Value = serde_json::from_str(&out_str).ok()?;
+        let map = out.as_object().cloned()?;
+        if map.is_empty() {
+            return None;
+        }
+        Some(map)
+    }
+
+    fn runtime_sender(&self) -> Option<mpsc::Sender<ConverterJob>> {
+        let mut guard = self.runtime.lock().ok()?;
+        if let Some(sender) = guard.as_ref() {
+            return Some(sender.clone());
+        }
+        let (sender, receiver) = mpsc::channel::<ConverterJob>();
+        let dir = self.dir.clone();
+        let registry_url = self.registry_url.clone();
+        std::thread::Builder::new()
+            .name("z2m-converters".into())
+            .spawn(move || {
+                let converter = ExternalConverter::new(dir, registry_url);
+                let mut sessions: HashMap<String, ConverterSession> = HashMap::new();
+                while let Ok(job) = receiver.recv() {
+                    match job {
+                        ConverterJob::Convert {
+                            model,
+                            cluster_id,
+                            msg_type,
+                            reports,
+                            device,
+                            message,
+                            state,
+                            reply,
+                        } => {
+                            let key = format!("{}|{model}", device.ieee_addr);
+                            if !sessions.contains_key(&key) {
+                                match converter.open_session(&model, &device) {
+                                    Some(session) => {
+                                        sessions.insert(key.clone(), session);
+                                    }
+                                    None => {
+                                        let _ = reply.send(None);
+                                        continue;
+                                    }
+                                }
+                            }
+                            let result = sessions.get_mut(&key).and_then(|session| {
+                                converter.dispatch_session(
+                                    session, cluster_id, &msg_type, &reports, &device, &message,
+                                    &state,
+                                )
+                            });
+                            let _ = reply.send(result);
+                        }
+                    }
+                }
+            })
+            .ok()?;
+        *guard = Some(sender.clone());
+        Some(sender)
+    }
+
+    /// Convert a frame using the persistent per-device Boa session.
+    ///
+    /// Module state and timers survive between frames for the same IEEE address.
+    /// Falls back to the per-call context only when the runtime thread cannot be
+    /// started or has stopped.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_from_zigbee_session(
+        &self,
+        model: &str,
+        cluster_id: u16,
+        msg_type: &str,
+        reports: &[(u16, serde_json::Value)],
+        device: &ExternalDeviceInfo,
+        message: &IncomingMessageInfo,
+        state: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<serde_json::Map<String, serde_json::Value>> {
+        let Some(sender) = self.runtime_sender() else {
+            return self.convert_from_zigbee_with_message(
+                model, cluster_id, msg_type, reports, device, message, state,
+            );
+        };
+        let (reply, receiver) = mpsc::channel();
+        let job = ConverterJob::Convert {
+            model: model.to_string(),
+            cluster_id,
+            msg_type: msg_type.to_string(),
+            reports: reports.to_vec(),
+            device: device.clone(),
+            message: *message,
+            state: state.clone(),
+            reply,
+        };
+        if sender.send(job).is_err() {
+            return self.convert_from_zigbee_with_message(
+                model, cluster_id, msg_type, reports, device, message, state,
+            );
+        }
+        match receiver.recv_timeout(Duration::from_secs(10)) {
+            Ok(result) => result,
+            Err(error) => {
+                warn!("external converter session timed out: {error}");
+                None
+            }
+        }
     }
 }
 
@@ -1113,6 +1395,7 @@ impl ExternalConverter {
 
 /// Collect every CJS source reachable from the entry device file.
 /// Keys are dist-relative paths (`devices/lytko.js`, `converters/foo.js`, ...).
+/// Collect every CJS source reachable from the entry device file.
 fn collect_sources(
     dir: &Path,
     entry_src: &str,
@@ -1858,5 +2141,137 @@ module.exports = {definitions};
         );
         let exposes = conv.exposes("ExposeBulb", &device()).expect("exposes");
         assert_eq!(exposes[0]["name"], "temperature");
+    }
+
+    const TIMER_DEVICE_JS: &str = r#"
+let frames = 0;
+let timerFired = 0;
+const definitions = [
+    {
+        model: "TimerBulb",
+        vendor: "Fixture",
+        description: "session state fixture",
+        fromZigbee: [
+            {
+                cluster: "msTemperatureMeasurement",
+                type: ["attributeReport"],
+                convert: () => {
+                    frames += 1;
+                    if (frames === 1) setTimeout(() => { timerFired += 1; }, 0);
+                    return {frames, timerFired};
+                },
+            },
+        ],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    #[test]
+    fn session_keeps_module_state_and_runs_due_timers() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("timerdev.js"),
+            TIMER_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"timerbulb": [["timerdev.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let mut timer_device = device();
+        timer_device.ieee_addr = "0x00000000000000aa".into();
+        let first = conv
+            .convert_from_zigbee_session(
+                "TimerBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(100))],
+                &timer_device,
+                &IncomingMessageInfo::default(),
+                &Default::default(),
+            )
+            .expect("first frame");
+        assert_eq!(first.get("frames"), Some(&serde_json::json!(1)));
+        assert_eq!(first.get("timerFired"), Some(&serde_json::json!(0)));
+
+        let second = conv
+            .convert_from_zigbee_session(
+                "TimerBulb",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(110))],
+                &timer_device,
+                &IncomingMessageInfo::default(),
+                &Default::default(),
+            )
+            .expect("second frame");
+        assert_eq!(second.get("frames"), Some(&serde_json::json!(2)));
+        assert_eq!(
+            second.get("timerFired"),
+            Some(&serde_json::json!(1)),
+            "setTimeout callback must run and mutate module state"
+        );
+    }
+
+    const STORE_DEVICE_JS: &str = r#"
+const deviceStore = new Map();
+const definitions = [
+    {
+        model: "StoreBulb",
+        vendor: "Fixture",
+        description: "shared store fixture",
+        fromZigbee: [
+            {
+                cluster: "msTemperatureMeasurement",
+                type: ["attributeReport"],
+                convert: (model, msg, publish, options, meta) => {
+                    const count = (deviceStore.get(meta.device) || 0) + 1;
+                    deviceStore.set(meta.device, count);
+                    return {store_count: count};
+                },
+            },
+        ],
+        toZigbee: [],
+    },
+];
+module.exports = {definitions};
+"#;
+
+    #[test]
+    fn session_keeps_device_keyed_module_store() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("storedev.js"),
+            STORE_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"storebulb": [["storedev.js", 0]]},
+                "fingerprints": [],
+            }),
+        );
+        let mut store_device = device();
+        store_device.ieee_addr = "0x00000000000000bb".into();
+        for expected in [1, 2, 3] {
+            let out = conv
+                .convert_from_zigbee_session(
+                    "StoreBulb",
+                    1026,
+                    "attributeReport",
+                    &[(0, serde_json::json!(100))],
+                    &store_device,
+                    &IncomingMessageInfo::default(),
+                    &Default::default(),
+                )
+                .expect("store frame");
+            assert_eq!(out.get("store_count"), Some(&serde_json::json!(expected)));
+        }
     }
 }

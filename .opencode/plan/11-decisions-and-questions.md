@@ -78,24 +78,18 @@ Silent `mqtts`→plain TCP является дефектом, а не вариа
 адаптированного кода/fixtures/assets и правила поставки подтвердить с владельцем
 до release; не изменять license на основании названия проекта.
 
-### ADR-08. Владение persistent Boa context
+### ADR-08. Владение persistent Boa context — выбран вариант 1
 
-**Блокер:** `boa_engine::Context` не `Send` (содержит `Rc<dyn JobQueue>`,
-`Rc<dyn ModuleLoader>` и Rc-значения), а `ExternalConverter` живёт в `Arc` и
-используется задачей на multi-thread Tokio. Нельзя хранить Context в общей
-структуре или thread-local без риска потери состояния при миграции задачи.
+**Реализовано:** dedicated `z2m-converters` thread владеет Boa-контекстами;
+`ExternalConverter` отправляет owned jobs через `std::sync::mpsc` и ждёт ответ.
+Сессия кэшируется по `(IEEE, model)`, module state и `globalThis.__device`
+сохраняются, timers выполняются после кадра. Fallback на per-call context при
+недоступном actor.
 
-Варианты до реализации CV-06/07:
-1. **Выделенный converter actor thread (рекомендуется):** поток владеет всеми
-   контекстами/кэшем модулей, `ExternalConverter` отправляет blocking job через
-   канал. Сохраняет одного владельца business state; нужны shutdown protocol и
-   измерение памяти на роутере.
-2. **Tokio current_thread + thread-local контексты:** проще, но меняет scheduler
-   topology проекта и исключает будущий параллелизм.
-3. Оставить context на кадр: невозможно для timers/shared store.
-
-До решения CV-06/07 остаются частичными; независимые exposes API и HA mapping
-можно развивать отдельно.
+**Ограничения:** async fz Promise не ожидается; timers с будущей задержкой не
+планируются самостоятельно; сессии не вытесняются (RAM не измерен); callback
+timers не публикует результат; shutdown/panic actor наблюдаются только как
+закрытый канал и 10s timeout. Это `IN_PROGRESS`, не parity evidence.
 
 ## Необходимые исходные данные (первый шаг OPS-01)
 
