@@ -26,6 +26,9 @@ pub enum MqttCommand {
     SetDevice {
         friendly_name: String,
         payload: serde_json::Value,
+        /// Endpoint selected by a multi-endpoint command topic
+        /// (`<base>/<name>/l1/set`), or `None` for the whole device.
+        endpoint: Option<u8>,
     },
     GetDevice {
         friendly_name: String,
@@ -53,7 +56,23 @@ pub(crate) fn parse_device_command(
         return None;
     }
     let suffix = if is_set { "/set" } else { "/get" };
-    let friendly_name = friendly_name_from_topic(topic, base_topic, suffix);
+    let path = topic
+        .strip_prefix(base_topic)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .and_then(|rest| rest.strip_suffix(suffix));
+    // `<base>/<friendly>/l<N>/set` selects one endpoint; `<base>/<friendly>/set`
+    // addresses the whole device. Friendly names may contain '/', so only a
+    // trailing `l<N>` segment is treated as an endpoint selector.
+    let (friendly_name, endpoint) = match path {
+        Some(rest) => match rest.rsplit_once('/') {
+            Some((name, selector)) if !name.is_empty() => match endpoint_index(selector) {
+                Some(endpoint) => (name.to_string(), Some(endpoint)),
+                None => (rest.to_string(), None),
+            },
+            _ => (rest.to_string(), None),
+        },
+        None => (friendly_name_from_topic(topic, base_topic, suffix), None),
+    };
     let json_value = if is_get && payload.is_empty() {
         serde_json::Value::Null
     } else {
@@ -69,6 +88,7 @@ pub(crate) fn parse_device_command(
         MqttCommand::SetDevice {
             friendly_name,
             payload: json_value,
+            endpoint,
         }
     } else {
         MqttCommand::GetDevice {
@@ -363,6 +383,25 @@ impl MqttBridge {
         self.publish_retained(&topic, &bytes).await
     }
 
+    /// Publish a per-endpoint state snapshot (`<base>/<friendly>/<endpoint>`).
+    ///
+    /// z2m republishes stripped endpoint keys here because the HA MQTT JSON
+    /// light used for multi-gang devices cannot read suffixed `state_lN` keys
+    /// from the main topic.
+    pub async fn publish_endpoint_state(
+        &self,
+        friendly_name: &str,
+        endpoint: &str,
+        payload: &serde_json::Value,
+    ) -> Result<()> {
+        let topic = endpoint_state_topic(&self.base_topic, friendly_name, endpoint);
+        let bytes = serde_json::to_vec(payload)?;
+        self.client
+            .publish(&topic, QoS::AtMostOnce, false, bytes)
+            .await
+            .map_err(Error::Mqtt)
+    }
+
     /// Delete a retained Home Assistant discovery config (empty payload).
     pub async fn clear_ha_discovery(
         &self,
@@ -508,12 +547,44 @@ fn friendly_name_from_topic(topic: &str, base_topic: &str, suffix: &str) -> Stri
         .to_string()
 }
 
+/// Per-endpoint state topic used for stripped multi-gang snapshots.
+pub(crate) fn endpoint_state_topic(
+    base_topic: &str,
+    friendly_name: &str,
+    endpoint: &str,
+) -> String {
+    format!("{base_topic}/{friendly_name}/{endpoint}")
+}
+
+/// Map a multi-endpoint selector (`l1`, `l2`, ... or `button`) to an endpoint.
+///
+/// This is the cluster-fallback naming used by the bridge; definitions that
+/// provide explicit endpoint names are handled by the exposes path.
+pub(crate) fn endpoint_index(selector: &str) -> Option<u8> {
+    if selector == "button" {
+        return Some(3);
+    }
+    selector
+        .strip_prefix('l')
+        .and_then(|digits| digits.parse::<u8>().ok())
+        .filter(|endpoint| *endpoint > 0)
+}
+
 async fn subscribe_topics(client: &AsyncClient, base_topic: &str) -> bool {
     let set_wildcard = format!("{}/+/set", base_topic);
     let get_wildcard = format!("{}/+/get", base_topic);
+    // Multi-endpoint command topics: `<base>/<friendly>/l1/set`.
+    let endpoint_set_wildcard = format!("{}/+/+/set", base_topic);
+    let endpoint_get_wildcard = format!("{}/+/+/get", base_topic);
     let bridge_req_wildcard = format!("{}/bridge/request/#", base_topic);
 
-    for topic in &[&set_wildcard, &get_wildcard, &bridge_req_wildcard] {
+    for topic in &[
+        &set_wildcard,
+        &get_wildcard,
+        &endpoint_set_wildcard,
+        &endpoint_get_wildcard,
+        &bridge_req_wildcard,
+    ] {
         if let Err(e) = client.subscribe(*topic, QoS::AtLeastOnce).await {
             error!("MQTT subscribe error for {topic}: {e}");
             return false;
@@ -693,6 +764,52 @@ mod tests {
         assert_eq!(
             bridge_response_topic("zigbee2mqtt", "device/reporting/read"),
             "zigbee2mqtt/bridge/response/device/reporting/read"
+        );
+    }
+
+    #[test]
+    fn endpoint_set_topic_selects_the_endpoint() {
+        match parse_device_command(
+            "zigbee2mqtt",
+            "zigbee2mqtt/two_gang/l2/set",
+            br#"{"state":"ON"}"#,
+        ) {
+            Some(MqttCommand::SetDevice {
+                friendly_name,
+                endpoint,
+                payload,
+            }) => {
+                assert_eq!(friendly_name, "two_gang");
+                assert_eq!(endpoint, Some(2));
+                assert_eq!(payload["state"], "ON");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        match parse_device_command("zigbee2mqtt", "zigbee2mqtt/room/light/l1/set", b"ON") {
+            Some(MqttCommand::SetDevice {
+                friendly_name,
+                endpoint,
+                ..
+            }) => {
+                assert_eq!(friendly_name, "room/light");
+                assert_eq!(endpoint, Some(1));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        match parse_device_command("zigbee2mqtt", "zigbee2mqtt/two_gang/set", b"ON") {
+            Some(MqttCommand::SetDevice { endpoint, .. }) => assert_eq!(endpoint, None),
+            other => panic!("unexpected command: {other:?}"),
+        }
+        assert_eq!(endpoint_index("l3"), Some(3));
+        assert_eq!(endpoint_index("button"), Some(3));
+        assert_eq!(endpoint_index("left"), None);
+    }
+
+    #[test]
+    fn endpoint_state_topic_matches_discovery_contract() {
+        assert_eq!(
+            endpoint_state_topic("zigbee2mqtt", "two_gang", "l1"),
+            "zigbee2mqtt/two_gang/l1"
         );
     }
 }

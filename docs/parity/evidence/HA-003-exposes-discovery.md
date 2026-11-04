@@ -46,6 +46,8 @@ Pinned app `344b6e03b43644c97154a72ca9eae17193c553a2`,
 
 ## Divergences and gaps (not verified)
 
+- Endpoint-aware exposes (`endpoint: "l1"`) now produce per-endpoint entities; see
+  HA-005 for the multi-endpoint contract.
 - Only numeric/binary/switch/light exposes are mapped. Climate, cover, lock,
   fan, select, number, button, event, update and vendor-specific features are
   still using no/legacy inference.

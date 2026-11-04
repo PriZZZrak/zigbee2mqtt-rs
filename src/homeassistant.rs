@@ -16,6 +16,89 @@ async fn publish(mqtt: &MqttBridge, component: &str, ieee: &str, object_id: &str
     }
 }
 
+/// Sorted unique endpoints that expose the OnOff cluster.
+fn on_off_endpoints(device: &Device) -> Vec<u8> {
+    let mut endpoints: Vec<u8> = device
+        .endpoints
+        .iter()
+        .filter(|endpoint| endpoint.input_clusters.contains(&0x0006))
+        .map(|endpoint| endpoint.endpoint)
+        .collect();
+    endpoints.sort_unstable();
+    endpoints.dedup();
+    endpoints
+}
+
+/// z2m renders suffixed switch keys with bracket notation.
+fn state_template(property_key: &str, endpoint: Option<&str>) -> String {
+    match endpoint {
+        Some(_) => format!("{{{{ value_json[\"{property_key}\"] }}}}"),
+        None => format!("{{{{ value_json.{property_key} }}}}"),
+    }
+}
+
+fn endpoint_has(device: &Device, endpoint: u8, cluster: u16) -> bool {
+    device.endpoints.iter().any(|candidate| {
+        candidate.endpoint == endpoint && candidate.input_clusters.contains(&cluster)
+    })
+}
+
+/// Per-endpoint light/switch configs for a multi-gang device.
+///
+/// Naming follows z2m: lights use `light_lN` with a dedicated
+/// `<base>/<name>/lN` state topic; switches use `<friendly>_lN` with a
+/// `state_lN` template on the main state topic.
+fn endpoint_on_off_configs(
+    device: &Device,
+    base_topic: &str,
+    coordinator_ieee: &str,
+) -> Vec<(String, String, Value)> {
+    let ieee_hex = device.ieee_addr.as_hex();
+    let ha_device = device_block(device, base_topic, coordinator_ieee);
+    let availability = availability_block(base_topic);
+    let state_topic = format!("{}/{}", base_topic, device.friendly_name);
+    let mut configs = Vec::new();
+    for endpoint in on_off_endpoints(device) {
+        let suffix = format!("l{endpoint}");
+        let endpoint_command_topic = format!("{state_topic}/{suffix}/set");
+        if endpoint_has(device, endpoint, 0x0008) || endpoint_has(device, endpoint, 0x0300) {
+            let mut config = json!({
+                "availability": availability,
+                "command_topic": endpoint_command_topic,
+                "state_topic": format!("{state_topic}/{suffix}"),
+                "schema": "json",
+                "object_id": format!("light_{suffix}"),
+                "unique_id": format!("{ieee_hex}_light_{suffix}_{base_topic}"),
+                "device": ha_device,
+                "brightness": true,
+                "brightness_scale": 254,
+                "supported_color_modes": ["brightness"],
+            });
+            if endpoint_has(device, endpoint, 0x0300) {
+                config["supported_color_modes"] = json!(["color_temp", "xy"]);
+            }
+            configs.push(("light".to_string(), format!("light_{suffix}"), config));
+        } else {
+            configs.push((
+                "switch".to_string(),
+                format!("switch_{suffix}"),
+                json!({
+                    "availability": availability,
+                    "command_topic": endpoint_command_topic,
+                    "state_topic": state_topic,
+                    "object_id": format!("{}_{suffix}", device.friendly_name),
+                    "unique_id": format!("{ieee_hex}_switch_{suffix}_{base_topic}"),
+                    "device": ha_device,
+                    "value_template": format!("{{{{ value_json[\"state_{suffix}\"] }}}}"),
+                    "payload_on": "ON",
+                    "payload_off": "OFF",
+                }),
+            ));
+        }
+    }
+    configs
+}
+
 /// Publish all HA discovery messages for a device.
 pub async fn publish_discovery(
     mqtt: &MqttBridge,
@@ -33,7 +116,15 @@ pub async fn publish_discovery(
     let has_color = clusters.contains(&0x0300);
 
     // ── Light or Switch ───────────────────────────────────────────────────
-    if has_on_off {
+    // Multi-gang devices get one entity per OnOff endpoint; a single-endpoint
+    // device keeps the original global light/switch discovery unchanged.
+    if on_off_endpoints(device).len() > 1 {
+        for (component, object_id, config) in
+            endpoint_on_off_configs(device, base_topic, coordinator_ieee)
+        {
+            publish(mqtt, &component, &ieee_hex, &object_id, &config).await;
+        }
+    } else if has_on_off {
         if has_level || has_color {
             let mut config = json!({
                 "availability": availability,
@@ -388,6 +479,26 @@ fn binary_class(property: &str) -> Option<&'static str> {
 /// Returns `(component, object_id, config)` tuples for the expose kinds with a
 /// verified simple mapping. Unknown/complex exposes (climate, cover, lock, fan,
 /// vendor features) are skipped until their contracts are ported.
+/// Endpoint name from an upstream expose (`endpoint: "l1"` or an endpoint
+/// object), used for per-endpoint discovery.
+fn expose_endpoint(expose: &Value) -> Option<String> {
+    match expose.get("endpoint")? {
+        Value::String(name) if !name.is_empty() => Some(name.clone()),
+        Value::Object(object) => object
+            .get("name")
+            .and_then(|name| name.as_str())
+            .map(str::to_string)
+            .or_else(|| {
+                object
+                    .get("ID")
+                    .and_then(|id| id.as_u64())
+                    .map(|id| format!("l{id}"))
+            }),
+        Value::Number(id) => id.as_u64().map(|id| format!("l{id}")),
+        _ => None,
+    }
+}
+
 pub(crate) fn configs_from_exposes(
     device: &Device,
     exposes: &[Value],
@@ -398,11 +509,21 @@ pub(crate) fn configs_from_exposes(
     let ha_device = device_block(device, base_topic, coordinator_ieee);
     let availability = availability_block(base_topic);
     let state_topic = format!("{}/{}", base_topic, device.friendly_name);
-    let command_topic = format!("{}/set", state_topic);
     let mut configs = Vec::new();
     for expose in exposes {
         let Some(property) = expose_property(expose) else {
             continue;
+        };
+        // Definitions may expose per-endpoint features; z2m then suffixes the
+        // state property and routes commands to `<friendly>/<endpoint>/set`.
+        let endpoint = expose_endpoint(expose);
+        let property_key = match &endpoint {
+            Some(endpoint) => format!("{property}_{endpoint}"),
+            None => property.to_string(),
+        };
+        let command_topic = match &endpoint {
+            Some(endpoint) => format!("{state_topic}/{endpoint}/set"),
+            None => format!("{state_topic}/set"),
         };
         let kind = expose
             .get("type")
@@ -417,10 +538,10 @@ pub(crate) fn configs_from_exposes(
                 let mut config = json!({
                     "availability": availability,
                     "state_topic": state_topic,
-                    "object_id": property,
-                    "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                    "object_id": property_key,
+                    "unique_id": format!("{ieee_hex}_{property_key}_{base_topic}"),
                     "device": ha_device,
-                    "value_template": format!("{{{{ value_json.{property} }}}}"),
+                    "value_template": state_template(&property_key, endpoint.as_deref()),
                     "state_class": "measurement",
                     "enabled_by_default": true,
                 });
@@ -430,7 +551,7 @@ pub(crate) fn configs_from_exposes(
                 if let Some(class) = sensor_class(property) {
                     config["device_class"] = json!(class);
                 }
-                configs.push(("sensor".to_string(), property.to_string(), config));
+                configs.push(("sensor".to_string(), property_key, config));
             }
             "binary" if access & 0x02 != 0 && property == "state" => {
                 let on = expose
@@ -441,17 +562,33 @@ pub(crate) fn configs_from_exposes(
                     .get("value_off")
                     .map(payload_string)
                     .unwrap_or_else(|| "OFF".into());
+                // Per-endpoint switch: z2m keeps the device state topic and
+                // selects `state_<endpoint>` in the template, while commands go
+                // to `<friendly>/<endpoint>/set`.
+                let (object_id, unique_id) = match &endpoint {
+                    Some(endpoint) => (
+                        format!("{}_{endpoint}", device.friendly_name),
+                        format!("{ieee_hex}_switch_{endpoint}_{base_topic}"),
+                    ),
+                    None => (
+                        property_key.clone(),
+                        format!("{ieee_hex}_{property_key}_{base_topic}"),
+                    ),
+                };
                 configs.push((
                     "switch".to_string(),
-                    property.to_string(),
+                    match &endpoint {
+                        Some(endpoint) => format!("switch_{endpoint}"),
+                        None => property_key.clone(),
+                    },
                     json!({
                         "availability": availability,
                         "command_topic": command_topic,
                         "state_topic": state_topic,
-                        "object_id": property,
-                        "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                        "object_id": object_id,
+                        "unique_id": unique_id,
                         "device": ha_device,
-                        "value_template": format!("{{{{ value_json.{property} }}}}"),
+                        "value_template": state_template(&property_key, endpoint.as_deref()),
                         "payload_on": on,
                         "payload_off": off,
                     }),
@@ -469,10 +606,10 @@ pub(crate) fn configs_from_exposes(
                 let mut config = json!({
                     "availability": availability,
                     "state_topic": state_topic,
-                    "object_id": property,
-                    "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                    "object_id": property_key,
+                    "unique_id": format!("{ieee_hex}_{property_key}_{base_topic}"),
                     "device": ha_device,
-                    "value_template": format!("{{{{ value_json.{property} }}}}"),
+                    "value_template": state_template(&property_key, endpoint.as_deref()),
                     "payload_on": on,
                     "payload_off": off,
                     "enabled_by_default": true,
@@ -480,7 +617,7 @@ pub(crate) fn configs_from_exposes(
                 if let Some(class) = binary_class(property) {
                     config["device_class"] = json!(class);
                 }
-                configs.push(("binary_sensor".to_string(), property.to_string(), config));
+                configs.push(("binary_sensor".to_string(), property_key, config));
             }
             "switch" => {
                 let on = expose
@@ -491,17 +628,30 @@ pub(crate) fn configs_from_exposes(
                     .get("value_off")
                     .map(payload_string)
                     .unwrap_or_else(|| "OFF".into());
+                let (object_id, unique_id) = match &endpoint {
+                    Some(endpoint) => (
+                        format!("{}_{endpoint}", device.friendly_name),
+                        format!("{ieee_hex}_switch_{endpoint}_{base_topic}"),
+                    ),
+                    None => (
+                        property_key.clone(),
+                        format!("{ieee_hex}_{property_key}_{base_topic}"),
+                    ),
+                };
                 configs.push((
                     "switch".to_string(),
-                    property.to_string(),
+                    match &endpoint {
+                        Some(endpoint) => format!("switch_{endpoint}"),
+                        None => property_key.clone(),
+                    },
                     json!({
                         "availability": availability,
                         "command_topic": command_topic,
                         "state_topic": state_topic,
-                        "object_id": property,
-                        "unique_id": format!("{ieee_hex}_{property}_{base_topic}"),
+                        "object_id": object_id,
+                        "unique_id": unique_id,
                         "device": ha_device,
-                        "value_template": format!("{{{{ value_json.{property} }}}}"),
+                        "value_template": state_template(&property_key, endpoint.as_deref()),
                         "payload_on": on,
                         "payload_off": off,
                     }),
@@ -528,13 +678,26 @@ pub(crate) fn configs_from_exposes(
                         Some("color_xy") | Some("color_hs")
                     )
                 });
+                let (object_id, unique_id, state_topic_or_endpoint) = match &endpoint {
+                    Some(endpoint) => (
+                        format!("light_{endpoint}"),
+                        format!("{ieee_hex}_light_{endpoint}_{base_topic}"),
+                        // z2m republishes stripped endpoint state here.
+                        format!("{state_topic}/{endpoint}"),
+                    ),
+                    None => (
+                        device.friendly_name.clone(),
+                        format!("{ieee_hex}_light_{base_topic}"),
+                        state_topic.clone(),
+                    ),
+                };
                 let mut config = json!({
                     "availability": availability,
                     "command_topic": command_topic,
-                    "state_topic": state_topic,
+                    "state_topic": state_topic_or_endpoint,
                     "schema": "json",
-                    "object_id": device.friendly_name,
-                    "unique_id": format!("{ieee_hex}_light_{base_topic}"),
+                    "object_id": object_id,
+                    "unique_id": unique_id,
                     "device": ha_device,
                     "brightness": has_brightness,
                     "brightness_scale": 254,
@@ -552,7 +715,11 @@ pub(crate) fn configs_from_exposes(
                 if !modes.is_empty() {
                     config["supported_color_modes"] = json!(modes);
                 }
-                configs.push(("light".to_string(), "light".to_string(), config));
+                let object_id = match &endpoint {
+                    Some(endpoint) => format!("light_{endpoint}"),
+                    None => "light".to_string(),
+                };
+                configs.push(("light".to_string(), object_id, config));
             }
             _ => {}
         }
@@ -578,7 +745,11 @@ pub(crate) fn discovery_topics(device: &Device, exposes: &[Value]) -> Vec<(Strin
     let mut push = |component: &str, object_id: &str| {
         topics.push((component.to_string(), object_id.to_string()));
     };
-    if clusters.contains(&0x0006) {
+    if on_off_endpoints(device).len() > 1 {
+        for (component, object_id, _) in endpoint_on_off_configs(device, "zigbee2mqtt", "") {
+            push(&component, &object_id);
+        }
+    } else if clusters.contains(&0x0006) {
         if clusters.contains(&0x0008) || clusters.contains(&0x0300) {
             push("light", "light");
         } else {
@@ -1334,5 +1505,120 @@ mod tests {
             ]
         );
         assert!(crate::mqtt::ha_clear_payload().is_empty());
+    }
+
+    fn make_two_gang() -> Device {
+        let mut dev = Device::new(
+            IeeeAddr([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]),
+            0x2345,
+        );
+        dev.friendly_name = "two_gang".to_string();
+        dev.interview_complete = true;
+        dev.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0100,
+            input_clusters: vec![0x0000, 0x0006, 0x0008],
+            output_clusters: vec![],
+        });
+        dev.endpoints.push(EndpointDesc {
+            endpoint: 2,
+            profile_id: 0x0104,
+            device_id: 0x0100,
+            input_clusters: vec![0x0006],
+            output_clusters: vec![],
+        });
+        dev
+    }
+
+    #[test]
+    fn multi_endpoint_discovery_publishes_one_entity_per_endpoint() {
+        let dev = make_two_gang();
+        let configs = endpoint_on_off_configs(&dev, BASE, COORD_IEEE);
+        assert_eq!(configs.len(), 2);
+
+        let (component, object_id, light) = &configs[0];
+        assert_eq!(component, "light");
+        assert_eq!(object_id, "light_l1");
+        assert_eq!(light["object_id"], "light_l1");
+        assert_eq!(
+            light["unique_id"],
+            format!("{}_light_l1_{BASE}", dev.ieee_addr.as_hex())
+        );
+        // Per-endpoint lights read a stripped snapshot topic, not state_l1.
+        assert_eq!(light["state_topic"], format!("{BASE}/two_gang/l1"));
+        assert_eq!(light["command_topic"], format!("{BASE}/two_gang/l1/set"));
+        assert_eq!(light["schema"], "json");
+        assert!(light.get("value_template").is_none());
+
+        let (component, object_id, switch) = &configs[1];
+        assert_eq!(component, "switch");
+        assert_eq!(object_id, "switch_l2");
+        assert_eq!(switch["object_id"], "two_gang_l2");
+        assert_eq!(
+            switch["unique_id"],
+            format!("{}_switch_l2_{BASE}", dev.ieee_addr.as_hex())
+        );
+        // Per-endpoint switches keep the main state topic with a suffixed key.
+        assert_eq!(switch["state_topic"], format!("{BASE}/two_gang"));
+        assert_eq!(switch["value_template"], "{{ value_json[\"state_l2\"] }}");
+        assert_eq!(switch["command_topic"], format!("{BASE}/two_gang/l2/set"));
+        assert_eq!(switch["payload_on"], "ON");
+        assert_eq!(switch["payload_off"], "OFF");
+    }
+
+    #[test]
+    fn multi_endpoint_cleanup_topics_match_discovery_entities() {
+        let dev = make_two_gang();
+        assert_eq!(
+            discovery_topics(&dev, &[]),
+            vec![
+                ("light".to_string(), "light_l1".to_string()),
+                ("sensor".to_string(), "linkquality".to_string()),
+                ("switch".to_string(), "switch_l2".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn single_endpoint_discovery_shape_is_unchanged() {
+        let dev = make_light();
+        let configs = configs_from_exposes(
+            &dev,
+            &[json!({"type": "light", "name": "light", "features": [{"name": "brightness"}]})],
+            BASE,
+            COORD_IEEE,
+        );
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].0, "light");
+        assert_eq!(configs[0].1, "light");
+        assert_eq!(configs[0].2["state_topic"], format!("{BASE}/bulb"));
+        assert_eq!(configs[0].2["command_topic"], format!("{BASE}/bulb/set"));
+        assert_eq!(
+            configs[0].2["unique_id"],
+            format!("{}_light_{BASE}", dev.ieee_addr.as_hex())
+        );
+    }
+
+    #[test]
+    fn expose_endpoint_produces_suffixed_entity() {
+        let dev = make_two_gang();
+        let exposes = vec![
+            json!({"type": "light", "name": "light", "endpoint": "l1", "features": [{"name": "brightness"}]}),
+            json!({"type": "switch", "name": "state", "endpoint": "l2",
+                   "property": "state", "access": 7, "value_on": "ON", "value_off": "OFF"}),
+        ];
+        let configs = configs_from_exposes(&dev, &exposes, BASE, COORD_IEEE);
+        assert_eq!(configs.len(), 2);
+        let light = &configs[0];
+        assert_eq!(light.1, "light_l1");
+        assert_eq!(light.2["state_topic"], format!("{BASE}/two_gang/l1"));
+        assert_eq!(light.2["command_topic"], format!("{BASE}/two_gang/l1/set"));
+
+        let switch = &configs[1];
+        assert_eq!(switch.1, "switch_l2");
+        assert_eq!(switch.2["object_id"], "two_gang_l2");
+        assert_eq!(switch.2["value_template"], "{{ value_json[\"state_l2\"] }}");
+        assert_eq!(switch.2["command_topic"], format!("{BASE}/two_gang/l2/set"));
     }
 }

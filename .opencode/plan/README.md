@@ -90,6 +90,11 @@ R1 — явно ограниченный релиз для проверенно�
   QueryNextImage запускает auto-check и публикует `available` с throttling;
   bridge-level helper проверен fake index/device fixture. Полный Message loop,
   настраиваемый override, реальный HTTPS/cache и HIL отсутствуют.
+- **HA multi-endpoint частично**: устройство с несколькими OnOff endpoint
+  публикует `light_lN`/`switch_lN`, команды идут на `<friendly>/lN/set`,
+  `state_lN`/`brightness_lN` разбираются, а stripped-снимок публикуется на
+  `<base>/<friendly>/<lN>` как в z2m. Cover/postfix-attribute topics, live
+  broker/HA и HIL отсутствуют.
 - **HA cleanup частично**: retained discovery configs удаляются пустым payload
   (`retain=true`, QoS1) при remove; rename очищает старые configs и публикует
   новые. Fake MQTT sink E2E проводит device/remove через publish path и проверяет

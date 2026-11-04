@@ -857,17 +857,9 @@ impl Bridge {
                             let external_used = external_values.is_some();
                             values = merge_converted_values(values, external_values);
                             if !values.is_empty() {
-                                let suffix = devices.get_by_nwk(src_addr).and_then(|d| {
-                                    if d.endpoints.len() <= 1 {
-                                        return None;
-                                    }
-                                    match src_ep {
-                                        1 => Some("l1".to_string()),
-                                        2 => Some("l2".to_string()),
-                                        3 => Some("button".to_string()),
-                                        _ => None,
-                                    }
-                                });
+                                let suffix = devices
+                                    .get_by_nwk(src_addr)
+                                    .and_then(|d| endpoint_suffix(&d, src_ep));
                                 if let Some(suffix) = &suffix {
                                     let keys: Vec<String> = values.keys().cloned().collect();
                                     let mut suffixed = serde_json::Map::new();
@@ -933,11 +925,11 @@ impl Bridge {
                                 });
                             }
                         }
-                        Some(MqttCommand::SetDevice { friendly_name, payload }) => {
-                            info!("MQTT set: {friendly_name} -> {payload}");
+                        Some(MqttCommand::SetDevice { friendly_name, payload, endpoint }) => {
+                            info!("MQTT set: {friendly_name} (endpoint {endpoint:?}) -> {payload}");
                             Self::handle_set(
                                 &devices, &coord, &mqtt, self.cfg.advanced.output, &mut trans_id,
-                                &friendly_name, &payload,
+                                &friendly_name, endpoint, &payload,
                             ).await;
                         }
                         Some(MqttCommand::GetDevice { friendly_name, payload }) => {
@@ -1802,6 +1794,7 @@ impl Bridge {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn handle_set(
         devices: &DeviceRegistry,
         coord: &CoordinatorHandle,
@@ -1809,6 +1802,7 @@ impl Bridge {
         output: OutputMode,
         trans_id: &mut u8,
         name: &str,
+        endpoint: Option<u8>,
         payload: &serde_json::Value,
     ) {
         let dev = match devices.find_by_name(name) {
@@ -1833,41 +1827,88 @@ impl Bridge {
         // Build optimistic state from the command payload
         let mut optimistic = serde_json::Map::new();
 
-        // Handle state (on/off)
+        // Handle state (on/off), including per-endpoint `state_lN` keys.
+        let mut state_targets: Vec<(Option<String>, u8, String)> = Vec::new();
         if let Some(state_val) = payload.get("state") {
-            let state_str = state_val.as_str().unwrap_or("");
-            if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0006) {
-                if let Some(zcl_payload) = on_off::set_state_payload(*trans_id, state_str) {
-                    *trans_id = trans_id.wrapping_add(1);
-                    if let Err(e) = coord
-                        .send_zcl(nwk_addr, ep, 0x0006, *trans_id, zcl_payload)
-                        .await
-                    {
-                        warn!("Failed to send on/off command: {e}");
+            let state_str = state_val.as_str().unwrap_or("").to_string();
+            let target = endpoint.or_else(|| find_ep_with_cluster(&endpoints, 0x0006));
+            if let Some(ep) = target {
+                state_targets.push((None, ep, state_str));
+            }
+        }
+        for (key, value) in payload.as_object().into_iter().flatten() {
+            let Some((base, suffix)) = parse_endpoint_key(key) else {
+                continue;
+            };
+            if base == "state" {
+                if let Some(state_str) = value.as_str() {
+                    let selector = crate::mqtt::endpoint_index(&suffix)
+                        .or_else(|| endpoint_named(&endpoints, &suffix));
+                    if let Some(ep) = selector {
+                        state_targets.push((Some(suffix), ep, state_str.to_string()));
                     }
-                    optimistic.insert("state".into(), json!(state_str.to_uppercase()));
                 }
             }
         }
+        for (suffix, ep, state_str) in state_targets {
+            let Some(zcl_payload) = on_off::set_state_payload(*trans_id, &state_str) else {
+                continue;
+            };
+            *trans_id = trans_id.wrapping_add(1);
+            if let Err(e) = coord
+                .send_zcl(nwk_addr, ep, 0x0006, *trans_id, zcl_payload)
+                .await
+            {
+                warn!("Failed to send on/off command: {e}");
+            }
+            let key = match &suffix {
+                Some(suffix) => format!("state_{suffix}"),
+                None => "state".to_string(),
+            };
+            optimistic.insert(key, json!(state_str.to_uppercase()));
+        }
 
-        // Handle brightness
+        // Handle brightness, including per-endpoint `brightness_lN` keys.
+        let mut brightness_targets: Vec<(Option<String>, u8, u64)> = Vec::new();
         if let Some(brightness) = payload.get("brightness").and_then(|v| v.as_u64()) {
-            if let Some(ep) = find_ep_with_cluster(&endpoints, 0x0008) {
-                let lvl = brightness.min(254) as u8;
-                let transition = transition_time(payload);
-                let zcl_payload = level::move_to_level_payload(*trans_id, lvl, transition);
-                *trans_id = trans_id.wrapping_add(1);
-                if let Err(e) = coord
-                    .send_zcl(nwk_addr, ep, 0x0008, *trans_id, zcl_payload)
-                    .await
-                {
-                    warn!("Failed to send level command: {e}");
+            let target = endpoint.or_else(|| find_ep_with_cluster(&endpoints, 0x0008));
+            if let Some(ep) = target {
+                brightness_targets.push((None, ep, brightness));
+            }
+        }
+        for (key, value) in payload.as_object().into_iter().flatten() {
+            let Some((base, suffix)) = parse_endpoint_key(key) else {
+                continue;
+            };
+            if base == "brightness" {
+                if let Some(brightness) = value.as_u64() {
+                    let selector = crate::mqtt::endpoint_index(&suffix)
+                        .or_else(|| endpoint_named(&endpoints, &suffix));
+                    if let Some(ep) = selector {
+                        brightness_targets.push((Some(suffix), ep, brightness));
+                    }
                 }
-                optimistic.insert("brightness".into(), json!(lvl));
-                // Move-to-level-with-on/off implies state ON
-                if !optimistic.contains_key("state") {
-                    optimistic.insert("state".into(), json!("ON"));
-                }
+            }
+        }
+        for (suffix, ep, brightness) in brightness_targets {
+            let lvl = brightness.min(254) as u8;
+            let transition = transition_time(payload);
+            let zcl_payload = level::move_to_level_payload(*trans_id, lvl, transition);
+            *trans_id = trans_id.wrapping_add(1);
+            if let Err(e) = coord
+                .send_zcl(nwk_addr, ep, 0x0008, *trans_id, zcl_payload)
+                .await
+            {
+                warn!("Failed to send level command: {e}");
+            }
+            let (brightness_key, state_key) = match &suffix {
+                Some(suffix) => (format!("brightness_{suffix}"), format!("state_{suffix}")),
+                None => ("brightness".to_string(), "state".to_string()),
+            };
+            optimistic.insert(brightness_key, json!(lvl));
+            // Move-to-level-with-on/off implies state ON.
+            if !optimistic.contains_key(&state_key) {
+                optimistic.insert(state_key, json!("ON"));
             }
         }
 
@@ -2131,6 +2172,46 @@ impl Bridge {
                 warn!("Failed to publish attribute {key_path} for {friendly_name}: {e}");
             }
         }
+        // Republish stripped endpoint keys on `<base>/<friendly>/<endpoint>`,
+        // matching z2m's per-endpoint light state topic.
+        for (endpoint, payload) in Self::endpoint_state_payloads(state) {
+            if let Err(e) = mqtt
+                .publish_endpoint_state(friendly_name, &endpoint, &payload)
+                .await
+            {
+                warn!("Failed to publish endpoint state {friendly_name}/{endpoint}: {e}");
+            }
+        }
+    }
+
+    /// Split suffixed state keys into per-endpoint payloads.
+    ///
+    /// `{state_l1: "ON", brightness_l1: 20}` becomes `("l1", {state: "ON",
+    /// brightness: 20})`. Keys without a known endpoint suffix are ignored.
+    fn endpoint_state_payloads(state: &serde_json::Value) -> Vec<(String, serde_json::Value)> {
+        let Some(object) = state.as_object() else {
+            return Vec::new();
+        };
+        let mut endpoints: std::collections::BTreeMap<
+            String,
+            serde_json::Map<String, serde_json::Value>,
+        > = std::collections::BTreeMap::new();
+        for (key, value) in object {
+            let Some((base, suffix)) = parse_endpoint_key(key) else {
+                continue;
+            };
+            if crate::mqtt::endpoint_index(&suffix).is_none() {
+                continue;
+            }
+            endpoints
+                .entry(suffix)
+                .or_default()
+                .insert(base.to_string(), value.clone());
+        }
+        endpoints
+            .into_iter()
+            .map(|(endpoint, payload)| (endpoint, serde_json::Value::Object(payload)))
+            .collect()
     }
 
     /// Decides *what* `publish_state` should publish for a given output mode,
@@ -2730,6 +2811,48 @@ fn read_target(key: &str) -> Option<(u16, &'static [u16])> {
         "contact" | "tamper" => (0x0500, &[0x0002][..]),
         _ => return None,
     })
+}
+
+/// Cluster-fallback endpoint suffix used in state keys (`state_l1`).
+///
+/// Multi-endpoint devices get one suffix per endpoint. Definitions with explicit
+/// endpoint names are handled by the exposes discovery path instead.
+fn endpoint_suffix(device: &Device, endpoint: u8) -> Option<String> {
+    if device.endpoints.len() <= 1 {
+        return None;
+    }
+    // Switches/lights are addressed as `l<N>` regardless of gang count;
+    // action-only endpoints keep the historical `button` name.
+    if device.endpoints.iter().any(|candidate| {
+        candidate.endpoint == endpoint && candidate.input_clusters.contains(&0x0006)
+    }) {
+        return Some(format!("l{endpoint}"));
+    }
+    match endpoint {
+        1 => Some("l1".to_string()),
+        2 => Some("l2".to_string()),
+        3 => Some("button".to_string()),
+        _ => None,
+    }
+}
+
+/// Split a per-endpoint state key (`state_l1`, `brightness_l2`) into base + suffix.
+fn parse_endpoint_key(key: &str) -> Option<(&str, String)> {
+    // Split on the last underscore so `color_temp_l1` becomes
+    // (`color_temp`, `l1`), not (`color`, `temp_l1`).
+    let (base, suffix) = key.rsplit_once('_')?;
+    if suffix.is_empty() {
+        return None;
+    }
+    Some((base, suffix.to_string()))
+}
+
+/// Resolve an endpoint name used by a definition expose.
+fn endpoint_named(endpoints: &[EndpointDesc], name: &str) -> Option<u8> {
+    endpoints
+        .iter()
+        .find(|endpoint| endpoint.endpoint.to_string() == name)
+        .map(|endpoint| endpoint.endpoint)
 }
 
 fn find_ep_with_cluster(endpoints: &[EndpointDesc], cluster_id: u16) -> Option<u8> {
@@ -3796,5 +3919,75 @@ mod tests {
             now + std::time::Duration::from_secs(61),
         )
         .is_some());
+    }
+
+    #[test]
+    fn endpoint_state_payloads_strip_suffix_and_ignore_plain_keys() {
+        let state = json!({
+            "state_l1": "ON",
+            "brightness_l1": 20,
+            "state_l2": "OFF",
+            "color_temp": 300,
+            "linkquality": 90,
+            "color_temp_l1": 250
+        });
+        let payloads = Bridge::endpoint_state_payloads(&state);
+        assert_eq!(payloads.len(), 2);
+        assert_eq!(payloads[0].0, "l1");
+        assert_eq!(
+            payloads[0].1,
+            json!({"state": "ON", "brightness": 20, "color_temp": 250})
+        );
+        assert_eq!(payloads[1].0, "l2");
+        assert_eq!(payloads[1].1, json!({"state": "OFF"}));
+    }
+
+    #[test]
+    fn endpoint_suffix_uses_l_index_for_on_off_gangs() {
+        let mut device = Device::new(IeeeAddr::from_hex("0x0017880104e45522").unwrap(), 0x1234);
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0006],
+            output_clusters: vec![],
+        });
+        device.endpoints.push(EndpointDesc {
+            endpoint: 2,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0006],
+            output_clusters: vec![],
+        });
+        device.endpoints.push(EndpointDesc {
+            endpoint: 3,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0006],
+            output_clusters: vec![],
+        });
+        assert_eq!(endpoint_suffix(&device, 1).as_deref(), Some("l1"));
+        assert_eq!(endpoint_suffix(&device, 3).as_deref(), Some("l3"));
+
+        let mut action_device =
+            Device::new(IeeeAddr::from_hex("0x0017880104e45523").unwrap(), 0x1234);
+        action_device.endpoints.push(EndpointDesc {
+            endpoint: 3,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0012],
+            output_clusters: vec![],
+        });
+        action_device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0,
+            input_clusters: vec![0x0000],
+            output_clusters: vec![],
+        });
+        assert_eq!(
+            endpoint_suffix(&action_device, 3).as_deref(),
+            Some("button")
+        );
     }
 }
