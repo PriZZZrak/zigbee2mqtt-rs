@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-04T16:09:14+00:00",
+  "captured_utc": "2026-11-04T16:13:26+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1; Node, pnpm, mosquitto, nix and aarch64-linux-gnu-gcc unavailable",
   "commands": [
     {
@@ -25,7 +25,7 @@
     {
       "command": "python3 -m unittest discover -s scripts/tests",
       "exit": 0,
-      "result": "19 parity/layout validator tests passed"
+      "result": "24 parity/layout/EVID-04 harness tests passed"
     }
   ]
 }

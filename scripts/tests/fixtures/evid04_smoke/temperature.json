@@ -1,0 +1,9 @@
+{
+  "id": "harness-smoke-temperature",
+  "ignore": ["last_seen"],
+  "sort": ["actions"],
+  "input": {
+    "measuredValue": 2250,
+    "linkquality": 42
+  }
+}

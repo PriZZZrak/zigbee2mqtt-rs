@@ -41,3 +41,16 @@ jobs:
         run: python3 -m unittest discover -s scripts/tests -v
       - name: Inventory, evidence and dashboard gate
         run: python3 scripts/parity_report.py --check
+      - name: EVID-04 harness smoke (fake reference, not parity)
+        run: |
+          python3 scripts/evid04_harness.py \
+            --fixtures scripts/tests/fixtures/evid04_smoke \
+            --reference-cmd "python3 scripts/tests/fake_evid04_reference.py reference" \
+            --candidate-cmd "python3 scripts/tests/fake_evid04_reference.py candidate" \
+            --skip-pins \
+            --report evid04-smoke.json
+      - name: Upload EVID-04 smoke report
+        uses: actions/upload-artifact@v4
+        with:
+          name: evid04-smoke
+          path: evid04-smoke.json
