@@ -30,7 +30,7 @@
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
       "exit": 0,
-      "result": "static aarch64 ELF built from the current tree (5688640 bytes, sha256 abe3cd60...)"
+      "result": "static aarch64 ELF built from the current tree (5704112 bytes, sha256 1861112d...)"
     },
     {
       "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",
@@ -40,7 +40,7 @@
     {
       "command": "scripts/build-openwrt-ipk.sh <SDK>/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64",
       "exit": 0,
-      "result": "SDK .ipk rebuilt from the current tree: 5,665,808 B, sha256 4cc5cddb..., installed 12,113,920 B; identical hash on rebuild; install/upgrade BLOCKED on device"
+      "result": "SDK .ipk rebuilt from the current tree: 5,671,538 B, sha256 cef03150..., installed 12,134,400 B; identical hash on rebuild; install/upgrade BLOCKED on device"
     },
     {
       "command": "python3 scripts/evid04_harness.py --fixtures docs/parity/evidence/evid04/bridge-fixtures (real bridge, in-process broker)",
