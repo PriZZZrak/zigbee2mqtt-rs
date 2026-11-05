@@ -30,9 +30,9 @@ R1 — явно ограниченный релиз для проверенно�
 
 ## Состояние выполнения
 
-- **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 737 056 B,
-  sha256 `1576164a…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
-  (5 689 184 B, sha256 `e68d2f88…`, installed 12 165 120 B с app-resolved Windfront 2.15.0,
+- **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 746 664 B,
+  sha256 `a18be84d…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
+  (5 688 162 B, sha256 `250cf601…`, installed 12 175 360 B с app-resolved Windfront 2.15.0,
   `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;

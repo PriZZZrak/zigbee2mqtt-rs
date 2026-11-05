@@ -126,6 +126,33 @@ content is covered by `docs/parity/reports/generated-definitions.json` (5/5).
    `findDefinition` (e.g. `Thermostat` → eCozy `1TST-EU`, not the Schneider
    CCTFR6400).
 
+## Frontend data contract (HomePage / About)
+
+Serving the pinned Windfront 2.15.0 exposed two real bridge/info contract gaps on
+the device:
+
+- `About-CPBYVYHu.js` reads `bridgeInfo.zigbee_herdsman.version`; the field was
+  absent, so the page crashed with `Cannot read properties of undefined
+  (reading 'version')`.
+- `HomePage-9dp65JcO.js` reads `config.availability.enabled`; the field was
+  absent (our config model does not include `availability`), crashing with
+  `... (reading 'enabled')`.
+
+`publishInfo` now publishes the upstream **config shape**, not only the modeled
+fields: the raw YAML document is deep-merged with the resolved runtime values,
+then upstream defaults are filled for `availability` (enabled/active/passive),
+`health`, `ota`, `map_options`, `version`, `device_types`, MQTT/serial extras
+and `advanced.last_seen`/logging keys. `homeassistant` is normalized to
+`{"enabled": ...}` (the YAML accepts a bare bool, but the UI dereferences
+`.enabled`), and `zigbee_herdsman.version` (pinned compatibility baseline
+`10.10.0`, checked against `upstream-lock.json` by a unit test) and
+`os.node_version` (`n/a (Rust)`) are published. Secrets (`advanced.network_key`,
+`mqtt.password`, `frontend.auth_token`) are stripped.
+
+The API differential now asserts the shape of these fields
+(`config_ui_shape`), so a missing `availability`/`last_seen`/`homeassistant`
+object or version field fails CI instead of only crashing the browser.
+
 ## Generated definitions
 
 Seven dump devices have upstream **generated** definitions

@@ -96,6 +96,11 @@ Partial / failing:
 5. **Packaging dependency**: the `.ipk` required `mosquitto-client`, which is not
    in the Routerich feeds (and the Rust binary does not use it). Removed;
    `mosquitto` is provided by `mosquitto-nossl`.
+6. **Frontend `bridge/info` data contract**: the pinned Windfront HomePage and
+   About pages crashed on missing `config.availability.enabled`,
+   `zigbee_herdsman.version` and `os.node_version`. The bridge now publishes the
+   full upstream-shaped config (raw YAML merged with runtime values and upstream
+   defaults) plus the version fields; see FRONTEND-004.
 
 A defensive decision was added: when the adapter backup matches the network but
 the alternate-key descriptor is missing/different, the bridge resumes with a

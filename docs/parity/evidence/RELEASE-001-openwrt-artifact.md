@@ -48,7 +48,7 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: 1576164aebc3c28a84a577359467a14c0cc441193e2023fdd8f719108ebc3b76 (5737056 bytes)
+binary sha256: a18be84ddc3e2e7cd076712d942643461ee2ca49d1f7333b247d40608075c5fe (5746664 bytes)
 archive sha256: f87d396d2cb25c40a6671c18d8ac9864eb853f053d11176c2ac1c48aeda84eba (5674937 bytes)
 manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=6d65a74..., rustc 1.99.1
 
@@ -70,15 +70,15 @@ $ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
 $ make defconfig
 $ make package/zigbee2mqtt-rs/compile
 ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
-        installed 12165120 B, data 5706157 B, binary 5735553 B, web 6266677 B
+        installed 12175360 B, data 5708952 B, binary 5745161 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
-sha256: e68d2f88e0b066c6a8aaed019718f734f2fe54e75e6ed232f027f907f85f5fad
-bytes:  5689184
+sha256: 250cf601e143e613f85943ff16437159de5120b6fb46d9fb132cb5a67420dfd5
+bytes:  5688162
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
 `Depends: libc, mosquitto`, `Architecture:
-aarch64_cortex-a53`, `Installed-Size: 12165120`; `conffiles` contains
+aarch64_cortex-a53`, `Installed-Size: 12175360`; `conffiles` contains
 `/etc/zigbee2mqtt-rs/config.yaml` (so upgrades keep the user's config).
 
 Data payload: `usr/bin/zigbee2mqtt-rs` (statically linked AArch64, executable),
@@ -94,7 +94,7 @@ The binary inside the `.ipk` is **not byte-identical** to
 (5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
 recorded here so the hash difference is not mistaken for a different build.
 Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
-(`e68d2f88…`), i.e. packaging is reproducible with the pinned SDK fed by the same
+(`250cf601…`), i.e. packaging is reproducible with the pinned SDK fed by the same
 binary and frontend assets.
 
 `scripts/check_ipk.py` validates the outer/inner layout, control fields,
@@ -112,7 +112,7 @@ tag releases. **That job has not run yet.**
   avoided by zig's linker.
 - The GitHub Actions workflow itself still has not run; the same zigbuild +
   packaging steps were executed locally instead.
-- **Real binary is 5 737 056 bytes** (rustc 1.99.1, `opt-level=z`, LTO, strip),
+- **Real binary is 5 746 664 bytes** (rustc 1.99.1, `opt-level=z`, LTO, strip),
   much larger than the previously committed 1 775 456-byte binary (which
   predated the Boa converter host). The installed size is **12 165 120 B**
   including 6.27 MB of frontend assets; the router's overlay was **5.6 MB free**
@@ -124,7 +124,7 @@ tag releases. **That job has not run yet.**
   `mosquitto` is provided by `mosquitto-nossl`. Upgrade, downgrade and uninstall
   were not exercised; rollback (`node-zigbee2mqtt 2.14.1-r2`) is available in
   the feed.
-- Measured installed size is **12 165 120 B (≈11.6 MiB)** including 6.27 MB of
+- Measured installed size is **12 175 360 B (≈11.6 MiB)** including 6.27 MB of
   frontend assets. The router overlay is 54.3 MB total with **5.6 MB free**
   before removing the Node installation; RAM is 497 MB total (76 MB free at
   test start). The aarch64 binary was executed on the router.

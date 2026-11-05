@@ -145,9 +145,27 @@ def normalize_info(info: dict) -> dict:
             "mqtt_base_topic": (config.get("mqtt") or {}).get("base_topic"),
         },
         "converters_version": (info.get("zigbee_herdsman_converters") or {}).get("version"),
+        "herdsman_version": (info.get("zigbee_herdsman") or {}).get("version"),
         "os_shape": {
             key: isinstance(os_info.get(key), (str, int))
-            for key in ("cpus", "memory_mb", "version")
+            for key in ("cpus", "memory_mb", "version", "node_version")
+        },
+        # Frontend pages dereference these without optional chaining
+        # (HomePage -> config.availability.enabled, About -> versions).
+        "config_ui_shape": {
+            "availability_enabled": isinstance(
+                (config.get("availability") or {}).get("enabled"), bool
+            ),
+            "advanced_last_seen": isinstance(
+                (advanced.get("last_seen")), str
+            ),
+            "homeassistant_enabled": isinstance(
+                (config.get("homeassistant") or {}).get("enabled"), bool
+            ),
+            "frontend_enabled": isinstance(
+                (config.get("frontend") or {}).get("enabled"), bool
+            ),
+            "ota_object": isinstance(config.get("ota"), dict),
         },
         "has_version": isinstance(info.get("version"), str) and bool(info.get("version")),
         "has_commit": isinstance(info.get("commit"), str) and bool(info.get("commit")),

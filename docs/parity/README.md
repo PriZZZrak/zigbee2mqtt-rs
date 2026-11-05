@@ -23,7 +23,7 @@ Discovered: 125 eligible behaviors; 16 unmeasured rows.
 Stage 1 Z-Stack parity: **1/118 = 0.85%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
 Global upstream parity: **1/125 = 0.80%** [all adapter families].
 Stage 1 / global weighted parity: 1.18% / 1.09% (2/170, 2/184).
-Stage 1 / global scenarios: 131/539 = 24.30% and 131/539 = 24.30% [9/16 unmeasured rows].
+Stage 1 / global scenarios: 133/541 = 24.58% and 133/541 = 24.58% [9/16 unmeasured rows].
 Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 52, IN_PROGRESS 48, PARTIAL 8, VERIFIED 1 (125 total).
 Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, CONVERTER-019, DRIFT-001, EVID-004, HA-001, HA-003 (+31 more)
 Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 1/112, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/6

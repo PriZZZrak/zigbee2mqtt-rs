@@ -121,6 +121,10 @@ impl ReportingIo for CoordinatorHandle {
     }
 }
 
+/// zigbee-herdsman compatibility baseline advertised in `bridge/info`.
+/// Pinned protocol/dependency version, not a linked library.
+pub const HERDSMAN_COMPAT_VERSION: &str = "10.10.0";
+
 pub struct Bridge {
     cfg: Config,
     config_path: PathBuf,
@@ -1362,17 +1366,36 @@ impl Bridge {
         }
     }
 
-    async fn publish_bridge_info(&self, mqtt: &MqttBridge, coord: &CoordinatorHandle) {
-        let coord_ieee = coord.info.ieee_addr.map(|a| a.as_hex()).unwrap_or_default();
-
-        // Config is the merged runtime view; secrets must never be published.
+    /// Full upstream-shaped `config` for `bridge/info`.
+    ///
+    /// `publishInfo` publishes `settings.get()` (the merged YAML document),
+    /// which contains keys this implementation does not model. Start from the
+    /// raw file, overlay the resolved runtime values, fill upstream defaults
+    /// for sections the frontend dereferences, and strip secrets.
+    fn bridge_info_config(&self) -> serde_json::Value {
         let mut config = serde_json::to_value(&self.cfg).unwrap_or_else(|_| json!({}));
+        if let Ok(text) = std::fs::read_to_string(&self.config_path) {
+            if let Ok(raw) = serde_yml::from_str::<serde_json::Value>(&text) {
+                config = merge_json(raw, config);
+            }
+        }
+        fill_info_config_defaults(&mut config);
         if let Some(advanced) = config.get_mut("advanced").and_then(|v| v.as_object_mut()) {
             advanced.remove("network_key");
         }
         if let Some(mqtt_config) = config.get_mut("mqtt").and_then(|v| v.as_object_mut()) {
             mqtt_config.remove("password");
         }
+        if let Some(frontend) = config.get_mut("frontend").and_then(|v| v.as_object_mut()) {
+            frontend.remove("auth_token");
+        }
+        config
+    }
+
+    async fn publish_bridge_info(&self, mqtt: &MqttBridge, coord: &CoordinatorHandle) {
+        let coord_ieee = coord.info.ieee_addr.map(|a| a.as_hex()).unwrap_or_default();
+
+        let config = self.bridge_info_config();
 
         let mut info = json!({
             "version": env!("CARGO_PKG_VERSION"),
@@ -1399,6 +1422,7 @@ impl Bridge {
             "permit_join": self.cfg.permit_join,
             "restart_required": false,
             "config": config,
+            "zigbee_herdsman": {"version": HERDSMAN_COMPAT_VERSION},
         });
         if let Some(version) = self.external.package_version() {
             info["zigbee_herdsman_converters"] = json!({"version": version});
@@ -3226,6 +3250,153 @@ fn mqtt_server_uri(cfg: &crate::config::MqttConfig) -> String {
 }
 
 /// Host OS information for `bridge/info.os` (upstream `osInfo`).
+/// Deep-merge `overlay` into `base`; objects merge recursively and scalars/arrays
+/// from `overlay` win.
+fn merge_json(mut base: serde_json::Value, overlay: serde_json::Value) -> serde_json::Value {
+    match (&mut base, overlay) {
+        (serde_json::Value::Object(base_map), serde_json::Value::Object(overlay_map)) => {
+            for (key, value) in overlay_map {
+                let merged = match base_map.remove(&key) {
+                    Some(existing) => merge_json(existing, value),
+                    None => value,
+                };
+                base_map.insert(key, merged);
+            }
+            serde_json::Value::Object(base_map.clone())
+        }
+        (_, overlay) => overlay,
+    }
+}
+
+fn set_default(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    value: serde_json::Value,
+) {
+    object.entry(key.to_string()).or_insert(value);
+}
+
+/// Fill the upstream settings defaults the frontend dereferences (`availability`,
+/// `health`, `ota`, `advanced.last_seen`, MQTT/serial extras). Existing values
+/// from the user's configuration are preserved.
+fn fill_info_config_defaults(config: &mut serde_json::Value) {
+    let Some(root) = config.as_object_mut() else {
+        return;
+    };
+    set_default(root, "version", json!(5));
+    set_default(root, "device_options", json!({}));
+    set_default(root, "groups", json!({}));
+    set_default(root, "devices", json!({}));
+    set_default(root, "passlist", json!([]));
+    set_default(root, "blocklist", json!([]));
+    set_default(
+        root,
+        "availability",
+        json!({
+            "enabled": false,
+            "active": {"timeout": 10, "max_jitter": 30000},
+            "passive": {"timeout": 1500},
+        }),
+    );
+    set_default(
+        root,
+        "health",
+        json!({"enabled": false, "interval": 900, "reset_on_check": false}),
+    );
+    set_default(
+        root,
+        "ota",
+        json!({"disable_automatic_update_check": false, "update_check_interval": 300}),
+    );
+    set_default(
+        root,
+        "map_options",
+        json!({
+            "graphviz": {
+                "colors": {
+                    "fill": {"enddevice": "#fff8ce", "coordinator": "#e04e5d", "router": "#4ea3e0"},
+                    "font": {"enddevice": "#000", "coordinator": "#fff", "router": "#fff"},
+                    "line": {"active": "#009900", "inactive": "#994444", "highlight": "#ff0000"},
+                }
+            },
+            "raw": false,
+        }),
+    );
+
+    // `HomeAssistantConfig` serializes as a bool for YAML round-tripping, but
+    // upstream `settings.get().homeassistant` is always a mapping and the
+    // frontend dereferences `.enabled`.
+    if root
+        .get("homeassistant")
+        .is_some_and(|value| value.is_boolean())
+    {
+        let enabled = root["homeassistant"].as_bool().unwrap_or(false);
+        root.insert("homeassistant".into(), json!({"enabled": enabled}));
+    }
+    if let Some(homeassistant) = root
+        .entry("homeassistant")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+    {
+        set_default(homeassistant, "enabled", json!(false));
+        set_default(homeassistant, "discovery_topic", json!("homeassistant"));
+        set_default(homeassistant, "status_topic", json!("homeassistant/status"));
+        set_default(homeassistant, "legacy_action_sensor", json!(false));
+        set_default(homeassistant, "experimental_event_entities", json!(false));
+    }
+    if let Some(mqtt) = root
+        .entry("mqtt")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+    {
+        set_default(mqtt, "version", json!(4));
+        set_default(mqtt, "keepalive", json!(60));
+        set_default(mqtt, "force_disable_retain", json!(false));
+        set_default(mqtt, "include_device_information", json!(false));
+        set_default(mqtt, "maximum_packet_size", json!(1048576));
+        set_default(mqtt, "reject_unauthorized", json!(true));
+    }
+    if let Some(serial) = root
+        .entry("serial")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+    {
+        set_default(serial, "disable_led", json!(false));
+        set_default(serial, "baudrate", json!(115200));
+        set_default(serial, "rtscts", json!(false));
+    }
+    if let Some(advanced) = root
+        .entry("advanced")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+    {
+        set_default(advanced, "last_seen", json!("disable"));
+        set_default(advanced, "log_console_json", json!(false));
+        set_default(advanced, "log_debug_namespace_ignore", json!(""));
+        set_default(advanced, "log_debug_to_mqtt_frontend", json!(false));
+        set_default(advanced, "log_directories_to_keep", json!(10));
+        set_default(advanced, "log_file", json!("log.log"));
+        set_default(advanced, "log_level", json!("info"));
+        set_default(advanced, "log_namespaced_levels", json!({}));
+        set_default(advanced, "log_output", json!(["console"]));
+        set_default(advanced, "log_rotation", json!(true));
+        set_default(advanced, "log_symlink_current", json!(false));
+        set_default(advanced, "log_syslog", json!({}));
+        set_default(advanced, "timestamp_format", json!("ISO_8601"));
+        set_default(advanced, "cache_state", json!(true));
+        set_default(advanced, "cache_state_persistent", json!(true));
+        set_default(advanced, "cache_state_send_on_startup", json!(true));
+        set_default(advanced, "elapsed", json!(false));
+        set_default(advanced, "enable_external_js", json!(true));
+    }
+    if !root.contains_key("frontend") {
+        root.insert(
+            "frontend".into(),
+            json!({"enabled": false, "package": "zigbee2mqtt-windfront", "port": 8080, "base_url": "/"}),
+        );
+    }
+}
+
 fn os_info() -> serde_json::Value {
     let cpuinfo = std::fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
     let cpu_model = cpuinfo
@@ -3266,6 +3437,9 @@ fn os_info() -> serde_json::Value {
         "cpus": cpu_model.map(|model| format!("{model} (x{cpu_count})")),
         "memory_mb": memory_mb,
         "version": format!("{os_name} - {kernel} - {arch}"),
+        // There is no Node.js runtime; keep the field so the frontend can
+        // render it without a TypeError and state that this is Rust.
+        "node_version": "n/a (Rust)",
     })
 }
 
@@ -3976,6 +4150,53 @@ fn days_to_ymd(days_since_epoch: u64) -> (u64, u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn info_config_fills_frontend_defaults() {
+        let mut config = json!({
+            "advanced": {"last_seen": "ISO_8601"},
+            "devices": {"0x1": {"friendly_name": "x"}},
+        });
+        fill_info_config_defaults(&mut config);
+        assert_eq!(config["availability"]["enabled"], false);
+        assert_eq!(config["availability"]["active"]["timeout"], 10);
+        assert_eq!(config["advanced"]["last_seen"], "ISO_8601");
+        assert_eq!(config["health"]["enabled"], false);
+        assert_eq!(config["ota"]["update_check_interval"], 300);
+        assert_eq!(config["mqtt"]["version"], 4);
+        assert_eq!(config["serial"]["disable_led"], false);
+        assert_eq!(config["version"], 5);
+        assert!(config["frontend"].is_object());
+        assert_eq!(config["homeassistant"]["enabled"], false);
+    }
+
+    #[test]
+    fn raw_config_merge_preserves_unmodeled_keys() {
+        let base = json!({
+            "frontend": {"enabled": true, "custom": 1},
+            "unknown": {"a": 1},
+        });
+        let overlay = json!({
+            "frontend": {"enabled": false},
+            "serial": {"port": "/dev/ttyUSB0"},
+        });
+        let merged = merge_json(base, overlay);
+        assert_eq!(merged["frontend"]["enabled"], false);
+        assert_eq!(merged["frontend"]["custom"], 1);
+        assert_eq!(merged["unknown"]["a"], 1);
+        assert_eq!(merged["serial"]["port"], "/dev/ttyUSB0");
+    }
+
+    #[test]
+    fn herdsman_compat_version_matches_upstream_lock() {
+        let lock: serde_json::Value =
+            serde_json::from_str(include_str!("../docs/parity/upstream-lock.json"))
+                .expect("upstream lock");
+        assert_eq!(
+            lock["baseline"]["zigbee-herdsman"]["resolved_version"], HERDSMAN_COMPAT_VERSION,
+            "update HERDSMAN_COMPAT_VERSION when advancing the baseline"
+        );
+    }
 
     #[test]
     fn parse_ieee_addr_valid() {
