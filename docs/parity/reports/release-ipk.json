@@ -1,6 +1,6 @@
 {
-  "captured_utc": "2026-11-05T09:12:55+00:00",
-  "git_sha": "5ee6fef0d4b0654e359e87da4ee445647940f8d1",
+  "captured_utc": "2026-11-05T10:14:51+00:00",
+  "git_sha": "daa5e66c843719a4e8668a72cdfc3e647b682ee5",
   "sdk": {
     "name": "openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64",
     "sha256": "d9fd074f281823a3023e8f6a73aaac598018c898ec9ac4d1c507b596930d7482",
@@ -9,8 +9,8 @@
     "architecture": "aarch64_cortex-a53"
   },
   "binary": {
-    "sha256": "f221602d1a4cfd5704f9710bb6995f6f39b0bc7d8245b96896c9ee72ba5eb076",
-    "bytes": 5734976,
+    "sha256": "1576164aebc3c28a84a577359467a14c0cc441193e2023fdd8f719108ebc3b76",
+    "bytes": 5737056,
     "source": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl"
   },
   "frontend": {
@@ -21,15 +21,15 @@
   },
   "ipk": {
     "file": "zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk",
-    "sha256": "db61ab9054ffee35c4b044261462bcc57f044c8e9559bf53b06a81146b9fc06b",
-    "bytes": 5682979,
+    "sha256": "e68d2f88e0b066c6a8aaed019718f734f2fe54e75e6ed232f027f907f85f5fad",
+    "bytes": 5689184,
     "installed_size": 12165120,
-    "data_bytes": 5703883,
-    "payload_binary_bytes": 5733473,
+    "data_bytes": 5706157,
+    "payload_binary_bytes": 5735553,
     "web_bytes": 6266677,
     "package": "zigbee2mqtt-rs",
     "version": "0.1.0-r1",
-    "depends": "libc, mosquitto, mosquitto-client",
+    "depends": "libc, mosquitto",
     "architecture": "aarch64_cortex-a53",
     "conffiles": [
       "/etc/zigbee2mqtt-rs/config.yaml"
@@ -37,5 +37,5 @@
     "payload_binary_note": "OpenWrt sstrip changes the payload hash/size relative to the staged ELF"
   },
   "reproducible_rebuild": true,
-  "install_status": "BLOCKED: requires Routerich AX3000 v1 (OpenWrt 24.10.8) and SONOFF Dongle-P; mosquitto packages are not in the SDK base feed"
+  "install_status": "INSTALLED and RUNNING on Routerich AX3000 v1 (OpenWrt 24.10.8) with SONOFF Dongle-P; upgrade/downgrade/uninstall not exercised; rollback package node-zigbee2mqtt 2.14.1-r2 remains in the Routerich feed"
 }

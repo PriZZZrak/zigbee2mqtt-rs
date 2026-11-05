@@ -48,7 +48,7 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: f221602d1a4cfd5704f9710bb6995f6f39b0bc7d8245b96896c9ee72ba5eb076 (5734976 bytes)
+binary sha256: 1576164aebc3c28a84a577359467a14c0cc441193e2023fdd8f719108ebc3b76 (5737056 bytes)
 archive sha256: 8dfdc0a5e8f50aac3873d1808767ce44289caec76d6cda6ef34cf811abcd3047 (5675367 bytes)
 manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=4e2054b..., rustc 1.99.1
 
@@ -70,14 +70,14 @@ $ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
 $ make defconfig
 $ make package/zigbee2mqtt-rs/compile
 ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
-        installed 12165120 B, data 5703883 B, binary 5733473 B, web 6266677 B
+        installed 12165120 B, data 5706157 B, binary 5735553 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
-sha256: db61ab9054ffee35c4b044261462bcc57f044c8e9559bf53b06a81146b9fc06b
-bytes:  5682979
+sha256: e68d2f88e0b066c6a8aaed019718f734f2fe54e75e6ed232f027f907f85f5fad
+bytes:  5689184
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
-`Depends: libc, mosquitto, mosquitto-client`, `Architecture:
+`Depends: libc, mosquitto`, `Architecture:
 aarch64_cortex-a53`, `Installed-Size: 12165120`; `conffiles` contains
 `/etc/zigbee2mqtt-rs/config.yaml` (so upgrades keep the user's config).
 
@@ -94,7 +94,7 @@ The binary inside the `.ipk` is **not byte-identical** to
 (5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
 recorded here so the hash difference is not mistaken for a different build.
 Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
-(`db61ab90…`), i.e. packaging is reproducible with the pinned SDK fed by the same
+(`e68d2f88…`), i.e. packaging is reproducible with the pinned SDK fed by the same
 binary and frontend assets.
 
 `scripts/check_ipk.py` validates the outer/inner layout, control fields,
@@ -112,20 +112,22 @@ tag releases. **That job has not run yet.**
   avoided by zig's linker.
 - The GitHub Actions workflow itself still has not run; the same zigbuild +
   packaging steps were executed locally instead.
-- **Real binary is 5 450 608 bytes** (rustc 1.99.1, `opt-level=z`, LTO, strip),
+- **Real binary is 5 737 056 bytes** (rustc 1.99.1, `opt-level=z`, LTO, strip),
   much larger than the previously committed 1 775 456-byte binary (which
-  predated the Boa converter host). This is a concrete OPS-03 budget input:
-  installed size + Windfront assets still needs measuring against the router's
-  free overlay, not the reported 54 MB total.
-- The `.ipk` builds and validates, but **install/upgrade/downgrade/uninstall are
-  BLOCKED**: they require the Routerich AX3000 v1 (OpenWrt 24.10.8) and the
-  SONOFF Dongle-P. `Depends: mosquitto, mosquitto-client` are not in the SDK
-  base feed (warning during `make`), so the device needs the `packages` feed or
-  a locally built broker before `opkg install` can succeed.
+  predated the Boa converter host). The installed size is **12 165 120 B**
+  including 6.27 MB of frontend assets; the router's overlay was **5.6 MB free**
+  before the test, so the Node installation had to be removed (see R1-001).
+- The `.ipk` was **installed and started** on the Routerich AX3000 v1 with the
+  Dongle-P on 2026-11-05 (see `R1-routerich-hil-20261105.md`). The initial
+  packaging required `mosquitto-client`, which is absent from the Routerich
+  feeds; it was removed because the Rust binary does not use it and
+  `mosquitto` is provided by `mosquitto-nossl`. Upgrade, downgrade and uninstall
+  were not exercised; rollback (`node-zigbee2mqtt 2.14.1-r2`) is available in
+  the feed.
 - Measured installed size is **12 165 120 B (≈11.6 MiB)** including 6.27 MB of
-  frontend assets; free overlay space still must be measured on the router (54 MB
-  is total storage, not free). RAM usage and the 5.47 MB binary on aarch64 remain
-  unmeasured.
+  frontend assets. The router overlay is 54.3 MB total with **5.6 MB free**
+  before removing the Node installation; RAM is 497 MB total (76 MB free at
+  test start). The aarch64 binary was executed on the router.
 - The earlier local `.ipk` had staged assets that were **not** the app-resolved
   Windfront build; it was rebuilt from `zigbee2mqtt-windfront@2.15.0` `dist`. The
   previous hashes are superseded and must not be published.
