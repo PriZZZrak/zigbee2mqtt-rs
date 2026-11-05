@@ -38,7 +38,7 @@ def build_ipk(
     *,
     binary: bytes | None = None,
     conffiles: str = "/etc/zigbee2mqtt-rs/config.yaml\n",
-    depends: str = "libc, mosquitto, mosquitto-client",
+    depends: str = "libc, mosquitto",
     architecture: str = "aarch64_cortex-a53",
     include_binary: bool = True,
     include_config: bool = True,

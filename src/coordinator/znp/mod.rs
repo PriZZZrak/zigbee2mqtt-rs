@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::{mpsc, Mutex};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use commands::*;
 use frame::ZnpFrame;
@@ -82,16 +82,15 @@ impl ZnpCoordinator {
                 }
             }
             None => {
-                // Transitional fallback for firmware where the strategy probe is
-                // unsupported. It is explicit in the log, unlike the previous
-                // unconditional rewrite.
+                // The strategy probe failed (unsupported firmware/NV layout).
+                // Never rewrite NV or commission here: that can re-form an
+                // existing network and orphan every device. `start_network`
+                // resumes the network already stored in the coordinator; a
+                // genuinely uncommissioned adapter fails and must be
+                // commissioned explicitly by the operator.
                 warn!(
-                    "ZNP startup: cannot determine adapter strategy from NV memory; using legacy NV write path"
+                    "ZNP startup: cannot determine adapter strategy from NV memory; resuming without rewriting NV"
                 );
-                self.write_nv_config(cfg).await?;
-                if is_zstack3 {
-                    self.configure_channel_bdb(cfg).await?;
-                }
             }
         }
         self.register_endpoints().await?;
@@ -276,21 +275,26 @@ impl ZnpCoordinator {
         };
         let nib_bytes = self.read_nv_item(nv::NIB).await?;
         let nib = match nib_bytes {
-            Some(bytes) => match parse_nib(&bytes) {
-                Some(nib) if bytes.len() == 112 => Some(nib),
-                _ => {
-                    // Aligned-memory targets or future layouts are not parsed;
-                    // do not claim a decision from misunderstood bytes.
-                    info!(
-                        "ZNP startup: unsupported NIB length {}; falling back",
-                        bytes.len()
-                    );
-                    return Ok(None);
+            Some(bytes) => {
+                // `Structs.nib` is a packed leading layout: the fields used for
+                // strategy (`nwkPanId` 33..35, `channelList` 36..40,
+                // `extendedPANID` 53..61) are at the same offsets for the
+                // 112-byte and 116-byte (aligned-memory) variants. Trailing
+                // padding/extra fields do not move them.
+                match parse_nib(&bytes) {
+                    Some(nib) if (112..=128).contains(&bytes.len()) => Some(nib),
+                    _ => {
+                        info!(
+                            "ZNP startup: unsupported NIB length {}; falling back",
+                            bytes.len()
+                        );
+                        return Ok(None);
+                    }
                 }
-            },
+            }
             None => None,
         };
-        let read_key = |id: u16| async move {
+        let read_descriptor = |id: u16| async move {
             match self.read_nv_item(id).await? {
                 Some(bytes) => parse_key_descriptor(&bytes)
                     .map(Some)
@@ -298,15 +302,31 @@ impl ZnpCoordinator {
                 None => Ok(None),
             }
         };
-        let preconfigured_key = read_key(nv::PRECFGKEY).await?;
+        // `PRECFGKEY` is a raw 16-byte key on Z-Stack 3 (`Structs.nwkKey`,
+        // manager.ts), not a 17-byte key descriptor. Parsing it as a descriptor
+        // fails with a short read on real CC2652 firmware.
+        let preconfigured_key = match self.read_nv_item(nv::PRECFGKEY).await? {
+            Some(bytes) if bytes.len() >= 16 => {
+                let mut key = [0u8; 16];
+                key.copy_from_slice(&bytes[..16]);
+                Some(key)
+            }
+            Some(bytes) => {
+                return Err(Error::Znp(format!(
+                    "short preconfigured key for NV 0x0062 ({} bytes)",
+                    bytes.len()
+                )))
+            }
+            None => None,
+        };
         let (active_key, alternate_key) = if version == ZnpVersion::ZStack12 {
             // Z-Stack 1.2 has no key-info entries; upstream uses the
             // preconfigured key as both active and alternate.
             (preconfigured_key, preconfigured_key)
         } else {
             (
-                read_key(nv::NWK_ACTIVE_KEY_INFO).await?,
-                read_key(nv::NWK_ALTERN_KEY_INFO).await?,
+                read_descriptor(nv::NWK_ACTIVE_KEY_INFO).await?,
+                read_descriptor(nv::NWK_ALTERN_KEY_INFO).await?,
             )
         };
 
@@ -321,6 +341,27 @@ impl ZnpCoordinator {
             network_key_distribute: false,
             has_default_extended_pan_id,
         };
+        if let Some(nib) = nib {
+            let reversed: [u8; 8] = {
+                let mut bytes = nib.extended_pan_id;
+                bytes.reverse();
+                bytes
+            };
+            debug!(
+                "ZNP startup probe: cfg_pan={}, nib_pan={}, cfg_ext={:02x?}, nib_ext={:02x?}, pan_match={}, ext_match={}, active_key_match={}, alternate_key_match={}, preconfigured_key_match={}",
+                cfg.advanced.pan_id,
+                nib.pan_id,
+                cfg.advanced.ext_pan_id,
+                nib.extended_pan_id,
+                cfg.advanced.pan_id == nib.pan_id,
+                cfg.advanced.ext_pan_id == nib.extended_pan_id
+                    || cfg.advanced.ext_pan_id == reversed
+                    || cfg.advanced.ext_pan_id == [0xDD; 8],
+                active_key == Some(cfg.advanced.network_key),
+                alternate_key == Some(cfg.advanced.network_key),
+                preconfigured_key == Some(cfg.advanced.network_key),
+            );
+        }
         let adapter = AdapterNvState {
             has_configured: configured.unwrap_or(false),
             nib,
@@ -459,9 +500,12 @@ impl ZnpCoordinator {
 
     async fn start_network(&self) -> Result<()> {
         let rsp = self.transport.request(zdo_startup_from_app(100)).await?;
+        // ZDO_StartupFromApp status: 0 = restored network state, 1 = formed a
+        // new network, 2 = joined a network.
         match rsp.data.first().copied() {
-            Some(0) => info!("ZDO startup: new network formed"),
-            Some(1) => info!("ZDO startup: rejoined existing network"),
+            Some(0) => info!("ZDO startup: restored network state from NV"),
+            Some(1) => info!("ZDO startup: formed a new network"),
+            Some(2) => info!("ZDO startup: joined a network"),
             other => warn!("ZDO startup returned status {:?}", other),
         }
         // Allow the network to stabilize

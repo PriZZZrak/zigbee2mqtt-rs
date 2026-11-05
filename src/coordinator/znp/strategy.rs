@@ -219,6 +219,22 @@ pub fn determine_strategy(
                     warnings,
                 });
             }
+            // Hardware finding (CC2652P, Z-Stack 2.7): the alternate key
+            // descriptor can be absent/zero even though the active key, PAN,
+            // extended PAN and channel all match the backup. Upstream would
+            // refuse; refusing here would make a known-good network
+            // unstartable. Resuming never rewrites NV and the backup proves
+            // the network state is consistent, so warn and start.
+            if config_matches_backup(config, backup) {
+                warnings.push(
+                    "adapter backup matches the network; resuming despite a missing/different alternate key descriptor (NV not rewritten)"
+                        .into(),
+                );
+                return Ok(Decision {
+                    strategy: StartupStrategy::Startup,
+                    warnings,
+                });
+            }
             return Err(Error::Znp(
                 "startup failed: configuration is not consistent with adapter state/backup; remove the coordinator backup only if you intend to re-commission and re-pair all devices"
                     .into(),
@@ -450,18 +466,32 @@ mod tests {
 
 /// Parse the Z-Stack NIB (unaligned layout, 112 bytes).
 ///
-/// Offsets follow `structs/entries/nib.ts`. Only the fields needed by strategy
-/// selection are decoded; aligned-memory targets are rejected by the caller's
-/// length check.
+/// Decode the NIB fields needed for strategy selection.
+///
+/// `Structs.nib` is serialized in **aligned** mode by herdsman
+/// (`struct.js` aligns every uint16/uint32 to an even offset): the 116-byte
+/// layout puts `nwkPanId` at 36, `channelList` at 40 and `extendedPANID` at
+/// 57. The unaligned/packed 112-byte variant uses 33/36/53. Both are
+/// accepted; trailing layout differences do not affect these offsets.
 #[must_use]
 pub fn parse_nib(bytes: &[u8]) -> Option<Nib> {
-    if bytes.len() < 61 {
+    let (pan_offset, channel_offset, ext_offset) = match bytes.len() {
+        112 => (33, 36, 53),
+        116..=128 => (36, 40, 57),
+        _ => return None,
+    };
+    if bytes.len() < ext_offset + 8 {
         return None;
     }
-    let pan_id = u16::from_le_bytes([bytes[33], bytes[34]]);
-    let channel_mask = u32::from_le_bytes([bytes[36], bytes[37], bytes[38], bytes[39]]);
+    let pan_id = u16::from_le_bytes([bytes[pan_offset], bytes[pan_offset + 1]]);
+    let channel_mask = u32::from_le_bytes([
+        bytes[channel_offset],
+        bytes[channel_offset + 1],
+        bytes[channel_offset + 2],
+        bytes[channel_offset + 3],
+    ]);
     let mut extended_pan_id = [0u8; 8];
-    extended_pan_id.copy_from_slice(&bytes[53..61]);
+    extended_pan_id.copy_from_slice(&bytes[ext_offset..ext_offset + 8]);
     extended_pan_id.reverse();
     Some(Nib {
         pan_id,
@@ -588,6 +618,20 @@ mod parse_tests {
         let nib = parse_nib(&bytes).unwrap();
         assert_eq!(nib.pan_id, 0x1a62);
         assert_eq!(nib.channel_mask, 1 << 15);
+        assert_eq!(nib.extended_pan_id, EXT);
+    }
+
+    #[test]
+    fn parses_aligned_nib_fields() {
+        let mut bytes = vec![0u8; 116];
+        bytes[36..38].copy_from_slice(&0x1a62u16.to_le_bytes());
+        bytes[40..44].copy_from_slice(&(1u32 << 11).to_le_bytes());
+        let mut reversed = EXT;
+        reversed.reverse();
+        bytes[57..65].copy_from_slice(&reversed);
+        let nib = parse_nib(&bytes).unwrap();
+        assert_eq!(nib.pan_id, 0x1a62);
+        assert_eq!(nib.channel_mask, 1 << 11);
         assert_eq!(nib.extended_pan_id, EXT);
     }
 

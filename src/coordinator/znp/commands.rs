@@ -133,13 +133,32 @@ pub struct DeviceInfo {
 }
 
 impl DeviceInfo {
+    /// Parse `UTIL_GET_DEVICE_INFO`: `status:u8, ieeeAddr:ieee(8), ...`.
+    /// The IEEE address is stored little-endian (as everywhere in ZNP).
     pub fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() < 8 {
+        if data.len() < 9 {
             return None;
         }
         let mut ieee = [0u8; 8];
-        ieee.copy_from_slice(&data[0..8]);
+        ieee.copy_from_slice(&data[1..9]);
         Some(Self { ieee_addr: ieee })
+    }
+}
+
+#[cfg(test)]
+mod device_info_tests {
+    use super::*;
+    use crate::zigbee::IeeeAddr;
+
+    #[test]
+    fn parse_skips_status_and_reads_little_endian_ieee() {
+        // status=0, IEEE raw (LE) for 0x00124b0024c2d400, short addr/type/state.
+        let data = [
+            0x00, 0x00, 0xd4, 0xc2, 0x24, 0x00, 0x4b, 0x12, 0x00, 0x00, 0x00, 0x02, 0x02, 0x00,
+        ];
+        let info = DeviceInfo::parse(&data).expect("device info");
+        assert_eq!(IeeeAddr(info.ieee_addr).as_hex(), "0x00124b0024c2d400");
+        assert!(DeviceInfo::parse(&data[..8]).is_none());
     }
 }
 

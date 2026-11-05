@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "438 library + 2 binary + 30 compatibility = 470 passed, 0 failed"
+      "result": "440 library + 2 binary + 30 compatibility = 472 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -66,6 +66,11 @@
       "command": "python3 scripts/frontend_static_diff.py --require-pins (pinned srvx static middleware)",
       "exit": 0,
       "result": "14 passed, 0 failed; index/asset/br/gzip/preference/HEAD/range 206/416/extensionless/404/ETag-only 304/date-only 304/If-Range match+stale; all 4 pins MATCH"
+    },
+    {
+      "command": "ssh root@routerich.lan (R1 HIL: install, import, network resume, MQTT/frontend)",
+      "exit": 0,
+      "result": "installed and running on Routerich AX3000 v1 + Dongle-P; network restored without NV rewrite; 3 devices imported; Lytko states live; frontend HTTP 200; Tuya sensor and external converters incomplete (see evidence)"
     }
   ]
 }

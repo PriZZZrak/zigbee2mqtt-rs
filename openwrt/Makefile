@@ -18,7 +18,7 @@ define Package/zigbee2mqtt-rs
   SECTION:=utils
   CATEGORY:=Utilities
   TITLE:=Zigbee to MQTT bridge (Rust)
-  DEPENDS:=+libc +mosquitto +mosquitto-client
+  DEPENDS:=+libc +mosquitto
   URL:=https://github.com/PriZZZrak/zigbee2mqtt-rs
 endef
 

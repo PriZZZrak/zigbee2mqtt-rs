@@ -103,6 +103,19 @@ R1 — явно ограниченный релиз для проверенно�
   ranges и encodings; absolute `frontend.host` поднимает unix socket (общий
   HTTP/WS handler, тест с `UnixStream`). Остаются TLS, Node WS differential,
   fragmentation, live broker/HA и HIL.
+- **R1 HIL — первый прогон на железе (2026-11-05, `R1-001`)**: реальный
+  Routerich AX3000 v1 (54.3 МБ overlay, 5.6 МБ свободно) + Dongle-P. Node-версия
+  временно удалена (бэкап `/etc/zigbee2mqtt` снят и скачан), `.ipk`
+  установлен, реальная `database.db` импортирована (3 устройства), сеть
+  **возобновлена без перезаписи NV**. Найдены и исправлены 4 HIL-бага:
+  aligned 116-байтный NIB, raw `PRECFGKEY`, деструктивный fallback при
+  неизвестной стратегии и сдвиг IEEE координатора; из упаковки убран
+  несуществующий в фидах `mosquitto-client`. Остаются: полное декодирование
+  Tuya TH01Z (сейчас только `max_temperature` + `unsupported attribute type`),
+  загрузка пользовательских external converters (Lytko definitions →
+  `generated`/`supported=false`), очистка старых retained IEEE-топиков,
+  restart/power-loss и живой HA. Отчёт:
+  `docs/parity/evidence/R1-routerich-hil-20261105.md`.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и
