@@ -103,6 +103,15 @@ R1 — явно ограниченный релиз для проверенно�
   ranges и encodings; absolute `frontend.host` поднимает unix socket (общий
   HTTP/WS handler, тест с `UnixStream`). Остаются TLS, Node WS differential,
   fragmentation, live broker/HA и HIL.
+- **External converters (CONVERTER-022)**: реализованы
+  `bridge/request/converter/save|remove`, загрузка
+  `<config-dir>/external_converters/*.js` через synthetic-модуль и
+  `external_registry.json` (external definitions имеют приоритет), retained
+  `bridge/converters`, фоновый republish `bridge/devices` (Boa ~6-9 с на
+  роутере, ответ не должен ждать генерацию definitions) и лимит итераций Boa.
+  HIL: реальный `L101Ze_z2m.js` сохранён и активен, Lytko definitions
+  `external`/`supported=true` (20/34 exposes). `extension/*` пока заглушки,
+  `.mjs` отклоняется.
 - **UI-итерации без пересборки `.ipk`**: по просьбе пользователя после
   HIL-прогона обновляется только aarch64-бинарник (scp → `/usr/bin` → restart),
   `.ipk`/tarball не пересобираются. Поэтому установленный бинарник новее

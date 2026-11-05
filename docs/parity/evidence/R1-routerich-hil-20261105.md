@@ -57,8 +57,10 @@ Working:
   extended PAN `0x00124b0024c2d400`, channel 11, `permit_join=false`.
 - `bridge/devices` contains the coordinator plus the three real devices.
 - Both Lytko thermostats publish live states (`local_temperature_l1/l2`,
-  `fault_*`, `hysteresis_l1`, `linkquality`, `last_seen`) through the native
-  Lytko handling.
+  `fault_*`, `hysteresis_l1`, `energy_l1/l2`, `linkquality`, `last_seen`).
+  With the user's `L101Ze_z2m.js` external converter saved through
+  `bridge/request/converter/save`, their definitions are now
+  `source: external`, `supported: true` with 20/34 exposes.
 - The coordinator resumes its existing network; NV is **not** rewritten and
   `ZDO_STARTUP_FROM_APP` reports "restored network state from NV".
 
@@ -102,6 +104,12 @@ Partial / failing:
    `zigbee_herdsman.version` and `os.node_version`. The bridge now publishes the
    full upstream-shaped config (raw YAML merged with runtime values and upstream
    defaults) plus the version fields; see FRONTEND-004.
+9. **External converter save timed out / did not load**: `converter/save` had
+   no handler and external converters were never loaded. Implemented
+   save/remove/load, retained `bridge/converters`, external registry precedence
+   and background device republish (Boa takes ~6-9 s on the router, so the
+   response must not wait for the expensive definition republish). See
+   CONVERTER-022.
 8. **Missing `config_schema`**: the Settings pages crashed on
    `config_schema.properties`. The bridge now publishes a hand-written
    compatibility schema (root sections plus device/group definitions); see

@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "445 library + 2 binary + 30 compatibility = 477 passed, 0 failed"
+      "result": "446 library + 2 binary + 30 compatibility = 478 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -30,7 +30,7 @@
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
       "exit": 0,
-      "result": "static aarch64 ELF built from the current tree (sha256 1e1ec763..., binary-only deploy; .ipk not rebuilt at user request)"
+      "result": "static aarch64 ELF built from the current tree (sha256 1d739caf..., binary-only deploy; .ipk not rebuilt at user request)"
     },
     {
       "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",
@@ -76,6 +76,11 @@
       "command": "scp target/aarch64.../zigbee2mqtt-rs root@routerich.lan:/tmp && cp to /usr/bin && restart (binary-only)",
       "exit": 0,
       "result": "UI config_schema/ZCL fixes deployed without rebuilding the .ipk; installed binary sha256 1e1ec763...; service resumes the network and frontend returns 200"
+    },
+    {
+      "command": "mosquitto_pub bridge/request/converter/save L101Ze_z2m.js (HIL)",
+      "exit": 0,
+      "result": "response {status:ok}; external converter loaded on startup; Lytko definitions source=external supported=true; bridge/converters listed"
     }
   ]
 }

@@ -445,6 +445,17 @@ impl MqttBridge {
         self.publish_retained(&topic, payload.as_bytes()).await
     }
 
+    /// Retained `bridge/converters` payload consumed by the DevConsole.
+    pub async fn publish_bridge_converters(&self, converters: &[(String, String)]) -> Result<()> {
+        let topic = format!("{}/bridge/converters", self.base_topic);
+        let payload: Vec<serde_json::Value> = converters
+            .iter()
+            .map(|(name, code)| json!({"name": name, "code": code}))
+            .collect();
+        let bytes = serde_json::to_vec(&payload)?;
+        self.publish_retained(&topic, &bytes).await
+    }
+
     pub async fn publish_bridge_extensions(&self) -> Result<()> {
         let topic = format!("{}/bridge/extensions", self.base_topic);
         let bytes = serde_json::to_vec(&json!([]))?;

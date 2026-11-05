@@ -8,7 +8,7 @@ use std::time::Duration;
 use boa_engine::{js_string, Context, JsString, JsValue, NativeFunction, Source};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 /// On-demand external converters (zigbee-herdsman-converters dist JS).
 ///
@@ -28,8 +28,17 @@ use tracing::{debug, warn};
 /// hand-copied), definition selection by exact model, and real
 /// `fromZigbee` dispatch for `attributeReport`/`readResponse` frames.
 /// `toZigbee` (convertSet) is NOT implemented yet.
+/// Wraps an upstream-style external converter (`module.exports = definition`
+/// or an array) into the `{definitions: [...]}` shape used by the package
+/// loaders.
+const EXTERNAL_WRAPPER: &str = r#"
+;(function() { var __m = module.exports; if (__m && typeof __m === "object" && __m.default !== undefined) __m = __m.default; module.exports = {definitions: Array.isArray(__m) ? __m : [__m]}; })();
+"#;
+
 pub struct ExternalConverter {
     dir: PathBuf,
+    /// User external converters (`<config-dir>/external_converters`).
+    external_dir: PathBuf,
     registry_url: String,
     runtime: Arc<Mutex<Option<mpsc::Sender<ConverterJob>>>>,
     zcl_io: Arc<Mutex<Option<ZclIo>>>,
@@ -411,6 +420,16 @@ fn zcl_command_json(raw: &str) -> String {
         Ok(()) => json!({"ok": true}).to_string(),
         Err(error) => json!({"error": error}).to_string(),
     }
+}
+
+/// Boa context with a loop-iteration limit so a broken external converter
+/// fails instead of pinning the bridge event loop.
+fn new_context() -> Context {
+    let mut context = Context::default();
+    let mut limits = context.runtime_limits();
+    limits.set_loop_iteration_limit(5_000_000);
+    context.set_runtime_limits(limits);
+    context
 }
 
 fn register_zcl_natives(context: &mut Context) {
@@ -960,8 +979,14 @@ struct ZclMaps {
 
 impl ExternalConverter {
     pub fn new(dir: impl AsRef<Path>, registry_url: impl Into<String>) -> Self {
+        let dir = dir.as_ref().to_path_buf();
+        let external_dir = dir
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("external_converters");
         Self {
-            dir: dir.as_ref().to_path_buf(),
+            dir,
+            external_dir,
             registry_url: registry_url.into(),
             runtime: Arc::new(Mutex::new(None)),
             zcl_io: Arc::new(Mutex::new(None)),
@@ -1026,7 +1051,268 @@ impl ExternalConverter {
 
     fn load_registry(&self) -> Option<RegistryFile> {
         let text = std::fs::read_to_string(self.registry_path()).ok()?;
-        serde_json::from_str(&text).ok()
+        let mut registry: RegistryFile = serde_json::from_str(&text).ok()?;
+        // External definitions take precedence over the packaged catalog.
+        if let Ok(external_text) = std::fs::read_to_string(self.dir.join("external_registry.json"))
+        {
+            if let Ok(external) = serde_json::from_str::<RegistryFile>(&external_text) {
+                for (key, mut candidates) in external.lookup {
+                    if let Some(existing) = registry.lookup.remove(&key) {
+                        candidates.extend(existing);
+                    }
+                    registry.lookup.insert(key, candidates);
+                }
+                for (key, model) in external.models {
+                    registry.models.insert(key, model);
+                }
+                let mut fingerprints = external.fingerprints;
+                fingerprints.extend(registry.fingerprints);
+                registry.fingerprints = fingerprints;
+            }
+        }
+        Some(registry)
+    }
+
+    /// Directory holding user external converters.
+    #[must_use]
+    pub fn external_dir(&self) -> &Path {
+        &self.external_dir
+    }
+
+    /// `(name, code)` pairs for the retained `bridge/converters` topic.
+    #[must_use]
+    pub fn list_external_converters(&self) -> Vec<(String, String)> {
+        let mut files = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&self.external_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+                if path.is_file() && (name.ends_with(".js") || name.ends_with(".cjs")) {
+                    if let Ok(code) = std::fs::read_to_string(&path) {
+                        files.push((name, code));
+                    }
+                }
+            }
+        }
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+        files
+    }
+
+    fn synthetic_external_name(name: &str) -> String {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        name.hash(&mut hasher);
+        let stem = name.rsplit_once('.').map(|(stem, _)| stem).unwrap_or(name);
+        let safe: String = stem
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                    ch
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        format!("__ext_{:x}_{safe}.js", hasher.finish())
+    }
+
+    /// Evaluate one synthetic external module and return its definition
+    /// metadata (model, zigbeeModel, fingerprint). The module is wrapped so
+    /// existing package loaders see `{definitions: [...]}`.
+    fn external_metadata(&self, synthetic: &str) -> Option<Vec<serde_json::Value>> {
+        let zcl = self.load_zcl()?;
+        let module_src = self.load_js(&format!("devices/{synthetic}"))?;
+        let sources = collect_sources(&self.dir, &module_src, synthetic, &zcl)?;
+        let mut ctx = new_context();
+        register_zcl_natives(&mut ctx);
+        let bootstrap = cjs_bootstrap(&sources, &zcl);
+        if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
+            return None;
+        }
+        let script = format!(
+            r#"(function() {{
+                try {{
+                    const defs = __require("devices/__entry__.js")("./{synthetic}").definitions;
+                    return JSON.stringify(defs.map((definition) => ({{
+                        model: definition.model || "",
+                        zigbeeModel: definition.zigbeeModel || [],
+                        fingerprint: definition.fingerprint || null,
+                    }})));
+                }} catch (error) {{
+                    return "ERR:" + String((error && error.stack) || error);
+                }}
+            }})()"#,
+        );
+        let raw = eval_string(&mut ctx, &script)?;
+        if raw.starts_with("ERR:") {
+            warn!("external converter {synthetic}: {raw}");
+            return None;
+        }
+        serde_json::from_str::<Vec<serde_json::Value>>(&raw).ok()
+    }
+
+    /// Rebuild synthetic device files and `external_registry.json` from
+    /// `<config-dir>/external_converters/*.{js,cjs}`.
+    pub fn sync_external_converters(&self) -> Result<Vec<(String, String)>, String> {
+        std::fs::create_dir_all(&self.external_dir)
+            .map_err(|error| format!("cannot create external_converters: {error}"))?;
+        let devices_dir = self.dir.join("devices");
+        if let Ok(entries) = std::fs::read_dir(&devices_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with("__ext_") && name.ends_with(".js") {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+
+        let mut entries: Vec<(String, std::path::PathBuf)> = Vec::new();
+        if let Ok(read_dir) = std::fs::read_dir(&self.external_dir) {
+            for entry in read_dir.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+                if path.is_file() && (name.ends_with(".js") || name.ends_with(".cjs")) {
+                    entries.push((name, path));
+                }
+            }
+        }
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut lookup: std::collections::BTreeMap<String, Vec<(String, usize)>> =
+            std::collections::BTreeMap::new();
+        let mut models: std::collections::BTreeMap<String, serde_json::Value> =
+            std::collections::BTreeMap::new();
+        let mut fingerprints: Vec<serde_json::Value> = Vec::new();
+        let mut files = Vec::new();
+        let mut errors = Vec::new();
+
+        for (name, path) in entries {
+            let code = match std::fs::read_to_string(&path) {
+                Ok(code) => code,
+                Err(error) => {
+                    errors.push(format!("{name}: {error}"));
+                    continue;
+                }
+            };
+            let synthetic = Self::synthetic_external_name(&name);
+            info!("external converter {name}: evaluating");
+            let wrapped = format!("{code}{EXTERNAL_WRAPPER}");
+            if let Err(error) = std::fs::write(devices_dir.join(&synthetic), wrapped) {
+                errors.push(format!("{name}: {error}"));
+                continue;
+            }
+            let Some(metas) = self.external_metadata(&synthetic) else {
+                let _ = std::fs::remove_file(devices_dir.join(&synthetic));
+                errors.push(format!("{name}: invalid converter code"));
+                continue;
+            };
+            for (index, meta) in metas.iter().enumerate() {
+                let model = meta
+                    .get("model")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("");
+                if !model.is_empty() {
+                    models.insert(
+                        model.to_lowercase(),
+                        serde_json::json!({"file": synthetic, "index": index}),
+                    );
+                }
+                if let Some(zigbee_models) =
+                    meta.get("zigbeeModel").and_then(|value| value.as_array())
+                {
+                    for zigbee_model in zigbee_models {
+                        let Some(zigbee_model) = zigbee_model.as_str() else {
+                            continue;
+                        };
+                        let key = if zigbee_model.trim().is_empty() {
+                            "null".to_string()
+                        } else {
+                            zigbee_model.to_lowercase()
+                        };
+                        lookup
+                            .entry(key)
+                            .or_default()
+                            .push((synthetic.clone(), index));
+                    }
+                }
+                if let Some(fingerprint) = meta.get("fingerprint") {
+                    let entries = if let Some(array) = fingerprint.as_array() {
+                        array.clone()
+                    } else if fingerprint.is_null() {
+                        Vec::new()
+                    } else {
+                        vec![fingerprint.clone()]
+                    };
+                    for entry in entries {
+                        fingerprints.push(serde_json::json!({
+                            "file": synthetic,
+                            "index": index,
+                            "fingerprint": entry,
+                        }));
+                    }
+                }
+            }
+            info!("external converter {name}: loaded");
+            files.push((name, code));
+        }
+
+        let registry = serde_json::json!({
+            "models": models,
+            "lookup": lookup,
+            "fingerprints": fingerprints,
+        });
+        std::fs::write(
+            self.dir.join("external_registry.json"),
+            serde_json::to_string(&registry).unwrap_or_else(|_| "{}".into()),
+        )
+        .map_err(|error| format!("cannot write external registry: {error}"))?;
+
+        if errors.is_empty() {
+            Ok(files)
+        } else {
+            Err(errors.join("; "))
+        }
+    }
+
+    /// Persist and activate one user external converter.
+    pub fn save_external_converter(&self, name: &str, code: &str) -> Result<(), String> {
+        if name.is_empty() || code.is_empty() {
+            return Err("Invalid payload".into());
+        }
+        if !(name.ends_with(".js") || name.ends_with(".cjs")) {
+            return Err("JavaScript file must have '.js' or '.cjs' extension".into());
+        }
+        if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
+            return Err("Invalid file name".into());
+        }
+        std::fs::create_dir_all(&self.external_dir)
+            .map_err(|error| format!("cannot create external_converters: {error}"))?;
+        let path = self.external_dir.join(name);
+        std::fs::write(&path, code).map_err(|error| format!("cannot write {name}: {error}"))?;
+        match self.sync_external_converters() {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let _ = std::fs::remove_file(&path);
+                let _ = self.sync_external_converters();
+                Err(format!("{name} contains invalid code: {error}"))
+            }
+        }
+    }
+
+    /// Remove one user external converter.
+    pub fn remove_external_converter(&self, name: &str) -> Result<(), String> {
+        if name.is_empty() {
+            return Err("Invalid payload".into());
+        }
+        if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
+            return Err("Invalid file name".into());
+        }
+        let path = self.external_dir.join(name);
+        if !path.exists() {
+            return Err(format!("{name} doesn't exist"));
+        }
+        std::fs::remove_file(&path).map_err(|error| format!("cannot remove {name}: {error}"))?;
+        self.sync_external_converters().map(|_| ())
     }
 
     /// Attribute/command type metadata published alongside `zcl.json`.
@@ -1083,6 +1369,11 @@ impl ExternalConverter {
             debug!("definition_payload: cannot load {file} for {model:?}");
             return None;
         };
+        let source = if file.starts_with("__ext_") {
+            "external"
+        } else {
+            "native"
+        };
         let meta = serde_json::json!({
             "device": device_meta_json(device),
         });
@@ -1094,13 +1385,14 @@ impl ExternalConverter {
                     const meta = JSON.parse({meta});
                     const device = meta.device;
                     install_endpoint_stubs(device);
-                    return __definitionPayloadJson(raw, device, "native", true);
+                    return __definitionPayloadJson(raw, device, "{source}", true);
                 }} catch (error) {{
                     return JSON.stringify({{__error: String((error && error.stack) || error)}});
                 }}
             }})()"#,
             file = file,
             index = index,
+            source = source,
             meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
         );
         let out = eval_string(&mut ctx, &script)?;
@@ -1123,7 +1415,7 @@ impl ExternalConverter {
         let zcl = self.load_zcl()?;
         let entry = r#"module.exports = require("../lib/generateDefinition");"#;
         let sources = collect_sources(&self.dir, entry, "gendef_probe.js", &zcl)?;
-        let mut ctx = Context::default();
+        let mut ctx = new_context();
         register_zcl_natives(&mut ctx);
         let bootstrap = cjs_bootstrap(&sources, &zcl);
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
@@ -1406,7 +1698,7 @@ impl ExternalConverter {
             .load_js(&format!("devices/{file}"))
             .or_else(|| self.load_js(&file))?;
         let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
-        let mut ctx = Context::default();
+        let mut ctx = new_context();
         register_zcl_natives(&mut ctx);
         let bootstrap = cjs_bootstrap(&sources, &zcl);
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
@@ -1929,7 +2221,7 @@ impl ExternalConverter {
             .load_js(&format!("devices/{file}"))
             .or_else(|| self.load_js(&file))?;
         let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
-        let mut ctx = Context::default();
+        let mut ctx = new_context();
         register_zcl_natives(&mut ctx);
         let bootstrap = format!("{}{}", cjs_bootstrap(&sources, &zcl), TIMERS_JS);
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
@@ -3083,7 +3375,7 @@ impl ExternalConverter {
             keys = serde_json::to_string(&serde_json::to_string(&keys).unwrap()).unwrap(),
             cluster_names = cluster_names,
         );
-        let mut ctx = Context::default();
+        let mut ctx = new_context();
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
             return Vec::new();
         }
@@ -3498,7 +3790,7 @@ impl ExternalConverter {
             index = index,
             meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
         );
-        let mut ctx = Context::default();
+        let mut ctx = new_context();
         let bootstrap = cjs_bootstrap(&sources, &zcl);
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
             return None;
@@ -4300,7 +4592,7 @@ module.exports = {uint16: enums.DataType.UINT16, listUint8: enums.BuffaloZclData
         let ts = "import type {DefinitionWithExtend} from '../lib/types';\nexport const x = 1;\n";
         std::fs::write(conv.dir.join("devices").join("badts.js"), ts).unwrap();
         // Direct eval of TS must fail loudly instead of producing a value.
-        let mut ctx = Context::default();
+        let mut ctx = new_context();
         assert!(ctx.eval(Source::from_bytes(ts.as_bytes())).is_err());
     }
 
@@ -4491,6 +4783,57 @@ module.exports = {definitions};
     }
 
     #[test]
+    fn external_converter_is_saved_loaded_and_removed() {
+        let (tmp, mut conv) = fixture_dir();
+        conv.external_dir = tmp.0.join("external_converters");
+        std::fs::create_dir_all(&conv.external_dir).unwrap();
+        let code = r#"
+module.exports = [{
+    model: "ExtBulb",
+    vendor: "Ext",
+    description: "external fixture",
+    zigbeeModel: ["EXTBULB"],
+    exposes: [{type: "numeric", name: "temperature", property: "temperature", access: 1}],
+    fromZigbee: [{
+        cluster: "msTemperatureMeasurement",
+        type: ["attributeReport"],
+        convert: (model, msg) => ({temperature: msg.data.measuredValue / 100}),
+    }],
+    toZigbee: [],
+}];
+"#;
+        std::fs::write(conv.external_dir.join("ext.js"), code).unwrap();
+        let files = conv.sync_external_converters().expect("sync");
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].0, "ext.js");
+
+        let mut device = device();
+        device.model_id = Some("EXTBULB".into());
+        let (file, index) = conv
+            .definition_for("EXTBULB", &device)
+            .expect("external definition selected");
+        assert!(file.starts_with("__ext_"), "{file}");
+        assert_eq!(index, 0);
+
+        let payload = conv
+            .definition_payload("EXTBULB", &device)
+            .expect("definition payload");
+        assert_eq!(payload["source"], "external");
+        assert_eq!(payload["model"], "ExtBulb");
+        assert_eq!(payload["exposes"][0]["name"], "temperature");
+
+        assert!(conv
+            .save_external_converter("bad.js", "module.exports = ;")
+            .is_err());
+        assert!(!conv.external_dir.join("bad.js").exists());
+
+        conv.remove_external_converter("ext.js").expect("remove");
+        assert!(conv
+            .definition_for("EXTBULB", &device)
+            .is_none_or(|(file, _)| !file.starts_with("__ext_")));
+    }
+
+    #[test]
     fn collect_sources_follows_relative_requires() {
         let (_tmp, conv) = fixture_dir();
         let src = std::fs::read_to_string(conv.dir.join("devices").join("fakedev.js")).unwrap();
@@ -4648,7 +4991,7 @@ module.exports = {definitions};
 
     #[test]
     fn buffer_shim_is_available_from_the_runtime_prelude() {
-        let mut ctx = Context::default();
+        let mut ctx = new_context();
         ctx.eval(Source::from_bytes(RUNTIME_PRELUDE.as_bytes()))
             .expect("prelude eval");
         let out = eval_string(

@@ -427,6 +427,15 @@ impl Bridge {
         )
         .await?;
         let _ = mqtt.publish_bridge_extensions().await;
+        match self.external.sync_external_converters() {
+            Ok(files) => {
+                if !files.is_empty() {
+                    info!("Loaded {} external converter(s)", files.len());
+                }
+                let _ = mqtt.publish_bridge_converters(&files).await;
+            }
+            Err(error) => warn!("external converters: {error}"),
+        }
         info!("MQTT connected (base_topic={})", self.cfg.mqtt.base_topic);
         if self.cfg.frontend.enabled {
             let options = crate::frontend::ServeOptions::from_config(&self.cfg.frontend);
@@ -1005,6 +1014,72 @@ impl Bridge {
                                         self.persist_database(coord.info.ieee_addr).await;
                                     }
                                 }
+                                "converter/save" => {
+                                    let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                    let code = payload.get("code").and_then(|v| v.as_str()).unwrap_or("");
+                                    match self.external.save_external_converter(name, code) {
+                                        Ok(()) => {
+                                            info!("converter/save: {name} synchronized");
+                                            self.definition_cache.clear();
+                                            let files = self.external.list_external_converters();
+                                            let _ = mqtt.publish_bridge_converters(&files).await;
+                                            let devices = Arc::clone(&self.devices);
+                                            let external = Arc::clone(&self.external);
+                                            let cache = Arc::clone(&self.definition_cache);
+                                            let list_mqtt = mqtt.clone();
+                                            let ieee = coordinator_ieee.clone();
+                                            tokio::spawn(async move {
+                                                let list = device_list_json(
+                                                    &devices,
+                                                    &external,
+                                                    &cache,
+                                                    Some(&ieee),
+                                                );
+                                                let _ = list_mqtt
+                                                    .publish_bridge_devices(&json!(list))
+                                                    .await;
+                                            });
+                                            let resp = mk_resp("ok", json!({}), None);
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        Err(error) => {
+                                            let resp = mk_resp("error", json!({}), Some(error));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                    }
+                                }
+                                "converter/remove" => {
+                                    let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                    match self.external.remove_external_converter(name) {
+                                        Ok(()) => {
+                                            self.definition_cache.clear();
+                                            let files = self.external.list_external_converters();
+                                            let _ = mqtt.publish_bridge_converters(&files).await;
+                                            let devices = Arc::clone(&self.devices);
+                                            let external = Arc::clone(&self.external);
+                                            let cache = Arc::clone(&self.definition_cache);
+                                            let list_mqtt = mqtt.clone();
+                                            let ieee = coordinator_ieee.clone();
+                                            tokio::spawn(async move {
+                                                let list = device_list_json(
+                                                    &devices,
+                                                    &external,
+                                                    &cache,
+                                                    Some(&ieee),
+                                                );
+                                                let _ = list_mqtt
+                                                    .publish_bridge_devices(&json!(list))
+                                                    .await;
+                                            });
+                                            let resp = mk_resp("ok", json!({}), None);
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        Err(error) => {
+                                            let resp = mk_resp("error", json!({}), Some(error));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                    }
+                                }
                                 "group/remove" => {
                                     let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or(payload.as_str().unwrap_or(""));
                                     let gid: u16 = id.parse().unwrap_or_else(|_| groups.get_by_name(id).map(|g| g.id).unwrap_or(0));
@@ -1181,7 +1256,7 @@ impl Bridge {
                                     let resp = mk_resp("ok", json!({}), None);
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
-                                "converter/save" | "converter/remove" | "extension/save" | "extension/remove" | "action" => {
+                                "extension/save" | "extension/remove" | "action" => {
                                     let resp = mk_resp("ok", json!({}), None);
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
