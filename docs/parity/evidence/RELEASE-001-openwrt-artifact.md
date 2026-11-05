@@ -48,7 +48,7 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: 29355e503500ce686ff2c8681a706ff2b526b411cb2c0e38776ddfec1f487df9 (5556360 bytes)
+binary sha256: 83b4277992009e10ca77868328482ba9a54659eec36abadbeeecc53c4d86088b (5595456 bytes)
 archive sha256: b539ab7264b38e501d74bc0b703f09ff9f447f29ca02babea372107320c1d25e (5582336 bytes)
 manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=0f09a3f..., rustc 1.99.1
 
@@ -70,10 +70,10 @@ $ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
 $ make defconfig
 $ make package/zigbee2mqtt-rs/compile
 ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
-        installed 11980800 B, data 5613796 B, binary 5554857 B, web 6266677 B
+        installed 12021760 B, data 5632394 B, binary 5593953 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
-sha256: bb26accb17e8e484fe7011aa07b639a75e8a2e65193af001dc0eccacb6cc4b90
-bytes:  5596574
+sha256: eaaebdf8c910e0afda25b1a865f859a57751456a2d7e3b921e9f876968b86cd1
+bytes:  5616007
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
@@ -94,7 +94,7 @@ The binary inside the `.ipk` is **not byte-identical** to
 (5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
 recorded here so the hash difference is not mistaken for a different build.
 Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
-(`bb26accb…`), i.e. packaging is reproducible with the pinned SDK fed by the same
+(`eaaebdf8…`), i.e. packaging is reproducible with the pinned SDK fed by the same
 binary and frontend assets.
 
 `scripts/check_ipk.py` validates the outer/inner layout, control fields,
@@ -122,7 +122,7 @@ tag releases. **That job has not run yet.**
   SONOFF Dongle-P. `Depends: mosquitto, mosquitto-client` are not in the SDK
   base feed (warning during `make`), so the device needs the `packages` feed or
   a locally built broker before `opkg install` can succeed.
-- Measured installed size is **11 980 800 B (≈11.4 MiB)** including 6.27 MB of
+- Measured installed size is **12 021 760 B (≈11.5 MiB)** including 6.27 MB of
   frontend assets; free overlay space still must be measured on the router (54 MB
   is total storage, not free). RAM usage and the 5.47 MB binary on aarch64 remain
   unmeasured.
