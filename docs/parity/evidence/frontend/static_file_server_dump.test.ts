@@ -14,7 +14,14 @@ describe("Static file server dump", () => {
         fs.writeFileSync(path.join(dir, "index.html"), "<html>index</html>");
         fs.writeFileSync(path.join(dir, "assets", "app.js"), "console.log('app');");
         fs.writeFileSync(path.join(dir, "assets", "app.js.br"), "compressed-js");
+        fs.writeFileSync(path.join(dir, "assets", "app.js.gz"), "gzipped-js");
+        fs.writeFileSync(path.join(dir, "about.html"), "<html>about</html>");
         fs.writeFileSync(path.join(dir, "missing.txt"), "");
+        // Deterministic validators: ETag/Last-Modified must match the Rust
+        // candidate, so both sides pin the same mtime.
+        for (const name of ["index.html", "assets/app.js", "assets/app.js.br", "assets/app.js.gz", "about.html"]) {
+            fs.utimesSync(path.join(dir, name), 1700000000, 1700000000);
+        }
     });
 
     afterAll(() => {
@@ -25,11 +32,12 @@ describe("Static file server dump", () => {
         port: number,
         url: string,
         headers: Record<string, string> = {},
+        method = "GET",
     ): Promise<{status: number; headers: Record<string, string>; body: string}> {
         const http = await import("node:http");
         return await new Promise((resolve, reject) => {
             const request = http.request(
-                {host: "127.0.0.1", port, path: url, method: "GET", headers},
+                {host: "127.0.0.1", port, path: url, method, headers},
                 (response) => {
                     const chunks: Buffer[] = [];
                     response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
@@ -61,16 +69,45 @@ describe("Static file server dump", () => {
         await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
         const address = server.address();
         const port = typeof address === "object" && address ? address.port : 0;
-        const cases: Array<{id: string; url: string; headers?: Record<string, string>}> = [
+        const cases: Array<{id: string; url: string; headers?: Record<string, string>; method?: string}> = [
             {id: "index", url: "/"},
             {id: "asset", url: "/assets/app.js"},
             {id: "asset-br", url: "/assets/app.js", headers: {"accept-encoding": "br"}},
+            {id: "asset-gzip", url: "/assets/app.js", headers: {"accept-encoding": "gzip"}},
+            {id: "asset-preference", url: "/assets/app.js", headers: {"accept-encoding": "gzip, br"}},
+            {id: "head-index", url: "/", method: "HEAD"},
+            {id: "range", url: "/assets/app.js", headers: {range: "bytes=0-4"}},
+            {id: "range-unsatisfiable", url: "/assets/app.js", headers: {range: "bytes=100-"}},
+            {id: "extensionless", url: "/about"},
             {id: "missing", url: "/nope.txt"},
         ];
         const responses: Record<string, unknown> = {};
         for (const testCase of cases) {
-            responses[testCase.id] = await request(port, testCase.url, testCase.headers);
+            responses[testCase.id] = await request(
+                port,
+                testCase.url,
+                testCase.headers,
+                testCase.method,
+            );
         }
+        const etag = (responses.asset as any)?.headers?.etag;
+        if (etag) {
+            responses.conditional = await request(port, "/assets/app.js", {"if-none-match": etag});
+        }
+        const lastModified = (responses.asset as any)?.headers?.["last-modified"];
+        if (lastModified) {
+            responses["conditional-since"] = await request(port, "/assets/app.js", {
+                "if-modified-since": lastModified,
+            });
+            responses["range-if-range"] = await request(port, "/assets/app.js", {
+                range: "bytes=0-4",
+                "if-range": lastModified,
+            });
+        }
+        responses["range-stale-if-range"] = await request(port, "/assets/app.js", {
+            range: "bytes=0-4",
+            "if-range": '"stale"',
+        });
         await new Promise<void>((resolve) => server.close(() => resolve()));
 
         const notFound: Record<string, string> = {};

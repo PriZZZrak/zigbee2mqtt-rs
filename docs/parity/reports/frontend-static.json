@@ -1,6 +1,6 @@
 {
   "status": "PASS",
-  "passed": 4,
+  "passed": 14,
   "failed": 0,
   "pins": [
     {
@@ -44,12 +44,62 @@
       "mismatches": []
     },
     {
+      "id": "asset-gzip",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "asset-preference",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "conditional",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "conditional-since",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "extensionless",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "head-index",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
       "id": "index",
       "status": "PASS",
       "mismatches": []
     },
     {
       "id": "missing",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "range",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "range-if-range",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "range-stale-if-range",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "range-unsatisfiable",
       "status": "PASS",
       "mismatches": []
     }

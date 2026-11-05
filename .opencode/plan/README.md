@@ -95,9 +95,13 @@ R1 — явно ограниченный релиз для проверенно�
   assets с `.br`/`.gz`, `no-store` для HTML и точной srvx 404-страницей.
   Клиентские сообщения **напрямую** парсятся тем же `commands_from_publish` и
   кладутся в bridge command queue (без broker echo), как upstream
-  `mqtt.onMessage`. Pinned static differential — **4/4 PASS**; Rust integration
-  tests покрывают auth/replay/direct-dispatch/redirect. Остаются TLS/unix
-  sockets, Node WS differential, fragmentation, live broker/HA и HIL.
+  `mqtt.onMessage`. Pinned static differential расширен до **14/14 PASS**:
+  index/extensionless, `.br`/`.gz`/preference, HEAD, ETag + Last-Modified,
+  `If-None-Match`/`If-Modified-Since` → 304, `If-Range` (match 206, weak 200),
+  byte ranges 206/416 и srvx 404. Rust integration tests покрывают
+  auth/replay/live-forwarding/direct-dispatch/redirect; unit tests — ETag, даты,
+  ranges и encodings. Остаются TLS/unix sockets, Node WS differential,
+  fragmentation, live broker/HA и HIL.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

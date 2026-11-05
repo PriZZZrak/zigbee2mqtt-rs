@@ -7,10 +7,10 @@
         "cache-control": "no-store",
         "content-length": "18",
         "content-type": "text/html; charset=utf-8",
-        "etag": "W/\"12-1a1aa68a92f\"",
-        "last-modified": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "etag": "W/\"12-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
         "vary": "Accept-Encoding",
-        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
         "connection": "keep-alive",
         "keep-alive": "timeout=5"
       },
@@ -22,10 +22,10 @@
         "accept-ranges": "bytes",
         "content-length": "19",
         "content-type": "text/javascript; charset=utf-8",
-        "etag": "W/\"13-1a1aa68a930\"",
-        "last-modified": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "etag": "W/\"13-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
         "vary": "Accept-Encoding",
-        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
         "connection": "keep-alive",
         "keep-alive": "timeout=5"
       },
@@ -37,14 +37,103 @@
         "content-encoding": "br",
         "content-length": "13",
         "content-type": "text/javascript; charset=utf-8",
-        "etag": "W/\"d-1a1aa68a930-br\"",
-        "last-modified": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "etag": "W/\"d-18bcfe56800-br\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
         "vary": "Accept-Encoding",
-        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
         "connection": "keep-alive",
         "keep-alive": "timeout=5"
       },
       "body": "Y29tcHJlc3NlZC1qcw=="
+    },
+    "asset-gzip": {
+      "status": 200,
+      "headers": {
+        "content-encoding": "gzip",
+        "content-length": "10",
+        "content-type": "text/javascript; charset=utf-8",
+        "etag": "W/\"a-18bcfe56800-gzip\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "Z3ppcHBlZC1qcw=="
+    },
+    "asset-preference": {
+      "status": 200,
+      "headers": {
+        "content-encoding": "br",
+        "content-length": "13",
+        "content-type": "text/javascript; charset=utf-8",
+        "etag": "W/\"d-18bcfe56800-br\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "Y29tcHJlc3NlZC1qcw=="
+    },
+    "head-index": {
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "no-store",
+        "content-length": "18",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "W/\"12-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": ""
+    },
+    "range": {
+      "status": 206,
+      "headers": {
+        "accept-ranges": "bytes",
+        "content-length": "5",
+        "content-range": "bytes 0-4/19",
+        "content-type": "text/javascript; charset=utf-8",
+        "etag": "W/\"13-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "Y29uc28="
+    },
+    "range-unsatisfiable": {
+      "status": 416,
+      "headers": {
+        "content-range": "bytes */19",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5",
+        "transfer-encoding": "chunked"
+      },
+      "body": ""
+    },
+    "extensionless": {
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "no-store",
+        "content-length": "18",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "W/\"12-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "PGh0bWw+YWJvdXQ8L2h0bWw+"
     },
     "missing": {
       "status": 404,
@@ -53,11 +142,66 @@
         "x-content-type-options": "nosniff",
         "content-type": "text/html; charset=utf-8",
         "content-length": "147",
-        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
         "connection": "keep-alive",
         "keep-alive": "timeout=5"
       },
       "body": "PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9InV0Zi04Ij4KPHRpdGxlPkVycm9yPC90aXRsZT4KPC9oZWFkPgo8Ym9keT4KPHByZT5DYW5ub3QgR0VUIC9ub3BlLnR4dDwvcHJlPgo8L2JvZHk+CjwvaHRtbD4K"
+    },
+    "conditional": {
+      "status": 304,
+      "headers": {
+        "etag": "W/\"13-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": ""
+    },
+    "conditional-since": {
+      "status": 304,
+      "headers": {
+        "etag": "W/\"13-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": ""
+    },
+    "range-if-range": {
+      "status": 206,
+      "headers": {
+        "accept-ranges": "bytes",
+        "content-length": "5",
+        "content-range": "bytes 0-4/19",
+        "content-type": "text/javascript; charset=utf-8",
+        "etag": "W/\"13-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "Y29uc28="
+    },
+    "range-stale-if-range": {
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "content-length": "19",
+        "content-type": "text/javascript; charset=utf-8",
+        "etag": "W/\"13-18bcfe56800\"",
+        "last-modified": "Tue, 14 Nov 2023 22:13:20 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 08:38:49 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "Y29uc29sZS5sb2coJ2FwcCcpOw=="
     }
   },
   "not_found": {

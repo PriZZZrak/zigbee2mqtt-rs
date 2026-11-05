@@ -22,9 +22,23 @@ Behavior: FRONTEND-005; related FRONTEND-001/004, EVID-004.
 - A client text frame `{topic, payload}` is handed to `mqtt.onMessage` on
   `<base_topic>/<topic>`.
 - With `disable_ui_serving: false` the same listener serves the Windfront assets
-  through `createStaticFileServer` (`srvx`): index resolution, precompressed
-  `.br`/`.gz` when accepted, `Cache-Control: no-store` for HTML, and a
-  404 page with CSP/nosniff headers (`staticFileServer.ts`).
+  through `createStaticFileServer` (`srvx` `dist/static.mjs`):
+  - extensionless paths try `path`, `path.html`, `path/index.html`; a trailing
+    slash uses `index.html`;
+  - precompressed `.br`/`.gz` variants are served when accepted, `br` before
+    `gzip`, honouring `q=0`/`*` (quality only filters, it does not reorder);
+  - text/* content types get `; charset=utf-8`; output/HTML/JSON/wasm get
+    `Vary: Accept-Encoding`; HTML gets `Cache-Control: no-store`;
+  - `ETag: W/"<size-hex>-<mtimeMs-hex>[-br|-gzip]"`, and `Last-Modified` capped
+    to now (IMF-fixdate);
+  - `Accept-Ranges: bytes` on unencoded responses; `Range` → `206` with
+    `Content-Range`, unsatisfiable → `416` with `Content-Range: bytes */<size>`;
+    `If-Range` must be the exact date (quoted/weak values never match);
+  - `If-None-Match` (weak/list/`*`) → `304`, otherwise `If-Modified-Since` is
+    parsed and compared (`last_modified <= since`) → `304`; 304 carries only
+    `ETag`/`Last-Modified`/`Vary`/`Cache-Control`;
+  - `HEAD` returns the same headers without a body;
+  - miss → exact `sendNotFound` HTML with CSP/nosniff headers.
 
 ## Rust implementation
 
@@ -45,8 +59,10 @@ Behavior: FRONTEND-005; related FRONTEND-001/004, EVID-004.
   matching upstream's direct `mqtt.onMessage` call. No broker round-trip and no
   echo of the command topic. Only recognized device commands / bridge requests
   are accepted; unknown topics are logged and ignored.
-- Static: index, content types, `.br`/`.gz` selection, `Vary: Accept-Encoding`,
-  `no-store` for HTML, and the exact `srvx` 404 HTML/headers.
+- Static: index/extensionless resolution, content types, `.br`/`.gz` selection
+  (br preferred), `Vary: Accept-Encoding`, `no-store` for HTML, ETag/
+  Last-Modified generation, conditional requests, byte ranges, HEAD, and the
+  exact `srvx` 404 HTML/headers.
 
 ## Evidence
 
@@ -54,17 +70,26 @@ Rust integration tests (`src/frontend/mod.rs` tests):
 
 - `websocket_auth_replay_forwarding_and_static_files`: wrong token closes 4401;
   authorized connect replays `bridge/state` and the `bulb` device state; a
-  client `bulb/set` frame reaches the bridge command queue as `SetDevice`
-  **without** a broker publish; `GET /` serves the file.
+  later device publish is fanned out live; a client `bulb/set` frame reaches the
+  bridge command queue as `SetDevice` **without** a broker publish; `GET /`
+  serves the file.
 - `base_url_redirects_without_trailing_slash`: `/z2m` → 301 `/z2m/`.
 - `frontend::ws` tests: SHA-1 vectors, RFC 6455 accept key, base64, masked frame
   decode, oversized-frame rejection, frame round-trip.
+- Unit tests for the static contract helpers: `weak_etag` (srvx format with
+  encoding suffixes), `http_date`/`parse_http_date` (IMF-fixdate round-trip and
+  `If-Modified-Since`), `parse_range` (open/closed/suffix/unsatisfiable/invalid),
+  `accepted_encodings` (`q=0`, wildcard, br preference), and conditional
+  validators (`If-None-Match` lists/`*`, `If-Range` rejecting quoted/weak).
 - `scripts/frontend_static_diff.py` against the pinned `srvx` reference
-  (`docs/parity/evidence/frontend/upstream-static-dump.json`):
-  `STATIC: 4 passed, 0 failed` (index, asset, brotli asset, 404), all pins MATCH.
+  (`docs/parity/evidence/frontend/upstream-static-dump.json`, fixture mtimes
+  pinned to 1700000000): `STATIC: 14 passed, 0 failed`, all pins MATCH:
+  index, asset, brotli, gzip, br preference, HEAD, byte range `206`,
+  unsatisfiable `416`, extensionless, 404, `If-None-Match` `304`,
+  `If-Modified-Since` `304`, `If-Range` match `206` and stale `200`.
   Only contract fields are compared (status/content-type/cache-control/
-  content-encoding/body); `date`, `etag`, `last-modified`, `connection`,
-  `keep-alive`, `accept-ranges` are dynamic and ignored.
+  content-encoding/ETag/Last-Modified/Accept-Ranges/Content-Range/Vary/body);
+  `date`, `connection`, `keep-alive` and length/chunking are dynamic.
 
 ## Gaps
 
@@ -74,6 +99,9 @@ Rust integration tests (`src/frontend/mod.rs` tests):
   asserted by our integration test and cited from source.
 - Direct dispatch covers command/bridge-request topics only (as upstream); it is
   not exercised against a live broker/HA.
-- TLS (`ssl_key`/`ssl_cert`), unix sockets, websocket fragmentation, cache
-  validators, and full `srvx` header parity are not implemented.
+- TLS (`ssl_key`/`ssl_cert`), unix sockets and WebSocket fragmentation are not
+  implemented; `disable_ui_serving` still binds an HTTP listener that answers
+  plain-text 404 instead of only serving the WebSocket.
+- On-the-fly compression of large uncompressed assets (`COMPRESS_MIN_SIZE`) is
+  not implemented; only precompressed variants are used.
 - No browser/HA/HIL verification.

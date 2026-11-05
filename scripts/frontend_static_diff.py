@@ -6,8 +6,10 @@ The upstream dump is produced by `static_file_server_dump.test.ts` (real
 serves the same fixture tree through the bridge frontend server.
 
 Only the contract fields are compared: status, content-type, cache-control,
-content-encoding and the body. Dynamic validators (`date`, `etag`,
-`last-modified`, `connection`, `keep-alive`, `accept-ranges`) are ignored.
+content-encoding, ETag, Last-Modified, Accept-Ranges, Content-Range, Vary and
+the body. Purely dynamic fields (`date`, `connection`, `keep-alive`,
+`content-length`/chunking) are ignored; fixture mtimes are pinned to
+1700000000 so validators must match exactly.
 """
 
 from __future__ import annotations
@@ -25,7 +27,16 @@ except ImportError:  # pragma: no cover
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from evid04_harness import verify_pins
 
-KEEP_HEADERS = ("content-type", "cache-control", "content-encoding")
+KEEP_HEADERS = (
+    "content-type",
+    "cache-control",
+    "content-encoding",
+    "etag",
+    "last-modified",
+    "accept-ranges",
+    "content-range",
+    "vary",
+)
 
 
 def normalize(response: dict) -> dict:
