@@ -60,6 +60,11 @@ pub struct CoordinatorInfo {
     pub ieee_addr: Option<IeeeAddr>,
     pub version: String,
     pub transport_rev: u8,
+    /// Coordinator network parameters (`ZDO_EXT_NWK_INFO`). `None` when the
+    /// firmware does not answer the request.
+    pub channel: Option<u8>,
+    pub pan_id: Option<u16>,
+    pub extended_pan_id: Option<String>,
 }
 
 pub struct CoordinatorHandle {

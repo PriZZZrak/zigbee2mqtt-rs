@@ -30,6 +30,8 @@ struct DbEntry {
     #[serde(default)]
     sw_build_id: Option<String>,
     #[serde(default)]
+    date_code: Option<String>,
+    #[serde(default)]
     ep_list: Option<Vec<u8>>,
     #[serde(default)]
     endpoints: HashMap<String, DbEndpoint>,
@@ -127,6 +129,7 @@ pub fn load_database(
         dev.power_source = entry.power_source;
         dev.model = entry.model_id;
         dev.sw_build_id = entry.sw_build_id;
+        dev.date_code = entry.date_code;
         // interviewState takes precedence, fallback to interviewCompleted
         dev.interview_complete = entry
             .interview_state

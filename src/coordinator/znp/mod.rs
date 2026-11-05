@@ -99,10 +99,27 @@ impl ZnpCoordinator {
         let device_info = self.get_device_info().await;
         info!("ZNP coordinator ready");
 
+        // Network parameters come from the coordinator itself, not the config:
+        // the device may have been commissioned with a different channel/PAN.
+        let network = match self.transport.request(zdo_ext_nwk_info()).await {
+            Ok(rsp) => ExtNwkInfo::parse(&rsp.data),
+            Err(error) => {
+                warn!("ZDO_EXT_NWK_INFO failed: {error}");
+                None
+            }
+        };
+        if network.is_none() {
+            warn!("Coordinator did not report network parameters");
+        }
         let coord_info = CoordinatorInfo {
             ieee_addr: device_info.as_ref().map(|d| IeeeAddr(d.ieee_addr)),
             version: format!("{}.{}", version.major_rel, version.minor_rel),
             transport_rev: version.transport_rev,
+            channel: network.as_ref().map(|network| network.channel),
+            pan_id: network.as_ref().map(|network| network.pan_id),
+            extended_pan_id: network
+                .as_ref()
+                .map(|network| network.extended_pan_id.clone()),
         };
 
         let (coord_event_tx, coord_event_rx) = mpsc::channel::<CoordinatorEvent>(64);

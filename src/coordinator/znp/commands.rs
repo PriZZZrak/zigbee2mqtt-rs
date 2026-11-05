@@ -244,6 +244,7 @@ mod zdo {
     pub const BIND_REQ: u8 = 0x21;
     pub const PERMIT_JOIN_REQ: u8 = 0x36;
     pub const STARTUP_FROM_APP: u8 = 0x40;
+    pub const EXT_NWK_INFO: u8 = 0x50;
 }
 
 pub fn zdo_startup_from_app(start_delay_ms: u16) -> ZnpFrame {
@@ -252,6 +253,49 @@ pub fn zdo_startup_from_app(start_delay_ms: u16) -> ZnpFrame {
         zdo::STARTUP_FROM_APP,
         start_delay_ms.to_le_bytes().to_vec(),
     )
+}
+
+/// `ZDO_EXT_NWK_INFO`: coordinator network parameters.
+///
+/// Reference: zigbee-herdsman `zStackAdapter.getNetworkParameters()`.
+pub fn zdo_ext_nwk_info() -> ZnpFrame {
+    ZnpFrame::sreq(Subsystem::Zdo, zdo::EXT_NWK_INFO, vec![])
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtNwkInfo {
+    pub short_addr: u16,
+    pub pan_id: u16,
+    pub extended_pan_id: String,
+    pub channel: u8,
+}
+
+impl ExtNwkInfo {
+    /// Parse the `ZDO_EXT_NWK_INFO` response payload.
+    ///
+    /// Layout: `shortaddr:u16, devstate:u8, panid:u16, parentaddr:u16,
+    /// extendedpanid:ieee(8), parentextaddr:ieee(8), channel:u8`. IEEE values
+    /// are little-endian buffers rendered as `0x` + reversed hex, matching
+    /// herdsman's `eui64LEBufferToHex`.
+    pub fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() < 24 {
+            return None;
+        }
+        let mut extended = data[7..15].to_vec();
+        extended.reverse();
+        Some(Self {
+            short_addr: u16::from_le_bytes([data[0], data[1]]),
+            pan_id: u16::from_le_bytes([data[3], data[4]]),
+            extended_pan_id: format!(
+                "0x{}",
+                extended
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>()
+            ),
+            channel: data[23],
+        })
+    }
 }
 
 pub fn zdo_permit_join(dst_addr: u16, duration: u8) -> ZnpFrame {

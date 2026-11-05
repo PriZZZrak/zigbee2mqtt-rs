@@ -48,6 +48,9 @@ fn fake_coordinator() -> CoordinatorHandle {
             ieee_addr: IeeeAddr::from_hex("0x00124b00120144ae"),
             version: "1".into(),
             transport_rev: 2,
+            channel: Some(15),
+            pan_id: Some(5674),
+            extended_pan_id: Some("0x64c5fd698daf0c00".into()),
         },
     }
 }
@@ -72,6 +75,11 @@ async fn wait_topic(broker: &FakeBroker, topic: &str) -> Value {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
+    let filter = std::env::var("EVID04_LOG").unwrap_or_else(|_| "warn".into());
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::try_new(filter).unwrap_or_default())
+        .with_writer(std::io::stderr)
+        .try_init();
     let mut data_dir: Option<PathBuf> = None;
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut index = 0;
@@ -89,25 +97,28 @@ async fn main() {
     }
     let data_dir = data_dir.unwrap_or_else(|| fail("--data is required"));
     let config_path = data_dir.join("configuration.yaml");
-    let mut config =
+    let config =
         Config::load(&config_path).unwrap_or_else(|error| fail(format!("config: {error}")));
 
     let broker = FakeBroker::start().await;
-    config.mqtt.server = "127.0.0.1".into();
-    config.mqtt.port = broker.port;
-    config.mqtt.client_id = format!("z2m-api-diff-{}", std::process::id());
+    // The bridge keeps the configured MQTT URI (it is part of `bridge/info`);
+    // only the transport uses the in-process broker.
+    let mut runtime_mqtt = config.mqtt.clone();
+    runtime_mqtt.server = "127.0.0.1".into();
+    runtime_mqtt.port = broker.port;
+    runtime_mqtt.client_id = format!("z2m-api-diff-{}", std::process::id());
     let base_topic = config.mqtt.base_topic.clone();
-    let bridge = Bridge::new(config.clone(), config_path);
+    let bridge = Bridge::new(config, config_path);
     bridge.import_for_diff();
 
-    let (mqtt, _commands) = MqttBridge::connect(&config.mqtt)
+    let (mqtt, _commands) = MqttBridge::connect(&runtime_mqtt)
         .await
         .unwrap_or_else(|error| fail(format!("mqtt connect: {error}")));
     let coord = fake_coordinator();
 
     let _ = mqtt.publish_bridge_state(true).await;
     bridge.publish_info_for_diff(&mqtt, &coord).await;
-    bridge.publish_devices_for_diff(&mqtt).await;
+    bridge.publish_devices_for_diff(&mqtt, &coord).await;
     let permit_join_response = bridge.permit_join_for_diff(&mqtt, &coord, 120).await;
     let state = wait_topic(&broker, &format!("{base_topic}/bridge/state")).await;
     let info = wait_topic(&broker, &format!("{base_topic}/bridge/info")).await;

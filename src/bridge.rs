@@ -10,7 +10,7 @@ use tracing::{debug, error, info, warn};
 use std::path::PathBuf;
 
 use crate::config::{Config, OutputMode};
-use crate::converters::external::ExternalConverter;
+use crate::converters::external::{ExternalConverter, ExternalDeviceInfo};
 use crate::coordinator::znp::ZnpHandle;
 use crate::coordinator::{open_coordinator, CoordinatorEvent, CoordinatorHandle};
 use crate::database::{self, PersistentDatabase};
@@ -129,8 +129,25 @@ pub struct Bridge {
     database: Arc<Mutex<PersistentDatabase>>,
     db_write_pending: Arc<Mutex<bool>>,
     external: Arc<ExternalConverter>,
+    /// Converter definitions are expensive to evaluate (Boa); cache them per
+    /// model/fingerprint so repeated `bridge/devices` publishes stay cheap.
+    definition_cache: Arc<dashmap::DashMap<String, Option<serde_json::Value>>>,
     ota: Arc<Mutex<crate::ota::OtaManager>>,
     ota_provider: crate::ota::OtaIndexProvider,
+}
+
+/// Converter package directory.
+///
+/// The harness may point it at a staged package; production always uses the
+/// installed path.
+fn converter_dir() -> String {
+    #[cfg(feature = "test-support")]
+    if let Ok(dir) = std::env::var("Z2M_CONVERTERS_DIR") {
+        if !dir.is_empty() {
+            return dir;
+        }
+    }
+    "/etc/zigbee2mqtt-rs/herdsman-converters".to_string()
 }
 
 /// Resolve when the service manager or user asks the bridge to stop.
@@ -226,7 +243,7 @@ impl Bridge {
             }
         }
         let external = ExternalConverter::new(
-            "/etc/zigbee2mqtt-rs/herdsman-converters",
+            converter_dir(),
             "https://prizzzrak.github.io/zigbee2mqtt-rs/herdsman-converters/latest",
         );
         let _ = external.ensure_dir();
@@ -238,6 +255,7 @@ impl Bridge {
             database: Arc::new(Mutex::new(db)),
             db_write_pending: Arc::new(Mutex::new(false)),
             external: Arc::new(external),
+            definition_cache: Arc::new(dashmap::DashMap::new()),
             ota: Arc::new(Mutex::new(crate::ota::OtaManager::default())),
             ota_provider: crate::ota::OtaIndexProvider::new(
                 crate::ota::DEFAULT_INDEX_URL,
@@ -485,7 +503,13 @@ impl Bridge {
                             if let Err(e) = mqtt.publish_bridge_log("info", &format!("Device left: {ieee}")).await {
                                 warn!("Failed to publish bridge log: {e}");
                             }
-                            Self::publish_device_list_static(&devices, &mqtt).await;
+                            let list = device_list_json(
+                                &devices,
+                                &external,
+                                &self.definition_cache,
+                                Some(&coordinator_ieee),
+                            );
+                            let _ = mqtt.publish_bridge_devices(&json!(list)).await;
                         }
 
                         Some(CoordinatorEvent::AddressResolved { ieee_addr, nwk_addr }) => {
@@ -657,7 +681,13 @@ impl Bridge {
                                 }
                             }
 
-                            Self::publish_device_list_static(&devices, &mqtt).await;
+                            let list = device_list_json(
+                                &devices,
+                                &external,
+                                &self.definition_cache,
+                                Some(&coordinator_ieee),
+                            );
+                            let _ = mqtt.publish_bridge_devices(&json!(list)).await;
 
                             // Publish HA discovery after interview
                             if ha_enabled && interview_just_completed {
@@ -896,7 +926,13 @@ impl Bridge {
                                                 self.publish_device_discovery(&mqtt, &new_device, &base_topic, &coordinator_ieee).await;
                                             }
                                         }
-                                        Self::publish_device_list_static(&devices, &mqtt).await;
+                                        let list = device_list_json(
+                                &devices,
+                                &external,
+                                &self.definition_cache,
+                                Some(&coordinator_ieee),
+                            );
+                            let _ = mqtt.publish_bridge_devices(&json!(list)).await;
                                         self.persist_database(coord.info.ieee_addr).await;
                                         let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": ha_rename}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
@@ -926,6 +962,8 @@ impl Bridge {
                                     let removed = process_device_remove(
                                         &devices,
                                         &self.external,
+                                        &self.definition_cache,
+                                        Some(&coordinator_ieee),
                                         self.cfg.homeassistant.enabled(),
                                         &mqtt,
                                         &request,
@@ -1225,13 +1263,9 @@ impl Bridge {
     /// Harness entry: publish `bridge/devices`.
     #[cfg(feature = "test-support")]
     #[doc(hidden)]
-    pub async fn publish_devices_for_diff(&self, mqtt: &MqttBridge) {
-        eprintln!(
-            "DBG devices_for_diff devices={}",
-            self.devices.all_devices().len()
-        );
-        self.publish_device_list(mqtt).await;
-        eprintln!("DBG devices_for_diff returned");
+    pub async fn publish_devices_for_diff(&self, mqtt: &MqttBridge, coord: &CoordinatorHandle) {
+        let ieee = coord.info.ieee_addr.map(|a| a.as_hex());
+        self.publish_device_list(mqtt, ieee.as_deref()).await;
     }
 
     /// Harness entry: produce the `permit_join` bridge response.
@@ -1287,6 +1321,7 @@ impl Bridge {
 
                 if let Some(mut dev) = self.devices.get_mut_by_ieee(&ieee) {
                     dev.disabled = disabled;
+                    dev.description = cfg.description.clone();
                     drop(dev);
                     self.devices.rename(&ieee, name);
                 } else {
@@ -1294,6 +1329,7 @@ impl Bridge {
                     let mut dev = Device::new(ieee, 0);
                     dev.friendly_name = name;
                     dev.disabled = disabled;
+                    dev.description = cfg.description.clone();
                     self.devices.add(dev);
                 }
             }
@@ -1303,8 +1339,18 @@ impl Bridge {
     async fn publish_bridge_info(&self, mqtt: &MqttBridge, coord: &CoordinatorHandle) {
         let coord_ieee = coord.info.ieee_addr.map(|a| a.as_hex()).unwrap_or_default();
 
-        let info = json!({
+        // Config is the merged runtime view; secrets must never be published.
+        let mut config = serde_json::to_value(&self.cfg).unwrap_or_else(|_| json!({}));
+        if let Some(advanced) = config.get_mut("advanced").and_then(|v| v.as_object_mut()) {
+            advanced.remove("network_key");
+        }
+        if let Some(mqtt_config) = config.get_mut("mqtt").and_then(|v| v.as_object_mut()) {
+            mqtt_config.remove("password");
+        }
+
+        let mut info = json!({
             "version": env!("CARGO_PKG_VERSION"),
+            "commit": option_env!("Z2M_GIT_COMMIT").unwrap_or("unknown"),
             "coordinator": {
                 "ieee_address": coord_ieee,
                 "type": "z-Stack",
@@ -1313,10 +1359,24 @@ impl Bridge {
                     "version": coord.info.version,
                 }
             },
+            "network": {
+                "pan_id": coord.info.pan_id,
+                "extended_pan_id": coord.info.extended_pan_id,
+                "channel": coord.info.channel,
+            },
+            "mqtt": {
+                "server": mqtt_server_uri(&self.cfg.mqtt),
+                "version": 4,
+            },
+            "os": os_info(),
             "log_level": self.cfg.advanced.log_level,
             "permit_join": self.cfg.permit_join,
-            "config": {},
+            "restart_required": false,
+            "config": config,
         });
+        if let Some(version) = self.external.package_version() {
+            info["zigbee_herdsman_converters"] = json!({"version": version});
+        }
 
         if let Err(e) = mqtt.publish_bridge_info(&info).await {
             warn!("Failed to publish bridge info: {e}");
@@ -1347,7 +1407,8 @@ impl Bridge {
             }
         }
 
-        self.publish_device_list(mqtt).await;
+        self.publish_device_list(mqtt, Some(&coordinator_ieee_str))
+            .await;
         let _ = mqtt.publish_bridge_groups(&self.groups).await;
         let _ = mqtt.publish_bridge_extensions().await;
     }
@@ -3015,16 +3076,13 @@ impl Bridge {
         }
     }
 
-    async fn publish_device_list(&self, mqtt: &MqttBridge) {
-        Self::publish_device_list_static(&self.devices, mqtt).await;
-    }
-
-    async fn publish_device_list_static(devices: &DeviceRegistry, mqtt: &MqttBridge) {
-        let list: Vec<_> = devices
-            .all_devices()
-            .iter()
-            .map(|d| d.to_z2m_device_json())
-            .collect();
+    async fn publish_device_list(&self, mqtt: &MqttBridge, coordinator_ieee: Option<&str>) {
+        let list = device_list_json(
+            &self.devices,
+            &self.external,
+            &self.definition_cache,
+            coordinator_ieee,
+        );
         if let Err(e) = mqtt.publish_bridge_devices(&json!(list)).await {
             warn!("Failed to publish device list: {e}");
         }
@@ -3119,6 +3177,129 @@ fn apply_endpoint_suffix(
         }
     }
     *values = suffixed;
+}
+
+/// Normalized MQTT server URI (`mqtt.ts:info`): `protocol://host:port`.
+fn mqtt_server_uri(cfg: &crate::config::MqttConfig) -> String {
+    let raw = cfg.server.trim();
+    if let Some(rest) = raw
+        .strip_prefix("mqtt://")
+        .or_else(|| raw.strip_prefix("mqtts://"))
+    {
+        let scheme = if raw.starts_with("mqtts://") {
+            "mqtts"
+        } else {
+            "mqtt"
+        };
+        if rest.contains(':') {
+            return raw.to_string();
+        }
+        return format!("{scheme}://{rest}:{}", cfg.port);
+    }
+    format!("mqtt://{raw}:{}", cfg.port)
+}
+
+/// Host OS information for `bridge/info.os` (upstream `osInfo`).
+fn os_info() -> serde_json::Value {
+    let cpuinfo = std::fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
+    let cpu_model = cpuinfo
+        .lines()
+        .find(|line| line.starts_with("model name") || line.starts_with("Model"))
+        .and_then(|line| line.split_once(':'))
+        .map(|(_, value)| value.trim().to_string());
+    let cpu_count = cpuinfo
+        .lines()
+        .filter(|line| line.starts_with("processor"))
+        .count();
+    let memory_mb = std::fs::read_to_string("/proc/meminfo")
+        .ok()
+        .and_then(|text| {
+            text.lines()
+                .find(|line| line.starts_with("MemTotal:"))
+                .and_then(|line| line.split_whitespace().nth(1))
+                .and_then(|value| value.parse::<u64>().ok())
+        })
+        .map(|kilobytes| kilobytes / 1024);
+    let kernel = std::fs::read_to_string("/proc/sys/kernel/osrelease")
+        .map(|release| release.trim().to_string())
+        .unwrap_or_default();
+    let os_name = {
+        let os = std::env::consts::OS;
+        let mut chars = os.chars();
+        match chars.next() {
+            Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
+            None => os.to_string(),
+        }
+    };
+    let arch = match std::env::consts::ARCH {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        other => other,
+    };
+    json!({
+        "cpus": cpu_model.map(|model| format!("{model} (x{cpu_count})")),
+        "memory_mb": memory_mb,
+        "version": format!("{os_name} - {kernel} - {arch}"),
+    })
+}
+
+/// Build `bridge/devices` (coordinator first, then registry devices) with the
+/// converter-derived `definition` payload cached per fingerprint.
+fn device_list_json(
+    devices: &DeviceRegistry,
+    external: &ExternalConverter,
+    cache: &dashmap::DashMap<String, Option<serde_json::Value>>,
+    coordinator_ieee: Option<&str>,
+) -> Vec<serde_json::Value> {
+    let mut list = Vec::new();
+    if let Some(ieee) = coordinator_ieee.filter(|ieee| !ieee.is_empty()) {
+        list.push(json!({
+            "ieee_address": ieee,
+            "type": "Coordinator",
+            "network_address": 0,
+            "friendly_name": "Coordinator",
+            "supported": true,
+            "interviewing": false,
+            "interview_completed": true,
+            "interview_state": "SUCCESSFUL",
+            "disabled": false,
+            "endpoints": {
+                "1": {
+                    "bindings": [],
+                    "clusters": {"input": [], "output": []},
+                    "configured_reportings": [],
+                    "scenes": [],
+                }
+            },
+        }));
+    }
+    for device in devices.all_devices() {
+        let definition = match device.model.as_deref() {
+            Some(model) => {
+                let key = format!(
+                    "{model}|{:?}|{:?}|{:?}",
+                    device.manufacturer_id,
+                    device.manufacturer,
+                    device
+                        .endpoints
+                        .iter()
+                        .map(|ep| ep.endpoint)
+                        .collect::<Vec<_>>()
+                );
+                if let Some(cached) = cache.get(&key) {
+                    cached.clone()
+                } else {
+                    let info = ExternalDeviceInfo::from_device(&device);
+                    let payload = external.definition_payload(model, &info);
+                    cache.insert(key, payload.clone());
+                    payload
+                }
+            }
+            None => None,
+        };
+        list.push(device.to_z2m_device_json_with_definition(definition));
+    }
+    list
 }
 
 fn merge_converted_values(
@@ -3381,6 +3562,8 @@ fn auto_check_bridge_query(
 async fn process_device_remove(
     devices: &DeviceRegistry,
     external: &ExternalConverter,
+    definition_cache: &dashmap::DashMap<String, Option<serde_json::Value>>,
+    coordinator_ieee: Option<&str>,
     ha_enabled: bool,
     mqtt: &dyn crate::mqtt::MqttPublishIo,
     request: &str,
@@ -3425,11 +3608,7 @@ async fn process_device_remove(
     }
 
     devices.remove_by_ieee(&ieee);
-    let list: Vec<_> = devices
-        .all_devices()
-        .iter()
-        .map(|device| device.to_z2m_device_json())
-        .collect();
+    let list = device_list_json(devices, external, definition_cache, coordinator_ieee);
     let _ = mqtt.publish_devices(json!(list)).await;
     let response = reporting_mqtt_response(Ok(json!({"id": id})), transaction);
     let _ = mqtt.publish_response(request.to_string(), response).await;
@@ -4655,6 +4834,8 @@ mod tests {
         let removed = process_device_remove(
             &devices,
             &external,
+            &dashmap::DashMap::new(),
+            Some("0x00124b00120144ae"),
             true,
             &fake,
             "device/remove",
@@ -4696,6 +4877,8 @@ mod tests {
         let removed = process_device_remove(
             &devices,
             &external,
+            &dashmap::DashMap::new(),
+            Some("0x00124b00120144ae"),
             true,
             &fake,
             "device/remove",
@@ -4904,6 +5087,8 @@ mod tests {
         let removed = process_device_remove(
             &devices,
             &external,
+            &dashmap::DashMap::new(),
+            Some("0x00124b00120144ae"),
             true,
             &mqtt,
             "device/remove",
@@ -5209,6 +5394,9 @@ module.exports = {definitions};
                     ieee_addr: IeeeAddr::from_hex("0x00124b00120144ae"),
                     version: "test".into(),
                     transport_rev: 2,
+                    channel: Some(11),
+                    pan_id: Some(0x1a62),
+                    extended_pan_id: Some("0x00124b00120144ae".into()),
                 },
             },
         )

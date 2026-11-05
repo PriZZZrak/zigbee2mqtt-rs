@@ -15233,6 +15233,8 @@
       "manufName": "Centralite",
       "powerSource": "Mains (single phase)",
       "modelId": "3157100",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15249,6 +15251,8 @@
       "manufId": 4476,
       "powerSource": "Mains (single phase)",
       "modelId": "TRADFRI bulb E27 WS opal 980lm",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15281,6 +15285,8 @@
       "manufName": "BOSCH",
       "powerSource": "Battery",
       "modelId": "RBSH-TRV0-ZB-EU",
+      "swBuildId": "3.05.09",
+      "dateCode": "20231122",
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15309,6 +15315,8 @@
       "manufId": 4107,
       "powerSource": "Mains (single phase)",
       "modelId": "LLC020",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15340,6 +15348,8 @@
       "manufId": 4476,
       "powerSource": "Mains (single phase)",
       "modelId": "TRADFRI bulb E27 WS opal 980lm",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15371,6 +15381,8 @@
       "manufId": 4107,
       "powerSource": "Mains (single phase)",
       "modelId": "LGT003",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15443,6 +15455,8 @@
       "manufName": "Philips",
       "powerSource": "Mains (single phase)",
       "modelId": "LLC020",
+      "swBuildId": "5.127.1.26581",
+      "dateCode": "2019.09",
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15474,6 +15488,8 @@
       "manufId": 4107,
       "powerSource": "Battery",
       "modelId": "RWL021",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15513,6 +15529,8 @@
       "manufName": "notSupportedMfg",
       "powerSource": "Battery",
       "modelId": "notSupportedModelID",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15550,6 +15568,8 @@
       "manufId": 0,
       "powerSource": "Battery",
       "modelId": "notSupportedModelID",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15574,6 +15594,8 @@
       "nwkAddr": 6536,
       "manufId": 0,
       "powerSource": "Battery",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": false,
       "endpoints": [
         {
@@ -15599,6 +15621,8 @@
       "manufId": 0,
       "powerSource": "Battery",
       "modelId": "lumi.sensor_switch.aq2",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15624,6 +15648,8 @@
       "manufId": 4151,
       "powerSource": "Battery",
       "modelId": "lumi.sensor_switch.aq2",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15649,6 +15675,8 @@
       "manufId": 4151,
       "powerSource": "Battery",
       "modelId": "lumi.sensor_86sw2.es1",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15674,6 +15702,8 @@
       "manufId": 4151,
       "powerSource": "Battery",
       "modelId": "lumi.weather",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15692,6 +15722,8 @@
       "manufId": 4151,
       "powerSource": "Battery",
       "modelId": "lumi.weather",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15710,6 +15742,8 @@
       "manufId": 4151,
       "powerSource": "Battery",
       "modelId": "lumi.sensor_motion.aq2",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15728,6 +15762,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "lumi.plug",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15747,6 +15783,8 @@
       "manufId": 4476,
       "powerSource": "Mains (single phase)",
       "modelId": "TRADFRI on/off switch",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15765,6 +15803,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "lumi.ctrl_neutral1",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15793,6 +15833,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "lumi.ctrl_neutral2",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15827,6 +15869,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "GL-C-008",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15852,6 +15896,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "GL-C-008",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15885,6 +15931,8 @@
       "manufName": "GLEDOPTO",
       "powerSource": "Mains (single phase)",
       "modelId": "GL-C-007",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15952,6 +16000,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "FB56+ZSC05HG1.0",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15972,6 +16022,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "lumi.curtain",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -15997,6 +16049,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "HDC52EastwindFan",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16022,6 +16076,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "WarningDevice",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16040,6 +16096,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "Thermostat",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16058,6 +16116,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "SV01-410-MP-1.0",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16076,6 +16136,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "J1 (5502)",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16094,6 +16156,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "E11-G13",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16112,6 +16176,8 @@
       "nwkAddr": 6536,
       "manufId": 0,
       "powerSource": "Mains (single phase)",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": false,
       "endpoints": [
         {
@@ -16138,6 +16204,8 @@
       "manufName": "Boef",
       "powerSource": "Mains (single phase)",
       "modelId": "notSupportedModelID",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16163,6 +16231,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "lumi.router",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16182,6 +16252,8 @@
       "manufId": 4152,
       "powerSource": "Mains (single phase)",
       "modelId": "TI0001          ",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16201,6 +16273,8 @@
       "manufId": 4476,
       "powerSource": "Battery",
       "modelId": "TRADFRI remote control",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16226,6 +16300,8 @@
       "manufId": 4476,
       "powerSource": "Battery",
       "modelId": "SCM-R_00.00.03.15TC",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16251,6 +16327,8 @@
       "manufId": 4476,
       "powerSource": "Mains (single phase)",
       "modelId": "lumi.light.aqcn02",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16291,6 +16369,8 @@
       "manufName": "Salus",
       "powerSource": "Mains (single phase)",
       "modelId": "SP600",
+      "swBuildId": null,
+      "dateCode": "20160120",
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16331,6 +16411,8 @@
       "manufName": "Salus",
       "powerSource": "Mains (single phase)",
       "modelId": "SP600",
+      "swBuildId": null,
+      "dateCode": "20170220",
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16370,6 +16452,8 @@
       "manufId": 4476,
       "powerSource": "Mains (single phase)",
       "modelId": "qnazj70",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16409,6 +16493,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "GL-S-007ZS",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16427,6 +16513,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "U202DST600ZB",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16455,6 +16543,8 @@
       "manufName": "Siglis",
       "powerSource": "Mains (single phase)",
       "modelId": "zigfred plus",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16552,6 +16642,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "J1 (5502)",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16569,6 +16661,8 @@
       "manufName": "_TZ3000_j1xl73iw",
       "powerSource": "Mains (single phase)",
       "modelId": "TS130F",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16610,6 +16704,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "kud7u2l",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16626,6 +16722,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "kjintbl",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16643,6 +16741,8 @@
       "manufName": "_TZE200_5nldle7w",
       "powerSource": "Mains (single phase)",
       "modelId": "TS0601",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16658,6 +16758,8 @@
       "nwkAddr": 1114,
       "manufId": 65535,
       "modelId": "external_converter_device",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": false,
       "endpoints": [
         {
@@ -16675,6 +16777,8 @@
       "manufName": "_TYZB01_v8gtiaed",
       "powerSource": "Mains (single phase)",
       "modelId": "TS110F",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16700,6 +16804,8 @@
       "nwkAddr": 6540,
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": []
     },
@@ -16710,6 +16816,8 @@
       "manufId": 4151,
       "powerSource": "Battery",
       "modelId": "temperature.sensor",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16731,6 +16839,8 @@
       "manufId": 4151,
       "powerSource": "Mains (single phase)",
       "modelId": "heating.actuator",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16755,6 +16865,8 @@
       "manufName": "Busch-Jaeger",
       "powerSource": "Battery",
       "modelId": "RB01",
+      "swBuildId": "1.2.0",
+      "dateCode": "20161222",
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16800,6 +16912,8 @@
       "manufId": 4699,
       "powerSource": "Mains (single phase)",
       "modelId": "Adapter Zigbee FUJITSU",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16823,6 +16937,8 @@
       "manufId": 4617,
       "powerSource": "Mains (single phase)",
       "modelId": "RBSH-MMS-ZB-EU",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16852,6 +16968,8 @@
       "manufId": 4617,
       "powerSource": "Mains (single phase)",
       "modelId": "RBSH-MMS-ZB-EU",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16881,6 +16999,8 @@
       "manufId": 4476,
       "powerSource": "Mains (single phase)",
       "modelId": "TRADFRI bulb E27 WS opal 980lm",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16912,6 +17032,8 @@
       "manufId": 4655,
       "powerSource": "Mains (single phase)",
       "modelId": "VZM31-SN",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16944,6 +17066,8 @@
       "manufId": 65521,
       "powerSource": "DC Source",
       "modelId": "FanBee1",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {
@@ -16974,6 +17098,8 @@
       "manufId": 4617,
       "powerSource": "Mains (single phase)",
       "modelId": "RBSH-RTH0-ZB-EU",
+      "swBuildId": null,
+      "dateCode": null,
       "interviewComplete": true,
       "endpoints": [
         {

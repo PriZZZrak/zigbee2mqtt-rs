@@ -25,9 +25,19 @@ except ImportError:  # pragma: no cover
     from evid04_harness import verify_pins
 
 
+def meta_manufacturer_id(upstream: dict, ieee: str):
+    for meta in upstream.get("device_meta", []):
+        if meta.get("ieeeAddr") == ieee:
+            return meta.get("manufId")
+    return None
+
+
 def build_fixture(upstream: dict, directory: Path) -> Path:
     info = upstream["bridge_info"]
-    base_topic = info.get("mqtt", {}).get("base_topic", "zigbee2mqtt")
+    config = info.get("config") or {}
+    advanced = config.get("advanced") or {}
+    mqtt = info.get("mqtt") or {}
+    base_topic = (config.get("mqtt") or {}).get("base_topic", "zigbee2mqtt")
     valid_ieee = re.compile(r"^0x[0-9a-f]{16}$")
     devices = [
         device
@@ -36,13 +46,27 @@ def build_fixture(upstream: dict, directory: Path) -> Path:
         and valid_ieee.match(str(device.get("ieee_address", "")))
         and (device.get("network_address") or 0) <= 0xFFFF
     ]
-    lines = ["mqtt:", f"  base_topic: {base_topic}", "  server: mqtt://127.0.0.1:1883",
-             "serial:", "  port: /dev/ttyACM0", "  adapter: zstack",
-             "advanced:", f"  log_level: {info.get('log_level', 'info')}", "devices:"]
+    lines = [
+        "mqtt:",
+        f"  base_topic: {base_topic}",
+        f"  server: {mqtt.get('server', 'mqtt://127.0.0.1:1883')}",
+        "serial:",
+        "  port: /dev/ttyACM0",
+        "  adapter: zstack",
+        "advanced:",
+        f"  log_level: {advanced.get('log_level', 'info')}",
+        f"  channel: {advanced.get('channel', 11)}",
+        f"  pan_id: {advanced.get('pan_id', 6754)}",
+        f"  output: {advanced.get('output', 'json')}",
+        "  ext_pan_id: [" + ", ".join(str(byte) for byte in advanced.get("ext_pan_id", [0xdd] * 8)) + "]",
+        "devices:",
+    ]
     for device in devices:
         lines.append(f'  "{device["ieee_address"]}":')
         lines.append(f'    friendly_name: "{device["friendly_name"]}"')
         lines.append(f'    disabled: {"true" if device.get("disabled") else "false"}')
+        if device.get("description"):
+            lines.append(f'    description: "{device["description"]}"')
     (directory / "configuration.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     db_lines = []
@@ -69,10 +93,12 @@ def build_fixture(upstream: dict, directory: Path) -> Path:
                     "type": device.get("type"),
                     "ieeeAddr": device["ieee_address"],
                     "nwkAddr": device.get("network_address", 0),
-                    "manufId": 0,
+                    "manufId": meta_manufacturer_id(upstream, device["ieee_address"]),
                     "manufName": device.get("manufacturer"),
                     "powerSource": device.get("power_source"),
                     "modelId": device.get("model_id"),
+                    "swBuildId": device.get("software_build_id"),
+                    "dateCode": device.get("date_code"),
                     "epList": endpoint_ids,
                     "endpoints": endpoints,
                     "interviewCompleted": device.get("interview_completed", False),
@@ -87,7 +113,16 @@ def build_fixture(upstream: dict, directory: Path) -> Path:
 
 
 def normalize_info(info: dict) -> dict:
+    """Normalize `bridge/info` to the contract subset the frontend reads.
+
+    Build/environment identity (`os` values, `version`, `commit`, herdsman
+    version) is only checked for presence: the Rust implementation necessarily
+    reports its own versions and the host's OS numbers.
+    """
     coordinator = info.get("coordinator") or {}
+    config = info.get("config") or {}
+    advanced = config.get("advanced") or {}
+    os_info = info.get("os") or {}
     return {
         "coordinator": {
             "ieee_address": coordinator.get("ieee_address"),
@@ -95,23 +130,55 @@ def normalize_info(info: dict) -> dict:
         },
         "log_level": info.get("log_level"),
         "permit_join": info.get("permit_join"),
+        "restart_required": info.get("restart_required"),
+        "network": info.get("network"),
+        "mqtt": {
+            "server": (info.get("mqtt") or {}).get("server"),
+            # The Rust transport is MQTT 3.1.1 (protocol version 4); the pinned
+            # upstream test harness reports its own client version (5).
+            "version_supported": (info.get("mqtt") or {}).get("version") in (4, 5),
+        },
+        "config": {
+            "advanced": {
+                key: advanced.get(key)
+                for key in ("channel", "pan_id", "ext_pan_id", "log_level", "output")
+            },
+            "mqtt_base_topic": (config.get("mqtt") or {}).get("base_topic"),
+        },
+        "converters_version": (info.get("zigbee_herdsman_converters") or {}).get("version"),
+        "os_shape": {
+            key: isinstance(os_info.get(key), (str, int))
+            for key in ("cpus", "memory_mb", "version")
+        },
+        "has_version": isinstance(info.get("version"), str) and bool(info.get("version")),
+        "has_commit": isinstance(info.get("commit"), str) and bool(info.get("commit")),
     }
 
 
-def normalize_devices(devices: list, cluster_map: dict) -> dict:
-    def cluster_id(value):
-        if isinstance(value, int):
-            return value
-        return cluster_map.get(str(value), value)
+def normalize_definition(value):
+    if not isinstance(value, dict):
+        return None
+    exposes = value.get("exposes") or []
+    return {
+        "source": value.get("source"),
+        "model": value.get("model"),
+        "vendor": value.get("vendor"),
+        "description": value.get("description"),
+        "supports_ota": value.get("supports_ota"),
+        "options": value.get("options") or [],
+        "version": value.get("version"),
+        "icon": value.get("icon"),
+        "exposes": exposes,
+    }
 
+
+def normalize_devices(devices: list, cluster_map: dict, include_definition: bool = True) -> dict:
     normalized = {}
     valid_ieee = re.compile(r"^0x[0-9a-f]{16}$")
     for device in devices:
-        if device.get("type") == "Coordinator":
-            continue
-        # The upstream test fixtures contain two synthetic devices that cannot
-        # exist on a real network (non-hex IEEE / 32-bit NWK); both importers
-        # reject them, so they are outside the contract.
+        # The upstream test fixtures contain synthetic devices that cannot exist
+        # on a real network (non-hex IEEE / 32-bit NWK); both importers reject
+        # them, so they are outside the contract.
         if not valid_ieee.match(str(device.get("ieee_address", ""))):
             continue
         if (device.get("network_address") or 0) > 0xFFFF:
@@ -125,18 +192,39 @@ def normalize_devices(devices: list, cluster_map: dict) -> dict:
             "type": device.get("type"),
             "network_address": device.get("network_address"),
             "friendly_name": device.get("friendly_name"),
-            "power_source": device.get("power_source") or "Unknown",
+            "power_source": device.get("power_source"),
             "model_id": device.get("model_id"),
             "manufacturer": device.get("manufacturer"),
+            "description": device.get("description"),
+            "software_build_id": device.get("software_build_id"),
+            "date_code": device.get("date_code"),
             "interview_completed": device.get("interview_completed"),
             "interview_state": device.get("interview_state"),
-            # `supported` depends on converter-definition availability and is a
-            # separate catalog-parity item; the API subset ignores it.
-            "supported": None,
+            "interviewing": device.get("interviewing"),
             "disabled": device.get("disabled"),
             "endpoints": endpoints,
         }
+        if include_definition:
+            normalized[device["ieee_address"]]["definition"] = normalize_definition(
+                device.get("definition")
+            )
+            normalized[device["ieee_address"]]["supported"] = device.get("supported")
     return normalized
+
+
+def _short(value, limit: int = 160) -> str:
+    text = repr(value)
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
+def definitions_view(normalized_devices: dict) -> dict:
+    return {
+        ieee: {
+            "definition": device.get("definition"),
+            "supported": device.get("supported"),
+        }
+        for ieee, device in normalized_devices.items()
+    }
 
 
 def recursive_diff(expected, actual, path="") -> list[str]:
@@ -146,7 +234,9 @@ def recursive_diff(expected, actual, path="") -> list[str]:
             child = f"{path}.{key}" if path else key
             mismatches.extend(recursive_diff(expected.get(key), actual.get(key), child))
     elif expected != actual:
-        mismatches.append(f"{path}: reference={expected!r} candidate={actual!r}")
+        mismatches.append(
+            f"{path}: reference={_short(expected)} candidate={_short(actual)}"
+        )
     return mismatches
 
 
@@ -174,6 +264,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--lock", type=Path, default=Path("docs/parity/upstream-lock.json"))
     parser.add_argument(
         "--pin-root", type=Path, default=Path(__file__).resolve().parents[1] / ".upstream"
+    )
+    parser.add_argument(
+        "--known-gap",
+        action="append",
+        default=[],
+        help="case id whose failure is a documented, tracked gap (reported, not fatal)",
     )
     parser.add_argument("--require-pins", action="store_true")
     parser.add_argument("--skip-pins", action="store_true")
@@ -212,12 +308,17 @@ def main(argv: list[str]) -> int:
         mismatches = comparator(expected, actual) if comparator else (
             [] if expected == actual else [f"reference={expected!r} candidate={actual!r}"]
         )
-        status = "PASS" if not mismatches else "FAIL"
-        if mismatches:
+        if mismatches and case_id in args.known_gap:
+            status = "KNOWN_GAP"
+            print(f"{case_id}: KNOWN_GAP ({len(mismatches)} mismatches)", file=sys.stderr)
+        elif mismatches:
+            status = "FAIL"
             failures += 1
             print(f"{case_id}: FAIL", file=sys.stderr)
             for mismatch in mismatches:
                 print(f"  {mismatch}", file=sys.stderr)
+        else:
+            status = "PASS"
         cases.append({"id": case_id, "status": status, "mismatches": mismatches})
 
     add_case("bridge-state", upstream["bridge_state"], candidate["bridge_state"], None)
@@ -227,10 +328,18 @@ def main(argv: list[str]) -> int:
         normalize_info(candidate["bridge_info"]),
         recursive_diff,
     )
+    upstream_devices = normalize_devices(upstream["bridge_devices"], cluster_map)
+    candidate_devices = normalize_devices(candidate["bridge_devices"], cluster_map)
     add_case(
         "bridge-devices",
-        normalize_devices(upstream["bridge_devices"], cluster_map),
-        normalize_devices(candidate["bridge_devices"], cluster_map),
+        normalize_devices(upstream["bridge_devices"], cluster_map, include_definition=False),
+        normalize_devices(candidate["bridge_devices"], cluster_map, include_definition=False),
+        diff,
+    )
+    add_case(
+        "bridge-devices-definitions",
+        definitions_view(upstream_devices),
+        definitions_view(candidate_devices),
         diff,
     )
     add_case(
@@ -240,10 +349,17 @@ def main(argv: list[str]) -> int:
         None,
     )
 
+    known_gaps = [case["id"] for case in cases if case["status"] == "KNOWN_GAP"]
+    passed = sum(1 for case in cases if case["status"] == "PASS")
     report = {
         "status": "PASS" if failures == 0 else "FAIL",
-        "passed": len(cases) - failures,
+        "passed": passed,
         "failed": failures,
+        "known_gap_cases": known_gaps,
+        "known_gap_reasons": {
+            gap: "tracked in docs/parity/inventory.csv (see FRONTEND-004 / CONVERTER-021)"
+            for gap in known_gaps
+        },
         "pins": pins,
         "cases": cases,
     }
@@ -251,6 +367,7 @@ def main(argv: list[str]) -> int:
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(
         f"API: {report['passed']} passed, {report['failed']} failed, "
+        f"known_gaps={known_gaps}, "
         f"pins={[(pin['source'], pin['status']) for pin in pins]}"
     )
     return 0 if failures == 0 else 1

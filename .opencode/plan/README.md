@@ -71,15 +71,20 @@ R1 — явно ограниченный релиз для проверенно�
   `read_temperature: 2250`. **Write/command теперь ждут результат**: AF-status
   проверяется, при `disableDefaultResponse:false` — ZCL default response
   (success/failure/AF-status покрыты тестами).
-- **Frontend/API differential**: pinned upstream z2m vitest-dump (`bridge/state`,
-  `bridge/info`, `bridge/devices`, `permit_join` response) против реального Rust
-  bridge с in-process брокером — **4/4 PASS**, пины MATCH. Differential нашёл и
-  исправил: отсутствующий `permit_join` response, отсутствие `endpoints`/
-  `interview_state` в device payload, потерю persisted `type`/`interviewState`
-  при импорте и **молчаливое отбрасывание `bridge/devices`** из-за 10 KiB
-  лимита rumqttc. Полные поля `bridge/info`, coordinator-запись, definitions/
-  exposes/options, endpoint clusters/bindings/reportings и HTTP/WS frontend —
-  не проверены.
+- **Frontend/API differential расширен**: pinned upstream z2m vitest-dump
+  (`bridge/state`, полный `bridge/info`, `bridge/devices` с coordinator-записью
+  и `definition`/`exposes`/`options`, `permit_join` response) против реального
+  Rust bridge — **4 кейса PASS + 1 явный known-gap**, пины MATCH. Реализованы:
+  сетевые параметры координатора (`ZDO_EXT_NWK_INFO`), MQTT URI/version, OS,
+  redacted config, `restart_required`, converter version; definition payload с
+  upstream `prepareDefinition` (extend/action-merge/generic toZigbee/calibration/
+  converter options/function exposes/white-label/linkquality), `supported =
+  !!definition`, `description`/`date_code`. Найдены и исправлены: **Boa не имеет
+  `String.prototype.substr`** → `Buffer.from(hex)` падал и 12 lumi-устройств не
+  загружали definition; fallback каталога игнорировал `zigbeeModel` кандидата
+  (registry теперь несёт `lookupCandidates`). Остаётся **генерация definitions**
+  для неизвестных устройств (7 из 62, CONVERTER-021 → known gap), `config_schema`,
+  endpoint bindings/reportings, coordinator meta и HTTP/WS frontend.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

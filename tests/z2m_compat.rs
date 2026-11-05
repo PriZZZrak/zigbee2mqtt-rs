@@ -122,10 +122,22 @@ mod bridge_devices {
     fn device_definition_block() {
         // z2m includes definition with model/vendor
         let dev = make_device();
+        // The definition payload is produced from the converter package in the
+        // bridge publish path; the device record alone carries none.
         let j = dev.to_z2m_device_json();
-        let def = &j["definition"];
-        assert!(def.get("model").is_some());
-        assert!(def.get("vendor").is_some());
+        assert!(j.get("definition").is_none());
+        let with_definition = dev.to_z2m_device_json_with_definition(Some(json!({
+            "source": "native",
+            "model": "TRADFRI",
+            "vendor": "IKEA",
+            "description": "",
+            "exposes": [],
+            "options": [],
+            "supports_ota": false,
+            "version": "0.0.0",
+        })));
+        assert_eq!(with_definition["definition"]["model"], "TRADFRI");
+        assert_eq!(with_definition["definition"]["vendor"], "IKEA");
     }
 
     #[test]
@@ -140,7 +152,12 @@ mod bridge_devices {
         dev.interview_complete = true;
         let j = dev.to_z2m_device_json();
         assert_eq!(j["interview_completed"], true);
-        assert_eq!(j["supported"], true);
+        // z2m `supported` is `!!definition`; the bridge supplies the definition
+        // when it can resolve one from the converter package.
+        assert_eq!(j["supported"], false);
+        let with_definition =
+            dev.to_z2m_device_json_with_definition(Some(json!({"model": "TRADFRI"})));
+        assert_eq!(with_definition["supported"], true);
     }
 
     #[test]

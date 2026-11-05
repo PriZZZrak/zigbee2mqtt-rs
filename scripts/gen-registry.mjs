@@ -132,6 +132,20 @@ for (const [lookupKey, candidates] of Object.entries(upstreamLookup)) {
     }
 }
 
+// --- 3b. Per-candidate zigbeeModel lists for the upstream fallback ---
+// Upstream `findDefinition` compares `candidate.zigbeeModel` with the device
+// modelID when fingerprint matching fails. `models-index.json` alone does not
+// carry it, so ship it next to `lookup` for the Rust resolver.
+const lookupCandidates = {};
+for (const [lookupKey, candidates] of Object.entries(upstreamLookup)) {
+    if (lookupKey === "null") continue;
+    lookupCandidates[lookupKey] = candidates.map(([file, idx]) => ({
+        file,
+        index: idx,
+        zigbeeModel: definitionsByFile.get(file)[idx].zigbeeModel ?? [],
+    }));
+}
+
 // --- 4. Legacy flat registry (compat only): unambiguous entries, never "null" ---
 const registry = {};
 const addUnique = (k, v) => {
@@ -174,6 +188,7 @@ const out = {
     ref,
     generated_at: new Date().toISOString(),
     lookup: upstreamLookup,
+    lookupCandidates,
     models,
     fingerprints,
     registry,

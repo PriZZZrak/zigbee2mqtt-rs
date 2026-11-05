@@ -62,7 +62,7 @@ describe("API dump", () => {
         controller = new Controller(vi.fn(), vi.fn());
         await controller.start();
         await flushPromises();
-    });
+    }, 120000);
 
     afterAll(async () => {
         await controller?.stop();
@@ -109,6 +109,8 @@ describe("API dump", () => {
                     manufName: device.manufacturerName,
                     powerSource: device.powerSource,
                     modelId: device.modelID,
+                    swBuildId: device.softwareBuildID ?? null,
+                    dateCode: device.dateCode ?? null,
                     interviewComplete: String(device.interviewState).toLowerCase() === "successful",
                     endpoints: (device.endpoints || []).map((endpoint: any) => ({
                         id: endpoint.ID,

@@ -73,7 +73,7 @@ def upstream_dump(name="bulb"):
 
 
 class ApiDiffTests(unittest.TestCase):
-    def _run(self, upstream, name):
+    def _run(self, upstream, name, extra=None):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             dump = root / "upstream.json"
@@ -81,28 +81,52 @@ class ApiDiffTests(unittest.TestCase):
             script = root / "candidate.py"
             script.write_text(SCRIPT, encoding="utf-8")
             report = root / "report.json"
-            code = api_diff.main(
-                [
-                    "--upstream", str(dump),
-                    "--candidate-cmd", f"{__import__('sys').executable} {script} --name {name}",
-                    "--skip-pins",
-                    "--report", str(report),
-                ]
-            )
+            argv = [
+                "--upstream", str(dump),
+                "--candidate-cmd", f"{__import__('sys').executable} {script} --name {name}",
+                "--skip-pins",
+                "--report", str(report),
+            ]
+            argv += extra or []
+            code = api_diff.main(argv)
             return code, json.loads(report.read_text())
 
     def test_matching_candidate_passes(self):
         code, report = self._run(upstream_dump(), "bulb")
         self.assertEqual(code, 0)
         self.assertEqual(report["status"], "PASS")
-        self.assertEqual(report["passed"], 4)
-        self.assertEqual([case["id"] for case in report["cases"]],
-                         ["bridge-state", "bridge-info", "bridge-devices", "permit-join-response"])
+        self.assertEqual(report["passed"], 5)
+        self.assertEqual(
+            [case["id"] for case in report["cases"]],
+            [
+                "bridge-state",
+                "bridge-info",
+                "bridge-devices",
+                "bridge-devices-definitions",
+                "permit-join-response",
+            ],
+        )
+        self.assertEqual(report["known_gap_cases"], [])
+
+    def test_known_gap_case_does_not_fail_the_run(self):
+        code, report = self._run(
+            upstream_dump(),
+            "other",
+            extra=["--known-gap", "bridge-devices"],
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["failed"], 0)
+        self.assertEqual(report["known_gap_cases"], ["bridge-devices"])
+        known = next(case for case in report["cases"] if case["id"] == "bridge-devices")
+        self.assertEqual(known["status"], "KNOWN_GAP")
+        self.assertTrue(known["mismatches"])
 
     def test_renamed_device_fails(self):
         code, report = self._run(upstream_dump(), "other")
         self.assertEqual(code, 1)
         self.assertEqual(report["failed"], 1)
+        self.assertEqual(report["cases"][2]["status"], "FAIL")
         self.assertTrue(any("friendly_name" in mismatch
                             for mismatch in report["cases"][2]["mismatches"]))
 

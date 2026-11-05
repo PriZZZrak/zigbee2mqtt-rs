@@ -237,6 +237,8 @@ pub struct DeviceConfig {
     pub retain: Option<bool>,
     pub qos: Option<u8>,
     pub disabled: Option<bool>,
+    /// Free-text description shown by the frontend (`bridge/devices`).
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]

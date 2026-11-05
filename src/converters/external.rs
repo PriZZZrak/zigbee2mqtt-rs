@@ -632,8 +632,19 @@ struct RegistryFile {
     /// Normalized Zigbee modelID -> ordered `[file, index]` candidates.
     #[serde(default)]
     lookup: HashMap<String, Vec<(String, usize)>>,
+    /// Candidate zigbeeModel lists for the upstream fallback match.
+    #[serde(default, rename = "lookupCandidates")]
+    lookup_candidates: HashMap<String, Vec<LookupCandidate>>,
     #[serde(default)]
     fingerprints: Vec<RegistryFingerprint>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LookupCandidate {
+    file: String,
+    index: usize,
+    #[serde(default, rename = "zigbeeModel")]
+    zigbee_model: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -828,9 +839,30 @@ fn select_definition(
     if let Some((_, selected)) = best {
         return Some(selected);
     }
-    // Upstream then compares the candidate zigbeeModel with the lookup key,
-    // which cannot be re-read here. Every lookup candidate contains this key,
-    // so the first candidate is the source-equivalent fallback.
+    // Upstream fallback: first candidate whose `zigbeeModel` equals the raw or
+    // NUL-normalized device modelID, then the first candidate.
+    let lookup_key = if model.trim().is_empty() {
+        "null".to_string()
+    } else {
+        model.to_lowercase()
+    };
+    let normalized = normalize_model_id(&lookup_key);
+    if let Some(entries) = registry
+        .lookup_candidates
+        .get(&lookup_key)
+        .or_else(|| registry.lookup_candidates.get(&normalized))
+    {
+        let device_model = model.trim();
+        for entry in entries {
+            if entry
+                .zigbee_model
+                .iter()
+                .any(|zigbee_model| zigbee_model == device_model || zigbee_model == &normalized)
+            {
+                return Some((entry.file.clone(), entry.index));
+            }
+        }
+    }
     candidates.first().cloned()
 }
 
@@ -931,6 +963,137 @@ impl ExternalConverter {
     ) -> Option<(String, usize)> {
         let registry = self.load_registry()?;
         select_definition(&registry, model, device)
+    }
+
+    /// Converter package version from the staged cache manifest (`v26.115.1`
+    /// becomes `26.115.1`), used by `bridge/info`.
+    #[must_use]
+    pub fn package_version(&self) -> Option<String> {
+        let text = std::fs::read_to_string(self.dir.join("manifest.json")).ok()?;
+        let manifest: serde_json::Value = serde_json::from_str(&text).ok()?;
+        let reference = manifest.get("ref")?.as_str()?;
+        Some(reference.trim_start_matches('v').to_string())
+    }
+
+    /// `bridge/devices` definition payload (`bridge.ts:getDefinitionPayload`).
+    ///
+    /// Evaluates the selected definition with the same CJS loader used for
+    /// conversion and returns `source/model/vendor/description/exposes/
+    /// supports_ota/options/version` (+ `icon` when the definition has one).
+    #[must_use]
+    pub fn definition_payload(
+        &self,
+        model: &str,
+        device: &ExternalDeviceInfo,
+    ) -> Option<serde_json::Value> {
+        let Some(registry) = self.load_registry() else {
+            debug!("definition_payload: no registry for {model:?}");
+            return None;
+        };
+        let Some((file, index)) = select_definition(&registry, model, device) else {
+            debug!(
+                "definition_payload: no definition for {model:?} (mfr {:?}/{:?}, endpoints {:?})",
+                device.manufacturer_name, device.manufacturer_id, device.endpoint_ids
+            );
+            return None;
+        };
+        let Some((mut ctx, file)) = self.definition_context(&file) else {
+            debug!("definition_payload: cannot load {file} for {model:?}");
+            return None;
+        };
+        let meta = serde_json::json!({
+            "device": {
+                "modelID": device.model_id,
+                "manufacturerID": device.manufacturer_id,
+                "manufacturerName": device.manufacturer_name,
+                "ieeeAddr": device.ieee_addr,
+                "powerSource": device.power_source,
+                "type": device.device_type,
+                "softwareBuildID": device.software_build_id,
+                "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
+                "meta": {},
+            },
+        });
+        let script = format!(
+            r#"(function() {{
+                try {{
+                    const defs = __require("devices/__entry__.js")("./{file}").definitions;
+                    const raw = defs[{index}];
+                    const definition = __prepareDefinition(raw);
+                    const meta = JSON.parse({meta});
+                    const device = meta.device;
+                    device.meta = device.meta || {{}};
+                    // Missing endpoints must be `undefined` (upstream
+                    // `zh.Device.getEndpoint`), definitions branch on that.
+                    device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id);
+                    for (const endpoint of (device.endpoints || [])) {{
+                        endpoint.getDevice = () => device;
+                        // Endpoint cluster values come from the interview; the
+                        // definition payload only needs the fallback semantics.
+                        endpoint.getClusterAttributeValue = () => undefined;
+                    }}
+                    let exposes = definition.exposes;
+                    if (typeof exposes === "function") exposes = exposes(device, {{}});
+                    if (!Array.isArray(exposes)) exposes = [];
+                    exposes = exposes.filter((entry) => entry !== null && entry !== undefined);
+                    const payload = {{
+                        source: "native",
+                        model: definition.model,
+                        vendor: definition.vendor,
+                        description: definition.description,
+                        exposes: JSON.parse(JSON.stringify(exposes, (key, value) => typeof value === "function" ? undefined : value)),
+                        supports_ota: !!definition.ota,
+                        options: JSON.parse(JSON.stringify(definition.options || [])),
+                        version: definition.version || "0.0.0",
+                    }};
+                    // Upstream `findByDevice`: white-label entries whose
+                    // fingerprint matches override model/vendor/description.
+                    if (Array.isArray(raw.whiteLabel)) {{
+                        const label = raw.whiteLabel.find((entry) =>
+                            Array.isArray(entry.fingerprint) && entry.fingerprint.some((fp) => __fingerprintMatch(fp, device)));
+                        if (label) {{
+                            payload.model = label.model;
+                            if (label.vendor !== undefined) payload.vendor = label.vendor;
+                            if (label.description !== undefined) payload.description = label.description;
+                        }}
+                    }}
+                    if (definition.icon) payload.icon = definition.icon;
+                    return JSON.stringify(payload);
+                }} catch (error) {{
+                    return JSON.stringify({{__error: String((error && error.stack) || error)}});
+                }}
+            }})()"#,
+            file = file,
+            index = index,
+            meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
+        );
+        let out = eval_string(&mut ctx, &script)?;
+        let value: serde_json::Value = serde_json::from_str(&out).ok()?;
+        if value.get("__error").is_some() {
+            warn!("external converter: cannot build definition payload for {model:?}: {out}");
+            return None;
+        }
+        let mut value = value;
+        if let Some(exposes) = value
+            .get_mut("exposes")
+            .and_then(|exposes| exposes.as_array_mut())
+        {
+            // `Device.exposes()` always appends the generic linkquality expose
+            // (`lib/model/device.ts`).
+            exposes.push(serde_json::json!({
+                "access": 1,
+                "category": "diagnostic",
+                "description": "Link quality (signal strength)",
+                "label": "Linkquality",
+                "name": "linkquality",
+                "property": "linkquality",
+                "type": "numeric",
+                "unit": "lqi",
+                "value_max": 255,
+                "value_min": 0,
+            }));
+        }
+        Some(value)
     }
 
     /// Public accessor used by the bridge to encode `convertSet` operations.
@@ -1118,6 +1281,44 @@ impl ExternalConverter {
         )
     }
 
+    /// Build a Boa context with the CJS loader and `__prepareDefinition`
+    /// installed for `file`, and verify the module loads.
+    fn definition_context(&self, file: &str) -> Option<(Context, String)> {
+        let file = file.to_string();
+        let zcl = self.load_zcl()?;
+        let module_src = self
+            .load_js(&format!("devices/{file}"))
+            .or_else(|| self.load_js(&file))?;
+        let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
+        let mut ctx = Context::default();
+        register_zcl_natives(&mut ctx);
+        let bootstrap = cjs_bootstrap(&sources, &zcl);
+        if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
+            warn!("external converter: bootstrap eval failed");
+            return None;
+        }
+        let check = format!(
+            r#"(function() {{
+                try {{ __require("devices/__entry__.js")("./{file}"); return "ok"; }}
+                catch (error) {{
+                    return "ERR:" + String(error) + "\n" + String((error && error.stack) || "");
+                }}
+            }})()"#,
+            file = file,
+        );
+        match eval_string(&mut ctx, &check) {
+            Some(result) if result == "ok" => Some((ctx, file)),
+            Some(error) => {
+                warn!("external converter: cannot load {file}: {error}");
+                None
+            }
+            None => {
+                warn!("external converter: cannot load {file}: evaluation failed");
+                None
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
     fn convert_with_data_full(
@@ -1134,133 +1335,7 @@ impl ExternalConverter {
         let (file, index) = select_definition(&registry, model, device)?;
         let zcl = self.load_zcl()?;
         let cluster_name = zcl.clusters.get(&cluster_id.to_string())?.clone();
-
-        let module_src = self.load_js(&format!("devices/{file}")).or_else(|| {
-            // Legacy flat mirror (pre-layout change).
-            self.load_js(&file)
-        })?;
-
-        let mut ctx = Context::default();
-        register_zcl_natives(&mut ctx);
-        let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
-        let bootstrap = format!(
-            r#"
-            const __sources = {sources};
-            if (__sources["__builtin__/runtime-prelude"]) new Function(__sources["__builtin__/runtime-prelude"])();
-            const __modules = {{}};
-            function __resolve(from, spec) {{
-                if (spec === "zigbee-herdsman" || spec.startsWith("zigbee-herdsman/")) return "__builtin__/" + spec;
-                if (spec.startsWith("converters/") || spec.startsWith("lib/")) {{
-                    let rel = spec;
-                    if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
-                    return rel;
-                }}
-                if (spec.startsWith("zigbee-herdsman-converters/")) {{
-                    let rel = spec.slice("zigbee-herdsman-converters/".length);
-                    if (!/\.[a-z0-9]+$/i.test(rel)) rel += ".js";
-                    return rel;
-                }}
-                if (!spec.startsWith(".")) return "__external__/" + spec;
-                if (spec.startsWith(".")) {{
-                    const parts = from.split("/").slice(0, -1).concat(spec.split("/"));
-                    const out = [];
-                    for (const p of parts) {{
-                        if (p === "" || p === ".") continue;
-                        if (p === "..") {{ out.pop(); continue; }}
-                        out.push(p);
-                    }}
-                    let joined = out.join("/");
-                    // Same rule as Rust resolve_relative: extensionless => .js
-                    if (!/\.[a-z0-9]+$/i.test(joined)) joined += ".js";
-                    return joined;
-                }}
-                return spec;
-            }}
-            function __require(from) {{
-                return function(spec) {{
-                    const key = __resolve(from, spec);
-                    if (!__sources[key] && key.startsWith("__external__/")) {{
-                        // Unknown npm packages are exposed as empty modules so the
-                        // package still loads; using them fails at runtime.
-                        __sources[key] = "module.exports = {{}};";
-                    }}
-                    if (!__sources[key]) throw new Error("Cannot find module '" + spec + "' from '" + from + "'");
-                    if (!__modules[key]) {{
-                        const module = {{exports: {{}}}};
-                        __modules[key] = module;
-                        try {{
-                            const fn_ = new Function("require", "module", "exports", __sources[key]);
-                            fn_(__require(key), module, module.exports);
-                        }} catch (error) {{
-                            throw new Error("while loading '" + key + "': " + String(error));
-                        }}
-                    }}
-                    return __modules[key].exports;
-                }};
-            }}
-            function __prepareDefinition(definition) {{
-                if (!definition || !Array.isArray(definition.extend)) return definition;
-                let meta = definition.meta ? Object.assign({{}}, definition.meta) : undefined;
-                let endpoint = definition.endpoint;
-                const prepared = Object.assign({{}}, definition, {{
-                    fromZigbee: [...(definition.fromZigbee || [])],
-                    toZigbee: [...(definition.toZigbee || [])],
-                    exposes: typeof definition.exposes === "function" ? definition.exposes : [...(definition.exposes || [])],
-                    options: [...(definition.options || [])],
-                }});
-                for (const extend of definition.extend) {{
-                    if (!extend || !extend.isModernExtend) continue;
-                    if (extend.fromZigbee) prepared.fromZigbee.push(...extend.fromZigbee);
-                    if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
-                    if (Array.isArray(prepared.exposes) && extend.exposes) prepared.exposes.push(...extend.exposes);
-                    if (extend.options) prepared.options.push(...extend.options);
-                    // Upstream: Object.assign({{}}, ext.meta, meta) -> definition wins.
-                    if (extend.meta) meta = Object.assign({{}}, extend.meta, meta);
-                    if (extend.endpoint && !endpoint) endpoint = extend.endpoint;
-                }}
-                if (meta) prepared.meta = meta;
-                if (endpoint) prepared.endpoint = endpoint;
-                // Upstream prepends generic toZigbee converters before device-specific ones.
-                try {{
-                    const tz = __require("devices/__entry__.js")("converters/toZigbee.js");
-                    const generic = [tz.scene_store, tz.scene_recall, tz.scene_add, tz.scene_remove,
-                        tz.scene_remove_all, tz.scene_rename, tz.read, tz.write, tz.command,
-                        tz.factory_reset, tz.zcl_command].filter(Boolean);
-                    if (generic.length) prepared.toZigbee = generic.concat(prepared.toZigbee);
-                }} catch (error) {{}}
-                return prepared;
-            }}
-            "#,
-            sources = serde_json::to_string(&sources).unwrap_or_default(),
-        );
-        if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
-            warn!("external converter: bootstrap eval failed");
-            return None;
-        }
-
-        // Load the device module (its `definitions` export) lazily inside the
-        // dispatch script below; here we only verify the module is loadable
-        // by evaluating its source once (syntax + top-level side effects).
-        let check = format!(
-            r#"(function() {{
-                try {{ __require("devices/__entry__.js")("./{file}"); return "ok"; }}
-                catch (error) {{
-                    return "ERR:" + String(error) + "\n" + String((error && error.stack) || "");
-                }}
-            }})()"#,
-            file = file,
-        );
-        match eval_string(&mut ctx, &check) {
-            Some(result) if result == "ok" => {}
-            Some(error) => {
-                warn!("external converter: cannot load {file}: {error}");
-                return None;
-            }
-            None => {
-                warn!("external converter: cannot load {file}: evaluation failed");
-                return None;
-            }
-        }
+        let (mut ctx, file) = self.definition_context(&file)?;
 
         // Build msg + meta as JSON, then run dispatch fully inside JS so that
         // converter functions receive real objects (not strings).
@@ -2781,7 +2856,7 @@ impl ExternalConverter {
                             const fn_ = new Function("require", "module", "exports", __sources[key]);
                             fn_(__require(key), module, module.exports);
                         }} catch (error) {{
-                            throw new Error("while loading '" + key + "': " + String(error));
+                            throw new Error("while loading '" + key + "': " + String(error) + "\n" + String((error && error.stack) || ""));
                         }}
                     }}
                     return __modules[key].exports;
@@ -2972,6 +3047,189 @@ fn cluster_name_to_id(zcl: &ZclMaps, name: &str) -> Option<u16> {
         .find_map(|(id, value)| (value == name).then(|| id.parse::<u16>().ok()).flatten())
 }
 
+/// JavaScript port of upstream `processExtensions` / `prepareDefinition`
+/// (`zigbee-herdsman-converters/dist/index.js`), used by the CJS bootstrap.
+///
+/// Kept as a plain constant (not inside the `format!` template) so the
+/// unescaped braces stay readable and the port can be diffed against upstream.
+const PREPARE_DEFINITION_JS: &str = r#"
+        function __fingerprintMatch(fingerprint, device) {
+            const endpoints = device.endpoints || [];
+            const match = (fingerprint.applicationVersion === undefined || device.applicationVersion === fingerprint.applicationVersion) &&
+                (fingerprint.manufacturerID === undefined || device.manufacturerID === fingerprint.manufacturerID) &&
+                (!fingerprint.type || device.type === fingerprint.type) &&
+                (!fingerprint.dateCode || device.dateCode === fingerprint.dateCode) &&
+                (fingerprint.hardwareVersion === undefined || device.hardwareVersion === fingerprint.hardwareVersion) &&
+                (!fingerprint.manufacturerName || device.manufacturerName === fingerprint.manufacturerName) &&
+                (!fingerprint.modelID || device.modelID === fingerprint.modelID) &&
+                (!fingerprint.powerSource || device.powerSource === fingerprint.powerSource) &&
+                (!fingerprint.softwareBuildID || device.softwareBuildID === fingerprint.softwareBuildID) &&
+                (fingerprint.stackVersion === undefined || device.stackVersion === fingerprint.stackVersion) &&
+                (fingerprint.zclVersion === undefined || device.zclVersion === fingerprint.zclVersion) &&
+                (!fingerprint.endpoints || JSON.stringify(endpoints.map((e) => e.ID)) === JSON.stringify(fingerprint.endpoints.map((e) => e.ID)));
+            if (!match) return false;
+            if (fingerprint.endpoints) {
+                for (const fingerprintEndpoint of fingerprint.endpoints) {
+                    const deviceEndpoint = endpoints.find((endpoint) => endpoint.ID === fingerprintEndpoint.ID);
+                    if (fingerprintEndpoint.deviceID !== undefined && (!deviceEndpoint || deviceEndpoint.deviceID !== fingerprintEndpoint.deviceID)) return false;
+                    if (fingerprintEndpoint.profileID !== undefined && (!deviceEndpoint || deviceEndpoint.profileID !== fingerprintEndpoint.profileID)) return false;
+                    if (fingerprintEndpoint.inputClusters && (!deviceEndpoint || JSON.stringify(deviceEndpoint.inputClusters) !== JSON.stringify(fingerprintEndpoint.inputClusters))) return false;
+                    if (fingerprintEndpoint.outputClusters && (!deviceEndpoint || JSON.stringify(deviceEndpoint.outputClusters) !== JSON.stringify(fingerprintEndpoint.outputClusters))) return false;
+                }
+            }
+            return true;
+        }
+
+        function __augmentDefinitionOptions(prepared) {
+            // Upstream `prepareDefinition`: add calibration/precision and
+            // converter-declared device options (deduplicated by name).
+            const finalOptions = [...(prepared.options ?? [])];
+            const optionKeys = finalOptions.map((option) => option && option.name);
+            let exposeList = [];
+            if (Array.isArray(prepared.exposes)) {
+                exposeList = prepared.exposes;
+            } else if (typeof prepared.exposes === "function") {
+                try { exposeList = prepared.exposes({isDummyDevice: true}, {}); } catch (error) { exposeList = []; }
+            }
+            let utilsNs = null;
+            let exposesNs = null;
+            try { utilsNs = __require("devices/__entry__.js")("lib/utils.js"); } catch (error) {}
+            try { exposesNs = __require("devices/__entry__.js")("lib/exposes.js"); } catch (error) {}
+            const defaults = (utilsNs && utilsNs.calibrateAndPrecisionRoundOptionsDefaultPrecision) || {};
+            for (const expose of exposeList) {
+                if (!expose || !utilsNs || !exposesNs) continue;
+                if (optionKeys.includes(expose.name)) continue;
+                if (typeof utilsNs.isNumericExpose === "function" && utilsNs.isNumericExpose(expose) && expose.name in defaults) {
+                    if (expose.name === "voltage" && expose.unit === "mV") continue;
+                    const type = utilsNs.calibrateAndPrecisionRoundOptionsIsPercentual(expose.name) ? "percentual" : "absolute";
+                    finalOptions.push(exposesNs.options.calibration(expose.name, type).withValueStep(0.1));
+                    if (defaults[expose.name] !== 0) {
+                        finalOptions.push(exposesNs.options.precision(expose.name));
+                    }
+                    optionKeys.push(expose.name);
+                }
+            }
+            for (const converter of [...(prepared.toZigbee || []), ...(prepared.fromZigbee || [])]) {
+                if (!converter || !converter.options) continue;
+                let converterOptions = converter.options;
+                if (typeof converterOptions === "function") {
+                    try { converterOptions = converterOptions(prepared); } catch (error) { continue; }
+                }
+                if (!Array.isArray(converterOptions)) continue;
+                for (const option of converterOptions) {
+                    if (!option || optionKeys.includes(option.name)) continue;
+                    finalOptions.push(option);
+                    optionKeys.push(option.name);
+                }
+            }
+            prepared.options = finalOptions;
+            return prepared;
+        }
+
+        function __prepareDefinition(definition) {
+            if (!definition) return definition;
+            if (!Array.isArray(definition.extend)) {
+                return __augmentDefinitionOptions(Object.assign({version: "0.0.0"}, definition));
+            }
+            const {extend, toZigbee: defToZigbee, fromZigbee: defFromZigbee,
+                exposes: definitionExposes, meta: defMeta, endpoint: defEndpoint,
+                ota: defOtaOriginal, configure: definitionConfigure,
+                onEvent: definitionOnEvent, options: defOptions,
+                ...definitionWithoutExtend} = definition;
+            const allExposesIsExposeOnly = (allExposes) => !allExposes.find((e) => typeof e === "function");
+            let allExposes = [];
+            if (definitionExposes) {
+                if (typeof definitionExposes === "function") allExposes.push(definitionExposes);
+                else allExposes.push(...definitionExposes);
+            }
+            const toZigbee = [...(defToZigbee ?? [])];
+            const fromZigbee = [...(defFromZigbee ?? [])];
+            const options = [...(defOptions ?? [])];
+            let meta = defMeta;
+            let endpoint = defEndpoint;
+            let ota = defOtaOriginal;
+            const configures = definitionConfigure ? [definitionConfigure] : [];
+            const onEvents = definitionOnEvent ? [definitionOnEvent] : [];
+            for (const ext of extend) {
+                if (!ext || !ext.isModernExtend) continue;
+                if (ext.toZigbee) toZigbee.push(...ext.toZigbee);
+                if (ext.fromZigbee) fromZigbee.push(...ext.fromZigbee);
+                if (ext.options) options.push(...ext.options);
+                if (ext.exposes) allExposes.push(...ext.exposes);
+                if (ext.meta) meta = Object.assign({}, ext.meta, meta);
+                if (ext.configure) configures.push(...ext.configure.filter((c) => c !== undefined));
+                if (ext.onEvent) onEvents.push(...ext.onEvent.filter((c) => c !== undefined));
+                if (ext.ota) ota = ext.ota;
+                if (ext.endpoint && !endpoint) endpoint = ext.endpoint;
+            }
+            const actionExposes = allExposes.filter((e) => typeof e !== "function" && e.name === "action");
+            allExposes = allExposes.filter((e) => e.name !== "action");
+            if (actionExposes.length > 0) {
+                const actions = [];
+                for (const expose of actionExposes) {
+                    if (expose && Array.isArray(expose.values)) {
+                        for (const action of expose.values) actions.push(String(action));
+                    }
+                }
+                const uniqueActions = actions.filter((value, index, array) => array.indexOf(value) === index);
+                let preset = null;
+                try {
+                    const exp = __require("devices/__entry__.js")("lib/exposes.js");
+                    if (exp.presets && exp.presets.action) preset = exp.presets.action(uniqueActions);
+                } catch (error) {}
+                allExposes.push(preset || {
+                    access: 1, category: "diagnostic", name: "action",
+                    property: "action", type: "enum", values: uniqueActions,
+                });
+            }
+            let exposes;
+            if (allExposesIsExposeOnly(allExposes)) {
+                exposes = allExposes;
+            } else {
+                exposes = (device, opts) => {
+                    const result = [];
+                    for (const item of allExposes) {
+                        if (typeof item === "function") {
+                            try { result.push(...item(device, opts)); } catch (error) {}
+                        } else {
+                            result.push(item);
+                        }
+                    }
+                    return result;
+                };
+            }
+            let configure;
+            if (configures.length !== 0) {
+                configure = async () => {};
+            }
+            let onEvent;
+            if (onEvents.length !== 0) {
+                onEvent = async () => {};
+            }
+            let preparedToZigbee = toZigbee;
+            try {
+                const tz = __require("devices/__entry__.js")("converters/toZigbee.js");
+                const generic = [tz.scene_store, tz.scene_recall, tz.scene_add, tz.scene_remove,
+                    tz.scene_remove_all, tz.scene_rename, tz.read, tz.write, tz.command,
+                    tz.factory_reset, tz.zcl_command].filter(Boolean);
+                if (generic.length) preparedToZigbee = generic.concat(toZigbee);
+            } catch (error) {}
+            return __augmentDefinitionOptions({
+                version: "0.0.0",
+                toZigbee: preparedToZigbee,
+                fromZigbee,
+                exposes,
+                meta,
+                configure,
+                endpoint,
+                onEvent,
+                ota,
+                options,
+                ...definitionWithoutExtend,
+            });
+        }
+"#;
+
 fn cjs_bootstrap(sources: &HashMap<String, String>, _zcl: &ZclMaps) -> String {
     format!(
         r#"
@@ -3019,47 +3277,16 @@ fn cjs_bootstrap(sources: &HashMap<String, String>, _zcl: &ZclMaps) -> String {
                         const fn_ = new Function("require", "module", "exports", __sources[key]);
                         fn_(__require(key), module, module.exports);
                     }} catch (error) {{
-                        throw new Error("while loading '" + key + "': " + String(error));
+                        throw new Error("while loading '" + key + "': " + String(error) + "\n" + String((error && error.stack) || ""));
                     }}
                 }}
                 return __modules[key].exports;
             }};
         }}
-        function __prepareDefinition(definition) {{
-            if (!definition || !Array.isArray(definition.extend)) return definition;
-            let meta = definition.meta ? Object.assign({{}}, definition.meta) : undefined;
-            let endpoint = definition.endpoint;
-            const prepared = Object.assign({{}}, definition, {{
-                fromZigbee: [...(definition.fromZigbee || [])],
-                toZigbee: [...(definition.toZigbee || [])],
-                exposes: typeof definition.exposes === "function" ? definition.exposes : [...(definition.exposes || [])],
-                options: [...(definition.options || [])],
-            }});
-            for (const extend of definition.extend) {{
-                if (!extend || !extend.isModernExtend) continue;
-                if (extend.fromZigbee) prepared.fromZigbee.push(...extend.fromZigbee);
-                if (extend.toZigbee) prepared.toZigbee.push(...extend.toZigbee);
-                if (Array.isArray(prepared.exposes) && extend.exposes) prepared.exposes.push(...extend.exposes);
-                if (extend.options) prepared.options.push(...extend.options);
-                // Upstream: Object.assign({{}}, ext.meta, meta) -> definition wins.
-                if (extend.meta) meta = Object.assign({{}}, extend.meta, meta);
-                if (extend.endpoint && !endpoint) endpoint = extend.endpoint;
-            }}
-            if (meta) prepared.meta = meta;
-            if (endpoint) prepared.endpoint = endpoint;
-            // Upstream prepends generic toZigbee converters (scene_*, read, write,
-            // command, factory_reset, zcl_command) before device-specific ones.
-            try {{
-                const tz = __require("devices/__entry__.js")("converters/toZigbee.js");
-                const generic = [tz.scene_store, tz.scene_recall, tz.scene_add, tz.scene_remove,
-                    tz.scene_remove_all, tz.scene_rename, tz.read, tz.write, tz.command,
-                    tz.factory_reset, tz.zcl_command].filter(Boolean);
-                if (generic.length) prepared.toZigbee = generic.concat(prepared.toZigbee);
-            }} catch (error) {{}}
-            return prepared;
-        }}
+        {prepare}
         "#,
         sources = serde_json::to_string(sources).unwrap_or_default(),
+        prepare = PREPARE_DEFINITION_JS,
     )
 }
 
@@ -3466,7 +3693,7 @@ if (typeof globalThis.__BufferShim === "undefined") {
             if (typeof value === "string") {
                 if (encoding === "hex") {
                     const out = [];
-                    for (let i = 0; i + 1 < value.length; i += 2) out.push(parseInt(value.substr(i, 2), 16));
+                    for (let i = 0; i + 1 < value.length; i += 2) out.push(parseInt(value.slice(i, i + 2), 16));
                     return new __BufferShim(out);
                 }
                 return __BufferShim.from(Array.from(new TextEncoder().encode(value)));
@@ -3973,6 +4200,42 @@ module.exports = {definitions};
     }
 
     #[test]
+    fn fallback_prefers_the_candidate_whose_zigbee_model_matches() {
+        let (_tmp, conv) = fixture_dir();
+        std::fs::write(
+            conv.dir.join("devices").join("otherdev.js"),
+            OTHER_DEVICE_JS,
+        )
+        .unwrap();
+        write_registry(
+            &conv,
+            serde_json::json!({
+                "lookup": {"thermostat": [["otherdev.js", 0], ["fakedev.js", 0]]},
+                "lookupCandidates": {
+                    "thermostat": [
+                        {"file": "otherdev.js", "index": 0, "zigbeeModel": []},
+                        {"file": "fakedev.js", "index": 0, "zigbeeModel": ["Thermostat"]},
+                    ],
+                },
+                "fingerprints": [],
+            }),
+        );
+        let mut device = device();
+        device.model_id = Some("Thermostat".into());
+        let out = conv
+            .convert_from_zigbee(
+                "Thermostat",
+                1026,
+                "attributeReport",
+                &[(0, serde_json::json!(1125))],
+                &device,
+                &Default::default(),
+            )
+            .expect("fallback should pick the zigbeeModel match");
+        assert_eq!(out.get("temperature"), Some(&serde_json::json!(22.5)));
+    }
+
+    #[test]
     fn unmatched_fingerprint_falls_back_to_first_candidate() {
         let (_tmp, conv) = fixture_dir();
         std::fs::write(
@@ -4218,6 +4481,34 @@ module.exports = {definitions};
             )
             .expect("modern extend should be prepared");
         assert_eq!(out.get("temperature"), Some(&serde_json::json!(20)));
+    }
+
+    #[test]
+    fn buffer_shim_is_available_from_the_runtime_prelude() {
+        let mut ctx = Context::default();
+        ctx.eval(Source::from_bytes(RUNTIME_PRELUDE.as_bytes()))
+            .expect("prelude eval");
+        let out = eval_string(
+            &mut ctx,
+            "String(typeof globalThis.__BufferShim) + \":\" + String(typeof globalThis.__BufferShim.from)",
+        )
+        .expect("eval");
+        assert_eq!(out, "function:function");
+        // Boa lacks Annex B `String.prototype.substr`; the hex decode path must
+        // use `slice` (lumi definitions call `Buffer.from(hex)` at load time).
+        let hex = eval_string(
+            &mut ctx,
+            "globalThis.__BufferShim.from(\"00158d00019d1b98\", \"hex\").toString(\"hex\")",
+        )
+        .expect("hex round-trip");
+        assert_eq!(hex, "00158d00019d1b98");
+
+        let written = eval_string(
+            &mut ctx,
+            "(function(){const b = globalThis.__BufferShim.alloc(4); b.writeUInt32LE(0x01020304, 0); return b.toString(\"hex\");})()",
+        )
+        .expect("write/read");
+        assert_eq!(written, "04030201");
     }
 
     #[test]

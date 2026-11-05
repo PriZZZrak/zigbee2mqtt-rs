@@ -25,6 +25,12 @@ pub struct Device {
     pub interview_state: Option<String>,
     #[serde(default)]
     pub sw_build_id: Option<String>,
+    /// Firmware date code (herdsman `dateCode`), when the database has one.
+    #[serde(default)]
+    pub date_code: Option<String>,
+    /// User-supplied description (`devices.<ieee>.description`).
+    #[serde(default)]
+    pub description: Option<String>,
     /// IAS Zone (0x0500) ZoneType attribute, when the device exposes that
     /// cluster. Determines whether a zone status change means "contact",
     /// "occupancy", "smoke", etc. -- see zigbee::zcl::clusters::ias_zone.
@@ -66,6 +72,8 @@ impl Device {
             power_source: None,
             device_type: None,
             interview_state: None,
+            date_code: None,
+            description: None,
             sw_build_id: None,
             zone_type: None,
             arrow_hold_direction: None,
@@ -131,18 +139,68 @@ impl Device {
     }
 
     /// Generate z2m-compatible device info JSON for bridge/devices.
+    ///
+    /// Field set and omission rules follow `bridge.ts:publishDevices`: values
+    /// the bridge does not know are omitted (JSON.stringify drops `undefined`)
+    /// instead of being published as `Unknown`/`null`.
     #[must_use]
     pub fn to_z2m_device_json(&self) -> serde_json::Value {
-        let definition = if self.manufacturer.is_some() || self.model.is_some() {
-            json!({
-                "model": self.model.as_deref().unwrap_or("Unknown"),
-                "vendor": self.manufacturer.as_deref().unwrap_or("Unknown"),
-                "description": "",
-            })
-        } else {
-            serde_json::Value::Null
-        };
+        self.to_z2m_device_json_with_definition(None)
+    }
 
+    /// Same as [`Device::to_z2m_device_json`] with a converter-derived
+    /// `definition` payload (see `bridge.ts:getDefinitionPayload`).
+    #[must_use]
+    pub fn to_z2m_device_json_with_definition(
+        &self,
+        definition: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let mut obj = serde_json::Map::new();
+        obj.insert("ieee_address".into(), json!(self.ieee_addr.as_hex()));
+        obj.insert("type".into(), json!(self.device_type()));
+        obj.insert("network_address".into(), json!(self.nwk_addr));
+        obj.insert("friendly_name".into(), json!(self.friendly_name));
+        let supported = definition.is_some();
+        if let Some(definition) = definition {
+            obj.insert("definition".into(), definition);
+        }
+        if let Some(power_source) = &self.power_source {
+            obj.insert("power_source".into(), json!(power_source));
+        }
+        if let Some(model) = &self.model {
+            obj.insert("model_id".into(), json!(model));
+        }
+        if let Some(manufacturer) = &self.manufacturer {
+            obj.insert("manufacturer".into(), json!(manufacturer));
+        }
+        if let Some(description) = &self.description {
+            obj.insert("description".into(), json!(description));
+        }
+        if let Some(sw_build_id) = &self.sw_build_id {
+            obj.insert("software_build_id".into(), json!(sw_build_id));
+        }
+        if let Some(date_code) = &self.date_code {
+            obj.insert("date_code".into(), json!(date_code));
+        }
+        obj.insert(
+            "interviewing".into(),
+            json!(self.interview_state.as_deref() == Some("IN_PROGRESS")),
+        );
+        obj.insert("interview_completed".into(), json!(self.interview_complete));
+        obj.insert(
+            "interview_state".into(),
+            json!(self
+                .interview_state
+                .as_deref()
+                .unwrap_or(if self.interview_complete {
+                    "SUCCESSFUL"
+                } else {
+                    "FAILED"
+                })),
+        );
+        // `isSupported` is `!!definition` upstream.
+        obj.insert("supported".into(), json!(supported));
+        obj.insert("disabled".into(), json!(self.disabled));
         let endpoints: serde_json::Map<String, serde_json::Value> = self
             .endpoints
             .iter()
@@ -161,26 +219,8 @@ impl Device {
                 )
             })
             .collect();
-        json!({
-            "ieee_address": self.ieee_addr.as_hex(),
-            "type": self.device_type(),
-            "network_address": self.nwk_addr,
-            "friendly_name": self.friendly_name,
-            "definition": definition,
-            "power_source": self.power_source.as_deref().unwrap_or("Unknown"),
-            "model_id": self.model,
-            "manufacturer": self.manufacturer,
-            "interviewing": !self.interview_complete && !self.endpoints.is_empty(),
-            "interview_completed": self.interview_complete,
-            "interview_state": self
-                .interview_state
-                .as_deref()
-                .unwrap_or(if self.interview_complete { "SUCCESSFUL" } else { "FAILED" }),
-            "software_build_id": self.sw_build_id,
-            "supported": self.interview_complete,
-            "disabled": self.disabled,
-            "endpoints": endpoints,
-        })
+        obj.insert("endpoints".into(), serde_json::Value::Object(endpoints));
+        serde_json::Value::Object(obj)
     }
 }
 
@@ -380,8 +420,16 @@ mod tests {
         let j = dev.to_z2m_device_json();
         assert_eq!(j["type"], "Router");
         assert_eq!(j["interview_completed"], true);
-        assert_eq!(j["definition"]["vendor"], "IKEA");
+        // A definition comes from the converter package, not from the device
+        // record, so the standalone payload has none.
+        assert!(j.get("definition").is_none());
         assert_eq!(j["friendly_name"], dev.ieee_addr.as_hex());
+
+        let with_definition = dev.to_z2m_device_json_with_definition(Some(json!({
+            "model": "TRADFRI",
+            "vendor": "IKEA",
+        })));
+        assert_eq!(with_definition["definition"]["vendor"], "IKEA");
     }
 
     #[test]
