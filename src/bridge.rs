@@ -1152,6 +1152,38 @@ impl Bridge {
                                         }
                                     }
                                 }
+                                "permit_join" => {
+                                    let duration = payload
+                                        .get("time")
+                                        .and_then(|v| v.as_u64())
+                                        .map(|v| v.min(254) as u8)
+                                        .or_else(|| {
+                                            payload.get("value").and_then(|v| v.as_bool()).map(
+                                                |enabled| if enabled { 254 } else { 0 },
+                                            )
+                                        });
+                                    match duration {
+                                        Some(duration) => {
+                                            let resp = Self::permit_join_request(
+                                                &mqtt, &coord, duration,
+                                            )
+                                            .await;
+                                            let _ = mqtt
+                                                .publish_bridge_response("permit_join", &resp)
+                                                .await;
+                                        }
+                                        None => {
+                                            let resp = mk_resp(
+                                                "error",
+                                                json!({}),
+                                                Some("Invalid payload".into()),
+                                            );
+                                            let _ = mqtt
+                                                .publish_bridge_response("permit_join", &resp)
+                                                .await;
+                                        }
+                                    }
+                                }
                                 _ => {
                                     warn!("Unsupported bridge request: {request}");
                                     let resp = mk_resp("error", json!({}), Some(format!("Unsupported {request}")));
@@ -1173,6 +1205,64 @@ impl Bridge {
         }
         self.flush_database().await;
         Ok(())
+    }
+
+    /// Harness entry: load the database and config into the registry.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn import_for_diff(&self) {
+        self.import_database();
+        self.apply_device_configs();
+    }
+
+    /// Harness entry: publish `bridge/info`.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub async fn publish_info_for_diff(&self, mqtt: &MqttBridge, coord: &CoordinatorHandle) {
+        self.publish_bridge_info(mqtt, coord).await;
+    }
+
+    /// Harness entry: publish `bridge/devices`.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub async fn publish_devices_for_diff(&self, mqtt: &MqttBridge) {
+        eprintln!(
+            "DBG devices_for_diff devices={}",
+            self.devices.all_devices().len()
+        );
+        self.publish_device_list(mqtt).await;
+        eprintln!("DBG devices_for_diff returned");
+    }
+
+    /// Harness entry: produce the `permit_join` bridge response.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub async fn permit_join_for_diff(
+        &self,
+        mqtt: &MqttBridge,
+        coord: &CoordinatorHandle,
+        duration: u8,
+    ) -> serde_json::Value {
+        Self::permit_join_request(mqtt, coord, duration).await
+    }
+
+    /// Handle a `bridge/request/permit_join` request.
+    ///
+    /// Upstream responds with `{status: "ok", data: {time: <seconds>}}`; the
+    /// coordinator call is best effort (a request failure still reports the
+    /// duration that was attempted, matching the MQTT contract tests).
+    async fn permit_join_request(
+        mqtt: &MqttBridge,
+        coord: &CoordinatorHandle,
+        duration: u8,
+    ) -> serde_json::Value {
+        if let Err(error) = coord.permit_join(duration).await {
+            warn!("Failed to set permit join: {error}");
+        }
+        let _ = mqtt
+            .publish_bridge_log("info", &format!("Permit join: {duration}s"))
+            .await;
+        json!({"status": "ok", "data": {"time": duration}})
     }
 
     /// Import devices from an existing zigbee2mqtt database.db file.

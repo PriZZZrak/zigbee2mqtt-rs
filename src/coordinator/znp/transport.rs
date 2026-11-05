@@ -293,8 +293,8 @@ impl ZnpTransport {
 
 /// Test-only actor over an arbitrary duplex stream, used by coordinator-level
 /// fake-serial E2E tests.
-#[cfg(test)]
-pub(crate) fn spawn_test_transport<S>(
+#[cfg(any(test, feature = "test-support"))]
+pub fn spawn_test_transport<S>(
     framed: Framed<S, ZnpCodec>,
 ) -> (ZnpTransport, mpsc::Receiver<ZnpEvent>)
 where

@@ -251,6 +251,10 @@ impl MqttBridge {
         let mut opts = MqttOptions::new(&cfg.client_id, &cfg.server, cfg.port);
         opts.set_keep_alive(Duration::from_secs(cfg.keepalive as u64));
         opts.set_clean_session(true);
+        // rumqttc defaults to a 10 KiB outgoing packet limit, which silently
+        // drops `bridge/devices` (and large state payloads) for real networks.
+        // The MQTT remaining-length field allows up to 256 MiB.
+        opts.set_max_packet_size(256 * 1024 * 1024, 256 * 1024 * 1024);
 
         if let (Some(user), Some(pass)) = (&cfg.username, &cfg.password) {
             opts.set_credentials(user, pass);
@@ -1109,6 +1113,29 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
         panic!("publish not observed; saw {:?}", broker.publishes());
+    }
+
+    #[tokio::test]
+    async fn large_bridge_devices_payload_is_published() {
+        let broker = fake_broker::FakeBroker::start().await;
+        let cfg = MqttConfig {
+            server: "127.0.0.1".into(),
+            port: broker.port,
+            base_topic: "zigbee2mqtt".into(),
+            client_id: format!("z2m-large-{}", std::process::id()),
+            ..MqttConfig::default()
+        };
+        let (mqtt, _commands) = MqttBridge::connect(&cfg).await.expect("connect");
+        let devices = serde_json::json!([
+            {"ieee_address": "0x00124b0000000001", "description": "x".repeat(20 * 1024)}
+        ]);
+        mqtt.publish_bridge_devices(&devices)
+            .await
+            .expect("large bridge/devices publish must not be dropped");
+        let published =
+            wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/bridge/devices").await;
+        assert!(published.payload.len() > 10 * 1024);
+        assert!(published.retain);
     }
 
     #[tokio::test]

@@ -18,6 +18,11 @@ name = "evid04_bridge_candidate"
 path = "src/bin/evid04_bridge_candidate.rs"
 required-features = ["test-support"]
 
+[[bin]]
+name = "evid04_api_candidate"
+path = "src/bin/evid04_api_candidate.rs"
+required-features = ["test-support"]
+
 [features]
 default = []
 # Harness-only surface (in-process MQTT broker and bridge diff hook).

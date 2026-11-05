@@ -17,6 +17,12 @@ pub struct Device {
     pub model: Option<String>,
     #[serde(default)]
     pub power_source: Option<String>,
+    /// Device type from the herdsman database (`Router`, `EndDevice`, ...).
+    #[serde(default)]
+    pub device_type: Option<String>,
+    /// Persisted interview state (`SUCCESSFUL`, `IN_PROGRESS`, `FAILED`, ...).
+    #[serde(default)]
+    pub interview_state: Option<String>,
     #[serde(default)]
     pub sw_build_id: Option<String>,
     /// IAS Zone (0x0500) ZoneType attribute, when the device exposes that
@@ -58,6 +64,8 @@ impl Device {
             manufacturer: None,
             model: None,
             power_source: None,
+            device_type: None,
+            interview_state: None,
             sw_build_id: None,
             zone_type: None,
             arrow_hold_direction: None,
@@ -82,8 +90,12 @@ impl Device {
 
     /// Determine device type based on capabilities.
     #[must_use]
-    pub fn device_type(&self) -> &'static str {
-        // Simple heuristic: devices with only battery power or no routing are EndDevice
+    pub fn device_type(&self) -> &str {
+        if let Some(device_type) = &self.device_type {
+            return device_type;
+        }
+        // Fallback for devices created at runtime (join) before the database
+        // type is known.
         if let Some(ref ps) = self.power_source {
             if ps.eq_ignore_ascii_case("battery") {
                 return "EndDevice";
@@ -131,6 +143,24 @@ impl Device {
             serde_json::Value::Null
         };
 
+        let endpoints: serde_json::Map<String, serde_json::Value> = self
+            .endpoints
+            .iter()
+            .map(|endpoint| {
+                (
+                    endpoint.endpoint.to_string(),
+                    json!({
+                        "bindings": [],
+                        "clusters": {
+                            "input": endpoint.input_clusters,
+                            "output": endpoint.output_clusters,
+                        },
+                        "configured_reportings": [],
+                        "scenes": [],
+                    }),
+                )
+            })
+            .collect();
         json!({
             "ieee_address": self.ieee_addr.as_hex(),
             "type": self.device_type(),
@@ -142,9 +172,14 @@ impl Device {
             "manufacturer": self.manufacturer,
             "interviewing": !self.interview_complete && !self.endpoints.is_empty(),
             "interview_completed": self.interview_complete,
+            "interview_state": self
+                .interview_state
+                .as_deref()
+                .unwrap_or(if self.interview_complete { "SUCCESSFUL" } else { "FAILED" }),
             "software_build_id": self.sw_build_id,
             "supported": self.interview_complete,
             "disabled": self.disabled,
+            "endpoints": endpoints,
         })
     }
 }

@@ -68,7 +68,18 @@ R1 — явно ограниченный релиз для проверенно�
   конвертеру**: `ZclIo` (coordinator Mutex + Tokio handle) выполняет
   `request_zcl` из converter-потока, пока bridge ждёт сессию; ZNP pump работает
   независимо, deadlock нет. Fake-coordinator multi-thread тест подтверждает
-  `read_temperature: 2250`. Write/command остаются fire-and-forget.
+  `read_temperature: 2250`. **Write/command теперь ждут результат**: AF-status
+  проверяется, при `disableDefaultResponse:false` — ZCL default response
+  (success/failure/AF-status покрыты тестами).
+- **Frontend/API differential**: pinned upstream z2m vitest-dump (`bridge/state`,
+  `bridge/info`, `bridge/devices`, `permit_join` response) против реального Rust
+  bridge с in-process брокером — **4/4 PASS**, пины MATCH. Differential нашёл и
+  исправил: отсутствующий `permit_join` response, отсутствие `endpoints`/
+  `interview_state` в device payload, потерю persisted `type`/`interviewState`
+  при импорте и **молчаливое отбрасывание `bridge/devices`** из-за 10 KiB
+  лимита rumqttc. Полные поля `bridge/info`, coordinator-запись, definitions/
+  exposes/options, endpoint clusters/bindings/reportings и HTTP/WS frontend —
+  не проверены.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

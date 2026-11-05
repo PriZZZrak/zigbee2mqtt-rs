@@ -120,6 +120,10 @@ pub fn load_database(
         }
         dev.database_id = entry.id;
         dev.manufacturer = entry.manuf_name;
+        if !entry.device_type.is_empty() {
+            dev.device_type = Some(entry.device_type.clone());
+        }
+        dev.interview_state = entry.interview_state.clone();
         dev.power_source = entry.power_source;
         dev.model = entry.model_id;
         dev.sw_build_id = entry.sw_build_id;

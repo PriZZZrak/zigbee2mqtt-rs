@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-04T22:30:00+00:00",
+  "captured_utc": "2026-11-05T02:09:51+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent",
   "commands": [
     {
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "418 library + 2 binary + 30 compatibility = 450 passed, 0 failed"
+      "result": "419 library + 2 binary + 30 compatibility = 451 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -25,7 +25,7 @@
     {
       "command": "python3 -m unittest discover -s scripts/tests",
       "exit": 0,
-      "result": "40 parity/layout/EVID-04/storage/OpenWrt artifact tests passed"
+      "result": "42 parity/layout/EVID-04/storage/API/OpenWrt artifact tests passed"
     },
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
@@ -51,6 +51,11 @@
       "command": "python3 scripts/storage_diff.py --require-pins (pinned herdsman Database + z2m config)",
       "exit": 0,
       "result": "9 passed, 0 failed; import, rewrite, raw persisted fields, groups/GreenPower, corrupted/truncated/stale tmp; all 4 pins MATCH"
+    },
+    {
+      "command": "python3 scripts/api_diff.py --require-pins (pinned upstream z2m vitest dump)",
+      "exit": 0,
+      "result": "4 passed, 0 failed; bridge state/info/devices/permit_join response; all 4 pins MATCH"
     }
   ]
 }

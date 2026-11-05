@@ -628,8 +628,8 @@ where
 
 /// Test-only handle plus a running event pump, so `request_zcl` can resolve
 /// responses delivered as AF incoming frames.
-#[cfg(test)]
-pub(crate) fn test_handle_with_pump(
+#[cfg(any(test, feature = "test-support"))]
+pub fn test_handle_with_pump(
     transport: ZnpTransport,
     events: mpsc::Receiver<ZnpEvent>,
 ) -> (ZnpHandle, mpsc::Receiver<CoordinatorEvent>) {
