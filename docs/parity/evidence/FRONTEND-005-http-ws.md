@@ -47,7 +47,9 @@ Behavior: FRONTEND-005; related FRONTEND-001/004, EVID-004.
   ping/pong/close, 1 MiB frame limit; no fragmentation (explicit error).
 - Config: upstream key set (`enabled`, `host`, `port`, `base_url`,
   `auth_token`, `disable_ui_serving`, `package`), defaults `enabled=false`,
-  `port=8080`, `base_url="/"`. Static assets are read from
+  `port=8080`, `base_url="/"`. An absolute `host` binds a unix socket instead of
+  TCP (the HTTP/WebSocket handler is generic over the stream; a stale socket
+  file is replaced only when it is a socket). Static assets are read from
   `$ZIGBEE2MQTT_FRONTEND_DIR` (OpenWrt package: `/www/zigbee2mqtt`), because a
   Rust binary cannot resolve the upstream npm package name.
 - `MqttBridge` publishes a `PublishedEvent{topic,payload,retain}` copy on every
@@ -74,6 +76,9 @@ Rust integration tests (`src/frontend/mod.rs` tests):
   bridge command queue as `SetDevice` **without** a broker publish; `GET /`
   serves the file.
 - `base_url_redirects_without_trailing_slash`: `/z2m` → 301 `/z2m/`.
+- `unix_socket_serves_the_websocket`: an absolute `frontend.host` binds a unix
+  socket, accepts the RFC 6455 handshake and forwards a live `bridge/state`
+  publish.
 - `frontend::ws` tests: SHA-1 vectors, RFC 6455 accept key, base64, masked frame
   decode, oversized-frame rejection, frame round-trip.
 - Unit tests for the static contract helpers: `weak_etag` (srvx format with
@@ -99,9 +104,9 @@ Rust integration tests (`src/frontend/mod.rs` tests):
   asserted by our integration test and cited from source.
 - Direct dispatch covers command/bridge-request topics only (as upstream); it is
   not exercised against a live broker/HA.
-- TLS (`ssl_key`/`ssl_cert`), unix sockets and WebSocket fragmentation are not
-  implemented; `disable_ui_serving` still binds an HTTP listener that answers
-  plain-text 404 instead of only serving the WebSocket.
+- TLS (`ssl_key`/`ssl_cert`) and WebSocket fragmentation are not implemented;
+  `disable_ui_serving` still binds an HTTP listener that answers plain-text 404
+  instead of only serving the WebSocket.
 - On-the-fly compression of large uncompressed assets (`COMPRESS_MIN_SIZE`) is
   not implemented; only precompressed variants are used.
 - No browser/HA/HIL verification.

@@ -100,7 +100,8 @@ R1 — явно ограниченный релиз для проверенно�
   `If-None-Match`/`If-Modified-Since` → 304, `If-Range` (match 206, weak 200),
   byte ranges 206/416 и srvx 404. Rust integration tests покрывают
   auth/replay/live-forwarding/direct-dispatch/redirect; unit tests — ETag, даты,
-  ranges и encodings. Остаются TLS/unix sockets, Node WS differential,
+  ranges и encodings; absolute `frontend.host` поднимает unix socket (общий
+  HTTP/WS handler, тест с `UnixStream`). Остаются TLS, Node WS differential,
   fragmentation, live broker/HA и HIL.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики

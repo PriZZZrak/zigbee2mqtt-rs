@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "437 library + 2 binary + 30 compatibility = 469 passed, 0 failed"
+      "result": "438 library + 2 binary + 30 compatibility = 470 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",

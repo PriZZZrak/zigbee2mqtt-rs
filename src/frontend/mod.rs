@@ -22,8 +22,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde_json::Value;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpListener;
+#[cfg(unix)]
+use tokio::net::UnixListener;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, info};
 
@@ -94,15 +96,13 @@ pub async fn serve(
     events: broadcast::Receiver<PublishedEvent>,
     mqtt: MqttBridge,
 ) -> std::io::Result<()> {
-    if options
+    if let Some(socket) = options
         .host
         .as_deref()
-        .is_some_and(|host| host.starts_with('/'))
+        .filter(|host| host.starts_with('/'))
+        .map(str::to_string)
     {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "frontend unix sockets are not supported",
-        ));
+        return serve_socket(socket, options, base_topic, devices, events, mqtt).await;
     }
     let address = match &options.host {
         Some(host) => format!("{host}:{}", options.port),
@@ -119,28 +119,108 @@ pub async fn serve_on(
     options: ServeOptions,
     base_topic: String,
     devices: Arc<DeviceRegistry>,
-    mut events: broadcast::Receiver<PublishedEvent>,
+    events: broadcast::Receiver<PublishedEvent>,
     mqtt: MqttBridge,
 ) -> std::io::Result<()> {
     let address = listener.local_addr()?;
+    let runtime = Runtime::new(options, devices, mqtt);
     info!(
         "Frontend listening on {address}{} (websocket {})",
-        if options.disable_ui_serving {
+        runtime.ui_suffix(),
+        runtime.options.ws_path()
+    );
+    let _ingest = runtime.ingest(events, base_topic);
+    loop {
+        let (stream, peer) = listener.accept().await?;
+        runtime.spawn(stream, peer.to_string());
+    }
+}
+
+/// Unix-domain socket listener (`frontend.host` is an absolute path upstream).
+#[cfg(unix)]
+async fn serve_socket(
+    socket_path: String,
+    options: ServeOptions,
+    base_topic: String,
+    devices: Arc<DeviceRegistry>,
+    events: broadcast::Receiver<PublishedEvent>,
+    mqtt: MqttBridge,
+) -> std::io::Result<()> {
+    // A crashed process leaves the socket file behind; only a socket may be
+    // replaced, never an arbitrary file.
+    if let Ok(metadata) = std::fs::symlink_metadata(&socket_path) {
+        use std::os::unix::fs::FileTypeExt;
+        if metadata.file_type().is_socket() {
+            std::fs::remove_file(&socket_path)?;
+        }
+    }
+    let listener = UnixListener::bind(&socket_path)?;
+    let runtime = Runtime::new(options, devices, mqtt);
+    info!(
+        "Frontend listening on unix:{socket_path}{} (websocket {})",
+        runtime.ui_suffix(),
+        runtime.options.ws_path()
+    );
+    let _ingest = runtime.ingest(events, base_topic);
+    loop {
+        let (stream, _peer) = listener.accept().await?;
+        runtime.spawn(stream, socket_path.clone());
+    }
+}
+
+#[cfg(not(unix))]
+async fn serve_socket(
+    _socket_path: String,
+    _options: ServeOptions,
+    _base_topic: String,
+    _devices: Arc<DeviceRegistry>,
+    _events: broadcast::Receiver<PublishedEvent>,
+    _mqtt: MqttBridge,
+) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "frontend unix sockets are not supported on this platform",
+    ))
+}
+
+/// Per-listener state shared by TCP and unix socket accept loops.
+struct Runtime {
+    options: Arc<ServeOptions>,
+    devices: Arc<DeviceRegistry>,
+    retained: Arc<Mutex<BTreeMap<String, Value>>>,
+    frames: broadcast::Sender<Arc<String>>,
+    mqtt: MqttBridge,
+}
+
+impl Runtime {
+    fn new(options: ServeOptions, devices: Arc<DeviceRegistry>, mqtt: MqttBridge) -> Self {
+        let (frames, _) = broadcast::channel(512);
+        Self {
+            options: Arc::new(options),
+            devices,
+            retained: Arc::new(Mutex::new(BTreeMap::new())),
+            frames,
+            mqtt,
+        }
+    }
+
+    fn ui_suffix(&self) -> &'static str {
+        if self.options.disable_ui_serving {
             " (UI serving disabled)"
         } else {
             ""
-        },
-        options.ws_path()
-    );
+        }
+    }
 
-    // Retained messages, as replayed to every new client, and the live frame
-    // bus every connected client follows.
-    let retained: Arc<Mutex<BTreeMap<String, Value>>> = Arc::new(Mutex::new(BTreeMap::new()));
-    let (frames, _) = broadcast::channel::<Arc<String>>(512);
-    let _ingest = {
-        let retained = Arc::clone(&retained);
-        let frames = frames.clone();
-        let base_topic = base_topic.clone();
+    /// Consume the MQTT publish bus: update the retained map and fan frames out
+    /// to every connected client.
+    fn ingest(
+        &self,
+        mut events: broadcast::Receiver<PublishedEvent>,
+        base_topic: String,
+    ) -> tokio::task::JoinHandle<()> {
+        let retained = Arc::clone(&self.retained);
+        let frames = self.frames.clone();
         tokio::spawn(async move {
             loop {
                 match events.recv().await {
@@ -173,16 +253,17 @@ pub async fn serve_on(
                 }
             }
         })
-    };
+    }
 
-    let options = Arc::new(options);
-    loop {
-        let (stream, peer) = listener.accept().await?;
-        let options = Arc::clone(&options);
-        let retained = Arc::clone(&retained);
-        let frames = frames.subscribe();
-        let devices = Arc::clone(&devices);
-        let mqtt = mqtt.clone();
+    fn spawn<S>(&self, stream: S, peer: String)
+    where
+        S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    {
+        let options = Arc::clone(&self.options);
+        let retained = Arc::clone(&self.retained);
+        let frames = self.frames.subscribe();
+        let devices = Arc::clone(&self.devices);
+        let mqtt = self.mqtt.clone();
         tokio::spawn(async move {
             if let Err(error) =
                 handle_connection(stream, options, devices, retained, frames, mqtt).await
@@ -204,7 +285,7 @@ struct Request {
     headers: BTreeMap<String, String>,
 }
 
-async fn read_request(stream: &mut TcpStream) -> std::io::Result<Option<Request>> {
+async fn read_request<S: AsyncRead + Unpin>(stream: &mut S) -> std::io::Result<Option<Request>> {
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 1024];
     loop {
@@ -245,8 +326,8 @@ async fn read_request(stream: &mut TcpStream) -> std::io::Result<Option<Request>
     }))
 }
 
-async fn handle_connection(
-    mut stream: TcpStream,
+async fn handle_connection<S: AsyncRead + AsyncWrite + Unpin>(
+    mut stream: S,
     options: Arc<ServeOptions>,
     devices: Arc<DeviceRegistry>,
     retained: Arc<Mutex<BTreeMap<String, Value>>>,
@@ -534,7 +615,10 @@ async fn handle_connection(
     stream.flush().await
 }
 
-async fn send_not_found(stream: &mut TcpStream, request: &Request) -> std::io::Result<()> {
+async fn send_not_found<S: AsyncWrite + Unpin>(
+    stream: &mut S,
+    request: &Request,
+) -> std::io::Result<()> {
     let message = format!("Cannot {} {}", request.method, request.path);
     let escaped = message
         .replace('&', "&#38;")
@@ -781,8 +865,8 @@ fn content_type(path: &Path) -> &'static str {
     }
 }
 
-async fn respond(
-    stream: &mut TcpStream,
+async fn respond<S: AsyncWrite + Unpin>(
+    stream: &mut S,
     status: u16,
     reason: &str,
     content_type: &str,
@@ -928,8 +1012,12 @@ mod tests {
         use crate::mqtt::fake_broker::FakeBroker;
         use crate::zigbee::IeeeAddr;
         use tokio::io::AsyncWriteExt;
+        use tokio::net::TcpStream;
 
-        async fn handshake(stream: &mut TcpStream, path: &str) -> String {
+        async fn handshake<S: AsyncRead + AsyncWrite + Unpin>(
+            stream: &mut S,
+            path: &str,
+        ) -> String {
             let request = format!(
                 "GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
             );
@@ -1135,6 +1223,74 @@ mod tests {
             let body = String::from_utf8_lossy(&body);
             assert!(body.starts_with("HTTP/1.1 200 OK"), "{body}");
             assert!(body.contains("windfront"));
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        #[cfg(unix)]
+        #[tokio::test]
+        async fn unix_socket_serves_the_websocket() {
+            use tokio::net::UnixStream;
+
+            let dir =
+                std::env::temp_dir().join(format!("z2m-frontend-unix-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            let socket_path = dir.join("frontend.sock");
+
+            let broker = FakeBroker::start().await;
+            let cfg = MqttConfig {
+                server: "127.0.0.1".into(),
+                port: broker.port,
+                base_topic: "zigbee2mqtt".into(),
+                client_id: format!("z2m-frontend-unix-{}", std::process::id()),
+                ..MqttConfig::default()
+            };
+            let (events_tx, events_rx) = broadcast::channel(64);
+            let (mqtt, _commands) = MqttBridge::connect_with_events(&cfg, Some(events_tx))
+                .await
+                .unwrap();
+            let mut unix_options = options(dir.clone(), None);
+            unix_options.host = Some(socket_path.to_string_lossy().into_owned());
+            let server_mqtt = mqtt.clone();
+            let server_socket = socket_path.clone();
+            tokio::spawn(async move {
+                serve(
+                    unix_options,
+                    "zigbee2mqtt".into(),
+                    Arc::new(DeviceRegistry::new()),
+                    events_rx,
+                    server_mqtt,
+                )
+                .await
+                .unwrap();
+            });
+            for _ in 0..200 {
+                if server_socket.exists() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            assert!(socket_path.exists(), "unix socket was not created");
+
+            let mut stream = UnixStream::connect(&socket_path).await.unwrap();
+            let response = handshake(&mut stream, "/api").await;
+            assert!(response.starts_with("HTTP/1.1 101"), "{response}");
+
+            mqtt.publish_bridge_state(true).await.unwrap();
+            let frame = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                ws::read_frame(&mut stream),
+            )
+            .await
+            .expect("frame timed out")
+            .unwrap()
+            .unwrap();
+            let frame: Value = match frame {
+                ws::Frame::Text(text) => serde_json::from_str(&text).unwrap(),
+                other => panic!("unexpected frame {other:?}"),
+            };
+            assert_eq!(frame["topic"], "bridge/state");
+            assert_eq!(frame["payload"]["state"], "online");
             std::fs::remove_dir_all(&dir).ok();
         }
 
