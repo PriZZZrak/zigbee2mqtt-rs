@@ -46,6 +46,20 @@ waiting bridge loop is not needed and no deadlock occurs.
   MQTT/coordinator event processing beyond the already-blocking conversion
   wait.
 
+## Acknowledgements for writes and commands
+
+`msg.endpoint.write` / `msg.endpoint.command` are now executed natively through
+the same `ZclIo` handle, so the converter's `await` reflects the device result:
+
+- `disableDefaultResponse: true` (default) → AF_DATA_REQUEST status is checked;
+  a non-zero SRSP status rejects the converter's promise with the hex status;
+- `disableDefaultResponse: false` → after the AF status the bridge waits for a
+  ZCL Default Response (0x0B) with the same TSN/cluster via
+  `request_zcl_expected`; a non-zero status rejects with
+  `ZCL default response status 0xNN`;
+- without a coordinator (EVID-04 candidate) the native call is disabled and the
+  operation is recorded for the wire/ops differential.
+
 ## Rust change
 
 - The Boa host records `command`, `write` and `read` calls during conversion,
@@ -82,6 +96,13 @@ waiting bridge loop is not needed and no deadlock occurs.
   answers `measuredValue = 2250`, and the published state contains
   `read_temperature: 2250` with the read frame
   `[0x10, 0x00, 0x00, 0x00, 0x00]` observed on the wire.
+- `converter_write_awaits_default_response_success` — write with
+  `disableDefaultResponse:false` emits control `0x00` and resolves after a
+  default response with status 0; published `write_ack:true`.
+- `converter_write_reports_default_response_failure` — status `0x01` rejects;
+  published `write_error` contains `0x01`.
+- `converter_write_reports_af_status_failure` — AF SRSP status `0xE9` rejects;
+  published `write_error` contains `0xE9`.
 - `fromZigbeeOps` differential compares requested operations **and their ZCL
   wire frames** with the pinned Node reference:
   - `leviton-level-config-write` → write cluster 8 `{options: 1}`,
@@ -100,8 +121,12 @@ waiting bridge loop is not needed and no deadlock occurs.
   events during that window. Devices that answer slowly cost the 3 s timeout.
 - The native read decoder covers the bounded `AttributeValue` primitives; arrays,
   structs, Buffers and manufacturer-specific clusters are skipped.
-- Operations are fire-and-forget except reads (writes/commands do not await an
-  AF/default-response result); destination is always the source endpoint.
+- Writes/commands now await AF status and, when enabled, the ZCL default
+  response; however, no pinned `fromZigbee` converter in the current package
+  enables default responses for these calls, so the wire differential only
+  exercises `disableDefaultResponse=true`; ack success/failure is covered by
+  fake-coordinator tests, not a Node differential.
+- Destination is always the source endpoint.
 - Recording order between commands/writes/reads is grouped, not the converter's
   global call order.
 - No live device/HIL verification of the replies/reads.

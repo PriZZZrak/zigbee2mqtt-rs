@@ -276,7 +276,12 @@ fn main() {
                 &command.payload,
             )
             .unwrap_or_else(|error| fail(format!("cannot encode command frame: {error}")));
-            frames.push(json!({"kind": "command", "tsn": tsn, "hex": hex(&bytes)}));
+            frames.push(json!({
+                "kind": "command",
+                "tsn": tsn,
+                "hex": hex(&bytes),
+                "await_default_response": !command.disable_default_response,
+            }));
             tsn = tsn.wrapping_add(1);
         }
         for write in &frame.writes {
@@ -285,10 +290,16 @@ fn main() {
                 tsn,
                 write.cluster,
                 write.manufacturer_code,
+                write.disable_default_response,
                 &write.attributes,
             )
             .unwrap_or_else(|error| fail(format!("cannot encode write frame: {error}")));
-            frames.push(json!({"kind": "write", "tsn": tsn, "hex": hex(&bytes)}));
+            frames.push(json!({
+                "kind": "write",
+                "tsn": tsn,
+                "hex": hex(&bytes),
+                "await_default_response": !write.disable_default_response,
+            }));
             tsn = tsn.wrapping_add(1);
         }
         for read in &frame.reads {
@@ -301,7 +312,12 @@ fn main() {
                 &read.attributes,
             )
             .unwrap_or_else(|error| fail(format!("cannot encode read frame: {error}")));
-            frames.push(json!({"kind": "read", "tsn": tsn, "hex": hex(&bytes)}));
+            frames.push(json!({
+                "kind": "read",
+                "tsn": tsn,
+                "hex": hex(&bytes),
+                "await_default_response": !read.disable_default_response,
+            }));
             tsn = tsn.wrapping_add(1);
         }
         println!(

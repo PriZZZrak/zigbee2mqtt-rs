@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "415 library + 2 binary + 30 compatibility = 447 passed, 0 failed"
+      "result": "418 library + 2 binary + 30 compatibility = 450 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -30,7 +30,7 @@
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
       "exit": 0,
-      "result": "static aarch64 ELF built from the current tree (5534968 bytes, sha256 2309dc36...)"
+      "result": "static aarch64 ELF built from the current tree (5549056 bytes, sha256 267be4ff...)"
     },
     {
       "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",
@@ -40,7 +40,7 @@
     {
       "command": "scripts/build-openwrt-ipk.sh <SDK>/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64",
       "exit": 0,
-      "result": "SDK .ipk rebuilt from the current tree: 5,585,084 B, sha256 af27af09..., installed 11,960,320 B; identical hash on rebuild; install/upgrade BLOCKED on device"
+      "result": "SDK .ipk rebuilt from the current tree: 5,589,657 B, sha256 17fffe82..., installed 11,980,800 B; identical hash on rebuild; install/upgrade BLOCKED on device"
     },
     {
       "command": "python3 scripts/evid04_harness.py --fixtures docs/parity/evidence/evid04/bridge-fixtures (real bridge, in-process broker)",

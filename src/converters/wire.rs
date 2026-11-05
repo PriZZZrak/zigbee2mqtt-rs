@@ -5,7 +5,7 @@
 
 use crate::converters::zcl_types::{encode_command_parameters, encode_value, ZclTypesFile};
 use crate::zigbee::zcl::frame::{read_attributes_payload_with_options, ZclFrameHeader};
-use crate::zigbee::zcl::write::write_attributes_payload;
+use crate::zigbee::zcl::write::write_attributes_payload_with_options;
 use serde_json::Value;
 
 /// Encode attributes for a Write Attributes request.
@@ -104,6 +104,7 @@ pub fn encode_write_frame(
     tsn: u8,
     cluster: u16,
     manufacturer_code: Option<u16>,
+    disable_default_response: bool,
     attributes: &[(String, Value)],
 ) -> Result<Vec<u8>, String> {
     let encoded = encode_write_attributes(types, cluster, attributes)?;
@@ -111,7 +112,12 @@ pub fn encode_write_frame(
         .iter()
         .map(|(id, data_type, bytes)| (*id, *data_type, bytes.as_slice()))
         .collect();
-    Ok(write_attributes_payload(tsn, manufacturer_code, &refs))
+    Ok(write_attributes_payload_with_options(
+        tsn,
+        manufacturer_code,
+        disable_default_response,
+        &refs,
+    ))
 }
 
 /// Build a Read Attributes frame.

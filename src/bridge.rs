@@ -1743,17 +1743,15 @@ impl Bridge {
             return;
         };
         for write in writes {
-            match encode_write_attributes(types, write.cluster, &write.attributes) {
-                Ok(encoded) => {
-                    let refs: Vec<(u16, u8, &[u8])> = encoded
-                        .iter()
-                        .map(|(id, data_type, bytes)| (*id, *data_type, bytes.as_slice()))
-                        .collect();
-                    let frame = zcl::write::write_attributes_payload(
-                        *trans_id,
-                        write.manufacturer_code,
-                        &refs,
-                    );
+            match crate::converters::wire::encode_write_frame(
+                types,
+                *trans_id,
+                write.cluster,
+                write.manufacturer_code,
+                write.disable_default_response,
+                &write.attributes,
+            ) {
+                Ok(frame) => {
                     *trans_id = trans_id.wrapping_add(1);
                     if let Err(error) = coord
                         .send_zcl(dst_addr, dst_ep, write.cluster, *trans_id, frame)
@@ -5624,6 +5622,115 @@ module.exports = {definitions};
         (devices, ieee)
     }
 
+    /// Converter package whose handler awaits write acknowledgements.
+    fn ack_fixture() -> (std::path::PathBuf, ExternalConverter) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "z2m-bridge-ack-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("devices")).unwrap();
+        std::fs::write(
+            dir.join("devices").join("ack.js"),
+            r#"
+function writeHandler(disableDefaultResponse) {
+    return async (model, msg) => {
+        try {
+            await msg.endpoint.write(
+                "genOnOff",
+                {onOff: 1},
+                {disableDefaultResponse},
+            );
+            return {write_ack: true};
+        } catch (error) {
+            return {write_error: String((error && error.message) || error)};
+        }
+    };
+}
+const definitions = [
+    {
+        model: "FixtureAck",
+        vendor: "Fixture",
+        description: "default-response write fixture",
+        fromZigbee: [
+            {cluster: "genOnOff", type: ["attributeReport"], convert: writeHandler(false)},
+        ],
+    },
+    {
+        model: "FixtureAckAf",
+        vendor: "Fixture",
+        description: "AF-status write fixture",
+        fromZigbee: [
+            {cluster: "genOnOff", type: ["attributeReport"], convert: writeHandler(true)},
+        ],
+    },
+];
+module.exports = {definitions};
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("registry.json"),
+            serde_json::json!({
+                "lookup": {
+                    "fixtureack": [["ack.js", 0]],
+                    "fixtureackaf": [["ack.js", 1]],
+                },
+                "fingerprints": [],
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl.json"),
+            serde_json::json!({
+                "clusters": {"6": "genOnOff"},
+                "manufacturerCodes": {},
+                "dataTypes": {},
+                "attributes": {"genOnOff": {"0": "onOff"}},
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl-commands.json"),
+            serde_json::json!({
+                "clusters": {
+                    "6": {
+                        "name": "genOnOff",
+                        "attributes": {"0": {"name": "onOff", "type": 16}},
+                        "commands": {}
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let converter = ExternalConverter::new(&dir, "https://example.invalid/x");
+        (dir, converter)
+    }
+
+    async fn ack_devices(model: &str) -> (DeviceRegistry, IeeeAddr) {
+        let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
+        let mut device = Device::new(ieee, 0x5678);
+        device.friendly_name = "ack".into();
+        device.model = Some(model.into());
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0100,
+            input_clusters: vec![0x0000, 0x0006],
+            output_clusters: vec![],
+        });
+        let devices = DeviceRegistry::new();
+        devices.add(device);
+        (devices, ieee)
+    }
+
     async fn tuya_devices() -> (DeviceRegistry, IeeeAddr) {
         let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
         let mut device = Device::new(ieee, 0x5678);
@@ -6304,6 +6411,154 @@ module.exports = {definitions};
         let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
         assert_eq!(state["read_temperature"], json!(2250));
         assert_eq!(state["read_ok"], json!(true));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    fn default_response_frame(
+        cluster: u16,
+        tsn: u8,
+        command: u8,
+        status: u8,
+    ) -> crate::coordinator::znp::frame::ZnpFrame {
+        af_incoming_frame(cluster, 0x5678, 1, vec![0x18, tsn, 0x0B, command, status])
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn converter_write_awaits_default_response_success() {
+        let (dir, external) = ack_fixture();
+        let (wire, coord) = fake_coordinator();
+        external.set_zcl_io(Some(crate::converters::external::ZclIo {
+            inner: Arc::clone(&coord.inner),
+            runtime: tokio::runtime::Handle::current(),
+            types: external.zcl_types(),
+            tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+        }));
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = ack_devices("FixtureAck").await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |sent| {
+            let tsn = sent.payload[1];
+            vec![
+                success_srsp(),
+                default_response_frame(0x0006, tsn, 0x02, 0x00),
+            ]
+        });
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            Some(&coord),
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            0x5678,
+            1,
+            0x0006,
+            42,
+            vec![0x18, 0x01, 0x0A, 0x00, 0x00, 0x10, 0x01],
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames.len(), 1);
+        // disableDefaultResponse=false => control 0x00.
+        assert_eq!(
+            frames[0].payload,
+            vec![0x00, 0x00, 0x02, 0x00, 0x00, 0x10, 0x01]
+        );
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/ack").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        assert_eq!(state["write_ack"], json!(true));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn converter_write_reports_default_response_failure() {
+        let (dir, external) = ack_fixture();
+        let (wire, coord) = fake_coordinator();
+        external.set_zcl_io(Some(crate::converters::external::ZclIo {
+            inner: Arc::clone(&coord.inner),
+            runtime: tokio::runtime::Handle::current(),
+            types: external.zcl_types(),
+            tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+        }));
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = ack_devices("FixtureAck").await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |sent| {
+            let tsn = sent.payload[1];
+            vec![
+                success_srsp(),
+                default_response_frame(0x0006, tsn, 0x02, 0x01),
+            ]
+        });
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            Some(&coord),
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            0x5678,
+            1,
+            0x0006,
+            42,
+            vec![0x18, 0x01, 0x0A, 0x00, 0x00, 0x10, 0x01],
+        )
+        .await;
+
+        let _ = collector.await.expect("collector");
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/ack").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        let error = state["write_error"].as_str().unwrap_or_default();
+        assert!(error.contains("0x01"), "unexpected error: {error}");
+        assert!(state.get("write_ack").is_none());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn converter_write_reports_af_status_failure() {
+        let (dir, external) = ack_fixture();
+        let (wire, coord) = fake_coordinator();
+        external.set_zcl_io(Some(crate::converters::external::ZclIo {
+            inner: Arc::clone(&coord.inner),
+            runtime: tokio::runtime::Handle::current(),
+            types: external.zcl_types(),
+            tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+        }));
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = ack_devices("FixtureAckAf").await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |_sent| {
+            vec![crate::coordinator::znp::frame::ZnpFrame::new(
+                crate::coordinator::znp::frame::FrameType::SRsp,
+                crate::coordinator::znp::frame::Subsystem::Af,
+                0x01,
+                vec![0xE9],
+            )]
+        });
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            Some(&coord),
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            0x5678,
+            1,
+            0x0006,
+            42,
+            vec![0x18, 0x01, 0x0A, 0x00, 0x00, 0x10, 0x01],
+        )
+        .await;
+
+        let _ = collector.await.expect("collector");
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/ack").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        let error = state["write_error"].as_str().unwrap_or_default();
+        assert!(error.contains("0xE9"), "unexpected error: {error}");
         std::fs::remove_dir_all(&dir).ok();
     }
 }

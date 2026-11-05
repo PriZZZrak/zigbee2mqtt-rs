@@ -3,8 +3,24 @@ pub fn write_attributes_payload(
     mfr_code: Option<u16>,
     attrs: &[(u16, u8, &[u8])],
 ) -> Vec<u8> {
+    write_attributes_payload_with_options(sequence, mfr_code, true, attrs)
+}
+
+/// Write Attributes frame with an explicit disable-default-response flag.
+pub fn write_attributes_payload_with_options(
+    sequence: u8,
+    mfr_code: Option<u16>,
+    disable_default_response: bool,
+    attrs: &[(u16, u8, &[u8])],
+) -> Vec<u8> {
     let mut frame = Vec::new();
-    let fc = if mfr_code.is_some() { 0x14u8 } else { 0x10u8 };
+    let mut fc = 0x00u8;
+    if mfr_code.is_some() {
+        fc |= 0x04;
+    }
+    if disable_default_response {
+        fc |= 0x10;
+    }
     frame.push(fc);
     if let Some(code) = mfr_code {
         frame.push((code & 0xFF) as u8);

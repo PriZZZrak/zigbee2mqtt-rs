@@ -69,6 +69,99 @@ fn install_zcl_context(context: Option<&ZclContext>) -> ZclGuard {
 }
 
 impl ZclIo {
+    fn dispatch(
+        &self,
+        context: &ZclContext,
+        cluster: u16,
+        tsn: u8,
+        frame: Vec<u8>,
+        disable_default_response: bool,
+    ) -> std::result::Result<(), String> {
+        let inner = Arc::clone(&self.inner);
+        let nwk_addr = context.nwk_addr;
+        let endpoint = context.endpoint;
+        self.runtime.block_on(async move {
+            let handle = inner.lock().await;
+            if disable_default_response {
+                handle
+                    .send_zcl(nwk_addr, endpoint, cluster, tsn, frame)
+                    .await
+                    .map_err(|error| error.to_string())
+            } else {
+                let response = handle
+                    .request_zcl_expected(
+                        nwk_addr,
+                        endpoint,
+                        cluster,
+                        tsn,
+                        frame,
+                        Duration::from_secs(3),
+                        2,
+                        Some(0x0B),
+                    )
+                    .await
+                    .map_err(|error| error.to_string())?;
+                let (header, offset) =
+                    crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data)
+                        .map_err(|error| error.to_string())?;
+                if header.command_id != 0x0B {
+                    return Err(format!(
+                        "expected default response, got command 0x{:02X}",
+                        header.command_id
+                    ));
+                }
+                let status = response.data.get(offset + 1).copied().unwrap_or(0xFF);
+                if status == 0 {
+                    Ok(())
+                } else {
+                    Err(format!("ZCL default response status 0x{status:02X}"))
+                }
+            }
+        })
+    }
+
+    fn command(
+        &self,
+        context: &ZclContext,
+        cluster: u16,
+        command: u8,
+        payload: &Value,
+        manufacturer_code: Option<u16>,
+        disable_default_response: bool,
+    ) -> std::result::Result<(), String> {
+        let tsn = self.tsn.fetch_add(1, Ordering::Relaxed);
+        let frame = crate::converters::wire::encode_command_frame(
+            &self.types,
+            tsn,
+            cluster,
+            command,
+            manufacturer_code,
+            disable_default_response,
+            payload,
+        )?;
+        self.dispatch(context, cluster, tsn, frame, disable_default_response)
+    }
+
+    fn write(
+        &self,
+        context: &ZclContext,
+        cluster: u16,
+        attributes: &[(String, Value)],
+        manufacturer_code: Option<u16>,
+        disable_default_response: bool,
+    ) -> std::result::Result<(), String> {
+        let tsn = self.tsn.fetch_add(1, Ordering::Relaxed);
+        let frame = crate::converters::wire::encode_write_frame(
+            &self.types,
+            tsn,
+            cluster,
+            manufacturer_code,
+            disable_default_response,
+            attributes,
+        )?;
+        self.dispatch(context, cluster, tsn, frame, disable_default_response)
+    }
+
     fn read(
         &self,
         context: &ZclContext,
@@ -212,7 +305,113 @@ fn zcl_read_json(raw: &str) -> String {
     }
 }
 
-fn register_zcl_read(context: &mut Context) {
+fn zcl_write_json(raw: &str) -> String {
+    let Some(context) = ZCL_CONTEXT.with(|cell| cell.borrow().clone()) else {
+        return json!({"disabled": true}).to_string();
+    };
+    let request: Value = match serde_json::from_str(raw) {
+        Ok(value) => value,
+        Err(error) => {
+            return json!({"error": format!("invalid write request: {error}")}).to_string()
+        }
+    };
+    let cluster = request
+        .get("cluster")
+        .and_then(|value| match value {
+            Value::Number(number) => number.as_u64(),
+            Value::String(name) => context.io.types.cluster_id_by_name(name).map(u64::from),
+            _ => None,
+        })
+        .and_then(|id| u16::try_from(id).ok());
+    let Some(cluster) = cluster else {
+        return json!({"error": "unresolved cluster"}).to_string();
+    };
+    let attributes: Vec<(String, Value)> = request
+        .get("attributes")
+        .and_then(|value| value.as_object())
+        .map(|object| object.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+        .unwrap_or_default();
+    let options = request.get("options");
+    let manufacturer_code = options
+        .and_then(|o| o.get("manufacturerCode"))
+        .and_then(|v| v.as_u64())
+        .and_then(|v| u16::try_from(v).ok());
+    let disable_default_response = options
+        .and_then(|o| o.get("disableDefaultResponse"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    match context.io.write(
+        &context,
+        cluster,
+        &attributes,
+        manufacturer_code,
+        disable_default_response,
+    ) {
+        Ok(()) => json!({"ok": true}).to_string(),
+        Err(error) => json!({"error": error}).to_string(),
+    }
+}
+
+fn zcl_command_json(raw: &str) -> String {
+    let Some(context) = ZCL_CONTEXT.with(|cell| cell.borrow().clone()) else {
+        return json!({"disabled": true}).to_string();
+    };
+    let request: Value = match serde_json::from_str(raw) {
+        Ok(value) => value,
+        Err(error) => {
+            return json!({"error": format!("invalid command request: {error}")}).to_string()
+        }
+    };
+    let cluster = request
+        .get("cluster")
+        .and_then(|value| match value {
+            Value::Number(number) => number.as_u64(),
+            Value::String(name) => context.io.types.cluster_id_by_name(name).map(u64::from),
+            _ => None,
+        })
+        .and_then(|id| u16::try_from(id).ok());
+    let Some(cluster) = cluster else {
+        return json!({"error": "unresolved cluster"}).to_string();
+    };
+    let command = request
+        .get("command")
+        .and_then(|value| match value {
+            Value::Number(number) => number.as_u64(),
+            Value::String(name) => context
+                .io
+                .types
+                .command_id_by_name(cluster, name)
+                .map(u64::from),
+            _ => None,
+        })
+        .and_then(|id| u8::try_from(id).ok());
+    let Some(command) = command else {
+        return json!({"error": "unresolved command"}).to_string();
+    };
+    let options = request.get("options");
+    let manufacturer_code = options
+        .and_then(|o| o.get("manufacturerCode"))
+        .and_then(|v| v.as_u64())
+        .and_then(|v| u16::try_from(v).ok());
+    let disable_default_response = options
+        .and_then(|o| o.get("disableDefaultResponse"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let payload = request.get("payload").cloned().unwrap_or(Value::Null);
+    match context.io.command(
+        &context,
+        cluster,
+        command,
+        &payload,
+        manufacturer_code,
+        disable_default_response,
+    ) {
+        Ok(()) => json!({"ok": true}).to_string(),
+        Err(error) => json!({"error": error}).to_string(),
+    }
+}
+
+fn register_zcl_natives(context: &mut Context) {
     let read = NativeFunction::from_copy_closure(|_this, args, context| {
         let raw = args
             .first()
@@ -222,6 +421,26 @@ fn register_zcl_read(context: &mut Context) {
         Ok(JsValue::from(JsString::from(zcl_read_json(&raw))))
     });
     let _ = context.register_global_callable(js_string!("__zclRead"), 1, read);
+
+    let write = NativeFunction::from_copy_closure(|_this, args, context| {
+        let raw = args
+            .first()
+            .and_then(|value| value.to_string(context).ok())
+            .map(|value| value.to_std_string_escaped())
+            .unwrap_or_default();
+        Ok(JsValue::from(JsString::from(zcl_write_json(&raw))))
+    });
+    let _ = context.register_global_callable(js_string!("__zclWrite"), 1, write);
+
+    let command = NativeFunction::from_copy_closure(|_this, args, context| {
+        let raw = args
+            .first()
+            .and_then(|value| value.to_string(context).ok())
+            .map(|value| value.to_std_string_escaped())
+            .unwrap_or_default();
+        Ok(JsValue::from(JsString::from(zcl_command_json(&raw))))
+    });
+    let _ = context.register_global_callable(js_string!("__zclCommand"), 1, command);
 }
 
 /// One ZCL operation requested by a converter `convertSet`.
@@ -922,7 +1141,7 @@ impl ExternalConverter {
         })?;
 
         let mut ctx = Context::default();
-        register_zcl_read(&mut ctx);
+        register_zcl_natives(&mut ctx);
         let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
         let bootstrap = format!(
             r#"
@@ -1106,6 +1325,18 @@ const __norm = (v) => {{
                 // and sends them after conversion.
                 const __commands = [];
                 msg.endpoint.command = (cluster, command, payload, options) => {{
+                    if (typeof __zclCommand === "function") {{
+                        const response = JSON.parse(__zclCommand(JSON.stringify({{
+                            cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                            command: (command && command.ID !== undefined) ? command.ID : command,
+                            payload: payload || {{}},
+                            options: options || {{}},
+                        }})));
+                        if (!response.disabled) {{
+                            if (response.error) return Promise.reject(new Error(response.error));
+                            return Promise.resolve();
+                        }}
+                    }}
                     __commands.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         command: (command && command.ID !== undefined) ? command.ID : command,
@@ -1119,6 +1350,17 @@ const __norm = (v) => {{
                 }};
                 const __writes = [];
                 msg.endpoint.write = (cluster, attributes, options) => {{
+                    if (typeof __zclWrite === "function") {{
+                        const response = JSON.parse(__zclWrite(JSON.stringify({{
+                            cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                            attributes: attributes || {{}},
+                            options: options || {{}},
+                        }})));
+                        if (!response.disabled) {{
+                            if (response.error) return Promise.reject(new Error(response.error));
+                            return Promise.resolve();
+                        }}
+                    }}
                     __writes.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         attributes: __norm(attributes || {{}}),
@@ -1497,7 +1739,7 @@ impl ExternalConverter {
             .or_else(|| self.load_js(&file))?;
         let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
         let mut ctx = Context::default();
-        register_zcl_read(&mut ctx);
+        register_zcl_natives(&mut ctx);
         let bootstrap = format!("{}{}", cjs_bootstrap(&sources, &zcl), TIMERS_JS);
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
             warn!("external converter: session bootstrap failed");
@@ -1713,6 +1955,18 @@ const __norm = (v) => {{
                 // the bridge encodes and sends them after conversion.
                 const __commands = [];
                 msg.endpoint.command = (cluster, command, payload, options) => {{
+                    if (typeof __zclCommand === "function") {{
+                        const response = JSON.parse(__zclCommand(JSON.stringify({{
+                            cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                            command: (command && command.ID !== undefined) ? command.ID : command,
+                            payload: payload || {{}},
+                            options: options || {{}},
+                        }})));
+                        if (!response.disabled) {{
+                            if (response.error) return Promise.reject(new Error(response.error));
+                            return Promise.resolve();
+                        }}
+                    }}
                     __commands.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         command: (command && command.ID !== undefined) ? command.ID : command,
@@ -1726,6 +1980,17 @@ const __norm = (v) => {{
                 }};
                 const __writes = [];
                 msg.endpoint.write = (cluster, attributes, options) => {{
+                    if (typeof __zclWrite === "function") {{
+                        const response = JSON.parse(__zclWrite(JSON.stringify({{
+                            cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                            attributes: attributes || {{}},
+                            options: options || {{}},
+                        }})));
+                        if (!response.disabled) {{
+                            if (response.error) return Promise.reject(new Error(response.error));
+                            return Promise.resolve();
+                        }}
+                    }}
                     __writes.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         attributes: __norm(attributes || {{}}),

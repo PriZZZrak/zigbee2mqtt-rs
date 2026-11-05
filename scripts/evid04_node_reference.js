@@ -243,8 +243,13 @@ function encodeFrames(result, clusterMap, zcl, startTsn) {
         const attributes = cluster.attributes || {};
         return attributes[value] ?? Object.values(attributes).find((entry) => String(entry.ID) === String(value));
     };
-    const push = (frame, kind, currentTsn) => {
-        frames.push({kind, tsn: currentTsn, hex: frame.toBuffer().toString("hex")});
+    const push = (frame, kind, currentTsn, awaitDefaultResponse) => {
+        frames.push({
+            kind,
+            tsn: currentTsn,
+            hex: frame.toBuffer().toString("hex"),
+            await_default_response: awaitDefaultResponse,
+        });
         tsn = (tsn + 1) & 0xff;
     };
 
@@ -270,7 +275,7 @@ function encodeFrames(result, clusterMap, zcl, startTsn) {
             payload,
             {},
         );
-        push(frame, "command", tsn);
+        push(frame, "command", tsn, !operation.options.disableDefaultResponse);
     }
     for (const operation of result.writes) {
         const cluster = clusterOf(operation.cluster);
@@ -291,7 +296,7 @@ function encodeFrames(result, clusterMap, zcl, startTsn) {
             payload,
             {},
         );
-        push(frame, "write", tsn);
+        push(frame, "write", tsn, !operation.options.disableDefaultResponse);
     }
     for (const operation of result.reads) {
         const cluster = clusterOf(operation.cluster);
@@ -312,7 +317,7 @@ function encodeFrames(result, clusterMap, zcl, startTsn) {
             payload,
             {},
         );
-        push(frame, "read", tsn);
+        push(frame, "read", tsn, !operation.options.disableDefaultResponse);
     }
     return frames;
 }

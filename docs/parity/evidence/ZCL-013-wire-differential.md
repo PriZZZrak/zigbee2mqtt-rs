@@ -23,7 +23,7 @@ The bridge must emit the same ZCL frame bytes as herdsman for the operations a
 ## Differential
 
 `fromZigbeeOps` output now includes a `frames` array
-(`{kind, tsn, hex}`), produced independently:
+(`{kind, tsn, hex, await_default_response}`), produced independently:
 
 - Node: real herdsman `Zcl.Frame.create(...).toBuffer()` for every recorded
   command/write/read;
@@ -52,3 +52,7 @@ converter differential is **10/10** with all pins MATCH
   default-option resolution lives in the converter host (implemented here as
   `disableDefaultResponse` default true), not independently re-derived.
 - TSN allocation is not compared (fixed by `wire_tsn`), only encoding.
+- `await_default_response` is derived from the recorded options; all current
+  real fixtures use `disableDefaultResponse=true`, so no `true` case is covered
+  by the Node differential (acknowledgement behaviour is covered by
+  fake-coordinator tests in CONVERTER-020).
