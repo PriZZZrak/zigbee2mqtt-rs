@@ -73,7 +73,7 @@ ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
         installed 12165120 B, data 5703883 B, binary 5733473 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
 sha256: db61ab9054ffee35c4b044261462bcc57f044c8e9559bf53b06a81146b9fc06b
-bytes:  5685137
+bytes:  5682979
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
