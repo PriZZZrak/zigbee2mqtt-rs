@@ -19,14 +19,14 @@ Compatibility baseline: zigbee2mqtt `344b6e03b43644c97154a72ca9eae17193c553a2` (
 Frontend baseline: **BLOCKED** — the app resolves Windfront 2.15.0; the historical lock pins 2.15.1. See upstream-lock.json.
 Latest upstream: app `3c841fdfd66c`, herdsman `eb80ba1f1cb3`, converters `1e18d5002118`, Windfront `b32226926e4d`, documentation `2421451eeaa9` (checked 2026-11-05T09:17:20+00:00).
 Freshness: **DRIFT_DETECTED**
-Discovered: 126 eligible behaviors; 16 unmeasured rows.
-Stage 1 Z-Stack parity: **1/119 = 0.84%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
-Global upstream parity: **1/126 = 0.79%** [all adapter families].
-Stage 1 / global weighted parity: 1.16% / 1.08% (2/172, 2/186).
-Stage 1 / global scenarios: 141/550 = 25.64% and 141/550 = 25.64% [9/16 unmeasured rows].
-Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 51, IN_PROGRESS 50, PARTIAL 8, VERIFIED 1 (126 total).
-Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, CONVERTER-019, DRIFT-001, EVID-004, HA-001, HA-003 (+31 more)
-Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 1/113, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/6
+Discovered: 127 eligible behaviors; 16 unmeasured rows.
+Stage 1 Z-Stack parity: **1/120 = 0.83%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
+Global upstream parity: **1/127 = 0.79%** [all adapter families].
+Stage 1 / global weighted parity: 1.16% / 1.07% (2/173, 2/187).
+Stage 1 / global scenarios: 143/553 = 25.86% and 143/553 = 25.86% [9/16 unmeasured rows].
+Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 51, IN_PROGRESS 51, PARTIAL 8, VERIFIED 1 (127 total).
+Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, CONVERTER-019, DRIFT-001, EVID-004, HA-001, HA-003 (+32 more)
+Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 1/114, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/6
 Inventory audit: incomplete; no substantiated domain fraction, catalog total or converter denominator.
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).
