@@ -48,7 +48,7 @@ $ cargo zigbuild --release --locked --target aarch64-unknown-linux-musl
 $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigbee2mqtt-rs
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
-binary sha256: a18be84ddc3e2e7cd076712d942643461ee2ca49d1f7333b247d40608075c5fe (5746664 bytes)
+binary sha256: 1d812e5412ab231aa1d4e4263da452f135a8efa7d5a023e7e0e38242f72b68fc (5748488 bytes)
 archive sha256: e4316ec72d426526452c121d7c5ba61f5a5ea549a6d9934a6f7542e9879a8afa (5681129 bytes)
 manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=44bf91f..., rustc 1.99.1
 
@@ -70,10 +70,10 @@ $ scripts/build-openwrt-ipk.sh /tmp/opencode/sdk/openwrt-sdk-24.10.8-...
 $ make defconfig
 $ make package/zigbee2mqtt-rs/compile
 ipk OK: zigbee2mqtt-rs 0.1.0-r1 (aarch64_cortex-a53);
-        installed 12175360 B, data 5708952 B, binary 5745161 B, web 6266677 B
+        installed 12175360 B, data 5712977 B, binary 5746985 B, web 6266677 B
 ipk:   dist/zigbee2mqtt-rs_0.1.0-r1_aarch64_cortex-a53.ipk
-sha256: 250cf601e143e613f85943ff16437159de5120b6fb46d9fb132cb5a67420dfd5
-bytes:  5688162
+sha256: 4f71a4f6d68f3bf385938461ab71058c6eac7d987c83bfa8ed6fbb281183522b
+bytes:  5695423
 ```
 
 Control metadata: `Package: zigbee2mqtt-rs`, `Version: 0.1.0-r1`,
@@ -94,7 +94,7 @@ The binary inside the `.ipk` is **not byte-identical** to
 (5 475 952 → 5 474 449 bytes, no section headers). That is expected and is
 recorded here so the hash difference is not mistaken for a different build.
 Re-running the SDK build a second time produced the **same** `.ipk` SHA-256
-(`250cf601…`), i.e. packaging is reproducible with the pinned SDK fed by the same
+(`4f71a4f6…`), i.e. packaging is reproducible with the pinned SDK fed by the same
 binary and frontend assets.
 
 `scripts/check_ipk.py` validates the outer/inner layout, control fields,
@@ -112,7 +112,7 @@ tag releases. **That job has not run yet.**
   avoided by zig's linker.
 - The GitHub Actions workflow itself still has not run; the same zigbuild +
   packaging steps were executed locally instead.
-- **Real binary is 5 746 664 bytes** (rustc 1.99.1, `opt-level=z`, LTO, strip),
+- **Real binary is 5 748 488 bytes** (rustc 1.99.1, `opt-level=z`, LTO, strip),
   much larger than the previously committed 1 775 456-byte binary (which
   predated the Boa converter host). The installed size is **12 165 120 B**
   including 6.27 MB of frontend assets; the router's overlay was **5.6 MB free**

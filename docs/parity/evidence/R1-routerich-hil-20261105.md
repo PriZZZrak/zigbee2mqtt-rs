@@ -65,9 +65,10 @@ Working:
 Partial / failing:
 
 - Tuya `TH01Z` sensor publishes only `max_temperature`, `linkquality`,
-  `last_seen`; `temperature`/`humidity`/`battery` are missing and each report
-  logs `Error parsing attribute 0x0000: unsupported attribute type Invalid`.
-  The legacy Nous/Tuya frame path is not fully decoded.
+  `last_seen`; `temperature`/`humidity`/`battery` are missing. The legacy
+  Nous/Tuya frame path is not fully decoded. (The `unsupported attribute type
+  Invalid` warning was **not** from this sensor: it came from the Lytko
+  thermostats' `seMetering` uint48 report and is fixed.)
 - Lytko definitions are `source: generated` and `supported=false` (10 generated
   exposes) because user `external_converters/L101Ze_z2m.js` is not loaded. Native
   state conversion works, but the frontend/HA definition payload does not match.
@@ -101,6 +102,12 @@ Partial / failing:
    `zigbee_herdsman.version` and `os.node_version`. The bridge now publishes the
    full upstream-shaped config (raw YAML merged with runtime values and upstream
    defaults) plus the version fields; see FRONTEND-004.
+7. **ZCL 40/48/56/64-bit types**: the Lytko thermostats report `seMetering`
+   `currentSummationDelivered` (0x0000) as **uint48 (0x25)**. The attribute
+   parser only knew up to 32-bit types, logged `unsupported attribute type
+   Invalid` every report and dropped `energy`. Added 0x1A/0x1B bitmap and
+   0x24..0x27 / 0x2C..0x2F integer types; the thermostats now publish
+   `energy_l1`/`energy_l2` (e.g. 0.032/0.005 kWh) and the warning is gone.
 
 A defensive decision was added: when the adapter backup matches the network but
 the alternate-key descriptor is missing/different, the bridge resumes with a

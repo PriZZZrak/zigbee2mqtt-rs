@@ -12,14 +12,24 @@ pub enum DataType {
     Boolean = 0x10,
     Bitmap8 = 0x18,
     Bitmap16 = 0x19,
+    Bitmap32 = 0x1A,
+    Bitmap64 = 0x1B,
     Uint8 = 0x20,
     Uint16 = 0x21,
     Uint24 = 0x22,
     Uint32 = 0x23,
+    Uint40 = 0x24,
+    Uint48 = 0x25,
+    Uint56 = 0x26,
+    Uint64 = 0x27,
     Int8 = 0x28,
     Int16 = 0x29,
     Int24 = 0x2A,
     Int32 = 0x2B,
+    Int40 = 0x2C,
+    Int48 = 0x2D,
+    Int56 = 0x2E,
+    Int64 = 0x2F,
     Enum8 = 0x30,
     Enum16 = 0x31,
     SemiFloat = 0x38,
@@ -44,14 +54,24 @@ impl DataType {
             0x10 => Self::Boolean,
             0x18 => Self::Bitmap8,
             0x19 => Self::Bitmap16,
+            0x1A => Self::Bitmap32,
+            0x1B => Self::Bitmap64,
             0x20 => Self::Uint8,
             0x21 => Self::Uint16,
             0x22 => Self::Uint24,
             0x23 => Self::Uint32,
+            0x24 => Self::Uint40,
+            0x25 => Self::Uint48,
+            0x26 => Self::Uint56,
+            0x27 => Self::Uint64,
             0x28 => Self::Int8,
             0x29 => Self::Int16,
             0x2A => Self::Int24,
             0x2B => Self::Int32,
+            0x2C => Self::Int40,
+            0x2D => Self::Int48,
+            0x2E => Self::Int56,
+            0x2F => Self::Int64,
             0x30 => Self::Enum8,
             0x31 => Self::Enum16,
             0x38 => Self::SemiFloat,
@@ -83,8 +103,11 @@ impl DataType {
             | Self::Data16
             | Self::SemiFloat => Some(2),
             Self::Uint24 | Self::Int24 | Self::Data24 => Some(3),
-            Self::Uint32 | Self::Int32 | Self::Data32 | Self::Float => Some(4),
-            Self::Double => Some(8),
+            Self::Uint32 | Self::Int32 | Self::Data32 | Self::Float | Self::Bitmap32 => Some(4),
+            Self::Uint40 | Self::Int40 => Some(5),
+            Self::Uint48 | Self::Int48 => Some(6),
+            Self::Uint56 | Self::Int56 => Some(7),
+            Self::Uint64 | Self::Int64 | Self::Double | Self::Bitmap64 => Some(8),
             _ => None,
         }
     }
@@ -97,10 +120,12 @@ pub enum AttributeValue {
     U16(u16),
     U24(u32),
     U32(u32),
+    U64(u64),
     I8(i8),
     I16(i16),
     I24(i32),
     I32(i32),
+    I64(i64),
     Float(f32),
     Str(String),
     Bytes,
@@ -154,7 +179,7 @@ impl AttributeValue {
                 let v = i32::from_le_bytes([buf[0], buf[1], buf[2], sign_ext]);
                 Ok((Self::I24(v), 3))
             }
-            DataType::Uint32 | DataType::Data32 => {
+            DataType::Uint32 | DataType::Data32 | DataType::Bitmap32 => {
                 if buf.len() < 4 {
                     return Err(Error::Zcl("truncated u32".into()));
                 }
@@ -162,6 +187,30 @@ impl AttributeValue {
                     Self::U32(u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]])),
                     4,
                 ))
+            }
+            DataType::Uint40
+            | DataType::Uint48
+            | DataType::Uint56
+            | DataType::Uint64
+            | DataType::Bitmap64 => {
+                let len = data_type.fixed_len().expect("fixed unsigned width");
+                if buf.len() < len {
+                    return Err(Error::Zcl(format!("truncated u{len}0")));
+                }
+                let mut bytes = [0u8; 8];
+                bytes[..len].copy_from_slice(&buf[..len]);
+                Ok((Self::U64(u64::from_le_bytes(bytes)), len))
+            }
+            DataType::Int40 | DataType::Int48 | DataType::Int56 | DataType::Int64 => {
+                let len = data_type.fixed_len().expect("fixed signed width");
+                if buf.len() < len {
+                    return Err(Error::Zcl(format!("truncated i{len}0")));
+                }
+                let mut bytes = [0u8; 8];
+                bytes[..len].copy_from_slice(&buf[..len]);
+                let shift = 64 - len * 8;
+                let value = (i64::from_le_bytes(bytes) << shift) >> shift;
+                Ok((Self::I64(value), len))
             }
             DataType::Int16 => {
                 if buf.len() < 2 {
@@ -254,10 +303,12 @@ impl AttributeValue {
             Self::U16(v) => Some(*v as f64),
             Self::U24(v) => Some(*v as f64),
             Self::U32(v) => Some(*v as f64),
+            Self::U64(v) => Some(*v as f64),
             Self::I8(v) => Some(*v as f64),
             Self::I16(v) => Some(*v as f64),
             Self::I24(v) => Some(*v as f64),
             Self::I32(v) => Some(*v as f64),
+            Self::I64(v) => Some(*v as f64),
             Self::Float(v) => Some(*v as f64),
             Self::Bool(v) => Some(if *v { 1.0 } else { 0.0 }),
             _ => None,
@@ -306,6 +357,24 @@ impl AttributeReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_48_bit_unsigned_and_signed_values() {
+        let (value, consumed) =
+            AttributeValue::parse(DataType::Uint48, &[0x20, 0, 0, 0, 0, 0]).unwrap();
+        assert_eq!(consumed, 6);
+        assert_eq!(value.as_f64(), Some(32.0));
+
+        let (value, consumed) =
+            AttributeValue::parse(DataType::Int48, &[0xfe, 0xff, 0xff, 0xff, 0xff, 0xff]).unwrap();
+        assert_eq!(consumed, 6);
+        assert_eq!(value.as_f64(), Some(-2.0));
+
+        assert_eq!(DataType::from_u8(0x25), DataType::Uint48);
+        assert_eq!(DataType::from_u8(0x2d), DataType::Int48);
+        assert_eq!(DataType::Uint48.fixed_len(), Some(6));
+        assert_eq!(DataType::Int64.fixed_len(), Some(8));
+    }
 
     #[test]
     fn parse_bool_true() {

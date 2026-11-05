@@ -30,9 +30,9 @@ R1 — явно ограниченный релиз для проверенно�
 
 ## Состояние выполнения
 
-- **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 746 664 B,
-  sha256 `a18be84d…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
-  (5 688 162 B, sha256 `250cf601…`, installed 12 175 360 B с app-resolved Windfront 2.15.0,
+- **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 748 488 B,
+  sha256 `1d812e54…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
+  (5 695 423 B, sha256 `4f71a4f6…`, installed 12 175 360 B с app-resolved Windfront 2.15.0,
   `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
@@ -110,8 +110,11 @@ R1 — явно ограниченный релиз для проверенно�
   **возобновлена без перезаписи NV**. Найдены и исправлены 4 HIL-бага:
   aligned 116-байтный NIB, raw `PRECFGKEY`, деструктивный fallback при
   неизвестной стратегии и сдвиг IEEE координатора; из упаковки убран
-  несуществующий в фидах `mosquitto-client`. Остаются: полное декодирование
-  Tuya TH01Z (сейчас только `max_temperature` + `unsupported attribute type`),
+  несуществующий в фидах `mosquitto-client`, и добавлены ZCL-типы
+  bitmap32/64 + uint/int 40/48/56/64: Lytko `seMetering` использует uint48,
+  из-за чего терялся `energy` и сыпался `unsupported attribute type`; теперь
+  публикуются `energy_l1/l2`. Остаются: полное декодирование
+  Tuya TH01Z (сейчас только `max_temperature`),
   загрузка пользовательских external converters (Lytko definitions →
   `generated`/`supported=false`), очистка старых retained IEEE-топиков,
   restart/power-loss и живой HA. Отчёт:

@@ -2145,6 +2145,11 @@ impl Bridge {
             .get_by_nwk(src_addr)
             .and_then(|d| d.arrow_hold_direction.clone());
 
+        debug!(
+            "incoming ZCL: nwk=0x{src_addr:04X} ep={src_ep} cluster=0x{cluster_id:04X} data={}",
+            hex::encode(&data)
+        );
+
         // Native parse and upstream definition conversion run for
         // the same frame; their values are merged once and published
         // once, with the device definition taking precedence.
@@ -4104,10 +4109,12 @@ fn attribute_json(
         V::U16(n) => Some(json!(*n)),
         V::U24(n) => Some(json!(*n)),
         V::U32(n) => Some(json!(*n)),
+        V::U64(n) => Some(json!(*n)),
         V::I8(n) => Some(json!(*n)),
         V::I16(n) => Some(json!(*n)),
         V::I24(n) => Some(json!(*n)),
         V::I32(n) => Some(json!(*n)),
+        V::I64(n) => Some(json!(*n)),
         V::Float(f) => Some(json!(*f as f64)),
         V::Str(s) => Some(serde_json::Value::String(s.clone())),
         V::Bytes | V::Invalid => None,
