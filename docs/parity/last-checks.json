@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "447 library + 2 binary + 30 compatibility = 479 passed, 0 failed"
+      "result": "448 library + 2 binary + 30 compatibility = 480 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -30,7 +30,7 @@
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
       "exit": 0,
-      "result": "static aarch64 ELF built from the current tree (sha256 d6e38d4d..., binary-only deploy; .ipk not rebuilt at user request)"
+      "result": "static aarch64 ELF built from the current tree (sha256 5159fa97..., binary-only deploy; .ipk not rebuilt at user request)"
     },
     {
       "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",

@@ -120,6 +120,12 @@ R1 — явно ограниченный релиз для проверенно�
   дважды; исправлено на `try_private true` (бэкап
   `/root/z2mback/mosquitto.conf.20261105T210942Z`), проверено: проба приходит
   один раз, мост к HA и MQTT-подключение z2m восстанавливаются.
+- **Tuya datapoint commands**: `manuSpecificTuya.dataRequest/sendData`
+  (`dpValues`, тип 1011) теперь кодируются (`seq:u16LE` + записи
+  `dp/datatype/len:u16BE/data`); HIL-команды `temperature_unit_convert`
+  (Nous/TH01Z) больше не отбрасываются с `ZCL type 0x03F3 needs command
+  context`. Полное декодирование TH01Z (`temperature`/`humidity`) остаётся
+  отдельной проблемой.
 - **UI-итерации без пересборки `.ipk`**: по просьбе пользователя после
   HIL-прогона обновляется только aarch64-бинарник (scp → `/usr/bin` → restart),
   `.ipk`/tarball не пересобираются. Поэтому установленный бинарник новее

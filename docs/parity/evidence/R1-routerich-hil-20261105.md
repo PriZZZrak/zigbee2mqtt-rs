@@ -109,6 +109,14 @@ Partial / failing:
    `zigbee_herdsman.version` and `os.node_version`. The bridge now publishes the
    full upstream-shaped config (raw YAML merged with runtime values and upstream
    defaults) plus the version fields; see FRONTEND-004.
+10. **Tuya datapoint commands were rejected by the ZCL encoder**: setting
+    `temperature_unit_convert` on the Nous/TH01Z sensor calls
+    `sendDataPointEnum` -> `manuSpecificTuya.dataRequest` with the custom
+    `dpValues` type (1011). The encoder logged `ZCL type 0x03F3 needs command
+    context` and dropped the command. Added the Tuya datapoint encoder
+    (`seq:u16LE, dp:u8, datatype:u8, length:u16BE, data`) for
+    `dataRequest`/`sendData`; HIL: fahrenheit/celsius commands are now sent
+    without the warning.
 9. **External converter save timed out / did not load**: `converter/save` had
    no handler and external converters were never loaded. Implemented
    save/remove/load, retained `bridge/converters`, external registry precedence

@@ -47,6 +47,50 @@ pub fn encode_command_op(
     command: u8,
     payload: &Value,
 ) -> Result<Vec<u8>, String> {
+    // Tuya `manuSpecificTuya` dataRequest/sendData carry
+    // `seq:u16` followed by concatenated datapoints; the `dpValues`
+    // parameter is `LIST_TUYA_DATAPOINT_VALUES` (1011), a custom type that
+    // needs this command context. Each datapoint is
+    // `dp:u8, datatype:u8, length:u16BE, data`.
+    if cluster == 0xEF00 && matches!(command, 0x00 | 0x04) {
+        if let Some(dp_values) = payload.get("dpValues").and_then(Value::as_array) {
+            let seq = payload.get("seq").and_then(Value::as_u64).unwrap_or(0) as u16;
+            let mut encoded = Vec::new();
+            encoded.extend_from_slice(&seq.to_le_bytes());
+            for dp_value in dp_values {
+                let dp = dp_value
+                    .get("dp")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u8::try_from(value).ok())
+                    .ok_or_else(|| "Tuya datapoint is missing a valid 'dp'".to_string())?;
+                let datatype = dp_value
+                    .get("datatype")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u8::try_from(value).ok())
+                    .ok_or_else(|| "Tuya datapoint is missing a valid 'datatype'".to_string())?;
+                let data: Vec<u8> = dp_value
+                    .get("data")
+                    .and_then(Value::as_array)
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(Value::as_u64)
+                            .map(|value| value as u8)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                if data.len() > u16::MAX as usize {
+                    return Err("Tuya datapoint payload is too large".into());
+                }
+                encoded.push(dp);
+                encoded.push(datatype);
+                encoded.push((data.len() >> 8) as u8);
+                encoded.push(data.len() as u8);
+                encoded.extend_from_slice(&data);
+            }
+            return Ok(encoded);
+        }
+    }
     let info = types.command(cluster, command).ok_or_else(|| {
         format!("no ZCL command metadata for command 0x{command:02X} (cluster 0x{cluster:04X})")
     })?;
@@ -153,4 +197,26 @@ pub fn encode_read_frame(
 #[must_use]
 pub fn global_frame(sequence: u8, command: u8) -> Vec<u8> {
     ZclFrameHeader::encode_global(sequence, command)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tuya_datapoint_command_encodes_seq_and_records() {
+        let types = ZclTypesFile::default();
+        let payload = serde_json::json!({
+            "seq": 0x1234u64,
+            "dpValues": [
+                {"dp": 2, "datatype": 4, "data": [1]},
+                {"dp": 7, "datatype": 0, "data": [0xaa, 0xbb]},
+            ],
+        });
+        let encoded = encode_command_op(&types, 0xEF00, 0x00, &payload).unwrap();
+        assert_eq!(
+            encoded,
+            vec![0x34, 0x12, 0x02, 0x04, 0x00, 0x01, 0x01, 0x07, 0x00, 0x00, 0x02, 0xaa, 0xbb]
+        );
+    }
 }
