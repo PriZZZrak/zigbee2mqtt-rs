@@ -105,7 +105,16 @@ non-aarch64/dynamic-interpreter/missing-mosquitto paths (9 tests).
 pinned Windfront npm package, builds and validates the `.ipk`, and attaches it to
 tag releases. **That job has not run yet.**
 
-## Gaps (not verified)
+## Binary-only updates after the packaged build
+
+Per user request, the HIL iteration after the packaged build deployed newer
+aarch64 binaries directly to `/usr/bin` (config_schema, ZCL widths, UI data
+contract) without rebuilding the `.ipk`/tarball. The hashes above describe the
+**last packaged build**, not the currently running binary. Re-run
+`scripts/build-openwrt-ipk.sh` and `scripts/build-openwrt-artifact.sh` before any
+release.
+
+## Gaps (not verified)## Gaps (not verified)
 
 - The artifact is now built from the current SHA with `cargo zigbuild` (zig
   0.13.0 is available). Original GNU-`ld` failure (`--fix-cortex-a53-843419`) is

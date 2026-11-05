@@ -103,6 +103,11 @@ R1 — явно ограниченный релиз для проверенно�
   ranges и encodings; absolute `frontend.host` поднимает unix socket (общий
   HTTP/WS handler, тест с `UnixStream`). Остаются TLS, Node WS differential,
   fragmentation, live broker/HA и HIL.
+- **UI-итерации без пересборки `.ipk`**: по просьбе пользователя после
+  HIL-прогона обновляется только aarch64-бинарник (scp → `/usr/bin` → restart),
+  `.ipk`/tarball не пересобираются. Поэтому установленный бинарник новее
+  последнего упакованного `.ipk`; перед выпуском нужен обязательный
+  `scripts/build-openwrt-ipk.sh`.
 - **R1 HIL — первый прогон на железе (2026-11-05, `R1-001`)**: реальный
   Routerich AX3000 v1 (54.3 МБ overlay, 5.6 МБ свободно) + Dongle-P. Node-версия
   временно удалена (бэкап `/etc/zigbee2mqtt` снят и скачан), `.ipk`
@@ -114,7 +119,9 @@ R1 — явно ограниченный релиз для проверенно�
   bitmap32/64 + uint/int 40/48/56/64: Lytko `seMetering` использует uint48,
   из-за чего терялся `energy` и сыпался `unsupported attribute type`; теперь
   публикуются `energy_l1/l2`. Остаются: полное декодирование
-  Tuya TH01Z (сейчас только `max_temperature`),
+  Tuya TH01Z (сейчас только `max_temperature`), полная upstream-схема
+  настроек (сейчас публикуется собственная минимальная `config_schema`,
+  закрывающая падения HomePage/About/Settings),
   загрузка пользовательских external converters (Lytko definitions →
   `generated`/`supported=false`), очистка старых retained IEEE-топиков,
   restart/power-loss и живой HA. Отчёт:

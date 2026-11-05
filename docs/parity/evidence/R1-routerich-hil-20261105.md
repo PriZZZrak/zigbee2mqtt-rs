@@ -102,6 +102,10 @@ Partial / failing:
    `zigbee_herdsman.version` and `os.node_version`. The bridge now publishes the
    full upstream-shaped config (raw YAML merged with runtime values and upstream
    defaults) plus the version fields; see FRONTEND-004.
+8. **Missing `config_schema`**: the Settings pages crashed on
+   `config_schema.properties`. The bridge now publishes a hand-written
+   compatibility schema (root sections plus device/group definitions); see
+   FRONTEND-004.
 7. **ZCL 40/48/56/64-bit types**: the Lytko thermostats report `seMetering`
    `currentSummationDelivered` (0x0000) as **uint48 (0x25)**. The attribute
    parser only knew up to 32-bit types, logged `unsupported attribute type

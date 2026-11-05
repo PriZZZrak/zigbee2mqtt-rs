@@ -167,6 +167,26 @@ def normalize_info(info: dict) -> dict:
             ),
             "ota_object": isinstance(config.get("ota"), dict),
         },
+        "config_schema_shape": {
+            "has_properties": isinstance(
+                (info.get("config_schema") or {}).get("properties"), dict
+            ),
+            "has_definitions": isinstance(
+                (info.get("config_schema") or {}).get("definitions"), dict
+            ),
+            "device_properties": isinstance(
+                (((info.get("config_schema") or {}).get("definitions") or {}).get("device") or {}).get(
+                    "properties"
+                ),
+                dict,
+            ),
+            "group_properties": isinstance(
+                (((info.get("config_schema") or {}).get("definitions") or {}).get("group") or {}).get(
+                    "properties"
+                ),
+                dict,
+            ),
+        },
         "has_version": isinstance(info.get("version"), str) and bool(info.get("version")),
         "has_commit": isinstance(info.get("commit"), str) and bool(info.get("commit")),
     }

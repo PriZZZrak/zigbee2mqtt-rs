@@ -1422,6 +1422,7 @@ impl Bridge {
             "permit_join": self.cfg.permit_join,
             "restart_required": false,
             "config": config,
+            "config_schema": crate::config_schema::config_schema(),
             "zigbee_herdsman": {"version": HERDSMAN_COMPAT_VERSION},
         });
         if let Some(version) = self.external.package_version() {

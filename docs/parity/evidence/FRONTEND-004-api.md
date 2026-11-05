@@ -153,7 +153,25 @@ The API differential now asserts the shape of these fields
 (`config_ui_shape`), so a missing `availability`/`last_seen`/`homeassistant`
 object or version field fails CI instead of only crashing the browser.
 
-## Generated definitions
+## Settings schema (`config_schema`)
+
+The settings pages dereference `bridge/info.config_schema.properties` and
+`config_schema.definitions.device/group.properties`. The field was absent, so
+`SettingsList-DXaUDCbO.js` crashed with `Cannot read properties of undefined
+(reading 'properties')`.
+
+The bridge now publishes an independently authored compatibility schema
+(`src/config_schema.rs`, not a copy of upstream's GPL document): root
+sections (`permit_join`, `mqtt`, `serial`, `frontend`, `homeassistant`,
+`availability`, `health`, `ota`, `advanced`, `blocklist`, `passlist`), nested
+`availability.active/passive`, and `definitions.device/group` for the per-device
+and per-group settings pages. Leaves use the types the Windfront renderer
+supports (`boolean`, `integer`, `string`, `array`). The API differential asserts
+the schema's shape, so a missing `properties`/`definitions` object fails CI.
+Exact upstream settings parity (all options, widgets and descriptions) remains a
+separate inventory item.
+
+## Generated definitions## Generated definitions
 
 Seven dump devices have upstream **generated** definitions
 (`zhc.findByDevice(..., true)` → `generateDefinition`). Rust now generates them
