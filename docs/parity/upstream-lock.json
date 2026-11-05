@@ -33,12 +33,12 @@
   "latest_heads": {
     "zigbee2mqtt": "3c841fdfd66c92239921ef84fde8f039c64e1662",
     "zigbee-herdsman": "eb80ba1f1cb339071b0557fabd18fa856d4ce36a",
-    "zigbee-herdsman-converters": "367100282578111770f1c8ab0e38805d9ec581d0",
+    "zigbee-herdsman-converters": "1e18d5002118828de8e4b136e022e22ac791afcd",
     "zigbee2mqtt-windfront": "b32226926e4dce8c68861b737d7c4fb06a6cf276",
-    "zigbee2mqtt.io": "14acd6165880130fa3c1608aab74cb5f38b2547a"
+    "zigbee2mqtt.io": "2421451eeaa9fa1ca9de55691586a855fdf713c3"
   },
-  "last_successful_fetch_utc": "2026-11-04T09:08:33.742736+00:00",
-  "last_checked_utc": "2026-11-04T09:08:33.742736+00:00",
+  "last_successful_fetch_utc": "2026-11-05T09:17:20+00:00",
+  "last_checked_utc": "2026-11-05T09:17:20+00:00",
   "freshness_status": "DRIFT_DETECTED",
   "baseline_approved_at_utc": null,
   "baseline_validation_status": "BLOCKED_FRONTEND_MISMATCH",
@@ -64,10 +64,26 @@
     "package_to_git_content_equivalence": "UNVERIFIED; tag versions inspected, package tarballs not executed"
   },
   "repository_checks": {
-    "zigbee2mqtt": {"checked_utc": "2026-11-04T09:06:04.251728+00:00", "fetch_exit": 0, "default_branch": "master"},
-    "zigbee-herdsman": {"checked_utc": "2026-11-04T09:06:05.512035+00:00", "fetch_exit": 0, "default_branch": "master"},
-    "zigbee-herdsman-converters": {"checked_utc": "2026-11-04T09:06:06.999710+00:00", "fetch_exit": 0, "default_branch": "master"},
-    "zigbee2mqtt-windfront": {"checked_utc": "2026-11-04T09:06:03.828297+00:00", "fetch_exit": 0, "default_branch": "main"},
+    "zigbee2mqtt": {
+      "checked_utc": "2026-11-04T09:06:04.251728+00:00",
+      "fetch_exit": 0,
+      "default_branch": "master"
+    },
+    "zigbee-herdsman": {
+      "checked_utc": "2026-11-04T09:06:05.512035+00:00",
+      "fetch_exit": 0,
+      "default_branch": "master"
+    },
+    "zigbee-herdsman-converters": {
+      "checked_utc": "2026-11-04T09:06:06.999710+00:00",
+      "fetch_exit": 0,
+      "default_branch": "master"
+    },
+    "zigbee2mqtt-windfront": {
+      "checked_utc": "2026-11-04T09:06:03.828297+00:00",
+      "fetch_exit": 0,
+      "default_branch": "main"
+    },
     "zigbee2mqtt.io": {
       "checked_utc": "2026-11-04T09:08:33.742736+00:00",
       "fetch_exit": 0,

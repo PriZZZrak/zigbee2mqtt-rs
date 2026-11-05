@@ -1,5 +1,22 @@
 # Upstream Changes
 
+## 2026-11-05T09:17:20+00:00 — 24h drift check (converters + docs)
+
+Baseline unchanged: app `344b6e03b43644c97154a72ca9eae17193c553a2`,
+herdsman `3cb89ad906bd9b2de8b3dfed20d5a21070a467d2`, converters
+`9dabbe4e343573c5a3070605efd843a1b3a16058`. Fetch succeeded for all five
+repositories; working trees remained clean. **DRIFT_DETECTED** (pending review
+below; baseline not advanced).
+
+| Delta | Old → final head | Impact and disposition |
+|---|---|---|
+| APP-20261105 | [344b6e03…3c841fdf](https://github.com/Koenkk/zigbee2mqtt/compare/344b6e03b43644c97154a72ca9eae17193c553a2...3c841fdfd66c92239921ef84fde8f039c64e1662) | Latest head unchanged since the 2026-11-04 check. No new review required. |
+| HERDSMAN-20261105 | [3cb89ad9…eb80ba1f](https://github.com/Koenkk/zigbee-herdsman/compare/3cb89ad906bd9b2de8b3dfed20d5a21070a467d2...eb80ba1f1cb339071b0557fabd18fa856d4ce36a) | Latest head unchanged; prior behavioral review remains pending. |
+| CONVERTERS-20261105 | [36710028…1e18d50](https://github.com/Koenkk/zigbee-herdsman-converters/compare/367100282578111770f1c8ab0e38805d9ec581d0...1e18d5002118828de8e4b136e022e22ac791afcd) | Release 26.127.0: device additions (ZMD-208-2, SFD02-Z, H2-ZB-SW-V1), Heiman M1P-E radar-learning reset, Tuya TS0005 countdown, Moes `_TZE204_rtrmfadk` preset fix, `_TZE284_fzo2pocs` detection. Catalog/converters remain untriaged; no baseline move. |
+| UI-20261105 | [b3222692…b3222692](https://github.com/Nerivec/zigbee2mqtt-windfront/compare/b32226926e4dce8c68861b737d7c4fb06a6cf276...b32226926e4dce8c68861b737d7c4fb06a6cf276) | Latest head unchanged. |
+| DOCS-20261105 | [14acd616…2421451e](https://github.com/Koenkk/zigbee2mqtt.io/compare/14acd6165880130fa3c1608aab74cb5f38b2547a...2421451eeaa9fa1ca9de55691586a855fdf713c3) | 16 dependency bumps plus CI/build experiments and one device picture. No Rust-contract change identified; generated catalog review still open. |
+
+
 ## 2026-11-04T09:08:33.742736+00:00 — planning audit refresh
 
 Baseline remains app `344b6e03b43644c97154a72ca9eae17193c553a2`, herdsman

@@ -17,7 +17,7 @@ percentage without changing tested Rust behavior or deleting historical
 <!-- BEGIN GENERATED PARITY DASHBOARD -->
 Compatibility baseline: zigbee2mqtt `344b6e03b43644c97154a72ca9eae17193c553a2` (2.14.2) + herdsman `3cb89ad906bd9b2de8b3dfed20d5a21070a467d2` (10.10.0) + converters `9dabbe4e343573c5a3070605efd843a1b3a16058` (26.115.1).
 Frontend baseline: **BLOCKED** — the app resolves Windfront 2.15.0; the historical lock pins 2.15.1. See upstream-lock.json.
-Latest upstream: app `3c841fdfd66c`, herdsman `eb80ba1f1cb3`, converters `367100282578`, Windfront `b32226926e4d`, documentation `14acd6165880` (checked 2026-11-04T09:08:33.742736+00:00).
+Latest upstream: app `3c841fdfd66c`, herdsman `eb80ba1f1cb3`, converters `1e18d5002118`, Windfront `b32226926e4d`, documentation `2421451eeaa9` (checked 2026-11-05T09:17:20+00:00).
 Freshness: **DRIFT_DETECTED**
 Discovered: 124 eligible behaviors; 16 unmeasured rows.
 Stage 1 Z-Stack parity: **1/117 = 0.85%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
