@@ -1,0 +1,17 @@
+homeassistant:
+  enabled: false
+permit_join: false
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://127.0.0.1:1883
+serial:
+  port: /dev/ttyACM0
+  adapter: zstack
+devices:
+  "0x000b57fffec6a5b2":
+    friendly_name: bulb
+    retain: true
+  "0x00158d0001a2b3c4":
+    friendly_name: sensor
+advanced:
+  last_seen: ISO_8601

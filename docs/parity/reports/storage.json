@@ -1,0 +1,60 @@
+{
+  "status": "PASS",
+  "passed": 3,
+  "failed": 0,
+  "database": {
+    "path": "docs/parity/evidence/storage/fixtures/upstream-database.db",
+    "sha256": "2992508c902be2967de09695befb44a2487fa04b3387ad782b5f0ccabbfbb2e0"
+  },
+  "config": {
+    "path": "docs/parity/evidence/storage/fixtures/configuration.yaml",
+    "sha256": "0fd8854e7df0d2daf50ea2de87e0d99ff8587d7192c91fcb840a12098c1f90ac"
+  },
+  "pins": [
+    {
+      "source": "zigbee2mqtt",
+      "expected": "344b6e03b43644c97154a72ca9eae17193c553a2",
+      "actual": "344b6e03b43644c97154a72ca9eae17193c553a2",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "zigbee-herdsman",
+      "expected": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
+      "actual": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "zigbee-herdsman-converters",
+      "expected": "9dabbe4e343573c5a3070605efd843a1b3a16058",
+      "actual": "9dabbe4e343573c5a3070605efd843a1b3a16058",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "frontend",
+      "expected": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
+      "actual": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
+      "status": "MATCH",
+      "reason": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "import-upstream-database",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "rewrite-preserves-reference-view",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "rewritten-database-import",
+      "status": "PASS",
+      "mismatches": []
+    }
+  ]
+}

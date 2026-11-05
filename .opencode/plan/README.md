@@ -37,6 +37,11 @@ R1 — явно ограниченный релиз для проверенно�
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
   free-space/RAM бюджет и HIL не проверены.
+- **STORAGE differential частично**: upstream `Database.write()` фикстура +
+  z2m-style config; Rust import/rewrite сравнивается с pinned herdsman
+  (`import`, `rewrite-preserves`, `rewritten-import`) — 3/3 PASS, пины MATCH.
+  Сравниваются identity/endpoints/interview/swBuildId и friendly names; clusters/
+  binds/reportings/meta, группы, backup/crash и HIL — нет.
 - **EVID-04 частично**: **6 реальных differential-фикстур** (SNZB-02 x3,
   TS0002 multi-endpoint, Tuya TRV report + convertSet) Node-vs-Rust проходят на
   **app-resolved herdsman 10.10.0**, все 4 пина MATCH. Нет MQTT/ZCL-wire/storage/
