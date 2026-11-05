@@ -40,10 +40,11 @@ Behavior: FRONTEND-005; related FRONTEND-001/004, EVID-004.
   successful publish (`connect_with_events`, used only when the frontend is
   enabled). The server keeps its own retained map and fans frames out to
   clients; retained replay + device states happen on connect.
-- Client messages are published to `<base>/<topic>` through the same bridge
-  client; the bridge event loop (subscribed to `<base>/#`) handles them. This is
-  the Rust equivalent of upstream's direct `mqtt.onMessage` call, but it
-  requires a broker echo (production path).
+- Client messages are parsed by the same `commands_from_publish` helper as MQTT
+  input and queued directly into the bridge event loop (`dispatch_frontend_message`),
+  matching upstream's direct `mqtt.onMessage` call. No broker round-trip and no
+  echo of the command topic. Only recognized device commands / bridge requests
+  are accepted; unknown topics are logged and ignored.
 - Static: index, content types, `.br`/`.gz` selection, `Vary: Accept-Encoding`,
   `no-store` for HTML, and the exact `srvx` 404 HTML/headers.
 
@@ -53,8 +54,8 @@ Rust integration tests (`src/frontend/mod.rs` tests):
 
 - `websocket_auth_replay_forwarding_and_static_files`: wrong token closes 4401;
   authorized connect replays `bridge/state` and the `bulb` device state; a
-  client text frame is published as `zigbee2mqtt/bridge/request/test`; `GET /`
-  serves the file.
+  client `bulb/set` frame reaches the bridge command queue as `SetDevice`
+  **without** a broker publish; `GET /` serves the file.
 - `base_url_redirects_without_trailing_slash`: `/z2m` → 301 `/z2m/`.
 - `frontend::ws` tests: SHA-1 vectors, RFC 6455 accept key, base64, masked frame
   decode, oversized-frame rejection, frame round-trip.
@@ -71,8 +72,8 @@ Rust integration tests (`src/frontend/mod.rs` tests):
   host the real `ws` server in this environment (`WebSocket.Server` CJS interop
   fails); attempts are recorded in the task log. The auth/close-code contract is
   asserted by our integration test and cited from source.
-- Message forwarding requires a broker echo and is not exercised against a live
-  broker/HA; a queued direct dispatch path is the next refinement.
+- Direct dispatch covers command/bridge-request topics only (as upstream); it is
+  not exercised against a live broker/HA.
 - TLS (`ssl_key`/`ssl_cert`), unix sockets, websocket fragmentation, cache
   validators, and full `srvx` header parity are not implemented.
 - No browser/HA/HIL verification.

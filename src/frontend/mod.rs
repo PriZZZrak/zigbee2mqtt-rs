@@ -182,12 +182,10 @@ pub async fn serve_on(
         let retained = Arc::clone(&retained);
         let frames = frames.subscribe();
         let devices = Arc::clone(&devices);
-        let base_topic = base_topic.clone();
         let mqtt = mqtt.clone();
         tokio::spawn(async move {
             if let Err(error) =
-                handle_connection(stream, options, base_topic, devices, retained, frames, mqtt)
-                    .await
+                handle_connection(stream, options, devices, retained, frames, mqtt).await
             {
                 debug!("frontend connection from {peer} ended: {error}");
             }
@@ -250,7 +248,6 @@ async fn read_request(stream: &mut TcpStream) -> std::io::Result<Option<Request>
 async fn handle_connection(
     mut stream: TcpStream,
     options: Arc<ServeOptions>,
-    base_topic: String,
     devices: Arc<DeviceRegistry>,
     retained: Arc<Mutex<BTreeMap<String, Value>>>,
     mut frames: broadcast::Receiver<Arc<String>>,
@@ -327,9 +324,9 @@ async fn handle_connection(
                             // architecture the bridge event loop already
                             // subscribes to the base topic, so publishing is
                             // the equivalent entry point.
-                            let _ = mqtt
-                                .publish_raw(&format!("{base_topic}/{topic}"), &payload)
-                                .await;
+                            if !mqtt.dispatch_frontend_message(topic, &payload) {
+                                debug!("frontend message on unrecognized topic '{topic}'");
+                            }
                         }
                         Some(ws::Frame::Ping(payload)) => {
                             ws::write_frame(&mut stream, &ws::pong_frame(&payload)).await?;
@@ -552,21 +549,14 @@ mod tests {
             frame
         }
 
-        async fn wait_for_publish(broker: &FakeBroker, topic: &str) -> Vec<u8> {
-            for _ in 0..100 {
-                if let Some(item) = broker
-                    .publishes()
-                    .into_iter()
-                    .find(|item| item.topic == topic)
-                {
-                    return item.payload.clone();
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-            }
-            panic!("no publish on {topic}; saw {:?}", broker.publishes());
-        }
-
-        async fn start(options: ServeOptions) -> (u16, Arc<DeviceRegistry>, FakeBroker) {
+        async fn start(
+            options: ServeOptions,
+        ) -> (
+            u16,
+            Arc<DeviceRegistry>,
+            FakeBroker,
+            tokio::sync::mpsc::Receiver<crate::mqtt::MqttCommand>,
+        ) {
             let broker = FakeBroker::start().await;
             let cfg = MqttConfig {
                 server: "127.0.0.1".into(),
@@ -576,7 +566,7 @@ mod tests {
                 ..MqttConfig::default()
             };
             let (events_tx, events_rx) = broadcast::channel(64);
-            let (mqtt, _commands) = MqttBridge::connect_with_events(&cfg, Some(events_tx))
+            let (mqtt, commands) = MqttBridge::connect_with_events(&cfg, Some(events_tx))
                 .await
                 .unwrap();
             let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
@@ -609,7 +599,7 @@ mod tests {
                 .await
                 .unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(80)).await;
-            (port, devices, broker)
+            (port, devices, broker, commands)
         }
 
         fn options(static_dir: PathBuf, auth_token: Option<&str>) -> ServeOptions {
@@ -629,7 +619,8 @@ mod tests {
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             std::fs::write(dir.join("index.html"), "<html>windfront</html>").unwrap();
-            let (port, _devices, broker) = start(options(dir.clone(), Some("secret"))).await;
+            let (port, _devices, broker, mut commands) =
+                start(options(dir.clone(), Some("secret"))).await;
 
             // Wrong token: upgrade succeeds, then close 4401 (upstream `ws`).
             let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -660,14 +651,33 @@ mod tests {
 
             stream
                 .write_all(&masked_text(
-                    r#"{"topic":"bridge/request/test","payload":{"value":1}}"#,
+                    r#"{"topic":"bulb/set","payload":{"state":"OFF"}}"#,
                 ))
                 .await
                 .unwrap();
-            let published = wait_for_publish(&broker, "zigbee2mqtt/bridge/request/test").await;
-            assert_eq!(
-                serde_json::from_slice::<Value>(&published).unwrap(),
-                serde_json::json!({"value": 1})
+            // `frontend.ts` calls `mqtt.onMessage`; no broker publish is made
+            // for the command itself.
+            let command = tokio::time::timeout(std::time::Duration::from_secs(2), commands.recv())
+                .await
+                .expect("command dispatch timed out")
+                .expect("command channel closed");
+            match command {
+                crate::mqtt::MqttCommand::SetDevice {
+                    friendly_name,
+                    endpoint,
+                    ..
+                } => {
+                    assert_eq!(friendly_name, "bulb");
+                    assert_eq!(endpoint, None);
+                }
+                other => panic!("unexpected command {other:?}"),
+            }
+            assert!(
+                !broker
+                    .publishes()
+                    .iter()
+                    .any(|item| item.topic == "zigbee2mqtt/bulb/set"),
+                "frontend commands must not be echoed through the broker"
             );
 
             // Static file serving on the same listener.
@@ -699,7 +709,7 @@ mod tests {
             std::fs::write(dir.join("index.html"), "ok").unwrap();
             let mut serve_options = options(dir.clone(), None);
             serve_options.base_url = "/z2m".into();
-            let (port, _devices, _broker) = start(serve_options).await;
+            let (port, _devices, _broker, _commands) = start(serve_options).await;
             let mut http = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
             http.write_all(b"GET /z2m HTTP/1.1\r\nHost: x\r\n\r\n")
                 .await

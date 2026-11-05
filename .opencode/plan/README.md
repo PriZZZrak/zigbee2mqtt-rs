@@ -93,9 +93,11 @@ R1 — явно ограниченный релиз для проверенно�
   сервер (`src/frontend`), config `frontend`, token-auth (close 4401), replay
   retained + device state, forwarding клиентских сообщений в MQTT, раздача
   assets с `.br`/`.gz`, `no-store` для HTML и точной srvx 404-страницей.
-  Pinned static differential — **4/4 PASS**; Rust integration tests покрывают
-  auth/replay/forwarding/redirect. Остаются TLS/unix sockets, Node WS
-  differential, fragmentation, live broker/HA и HIL.
+  Клиентские сообщения **напрямую** парсятся тем же `commands_from_publish` и
+  кладутся в bridge command queue (без broker echo), как upstream
+  `mqtt.onMessage`. Pinned static differential — **4/4 PASS**; Rust integration
+  tests покрывают auth/replay/direct-dispatch/redirect. Остаются TLS/unix
+  sockets, Node WS differential, fragmentation, live broker/HA и HIL.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

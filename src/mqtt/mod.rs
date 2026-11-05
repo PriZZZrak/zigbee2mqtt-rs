@@ -239,6 +239,9 @@ pub struct MqttBridge {
     base_topic: String,
     /// Frontend-facing copy of every publish (`lib/extension/frontend.ts`).
     events: Option<tokio::sync::broadcast::Sender<PublishedEvent>>,
+    /// Bridge command queue, shared with the frontend WebSocket so client
+    /// messages are handled without a broker round-trip.
+    commands: mpsc::Sender<MqttCommand>,
 }
 
 /// One message published by the bridge, forwarded to the frontend.
@@ -290,6 +293,7 @@ impl MqttBridge {
 
         let (client, event_loop) = AsyncClient::new(opts, 64);
         let (cmd_tx, cmd_rx) = mpsc::channel::<MqttCommand>(64);
+        let cmd_tx_for_bridge = cmd_tx.clone();
         let (connected_tx, connected_rx) = oneshot::channel();
 
         let base_topic = cfg.base_topic.clone();
@@ -308,6 +312,7 @@ impl MqttBridge {
                 client,
                 base_topic: cfg.base_topic.clone(),
                 events,
+                commands: cmd_tx_for_bridge,
             },
             cmd_rx,
         ))
@@ -516,15 +521,23 @@ impl MqttBridge {
             })
     }
 
-    /// Publish a raw frontend-originated message (`frontend.ts` calls
-    /// `mqtt.onMessage`, which this bridge models as a normal publish).
-    pub async fn publish_raw(&self, topic: &str, payload: &[u8]) -> Result<()> {
-        self.client
-            .publish(topic, QoS::AtLeastOnce, false, payload.to_vec())
-            .await
-            .map_err(Error::Mqtt)?;
-        self.emit(topic, payload, false);
-        Ok(())
+    /// Dispatch a frontend WebSocket message to the bridge command queue.
+    ///
+    /// `topic` is relative to the configured base topic, matching
+    /// `frontend.ts` (`mqtt.onMessage(`${base}/${topic}`, payload)`). Returns
+    /// whether the topic is a recognized device command or bridge request.
+    pub fn dispatch_frontend_message(&self, topic: &str, payload: &[u8]) -> bool {
+        let full_topic = format!("{}/{topic}", self.base_topic);
+        let commands = commands_from_publish(&self.base_topic, &full_topic, payload);
+        if commands.is_empty() {
+            return false;
+        }
+        for command in commands {
+            if self.commands.try_send(command).is_err() {
+                warn!("frontend command queue is full");
+            }
+        }
+        true
     }
 
     async fn publish_retained(&self, topic: &str, payload: &[u8]) -> Result<()> {
@@ -545,6 +558,39 @@ impl MqttBridge {
                 retain,
             });
         }
+    }
+}
+
+/// Translate one publish under the base topic into bridge commands.
+///
+/// Shared by the MQTT task and the frontend WebSocket (`frontend.ts`
+/// `mqtt.onMessage`), so both entry points have identical semantics.
+pub(crate) fn commands_from_publish(
+    base_topic: &str,
+    topic: &str,
+    payload: &[u8],
+) -> Vec<MqttCommand> {
+    if let Some(command) = parse_device_command(base_topic, topic, payload) {
+        return vec![command];
+    }
+    let Some((request, json_value)) = parse_bridge_request(base_topic, topic, payload) else {
+        return Vec::new();
+    };
+    // permit_join has legacy dedicated handling but also goes via bridge/request.
+    if request == "permit_join" || request.starts_with("permit_join") {
+        let duration = parse_permit_join_payload(payload);
+        vec![
+            MqttCommand::PermitJoin { duration },
+            MqttCommand::BridgeRequest {
+                request: "permit_join".to_string(),
+                payload: json_value,
+            },
+        ]
+    } else {
+        vec![MqttCommand::BridgeRequest {
+            request,
+            payload: json_value,
+        }]
     }
 }
 
@@ -581,30 +627,8 @@ async fn run_event_loop(
                 let topic = &pub_msg.topic;
                 let payload = &pub_msg.payload;
 
-                if let Some(cmd) = parse_device_command(base_topic, topic, payload) {
-                    let _ = cmd_tx.send(cmd).await;
-                } else if let Some((request, json_value)) =
-                    parse_bridge_request(base_topic, topic, payload)
-                {
-                    // permit_join has legacy dedicated handling but also goes via bridge/request
-                    if request == "permit_join" || request.starts_with("permit_join") {
-                        let duration = parse_permit_join_payload(payload);
-                        let _ = cmd_tx.send(MqttCommand::PermitJoin { duration }).await;
-                        // also forward as BridgeRequest for transaction response
-                        let _ = cmd_tx
-                            .send(MqttCommand::BridgeRequest {
-                                request: "permit_join".to_string(),
-                                payload: json_value.clone(),
-                            })
-                            .await;
-                    } else {
-                        let _ = cmd_tx
-                            .send(MqttCommand::BridgeRequest {
-                                request,
-                                payload: json_value,
-                            })
-                            .await;
-                    }
+                for command in commands_from_publish(base_topic, topic, payload) {
+                    let _ = cmd_tx.send(command).await;
                 }
             }
             Ok(Event::Incoming(Packet::Disconnect)) => {
