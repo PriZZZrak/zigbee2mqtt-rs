@@ -23,6 +23,7 @@ pub enum FrameType {
 #[derive(Debug, Clone)]
 pub struct ZclFrameHeader {
     pub frame_type: FrameType,
+    pub sequence: u8,
     pub command_id: u8,
     /// Manufacturer code, present when the frame control's manufacturer-
     /// specific bit is set (e.g. IKEA TRADFRI remotes' extra Scenes commands
@@ -60,13 +61,15 @@ impl ZclFrameHeader {
                 "ZCL frame too short for sequence+command".into(),
             ));
         }
-        pos += 1; // sequence
+        let sequence = buf[pos];
+        pos += 1;
         let command_id = buf[pos];
         pos += 1;
 
         Ok((
             ZclFrameHeader {
                 frame_type,
+                sequence,
                 command_id,
                 mfr_code,
             },

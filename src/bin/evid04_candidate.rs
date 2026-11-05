@@ -118,9 +118,18 @@ fn main() {
             endpoint,
             linkquality,
             group_id: 0,
+            tsn: input
+                .get("tsn")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u8::try_from(value).ok())
+                .or(Some(1)),
+            manufacturer_code: input
+                .get("manufacturer_code")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u16::try_from(value).ok()),
         };
         let converted = match input.get("data").and_then(|value| value.as_object()) {
-            Some(data) => converter.convert_from_zigbee_with_data(
+            Some(data) => converter.convert_from_zigbee_session_with_data_full(
                 model, cluster_id, msg_type, data, &device, &message, &state,
             ),
             None => {
@@ -136,7 +145,7 @@ fn main() {
                     .attribute_id(cluster_id, attribute)
                     .or_else(|| attribute.parse::<u16>().ok())
                     .unwrap_or_else(|| fail(format!("cannot resolve attribute '{attribute}'")));
-                converter.convert_from_zigbee_with_message(
+                converter.convert_from_zigbee_session_full(
                     model,
                     cluster_id,
                     msg_type,
@@ -147,10 +156,10 @@ fn main() {
                 )
             }
         };
+        let state_only = converted.map(|frame| frame.state).unwrap_or_default();
         println!(
             "{}",
-            serde_json::to_string(&json!(converted.unwrap_or_default()))
-                .unwrap_or_else(|_| "{}".into())
+            serde_json::to_string(&json!(state_only)).unwrap_or_else(|_| "{}".into())
         );
         return;
     }
@@ -160,9 +169,18 @@ fn main() {
             endpoint,
             linkquality,
             group_id: 0,
+            tsn: input
+                .get("tsn")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u8::try_from(value).ok())
+                .or(Some(1)),
+            manufacturer_code: input
+                .get("manufacturer_code")
+                .and_then(|value| value.as_u64())
+                .and_then(|value| u16::try_from(value).ok()),
         };
         let frame = match input.get("data").and_then(|value| value.as_object()) {
-            Some(data) => converter.convert_from_zigbee_with_data_full(
+            Some(data) => converter.convert_from_zigbee_session_with_data_full(
                 model, cluster_id, msg_type, data, &device, &message, &state,
             ),
             None => {
@@ -178,7 +196,7 @@ fn main() {
                     .attribute_id(cluster_id, attribute)
                     .or_else(|| attribute.parse::<u16>().ok())
                     .unwrap_or_else(|| fail(format!("cannot resolve attribute '{attribute}'")));
-                converter.convert_from_zigbee_with_message_full(
+                converter.convert_from_zigbee_session_full(
                     model,
                     cluster_id,
                     msg_type,
@@ -205,10 +223,40 @@ fn main() {
                 })
             })
             .collect();
+        let writes: Vec<Value> = frame
+            .writes
+            .iter()
+            .map(|write| {
+                let attributes: Map<String, Value> = write.attributes.iter().cloned().collect();
+                json!({
+                    "cluster": write.cluster,
+                    "attributes": attributes,
+                    "options": {
+                        "manufacturerCode": write.manufacturer_code,
+                        "disableDefaultResponse": write.disable_default_response,
+                    },
+                })
+            })
+            .collect();
+        let reads: Vec<Value> = frame
+            .reads
+            .iter()
+            .map(|read| {
+                json!({
+                    "cluster": read.cluster,
+                    "attributes": read.attributes,
+                })
+            })
+            .collect();
         println!(
             "{}",
-            serde_json::to_string(&json!({"state": frame.state, "commands": commands}))
-                .unwrap_or_else(|_| "{}".into())
+            serde_json::to_string(&json!({
+                "state": frame.state,
+                "commands": commands,
+                "writes": writes,
+                "reads": reads,
+            }))
+            .unwrap_or_else(|_| "{}".into())
         );
         return;
     }

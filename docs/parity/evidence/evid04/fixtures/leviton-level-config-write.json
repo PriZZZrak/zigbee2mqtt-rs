@@ -1,0 +1,21 @@
+{
+  "id": "leviton-level-config-write",
+  "input": {
+    "mode": "fromZigbeeOps",
+    "ieee_addr": "0x00124b0000000003",
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {
+      "level_config": {
+        "execute_if_off": true
+      }
+    },
+    "model": "DG3HL",
+    "manufacturer_name": "Leviton",
+    "cluster_id": 8,
+    "msg_type": "attributeReport",
+    "attribute": "currentLevel",
+    "value": 100,
+    "tsn": 1
+  }
+}

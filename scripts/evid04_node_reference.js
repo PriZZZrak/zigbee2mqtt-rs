@@ -122,6 +122,10 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
         endpoint: {ID: endpoint},
         linkquality: input.linkquality === undefined ? 0 : input.linkquality,
         groupID: 0,
+        meta: {
+            zclTransactionSequenceNumber: input.tsn,
+            manufacturerCode: input.manufacturer_code,
+        },
     };
     msg.endpoint.constructor = {name: "Endpoint"};
     const commands = [];
@@ -144,6 +148,8 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
         }
         return command;
     };
+    const writes = [];
+    const reads = [];
     Object.assign(msg.endpoint, {
         command: (cluster, command, payload, options) => {
             commands.push({
@@ -160,8 +166,27 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
             });
             return Promise.resolve();
         },
-        read: () => Promise.resolve(),
-        write: () => Promise.resolve(),
+        write: (cluster, attributes, options) => {
+            writes.push({
+                cluster: clusterIdOf(cluster),
+                attributes: normalize(attributes || {}),
+                options: {
+                    manufacturerCode:
+                        options && options.manufacturerCode !== undefined
+                            ? options.manufacturerCode
+                            : null,
+                    disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                },
+            });
+            return Promise.resolve();
+        },
+        read: (cluster, attributes) => {
+            reads.push({
+                cluster: clusterIdOf(cluster),
+                attributes: normalize(Array.isArray(attributes) ? attributes : [attributes]),
+            });
+            return Promise.resolve();
+        },
     });
     meta.device.constructor = {name: "Device"};
     msg.device = meta.device;
@@ -181,10 +206,10 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
         }
     }
     if (!matched) {
-        if (lenient) return {state: {}, commands};
+        if (lenient) return {state: {}, commands, writes, reads};
         fail(`no fromZigbee converter matched ${clusterName}/${msgType}`);
     }
-    return {state: out, commands};
+    return {state: out, commands, writes, reads};
 }
 
 async function main() {
@@ -248,6 +273,8 @@ async function main() {
             `${JSON.stringify({
                 state: normalize(result.state),
                 commands: normalize(result.commands),
+                writes: normalize(result.writes),
+                reads: normalize(result.reads),
             })}\n`,
         );
         return;

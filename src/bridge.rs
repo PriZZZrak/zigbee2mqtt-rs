@@ -1716,6 +1716,109 @@ impl Bridge {
         .await;
     }
 
+    /// Encode and send writes requested by a `fromZigbee` converter.
+    async fn forward_frame_writes(
+        coord: Option<&CoordinatorHandle>,
+        types: &crate::converters::zcl_types::ZclTypesFile,
+        trans_id: &mut u8,
+        dst_addr: u16,
+        dst_ep: u8,
+        writes: &[crate::converters::external::FrameWrite],
+    ) {
+        let Some(coord) = coord else {
+            debug!(
+                "converter requested {} write(s) but no coordinator is attached",
+                writes.len()
+            );
+            return;
+        };
+        for write in writes {
+            match encode_write_attributes(types, write.cluster, &write.attributes) {
+                Ok(encoded) => {
+                    let refs: Vec<(u16, u8, &[u8])> = encoded
+                        .iter()
+                        .map(|(id, data_type, bytes)| (*id, *data_type, bytes.as_slice()))
+                        .collect();
+                    let frame = zcl::write::write_attributes_payload(
+                        *trans_id,
+                        write.manufacturer_code,
+                        &refs,
+                    );
+                    *trans_id = trans_id.wrapping_add(1);
+                    if let Err(error) = coord
+                        .send_zcl(dst_addr, dst_ep, write.cluster, *trans_id, frame)
+                        .await
+                    {
+                        warn!(
+                            "converter write to cluster 0x{:04X} failed: {error}",
+                            write.cluster
+                        );
+                    }
+                }
+                Err(error) => warn!(
+                    "converter write to cluster 0x{:04X} skipped: {error}",
+                    write.cluster
+                ),
+            }
+        }
+    }
+
+    /// Encode and send reads requested by a `fromZigbee` converter.
+    async fn forward_frame_reads(
+        coord: Option<&CoordinatorHandle>,
+        types: &crate::converters::zcl_types::ZclTypesFile,
+        trans_id: &mut u8,
+        dst_addr: u16,
+        dst_ep: u8,
+        reads: &[crate::converters::external::FrameRead],
+    ) {
+        let Some(coord) = coord else {
+            debug!(
+                "converter requested {} read(s) but no coordinator is attached",
+                reads.len()
+            );
+            return;
+        };
+        for read in reads {
+            let ids: Option<Vec<u16>> = read
+                .attributes
+                .iter()
+                .map(|name| {
+                    name.parse::<u16>()
+                        .ok()
+                        .or_else(|| types.attribute_by_name(read.cluster, name))
+                })
+                .collect();
+            let Some(ids) = ids.filter(|ids| !ids.is_empty()) else {
+                warn!(
+                    "converter read on cluster 0x{:04X} skipped: unknown attributes",
+                    read.cluster
+                );
+                continue;
+            };
+            *trans_id = trans_id.wrapping_add(1);
+            let tsn = *trans_id;
+            let frame = crate::zigbee::zcl::frame::read_attributes_payload(tsn, &ids);
+            if let Err(error) = coord
+                .request_zcl(
+                    dst_addr,
+                    dst_ep,
+                    read.cluster,
+                    tsn,
+                    frame,
+                    GET_ZCL_TIMEOUT,
+                    GET_ZCL_ATTEMPTS,
+                )
+                .await
+            {
+                warn!(
+                    "converter read on cluster 0x{:04X} failed: {error}",
+                    read.cluster
+                );
+            }
+        }
+    }
+
     /// Encode and send response commands requested by a `fromZigbee` converter.
     async fn forward_frame_commands(
         coord: Option<&CoordinatorHandle>,
@@ -1855,6 +1958,8 @@ impl Bridge {
 
         let mut external_values = None;
         let mut frame_commands = Vec::new();
+        let mut frame_writes = Vec::new();
+        let mut frame_reads = Vec::new();
         let zcl_types = external.zcl_types();
         let prepared = devices.get_by_nwk(src_addr).map(|dev| {
             let info = crate::converters::external::ExternalDeviceInfo::from_device(&dev);
@@ -1889,12 +1994,16 @@ impl Bridge {
                                     endpoint: src_ep,
                                     linkquality: link_quality,
                                     group_id: 0,
+                                    tsn: Some(header.sequence),
+                                    manufacturer_code: header.mfr_code,
                                 };
                                 if let Some(frame) = external.convert_from_zigbee_session_full(
                                     model, cluster_id, msg_type, &reports, info, &message, state,
                                 ) {
                                     external_values = Some(frame.state);
                                     frame_commands.extend(frame.commands);
+                                    frame_writes.extend(frame.writes);
+                                    frame_reads.extend(frame.reads);
                                 }
                             } else {
                                 debug!("external converter: no candidates for model {model:?}");
@@ -1922,6 +2031,8 @@ impl Bridge {
                                             endpoint: src_ep,
                                             linkquality: link_quality,
                                             group_id: 0,
+                                            tsn: Some(header.sequence),
+                                            manufacturer_code: header.mfr_code,
                                         };
                                     let data_map = Self::tuya_command_data(&parsed);
                                     if let Some(frame) = external
@@ -1962,6 +2073,21 @@ impl Bridge {
                 &frame_commands,
             )
             .await;
+        }
+        if !frame_writes.is_empty() {
+            Self::forward_frame_writes(
+                coord,
+                &zcl_types,
+                trans_id,
+                src_addr,
+                src_ep,
+                &frame_writes,
+            )
+            .await;
+        }
+        if !frame_reads.is_empty() {
+            Self::forward_frame_reads(coord, &zcl_types, trans_id, src_addr, src_ep, &frame_reads)
+                .await;
         }
 
         let external_used = external_values.is_some();
@@ -5318,6 +5444,105 @@ module.exports = {definitions};
         (devices, ieee)
     }
 
+    /// Converter package whose fromZigbee handler requests a write and a read.
+    fn io_ops_fixture() -> (std::path::PathBuf, ExternalConverter) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "z2m-bridge-io-ops-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("devices")).unwrap();
+        std::fs::write(
+            dir.join("devices").join("io_ops.js"),
+            r#"
+const definitions = [
+    {
+        model: "FixtureIoOps",
+        vendor: "Fixture",
+        description: "fromZigbee read/write fixture",
+        fromZigbee: [
+            {
+                cluster: "genOnOff",
+                type: ["attributeReport"],
+                convert: (model, msg) => {
+                    msg.endpoint.write("genOnOff", {onOff: 1});
+                    msg.endpoint.read("msTemperatureMeasurement", ["measuredValue"]);
+                },
+            },
+        ],
+    },
+];
+module.exports = {definitions};
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("registry.json"),
+            serde_json::json!({
+                "lookup": {"fixtureioops": [["io_ops.js", 0]]},
+                "fingerprints": [],
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl.json"),
+            serde_json::json!({
+                "clusters": {"6": "genOnOff", "1026": "msTemperatureMeasurement"},
+                "manufacturerCodes": {},
+                "dataTypes": {},
+                "attributes": {
+                    "genOnOff": {"0": "onOff"},
+                    "msTemperatureMeasurement": {"0": "measuredValue"}
+                },
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl-commands.json"),
+            serde_json::json!({
+                "clusters": {
+                    "6": {
+                        "name": "genOnOff",
+                        "attributes": {"0": {"name": "onOff", "type": 16}},
+                        "commands": {}
+                    },
+                    "1026": {
+                        "name": "msTemperatureMeasurement",
+                        "attributes": {"0": {"name": "measuredValue", "type": 41}},
+                        "commands": {}
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let converter = ExternalConverter::new(&dir, "https://example.invalid/x");
+        (dir, converter)
+    }
+
+    async fn io_ops_devices() -> (DeviceRegistry, IeeeAddr) {
+        let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
+        let mut device = Device::new(ieee, 0x5678);
+        device.friendly_name = "ops".into();
+        device.model = Some("FixtureIoOps".into());
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0100,
+            input_clusters: vec![0x0000, 0x0006, 0x0402],
+            output_clusters: vec![],
+        });
+        let devices = DeviceRegistry::new();
+        devices.add(device);
+        (devices, ieee)
+    }
+
     async fn tuya_devices() -> (DeviceRegistry, IeeeAddr) {
         let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
         let mut device = Device::new(ieee, 0x5678);
@@ -5885,6 +6110,65 @@ module.exports = {definitions};
             vec![0x01, 0x00, 0x24, 0x02, 0x00, 0xAA, 0xBB]
         );
         assert_eq!(frames[0].af_trans_id, 1);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn converter_read_and_write_are_forwarded_as_af_frames() {
+        let (dir, external) = io_ops_fixture();
+        let (wire, coord) = fake_coordinator();
+        let (mqtt, _broker) = test_mqtt().await;
+        let (devices, _ieee) = io_ops_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 2, |sent| {
+            if sent.cluster == 0x0402 {
+                let tsn = sent.payload[1];
+                vec![
+                    success_srsp(),
+                    af_incoming_frame(
+                        0x0402,
+                        0x5678,
+                        1,
+                        vec![0x18, tsn, 0x01, 0x00, 0x00, 0x00, 0x29, 0xCA, 0x08],
+                    ),
+                ]
+            } else {
+                vec![success_srsp()]
+            }
+        });
+
+        // Global attribute report: genOnOff.onOff = 1.
+        let frame = vec![0x18, 0x01, 0x0A, 0x00, 0x00, 0x10, 0x01];
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            Some(&coord),
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            0x5678,
+            1,
+            0x0006,
+            42,
+            frame,
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames.len(), 2);
+
+        // Write: global Write Attributes, onOff (0x0000, BOOLEAN) = 1.
+        assert_eq!(frames[0].cluster, 0x0006);
+        assert_eq!(
+            frames[0].payload,
+            vec![0x10, 0x00, 0x02, 0x00, 0x00, 0x10, 0x01]
+        );
+        assert_eq!(frames[0].af_trans_id, 1);
+
+        // Read: global Read Attributes for measuredValue (0x0000).
+        assert_eq!(frames[1].cluster, 0x0402);
+        assert_eq!(frames[1].payload, vec![0x10, 0x02, 0x00, 0x00, 0x00]);
+        assert_eq!(frames[1].af_trans_id, 2);
         std::fs::remove_dir_all(&dir).ok();
     }
 }

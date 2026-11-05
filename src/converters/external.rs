@@ -74,11 +74,29 @@ pub struct FrameCommand {
     pub payload: serde_json::Value,
 }
 
-/// Converter output for one frame: state plus requested response commands.
+/// A write requested by a `fromZigbee` converter via `msg.endpoint.write`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FrameWrite {
+    pub cluster: u16,
+    pub manufacturer_code: Option<u16>,
+    pub disable_default_response: bool,
+    pub attributes: Vec<(String, serde_json::Value)>,
+}
+
+/// A read requested by a `fromZigbee` converter via `msg.endpoint.read`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FrameRead {
+    pub cluster: u16,
+    pub attributes: Vec<String>,
+}
+
+/// Converter output for one frame: state plus requested operations.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConvertedFrame {
     pub state: serde_json::Map<String, serde_json::Value>,
     pub commands: Vec<FrameCommand>,
+    pub writes: Vec<FrameWrite>,
+    pub reads: Vec<FrameRead>,
 }
 
 enum ConverterJob {
@@ -171,6 +189,10 @@ pub struct IncomingMessageInfo {
     pub endpoint: u8,
     pub linkquality: u8,
     pub group_id: u16,
+    /// ZCL transaction sequence number of the received frame, exposed to
+    /// converters as `msg.meta.zclTransactionSequenceNumber`.
+    pub tsn: Option<u8>,
+    pub manufacturer_code: Option<u16>,
 }
 
 impl Default for IncomingMessageInfo {
@@ -179,6 +201,8 @@ impl Default for IncomingMessageInfo {
             endpoint: 1,
             linkquality: 0,
             group_id: 0,
+            tsn: None,
+            manufacturer_code: None,
         }
     }
 }
@@ -807,6 +831,10 @@ impl ExternalConverter {
             "data": data_obj,
             "linkquality": message.linkquality,
             "groupID": message.group_id,
+            "meta": {
+                "zclTransactionSequenceNumber": message.tsn,
+                "manufacturerCode": message.manufacturer_code,
+            },
             "endpoint": {
                 "ID": message.endpoint,
                 "deviceIeeeAddress": device.ieee_addr,
@@ -867,6 +895,26 @@ const __norm = (v) => {{
                     }});
                     return Promise.resolve();
                 }};
+                const __writes = [];
+                msg.endpoint.write = (cluster, attributes, options) => {{
+                    __writes.push({{
+                        cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                        attributes: __norm(attributes || {{}}),
+                        options: {{
+                            manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
+                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                        }},
+                    }});
+                    return Promise.resolve();
+                }};
+                const __reads = [];
+                msg.endpoint.read = (cluster, attributes) => {{
+                    __reads.push({{
+                        cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                        attributes: __norm(Array.isArray(attributes) ? attributes : [attributes]),
+                    }});
+                    return Promise.resolve();
+                }};
                 msg.device = device;
                 if ((msg.type === "commandTuyaWeatherRequest" || msg.type === "commandTuyaWeatherSync") && Array.isArray(msg.data.payload)) {{
                     msg.data.payload = Buffer.from(msg.data.payload);
@@ -901,7 +949,7 @@ const __norm = (v) => {{
                     }}
                 }}
                 if (__debug) out.__debug = {{matched: __matched, errors: __errors}};
-                return JSON.stringify({{__state: out, __commands}});
+                return JSON.stringify({{__state: out, __commands, __writes, __reads}});
               }} catch (error) {{
                 return JSON.stringify({{__fatal: String((error && (error.stack || error.message)) || error)}});
               }}
@@ -920,12 +968,19 @@ const __norm = (v) => {{
             return None;
         }
         let state = out.get("__state")?.as_object()?.clone();
-        let commands =
-            frame_commands_from_json(&zcl, &self.load_zcl_types(), out.get("__commands"));
-        if state.is_empty() && commands.is_empty() {
+        let types = self.load_zcl_types();
+        let commands = frame_commands_from_json(&zcl, &types, out.get("__commands"));
+        let writes = frame_writes_from_json(&zcl, &types, out.get("__writes"));
+        let reads = frame_reads_from_json(&zcl, &types, out.get("__reads"));
+        if state.is_empty() && commands.is_empty() && writes.is_empty() && reads.is_empty() {
             return None;
         }
-        Some(ConvertedFrame { state, commands })
+        Some(ConvertedFrame {
+            state,
+            commands,
+            writes,
+            reads,
+        })
     }
 
     /// Compatibility wrapper returning only converted state.
@@ -980,6 +1035,135 @@ globalThis.__pumpTimers = function(maxAdvance) {
     return globalThis.__runDueTimers(globalThis.__now);
 };
 "#;
+
+fn resolve_cluster(
+    zcl: &ZclMaps,
+    types: &crate::converters::zcl_types::ZclTypesFile,
+    value: &serde_json::Value,
+) -> Option<u16> {
+    match value {
+        serde_json::Value::Number(number) => number.as_u64().and_then(|id| u16::try_from(id).ok()),
+        serde_json::Value::Object(object) => object
+            .get("ID")
+            .and_then(|id| id.as_u64())
+            .and_then(|id| u16::try_from(id).ok()),
+        serde_json::Value::String(name) => zcl
+            .clusters
+            .iter()
+            .find_map(|(id, value)| (value == name).then(|| id.parse::<u16>().ok()).flatten())
+            .or_else(|| types.cluster_id_by_name(name)),
+        _ => None,
+    }
+}
+
+fn resolve_attributes(
+    types: &crate::converters::zcl_types::ZclTypesFile,
+    cluster: u16,
+    value: &serde_json::Value,
+) -> Vec<String> {
+    match value {
+        serde_json::Value::Array(items) => items
+            .iter()
+            .filter_map(|item| match item {
+                serde_json::Value::String(name) => Some(name.clone()),
+                serde_json::Value::Number(number) => Some(number.to_string()),
+                _ => {
+                    let id = item.get("ID")?.as_u64()?;
+                    types
+                        .attribute(cluster, u16::try_from(id).ok()?)
+                        .map(|info| info.name.clone())
+                }
+            })
+            .collect(),
+        serde_json::Value::String(name) => vec![name.clone()],
+        serde_json::Value::Number(number) => vec![number.to_string()],
+        _ => Vec::new(),
+    }
+}
+
+/// Resolve recorded `msg.endpoint.write` calls.
+fn frame_writes_from_json(
+    zcl: &ZclMaps,
+    types: &crate::converters::zcl_types::ZclTypesFile,
+    raw: Option<&serde_json::Value>,
+) -> Vec<FrameWrite> {
+    let mut writes = Vec::new();
+    for item in raw.and_then(|value| value.as_array()).into_iter().flatten() {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let Some(cluster) = object
+            .get("cluster")
+            .and_then(|value| resolve_cluster(zcl, types, value))
+        else {
+            warn!("external converter requested a write on an unresolved cluster");
+            continue;
+        };
+        let attributes: Vec<(String, serde_json::Value)> = object
+            .get("attributes")
+            .and_then(|value| value.as_object())
+            .map(|attributes| {
+                attributes
+                    .iter()
+                    .map(|(name, value)| (name.clone(), value.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if attributes.is_empty() {
+            continue;
+        }
+        let manufacturer_code = object
+            .get("options")
+            .and_then(|options| options.get("manufacturerCode"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u16::try_from(value).ok());
+        let disable_default_response = object
+            .get("options")
+            .and_then(|options| options.get("disableDefaultResponse"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        writes.push(FrameWrite {
+            cluster,
+            manufacturer_code,
+            disable_default_response,
+            attributes,
+        });
+    }
+    writes
+}
+
+/// Resolve recorded `msg.endpoint.read` calls.
+fn frame_reads_from_json(
+    zcl: &ZclMaps,
+    types: &crate::converters::zcl_types::ZclTypesFile,
+    raw: Option<&serde_json::Value>,
+) -> Vec<FrameRead> {
+    let mut reads = Vec::new();
+    for item in raw.and_then(|value| value.as_array()).into_iter().flatten() {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let Some(cluster) = object
+            .get("cluster")
+            .and_then(|value| resolve_cluster(zcl, types, value))
+        else {
+            warn!("external converter requested a read on an unresolved cluster");
+            continue;
+        };
+        let attributes = object
+            .get("attributes")
+            .map(|value| resolve_attributes(types, cluster, value))
+            .unwrap_or_default();
+        if attributes.is_empty() {
+            continue;
+        }
+        reads.push(FrameRead {
+            cluster,
+            attributes,
+        });
+    }
+    reads
+}
 
 /// Resolve a recorded `msg.endpoint.command` list into ZCL ids.
 fn frame_commands_from_json(
@@ -1231,6 +1415,10 @@ impl ExternalConverter {
             "data": data_obj,
             "linkquality": message.linkquality,
             "groupID": message.group_id,
+            "meta": {
+                "zclTransactionSequenceNumber": message.tsn,
+                "manufacturerCode": message.manufacturer_code,
+            },
             "endpoint": {"ID": message.endpoint, "deviceIeeeAddress": device.ieee_addr},
         });
         let meta = serde_json::json!({
@@ -1286,6 +1474,26 @@ const __norm = (v) => {{
                     }});
                     return Promise.resolve();
                 }};
+                const __writes = [];
+                msg.endpoint.write = (cluster, attributes, options) => {{
+                    __writes.push({{
+                        cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                        attributes: __norm(attributes || {{}}),
+                        options: {{
+                            manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
+                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                        }},
+                    }});
+                    return Promise.resolve();
+                }};
+                const __reads = [];
+                msg.endpoint.read = (cluster, attributes) => {{
+                    __reads.push({{
+                        cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                        attributes: __norm(Array.isArray(attributes) ? attributes : [attributes]),
+                    }});
+                    return Promise.resolve();
+                }};
                 msg.device = device;
                 if ((msg.type === "commandTuyaWeatherRequest" || msg.type === "commandTuyaWeatherSync") && Array.isArray(msg.data.payload)) {{
                     msg.data.payload = Buffer.from(msg.data.payload);
@@ -1321,7 +1529,7 @@ const __norm = (v) => {{
                             }}
                         }}
                         if (__debug) out.__debug = {{matched: __matched, errors: __errors}};
-                        globalThis.__dispatchOut = {{__state: out, __commands}};
+                        globalThis.__dispatchOut = {{__state: out, __commands, __writes, __reads}};
                     }} catch (e) {{
                         globalThis.__dispatchError = String(e);
                     }}
@@ -1366,10 +1574,17 @@ const __norm = (v) => {{
         let state = out.get("__state")?.as_object()?.clone();
         let commands =
             frame_commands_from_json(&session.zcl, &session.types, out.get("__commands"));
-        if state.is_empty() && commands.is_empty() {
+        let writes = frame_writes_from_json(&session.zcl, &session.types, out.get("__writes"));
+        let reads = frame_reads_from_json(&session.zcl, &session.types, out.get("__reads"));
+        if state.is_empty() && commands.is_empty() && writes.is_empty() && reads.is_empty() {
             return None;
         }
-        Some(ConvertedFrame { state, commands })
+        Some(ConvertedFrame {
+            state,
+            commands,
+            writes,
+            reads,
+        })
     }
 
     /// Execute the upstream `toZigbee` converter for one key and record the ZCL
@@ -2698,6 +2913,11 @@ module.exports.strict = __assert;"#;
 /// `process` and `Buffer` are used without an explicit `require` (e.g. Tuya
 /// helpers), so they must exist before any module is evaluated.
 const RUNTIME_PRELUDE: &str = r#"
+if (typeof globalThis.console === "undefined") {
+    globalThis.console = {
+        log: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, trace: () => {},
+    };
+}
 if (typeof globalThis.process === "undefined") {
     globalThis.process = {
         env: {}, platform: "linux", version: "v22", versions: {node: "22"},
@@ -3486,6 +3706,8 @@ module.exports = {definitions};
                     endpoint: 3,
                     linkquality: 77,
                     group_id: 0,
+                    tsn: None,
+                    manufacturer_code: None,
                 },
                 &Default::default(),
             )
@@ -3948,6 +4170,8 @@ module.exports = {definitions};
                     endpoint: 2,
                     linkquality: 10,
                     group_id: 0,
+                    tsn: None,
+                    manufacturer_code: None,
                 },
                 &Default::default(),
             )

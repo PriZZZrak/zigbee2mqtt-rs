@@ -1,0 +1,19 @@
+{
+  "id": "yale-unknown-alarm-read",
+  "input": {
+    "mode": "fromZigbeeOps",
+    "ieee_addr": "0x00124b0000000003",
+    "endpoint": 1,
+    "linkquality": 42,
+    "state": {},
+    "model": "YRD256-TSDB",
+    "manufacturer_name": "Yale",
+    "cluster_id": 9,
+    "msg_type": "commandAlarm",
+    "data": {
+      "clusterid": 64512,
+      "alarmcode": 99
+    },
+    "tsn": 5
+  }
+}

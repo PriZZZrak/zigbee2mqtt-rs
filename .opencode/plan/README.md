@@ -32,7 +32,7 @@ R1 — явно ограниченный релиз для проверенно�
 
 - **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 475 952 B,
   sha256 `b9571660…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
-  (5 569 984 B, sha256 `e37eee4b…`, installed 11 929 600 B с app-resolved Windfront 2.15.0,
+  (5 573 655 B, sha256 `2f2fffac…`, installed 11 950 080 B с app-resolved Windfront 2.15.0,
   `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
@@ -52,8 +52,11 @@ R1 — явно ограниченный релиз для проверенно�
   Ответные команды конвертеров (`msg.endpoint.command`: time sync, gateway
   status, weather) теперь **отправляются** в координатор через
   `forward_frame_commands`; AF-кадр проверен fake-coordinator тестом, а
-  `fromZigbeeOps` differential сравнивает запрошенные команды с Node (2 кейса).
-  Ответы fire-and-forget; read/write из fromZigbee не пересылаются.
+  `fromZigbeeOps` differential сравнивает запрошенные команды, **read и write**
+  с Node (4 кейса: Tuya gateway/weather, Leviton write, Yale read).
+  Read/write из fromZigbee тоже пересылаются (`request_zcl`/`send_zcl`);
+  добавлен `console`-шим (иначе logger ломал конвертеры) и `msg.meta.tsn`.
+  Read-результат конвертеру не возвращается; write/command fire-and-forget.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и
