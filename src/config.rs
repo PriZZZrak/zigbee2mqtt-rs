@@ -102,6 +102,7 @@ pub struct Config {
     pub mqtt: MqttConfig,
     pub permit_join: bool,
     pub homeassistant: HomeAssistantConfig,
+    pub frontend: FrontendConfig,
     #[serde(deserialize_with = "deserialize_device_map", default)]
     pub devices: HashMap<String, DeviceConfig>,
     #[serde(deserialize_with = "deserialize_group_map", default)]
@@ -111,6 +112,34 @@ pub struct Config {
     #[serde(default)]
     pub passlist: Vec<String>,
     pub advanced: AdvancedConfig,
+}
+
+/// Frontend HTTP/WebSocket server (`lib/extension/frontend.ts`).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct FrontendConfig {
+    pub enabled: bool,
+    /// Bind host; an absolute path selects a unix socket upstream (unsupported).
+    pub host: Option<String>,
+    pub port: u16,
+    pub base_url: String,
+    pub auth_token: Option<String>,
+    pub disable_ui_serving: bool,
+    pub package: String,
+}
+
+impl Default for FrontendConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            host: None,
+            port: 8080,
+            base_url: "/".into(),
+            auth_token: None,
+            disable_ui_serving: false,
+            package: "zigbee2mqtt-windfront".into(),
+        }
+    }
 }
 
 /// Home Assistant discovery toggle. zigbee2mqtt allows either a boolean

@@ -1,0 +1,70 @@
+{
+  "responses": {
+    "index": {
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "no-store",
+        "content-length": "18",
+        "content-type": "text/html; charset=utf-8",
+        "etag": "W/\"12-1a1aa68a92f\"",
+        "last-modified": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "PGh0bWw+aW5kZXg8L2h0bWw+"
+    },
+    "asset": {
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "content-length": "19",
+        "content-type": "text/javascript; charset=utf-8",
+        "etag": "W/\"13-1a1aa68a930\"",
+        "last-modified": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "Y29uc29sZS5sb2coJ2FwcCcpOw=="
+    },
+    "asset-br": {
+      "status": 200,
+      "headers": {
+        "content-encoding": "br",
+        "content-length": "13",
+        "content-type": "text/javascript; charset=utf-8",
+        "etag": "W/\"d-1a1aa68a930-br\"",
+        "last-modified": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "vary": "Accept-Encoding",
+        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "Y29tcHJlc3NlZC1qcw=="
+    },
+    "missing": {
+      "status": 404,
+      "headers": {
+        "content-security-policy": "default-src 'none'",
+        "x-content-type-options": "nosniff",
+        "content-type": "text/html; charset=utf-8",
+        "content-length": "147",
+        "date": "Thu, 05 Nov 2026 06:32:28 GMT",
+        "connection": "keep-alive",
+        "keep-alive": "timeout=5"
+      },
+      "body": "PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9InV0Zi04Ij4KPHRpdGxlPkVycm9yPC90aXRsZT4KPC9oZWFkPgo8Ym9keT4KPHByZT5DYW5ub3QgR0VUIC9ub3BlLnR4dDwvcHJlPgo8L2JvZHk+CjwvaHRtbD4K"
+    }
+  },
+  "not_found": {
+    "content-security-policy": "default-src 'none'",
+    "x-content-type-options": "nosniff",
+    "content-type": "text/html; charset=utf-8",
+    "content-length": "147"
+  },
+  "errors": []
+}

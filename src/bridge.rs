@@ -414,9 +414,35 @@ impl Bridge {
         drop(all);
 
         // 4. Connect MQTT
-        let (mqtt, mut mqtt_rx) = MqttBridge::connect(&self.cfg.mqtt).await?;
+        // Frontend clients follow every publish; the event bus exists only when
+        // the frontend is enabled.
+        let (frontend_tx, frontend_rx) = tokio::sync::broadcast::channel(512);
+        let (mqtt, mut mqtt_rx) = MqttBridge::connect_with_events(
+            &self.cfg.mqtt,
+            self.cfg.frontend.enabled.then(|| frontend_tx.clone()),
+        )
+        .await?;
         let _ = mqtt.publish_bridge_extensions().await;
         info!("MQTT connected (base_topic={})", self.cfg.mqtt.base_topic);
+        if self.cfg.frontend.enabled {
+            let options = crate::frontend::ServeOptions::from_config(&self.cfg.frontend);
+            let devices = Arc::clone(&self.devices);
+            let base_topic = self.cfg.mqtt.base_topic.clone();
+            let mqtt_for_frontend = mqtt.clone();
+            tokio::spawn(async move {
+                if let Err(error) = crate::frontend::serve(
+                    options,
+                    base_topic,
+                    devices,
+                    frontend_rx,
+                    mqtt_for_frontend,
+                )
+                .await
+                {
+                    warn!("Frontend server stopped: {error}");
+                }
+            });
+        }
 
         // 5. Open coordinator
         let mut coord = open_coordinator(&self.cfg, &self.config_path).await?;

@@ -237,11 +237,29 @@ pub(crate) fn endpoint_index(selector: &str) -> Option<u8> {
 pub struct MqttBridge {
     client: AsyncClient,
     base_topic: String,
+    /// Frontend-facing copy of every publish (`lib/extension/frontend.ts`).
+    events: Option<tokio::sync::broadcast::Sender<PublishedEvent>>,
+}
+
+/// One message published by the bridge, forwarded to the frontend.
+#[derive(Debug, Clone)]
+pub struct PublishedEvent {
+    pub topic: String,
+    pub payload: Vec<u8>,
+    pub retain: bool,
 }
 
 impl MqttBridge {
     /// Connect to the broker, subscribe to command topics, and spawn the event loop.
     pub async fn connect(cfg: &MqttConfig) -> Result<(Self, mpsc::Receiver<MqttCommand>)> {
+        Self::connect_with_events(cfg, None).await
+    }
+
+    /// Connect and forward every publish to the frontend event bus.
+    pub async fn connect_with_events(
+        cfg: &MqttConfig,
+        events: Option<tokio::sync::broadcast::Sender<PublishedEvent>>,
+    ) -> Result<(Self, mpsc::Receiver<MqttCommand>)> {
         if cfg.tls_required {
             return Err(Error::Config(
                 "mqtts:// requires TLS, which this build does not support; refusing to fall back to plain TCP"
@@ -289,6 +307,7 @@ impl MqttBridge {
             Self {
                 client,
                 base_topic: cfg.base_topic.clone(),
+                events,
             },
             cmd_rx,
         ))
@@ -362,9 +381,11 @@ impl MqttBridge {
         });
         let bytes = serde_json::to_vec(&payload)?;
         self.client
-            .publish(&topic, QoS::AtLeastOnce, false, bytes)
+            .publish(&topic, QoS::AtLeastOnce, false, bytes.clone())
             .await
-            .map_err(Error::Mqtt)
+            .map_err(Error::Mqtt)?;
+        self.emit(&topic, &bytes, false);
+        Ok(())
     }
 
     pub async fn publish_bridge_health(&self, health: &serde_json::Value) -> Result<()> {
@@ -446,9 +467,11 @@ impl MqttBridge {
         let topic = endpoint_state_topic(&self.base_topic, friendly_name, endpoint);
         let bytes = serde_json::to_vec(payload)?;
         self.client
-            .publish(&topic, QoS::AtMostOnce, false, bytes)
+            .publish(&topic, QoS::AtMostOnce, false, bytes.clone())
             .await
-            .map_err(Error::Mqtt)
+            .map_err(Error::Mqtt)?;
+        self.emit(&topic, &bytes, false);
+        Ok(())
     }
 
     /// Delete a retained Home Assistant discovery config (empty payload).
@@ -464,10 +487,13 @@ impl MqttBridge {
 
     /// Clear one retained discovery topic by exact topic name.
     pub async fn clear_ha_topic(&self, topic: &str) -> Result<()> {
+        let payload = ha_clear_payload();
         self.client
-            .publish(topic, QoS::AtLeastOnce, true, ha_clear_payload())
+            .publish(topic, QoS::AtLeastOnce, true, payload.clone())
             .await
-            .map_err(Error::Mqtt)
+            .map_err(Error::Mqtt)?;
+        self.emit(topic, &payload, true);
+        Ok(())
     }
 
     /// Publish a Home Assistant MQTT discovery config.
@@ -490,11 +516,35 @@ impl MqttBridge {
             })
     }
 
+    /// Publish a raw frontend-originated message (`frontend.ts` calls
+    /// `mqtt.onMessage`, which this bridge models as a normal publish).
+    pub async fn publish_raw(&self, topic: &str, payload: &[u8]) -> Result<()> {
+        self.client
+            .publish(topic, QoS::AtLeastOnce, false, payload.to_vec())
+            .await
+            .map_err(Error::Mqtt)?;
+        self.emit(topic, payload, false);
+        Ok(())
+    }
+
     async fn publish_retained(&self, topic: &str, payload: &[u8]) -> Result<()> {
         self.client
             .publish(topic, QoS::AtLeastOnce, true, payload.to_vec())
             .await
-            .map_err(Error::Mqtt)
+            .map_err(Error::Mqtt)?;
+        self.emit(topic, payload, true);
+        Ok(())
+    }
+
+    /// Forward one successful publish to the frontend event bus.
+    fn emit(&self, topic: &str, payload: &[u8], retain: bool) {
+        if let Some(events) = &self.events {
+            let _ = events.send(PublishedEvent {
+                topic: topic.to_string(),
+                payload: payload.to_vec(),
+                retain,
+            });
+        }
     }
 }
 

@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "422 library + 2 binary + 30 compatibility = 454 passed, 0 failed"
+      "result": "432 library + 2 binary + 30 compatibility = 464 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -25,7 +25,7 @@
     {
       "command": "python3 -m unittest discover -s scripts/tests",
       "exit": 0,
-      "result": "45 parity/layout/EVID-04/storage/API/generated-definition/OpenWrt artifact tests passed"
+      "result": "47 parity/layout/EVID-04/storage/API/generated/frontend/OpenWrt tests passed"
     },
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
@@ -61,6 +61,11 @@
       "command": "python3 scripts/generated_definition_diff.py --require-pins (pinned zhc generator, full ZCL names)",
       "exit": 0,
       "result": "5 passed, 0 failed; temperature/heating/multi-endpoint/no-endpoint/external-converter generated definitions; all 4 pins MATCH"
+    },
+    {
+      "command": "python3 scripts/frontend_static_diff.py --require-pins (pinned srvx static middleware)",
+      "exit": 0,
+      "result": "4 passed, 0 failed; index/asset/brotli/404 contract fields; all 4 pins MATCH"
     }
   ]
 }

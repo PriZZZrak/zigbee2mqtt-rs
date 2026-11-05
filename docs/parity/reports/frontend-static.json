@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "passed": 4,
+  "failed": 0,
+  "pins": [
+    {
+      "source": "zigbee2mqtt",
+      "expected": "344b6e03b43644c97154a72ca9eae17193c553a2",
+      "actual": "344b6e03b43644c97154a72ca9eae17193c553a2",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "zigbee-herdsman",
+      "expected": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
+      "actual": "3cb89ad906bd9b2de8b3dfed20d5a21070a467d2",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "zigbee-herdsman-converters",
+      "expected": "9dabbe4e343573c5a3070605efd843a1b3a16058",
+      "actual": "9dabbe4e343573c5a3070605efd843a1b3a16058",
+      "status": "MATCH",
+      "reason": null
+    },
+    {
+      "source": "frontend",
+      "expected": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
+      "actual": "fbe6e2d7d508e23869efef86c71b2f3669c0022d",
+      "status": "MATCH",
+      "reason": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "asset",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "asset-br",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "index",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "missing",
+      "status": "PASS",
+      "mismatches": []
+    }
+  ]
+}

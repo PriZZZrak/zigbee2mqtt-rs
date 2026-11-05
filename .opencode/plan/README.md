@@ -89,6 +89,13 @@ R1 — явно ограниченный релиз для проверенно�
   Node-vs-Rust differential — **5/5 PASS**, API-кейс теперь **5/5** без
   known-gap. Остаются `config_schema`, endpoint bindings/reportings, coordinator
   meta и HTTP/WS frontend.
+- **Frontend HTTP/WS начат (FRONTEND-005)**: dependency-free HTTP/1.1 + RFC6455
+  сервер (`src/frontend`), config `frontend`, token-auth (close 4401), replay
+  retained + device state, forwarding клиентских сообщений в MQTT, раздача
+  assets с `.br`/`.gz`, `no-store` для HTML и точной srvx 404-страницей.
+  Pinned static differential — **4/4 PASS**; Rust integration tests покрывают
+  auth/replay/forwarding/redirect. Остаются TLS/unix sockets, Node WS
+  differential, fragmentation, live broker/HA и HIL.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и
