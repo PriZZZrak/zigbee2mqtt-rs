@@ -14,6 +14,10 @@ use zigbee2mqtt_rs::converters::external::{
     ConvertSetOp, ExternalConverter, ExternalDeviceInfo, IncomingMessageInfo,
 };
 
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn fail(message: impl std::fmt::Display) -> ! {
     eprintln!("evid04-candidate: {message}");
     std::process::exit(2);
@@ -245,9 +249,59 @@ fn main() {
                 json!({
                     "cluster": read.cluster,
                     "attributes": read.attributes,
+                    "options": {
+                        "manufacturerCode": read.manufacturer_code,
+                        "disableDefaultResponse": read.disable_default_response,
+                    },
                 })
             })
             .collect();
+        let zcl_types = converter.zcl_types();
+        let mut tsn = input
+            .get("wire_tsn")
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u8::try_from(value).ok())
+            .unwrap_or(1);
+        let mut frames = Vec::new();
+        for command in &frame.commands {
+            let bytes = zigbee2mqtt_rs::converters::wire::encode_command_frame(
+                &zcl_types,
+                tsn,
+                command.cluster,
+                command.command,
+                command.manufacturer_code,
+                command.disable_default_response,
+                &command.payload,
+            )
+            .unwrap_or_else(|error| fail(format!("cannot encode command frame: {error}")));
+            frames.push(json!({"kind": "command", "tsn": tsn, "hex": hex(&bytes)}));
+            tsn = tsn.wrapping_add(1);
+        }
+        for write in &frame.writes {
+            let bytes = zigbee2mqtt_rs::converters::wire::encode_write_frame(
+                &zcl_types,
+                tsn,
+                write.cluster,
+                write.manufacturer_code,
+                &write.attributes,
+            )
+            .unwrap_or_else(|error| fail(format!("cannot encode write frame: {error}")));
+            frames.push(json!({"kind": "write", "tsn": tsn, "hex": hex(&bytes)}));
+            tsn = tsn.wrapping_add(1);
+        }
+        for read in &frame.reads {
+            let bytes = zigbee2mqtt_rs::converters::wire::encode_read_frame(
+                &zcl_types,
+                tsn,
+                read.cluster,
+                read.manufacturer_code,
+                read.disable_default_response,
+                &read.attributes,
+            )
+            .unwrap_or_else(|error| fail(format!("cannot encode read frame: {error}")));
+            frames.push(json!({"kind": "read", "tsn": tsn, "hex": hex(&bytes)}));
+            tsn = tsn.wrapping_add(1);
+        }
         println!(
             "{}",
             serde_json::to_string(&json!({
@@ -255,6 +309,7 @@ fn main() {
                 "commands": commands,
                 "writes": writes,
                 "reads": reads,
+                "frames": frames,
             }))
             .unwrap_or_else(|_| "{}".into())
         );

@@ -1798,7 +1798,12 @@ impl Bridge {
             };
             *trans_id = trans_id.wrapping_add(1);
             let tsn = *trans_id;
-            let frame = crate::zigbee::zcl::frame::read_attributes_payload(tsn, &ids);
+            let frame = crate::zigbee::zcl::frame::read_attributes_payload_with_options(
+                tsn,
+                read.manufacturer_code,
+                read.disable_default_response,
+                &ids,
+            );
             if let Err(error) = coord
                 .request_zcl(
                     dst_addr,
@@ -3396,48 +3401,18 @@ fn encode_write_attributes(
     cluster: u16,
     attributes: &[(String, serde_json::Value)],
 ) -> std::result::Result<Vec<(u16, u8, Vec<u8>)>, String> {
-    let mut out = Vec::new();
-    for (name, value) in attributes {
-        let attribute_id = name
-            .parse::<u16>()
-            .ok()
-            .or_else(|| types.attribute_by_name(cluster, name))
-            .ok_or_else(|| format!("unknown attribute '{name}' for cluster 0x{cluster:04X}"))?;
-        let data_type = types
-            .attribute(cluster, attribute_id)
-            .map(|info| info.data_type)
-            .ok_or_else(|| {
-                format!("no ZCL type metadata for attribute 0x{attribute_id:04X} (cluster 0x{cluster:04X})")
-            })?;
-        // Attributes use real ZCL data types; Buffalo pseudo-types only occur in
-        // command parameters and cannot be written as an attribute type byte.
-        let attribute_type = u8::try_from(data_type).map_err(|_| {
-            format!(
-                "attribute 0x{attribute_id:04X} has non-ZCL type {data_type} (cluster 0x{cluster:04X})"
-            )
-        })?;
-        let bytes = crate::converters::zcl_types::encode_value(data_type, value)
-            .map_err(|error| error.to_string())?;
-        out.push((attribute_id, attribute_type, bytes));
-    }
-    Ok(out)
+    crate::converters::wire::encode_write_attributes(types, cluster, attributes)
 }
 
-/// Encode a converter-requested cluster command body (parameters only).
 fn encode_command_op(
     types: &crate::converters::zcl_types::ZclTypesFile,
     cluster: u16,
     command: u8,
     payload: &serde_json::Value,
 ) -> std::result::Result<Vec<u8>, String> {
-    let info = types.command(cluster, command).ok_or_else(|| {
-        format!("no ZCL command metadata for command 0x{command:02X} (cluster 0x{cluster:04X})")
-    })?;
-    crate::converters::zcl_types::encode_command_parameters(info, payload)
-        .map_err(|error| error.to_string())
+    crate::converters::wire::encode_command_op(types, cluster, command, payload)
 }
 
-/// Build a cluster-specific ZCL frame for a converter command.
 fn command_frame(
     sequence: u8,
     command: u8,
@@ -3445,21 +3420,13 @@ fn command_frame(
     disable_default_response: bool,
     parameters: &[u8],
 ) -> Vec<u8> {
-    let mut control = 0x01u8; // cluster-specific, client -> server
-    if manufacturer_code.is_some() {
-        control |= 0x04;
-    }
-    if disable_default_response {
-        control |= 0x10;
-    }
-    let mut frame = vec![control];
-    if let Some(code) = manufacturer_code {
-        frame.extend_from_slice(&code.to_le_bytes());
-    }
-    frame.push(sequence);
-    frame.push(command);
-    frame.extend_from_slice(parameters);
-    frame
+    crate::converters::wire::command_frame(
+        sequence,
+        command,
+        manufacturer_code,
+        disable_default_response,
+        parameters,
+    )
 }
 
 /// Build the MQTT bridge response envelope for reporting requests.
@@ -6103,11 +6070,11 @@ module.exports = {definitions};
         assert_eq!(frames.len(), 1);
         assert_eq!(frames[0].cluster, 0xEF00);
         assert_eq!(frames[0].endpoint, 1);
-        // control=0x01 (cluster-specific, no manufacturer, default response),
-        // TSN=0, command 0x24, params payloadSize u16 LE + two payload bytes.
+        // control=0x11 (cluster-specific + disable default response), TSN=0,
+        // command 0x24, params payloadSize u16 LE + two payload bytes.
         assert_eq!(
             frames[0].payload,
-            vec![0x01, 0x00, 0x24, 0x02, 0x00, 0xAA, 0xBB]
+            vec![0x11, 0x00, 0x24, 0x02, 0x00, 0xAA, 0xBB]
         );
         assert_eq!(frames[0].af_trans_id, 1);
         std::fs::remove_dir_all(&dir).ok();

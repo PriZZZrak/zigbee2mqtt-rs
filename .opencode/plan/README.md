@@ -32,7 +32,7 @@ R1 — явно ограниченный релиз для проверенно�
 
 - **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 475 952 B,
   sha256 `b9571660…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
-  (5 573 655 B, sha256 `2f2fffac…`, installed 11 950 080 B с app-resolved Windfront 2.15.0,
+  (5 573 977 B, sha256 `9dc3360f…`, installed 11 950 080 B с app-resolved Windfront 2.15.0,
   `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
@@ -56,7 +56,10 @@ R1 — явно ограниченный релиз для проверенно�
   с Node (4 кейса: Tuya gateway/weather, Leviton write, Yale read).
   Read/write из fromZigbee тоже пересылаются (`request_zcl`/`send_zcl`);
   добавлен `console`-шим (иначе logger ломал конвертеры) и `msg.meta.tsn`.
-  Read-результат конвертеру не возвращается; write/command fire-and-forget.
+  Добавлен **ZCL-wire differential**: pinned herdsman `Zcl.Frame.create`
+  кодирует те же команды/write/read, байты совпадают с Rust для 4 кейсов
+  (gateway/weather/Leviton/Yale). Read-результат конвертеру **не возвращается**
+  (нужен async conversion API — иначе deadlock); write/command fire-and-forget.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

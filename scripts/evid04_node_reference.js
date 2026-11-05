@@ -161,7 +161,10 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
                         options && options.manufacturerCode !== undefined
                             ? options.manufacturerCode
                             : null,
-                    disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                    disableDefaultResponse:
+                        options && options.disableDefaultResponse !== undefined
+                            ? !!options.disableDefaultResponse
+                            : true,
                 },
             });
             return Promise.resolve();
@@ -175,15 +178,28 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
                         options && options.manufacturerCode !== undefined
                             ? options.manufacturerCode
                             : null,
-                    disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                    disableDefaultResponse:
+                        options && options.disableDefaultResponse !== undefined
+                            ? !!options.disableDefaultResponse
+                            : true,
                 },
             });
             return Promise.resolve();
         },
-        read: (cluster, attributes) => {
+        read: (cluster, attributes, options) => {
             reads.push({
                 cluster: clusterIdOf(cluster),
                 attributes: normalize(Array.isArray(attributes) ? attributes : [attributes]),
+                options: {
+                    manufacturerCode:
+                        options && options.manufacturerCode !== undefined
+                            ? options.manufacturerCode
+                            : null,
+                    disableDefaultResponse:
+                        options && options.disableDefaultResponse !== undefined
+                            ? !!options.disableDefaultResponse
+                            : true,
+                },
             });
             return Promise.resolve();
         },
@@ -212,6 +228,95 @@ async function runFromZigbee({input, definition, meta, clusterName, clusterId, m
     return {state: out, commands, writes, reads};
 }
 
+function encodeFrames(result, clusterMap, zcl, startTsn) {
+    const frames = [];
+    let tsn = startTsn & 0xff;
+    const clusterOf = (value) =>
+        typeof value === "number"
+            ? Object.values(clusterMap).find((entry) => entry.ID === value)
+            : clusterMap[value];
+    const commandOf = (cluster, value) =>
+        typeof value === "number"
+            ? Object.values(cluster.commands || {}).find((entry) => entry.ID === value)
+            : (cluster.commands || {})[value];
+    const attributeOf = (cluster, value) => {
+        const attributes = cluster.attributes || {};
+        return attributes[value] ?? Object.values(attributes).find((entry) => String(entry.ID) === String(value));
+    };
+    const push = (frame, kind, currentTsn) => {
+        frames.push({kind, tsn: currentTsn, hex: frame.toBuffer().toString("hex")});
+        tsn = (tsn + 1) & 0xff;
+    };
+
+    for (const operation of result.commands) {
+        const cluster = clusterOf(operation.cluster);
+        if (!cluster) throw new Error(`unknown cluster ${operation.cluster}`);
+        const command = commandOf(cluster, operation.command);
+        if (!command) throw new Error(`unknown command ${operation.command}`);
+        const payload = {...operation.payload};
+        for (const parameter of command.parameters || []) {
+            if (parameter.type === 1008 && Array.isArray(payload[parameter.name])) {
+                payload[parameter.name] = Buffer.from(payload[parameter.name]);
+            }
+        }
+        const frame = zcl.Frame.create(
+            zcl.FrameType.SPECIFIC,
+            zcl.Direction.CLIENT_TO_SERVER,
+            operation.options.disableDefaultResponse,
+            operation.options.manufacturerCode ?? undefined,
+            tsn,
+            command.name,
+            cluster,
+            payload,
+            {},
+        );
+        push(frame, "command", tsn);
+    }
+    for (const operation of result.writes) {
+        const cluster = clusterOf(operation.cluster);
+        if (!cluster) throw new Error(`unknown cluster ${operation.cluster}`);
+        const payload = Object.entries(operation.attributes).map(([name, value]) => {
+            const attribute = attributeOf(cluster, name);
+            if (!attribute) throw new Error(`unknown attribute ${name} on ${cluster.name}`);
+            return {attrId: attribute.ID, dataType: attribute.type, attrData: value};
+        });
+        const frame = zcl.Frame.create(
+            zcl.FrameType.GLOBAL,
+            zcl.Direction.CLIENT_TO_SERVER,
+            operation.options.disableDefaultResponse,
+            operation.options.manufacturerCode ?? undefined,
+            tsn,
+            "write",
+            cluster,
+            payload,
+            {},
+        );
+        push(frame, "write", tsn);
+    }
+    for (const operation of result.reads) {
+        const cluster = clusterOf(operation.cluster);
+        if (!cluster) throw new Error(`unknown cluster ${operation.cluster}`);
+        const payload = operation.attributes.map((name) => {
+            const attribute = attributeOf(cluster, name);
+            if (!attribute) throw new Error(`unknown attribute ${name} on ${cluster.name}`);
+            return {attrId: attribute.ID};
+        });
+        const frame = zcl.Frame.create(
+            zcl.FrameType.GLOBAL,
+            zcl.Direction.CLIENT_TO_SERVER,
+            operation.options.disableDefaultResponse,
+            operation.options.manufacturerCode ?? undefined,
+            tsn,
+            "read",
+            cluster,
+            payload,
+            {},
+        );
+        push(frame, "read", tsn);
+    }
+    return frames;
+}
+
 async function main() {
     const input = await readInput();
     if (typeof input.model !== "string") fail("fixture is missing 'model'");
@@ -220,7 +325,7 @@ async function main() {
     const endpoint = Number.isInteger(input.endpoint) ? input.endpoint : 1;
     const msgType = input.msg_type || "attributeReport";
     const {Clusters} = requireFromConverters("zigbee-herdsman/dist/zspec/zcl/definition/cluster.js");
-    const clusters = requireFromConverters("zigbee-herdsman/dist/zspec/zcl/definition/cluster.js");
+    const zcl = requireFromConverters("zigbee-herdsman/dist/zspec/zcl");
     const clusterName = Object.values(Clusters).find((cluster) => cluster.ID === clusterId)?.name;
     if (!clusterName) fail(`unknown cluster id ${clusterId}`);
 
@@ -252,7 +357,7 @@ async function main() {
             clusterId,
             msgType,
             endpoint,
-            clusters,
+            clusters: Clusters,
         });
         process.stdout.write(`${JSON.stringify(normalize(result.state))}\n`);
         return;
@@ -267,7 +372,7 @@ async function main() {
             clusterId,
             msgType,
             endpoint,
-            clusters,
+            clusters: Clusters,
         });
         process.stdout.write(
             `${JSON.stringify({
@@ -275,6 +380,12 @@ async function main() {
                 commands: normalize(result.commands),
                 writes: normalize(result.writes),
                 reads: normalize(result.reads),
+                frames: encodeFrames(
+                    result,
+                    Clusters,
+                    zcl,
+                    input.wire_tsn === undefined ? 1 : input.wire_tsn,
+                ),
             })}\n`,
         );
         return;
@@ -289,7 +400,7 @@ async function main() {
             clusterId,
             msgType,
             endpoint,
-            clusters,
+            clusters: Clusters,
             lenient: true,
         });
         const out = result.state;
@@ -323,7 +434,7 @@ async function main() {
         const clusterIdOf = (cluster) => {
             if (cluster && cluster.ID !== undefined) return cluster.ID;
             if (typeof cluster === "number") return cluster;
-            return clusters.Clusters[cluster] ? clusters.Clusters[cluster].ID : cluster;
+            return Clusters[cluster] ? Clusters[cluster].ID : cluster;
         };
         const ops = [];
         const optionsOf = (options) => ({
@@ -341,7 +452,7 @@ async function main() {
             },
             command: (cluster, command, payload, options) => {
                 const cl = clusterIdOf(cluster);
-                const definitionCluster = Object.values(clusters.Clusters).find((c) => c.ID === cl);
+                const definitionCluster = Object.values(Clusters).find((c) => c.ID === cl);
                 const commandId =
                     typeof command === "number"
                         ? command

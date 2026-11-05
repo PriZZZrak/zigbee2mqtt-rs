@@ -87,6 +87,8 @@ pub struct FrameWrite {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrameRead {
     pub cluster: u16,
+    pub manufacturer_code: Option<u16>,
+    pub disable_default_response: bool,
     pub attributes: Vec<String>,
 }
 
@@ -890,7 +892,7 @@ const __norm = (v) => {{
                         payload: __norm(payload || {{}}),
                         options: {{
                             manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
-                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                            disableDefaultResponse: options && options.disableDefaultResponse !== undefined ? !!options.disableDefaultResponse : true,
                         }},
                     }});
                     return Promise.resolve();
@@ -902,16 +904,20 @@ const __norm = (v) => {{
                         attributes: __norm(attributes || {{}}),
                         options: {{
                             manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
-                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                            disableDefaultResponse: options && options.disableDefaultResponse !== undefined ? !!options.disableDefaultResponse : true,
                         }},
                     }});
                     return Promise.resolve();
                 }};
                 const __reads = [];
-                msg.endpoint.read = (cluster, attributes) => {{
+                msg.endpoint.read = (cluster, attributes, options) => {{
                     __reads.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         attributes: __norm(Array.isArray(attributes) ? attributes : [attributes]),
+                        options: {{
+                            manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
+                            disableDefaultResponse: options && options.disableDefaultResponse !== undefined ? !!options.disableDefaultResponse : true,
+                        }},
                     }});
                     return Promise.resolve();
                 }};
@@ -1157,8 +1163,20 @@ fn frame_reads_from_json(
         if attributes.is_empty() {
             continue;
         }
+        let manufacturer_code = object
+            .get("options")
+            .and_then(|options| options.get("manufacturerCode"))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u16::try_from(value).ok());
+        let disable_default_response = object
+            .get("options")
+            .and_then(|options| options.get("disableDefaultResponse"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(true);
         reads.push(FrameRead {
             cluster,
+            manufacturer_code,
+            disable_default_response,
             attributes,
         });
     }
@@ -1469,7 +1487,7 @@ const __norm = (v) => {{
                         payload: __norm(payload || {{}}),
                         options: {{
                             manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
-                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                            disableDefaultResponse: options && options.disableDefaultResponse !== undefined ? !!options.disableDefaultResponse : true,
                         }},
                     }});
                     return Promise.resolve();
@@ -1481,16 +1499,20 @@ const __norm = (v) => {{
                         attributes: __norm(attributes || {{}}),
                         options: {{
                             manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
-                            disableDefaultResponse: !!(options && options.disableDefaultResponse),
+                            disableDefaultResponse: options && options.disableDefaultResponse !== undefined ? !!options.disableDefaultResponse : true,
                         }},
                     }});
                     return Promise.resolve();
                 }};
                 const __reads = [];
-                msg.endpoint.read = (cluster, attributes) => {{
+                msg.endpoint.read = (cluster, attributes, options) => {{
                     __reads.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         attributes: __norm(Array.isArray(attributes) ? attributes : [attributes]),
+                        options: {{
+                            manufacturerCode: options && options.manufacturerCode !== undefined ? options.manufacturerCode : null,
+                            disableDefaultResponse: options && options.disableDefaultResponse !== undefined ? !!options.disableDefaultResponse : true,
+                        }},
                     }});
                     return Promise.resolve();
                 }};

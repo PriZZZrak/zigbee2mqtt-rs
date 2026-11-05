@@ -25,7 +25,9 @@ Behavior: CONVERTER-020; related CONVERTER-005, EVID-004.
 
 - The Boa host records `command`, `write` and `read` calls during conversion,
   including cluster, attributes/payload, manufacturer code, disable-default-
-  response and the ZCL transaction sequence number. `ConvertedFrame` now carries
+  response and the ZCL transaction sequence number. `disableDefaultResponse`
+  defaults to `true` when the converter does not specify it, matching herdsman's
+  `endpoint.write`/`endpoint.read` defaults. `ConvertedFrame` now carries
   `commands`, `writes`, `reads` and state; the old conversion APIs remain
   state-only wrappers.
 - `msg.meta.zclTransactionSequenceNumber` / `manufacturerCode` are exposed from
@@ -50,18 +52,25 @@ Behavior: CONVERTER-020; related CONVERTER-005, EVID-004.
   produces a write `[0x10, 0x00, 0x02, 0x00, 0x00, 0x10, 0x01]` on genOnOff and
   a read `[0x10, 0x02, 0x00, 0x00, 0x00]` on msTemperatureMeasurement, with
   APS transaction ids 1 and 2; the fake device answers the read.
-- `fromZigbeeOps` differential compares requested operations with the pinned
-  Node reference:
-  - `leviton-level-config-write` → write cluster 8 `{options: 1}`;
-  - `yale-unknown-alarm-read` → read cluster 257 `["lockState"]`;
-  - plus the existing Tuya gateway-status and weather response commands.
-  Converter report: **10/10**, all pins MATCH; bridge report **7/7**.
+- `fromZigbeeOps` differential compares requested operations **and their ZCL
+  wire frames** with the pinned Node reference:
+  - `leviton-level-config-write` → write cluster 8 `{options: 1}`,
+    frame `1001020f001801`;
+  - `yale-unknown-alarm-read` → read cluster 257 `["lockState"]`,
+    frame `1001000000`;
+  - `tuya-gateway-status-response` → command frame `110125010001`;
+  - `tuya-weather-response` → command frame `1101611100120513…`.
+  Converter report: **10/10**, all pins MATCH; bridge report **7/7**. See
+  ZCL-013 for the wire differential contract.
 
 ## Gaps
 
 - Reads are forwarded **after** conversion, so the converter does not receive
-  the read result (upstream awaits it). Converters that branch on the value are
-  not fully equivalent.
+  the read result (upstream awaits it). Returning results needs an asynchronous
+  conversion API: the bridge currently blocks on the converter session while the
+  session would have to block on the coordinator — a deadlock, so this is an
+  architectural change and remains open. Converters that branch on the read
+  value are therefore not fully equivalent.
 - Operations are fire-and-forget except reads (writes/commands do not await an
   AF/default-response result); destination is always the source endpoint.
 - Recording order between commands/writes/reads is grouped, not the converter's

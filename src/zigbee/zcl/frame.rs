@@ -105,7 +105,29 @@ pub fn read_reporting_config_payload(sequence: u8, attr_ids: &[u16]) -> Vec<u8> 
 
 /// Build a ZCL Read Attributes request payload.
 pub fn read_attributes_payload(sequence: u8, attr_ids: &[u16]) -> Vec<u8> {
-    let mut payload = ZclFrameHeader::encode_global(sequence, global::READ_ATTRIBUTES);
+    read_attributes_payload_with_options(sequence, None, true, attr_ids)
+}
+
+/// Read Attributes frame with explicit header options.
+pub fn read_attributes_payload_with_options(
+    sequence: u8,
+    mfr_code: Option<u16>,
+    disable_default_response: bool,
+    attr_ids: &[u16],
+) -> Vec<u8> {
+    let mut control = 0x00u8; // global, client -> server
+    if mfr_code.is_some() {
+        control |= 0x04;
+    }
+    if disable_default_response {
+        control |= 0x10;
+    }
+    let mut payload = vec![control];
+    if let Some(code) = mfr_code {
+        payload.extend_from_slice(&code.to_le_bytes());
+    }
+    payload.push(sequence);
+    payload.push(global::READ_ATTRIBUTES);
     for &id in attr_ids {
         payload.extend_from_slice(&id.to_le_bytes());
     }
