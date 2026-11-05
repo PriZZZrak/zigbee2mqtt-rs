@@ -49,8 +49,8 @@ $ cp target/aarch64-unknown-linux-musl/release/zigbee2mqtt-rs openwrt/files/zigb
 $ scripts/build-openwrt-artifact.sh
 artifact: dist/zigbee2mqtt-rs-0.1.0-aarch64-openwrt.tar.gz
 binary sha256: 2309dc36148bbe379919053e084483031c26837b2dc841a4bd2c244ab0496ca6 (5534968 bytes)
-archive sha256: 81054d971590b10d6488a8eee0cceadb70715a3e3bd074c9bea79e4cc995c70e (5565190 bytes)
-manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=3f3bc2e..., rustc 1.99.1
+archive sha256: 6a90e78f15348c79659dba15f41534707442a93d52cc0f5c803896c0105134f1 (5572365 bytes)
+manifest: target=aarch64-unknown-linux-musl, static=true, git_sha=82eff22..., rustc 1.99.1
 
 $ python3 -m unittest discover -s scripts/tests
 Ran 38 tests ... OK
