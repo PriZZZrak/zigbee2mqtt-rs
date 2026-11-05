@@ -63,6 +63,11 @@ Working:
   `source: external`, `supported: true` with 20/34 exposes.
 - The coordinator resumes its existing network; NV is **not** rewritten and
   `ZDO_STARTUP_FROM_APP` reports "restored network state from NV".
+- MQTT commands resolve both friendly names and IEEE addresses (upstream
+  `resolveEntity`): `zigbee2mqtt/0x404ccafffe5c4ce0/set
+  {"system_mode":"heat"}` and `{"sensor_type":"10 кОм"}` now reach the device
+  and the retained state shows `system_mode: heat`, `sensor_type: 10 кОм`,
+  `running_mode: heat`.
 
 Partial / failing:
 
@@ -125,6 +130,17 @@ A defensive decision was added: when the adapter backup matches the network but
 the alternate-key descriptor is missing/different, the bridge resumes with a
 warning instead of refusing (upstream would refuse; refusing makes a known-good
 network unstartable). This never rewrites NV; see `docs/parity/decisions.md`.
+
+## Operational note: duplicate MQTT commands
+
+The router's existing mosquitto configuration contains a bridge to Home
+Assistant (`connection ha-bridge`, `address 192.168.0.30:1883`,
+`topic # both 0`, `try_private false`). With that loop, a single
+`mosquitto_pub` is delivered **twice** to local subscribers (verified with an
+independent subscriber), so the bridge executes each set twice. This is a
+broker configuration loop, not a Rust subscription duplication; upstream would
+also receive both copies. `try_private true` or directional topics would stop
+the echo. The user's broker config was not modified.
 
 ## Not yet verified
 

@@ -1802,7 +1802,7 @@ impl Bridge {
             "contact",
         ];
 
-        let Some(dev) = devices.find_by_name(name) else {
+        let Some(dev) = find_device_for_id(devices, name) else {
             warn!("Get command for unknown device: {name}");
             return;
         };
@@ -2433,7 +2433,8 @@ impl Bridge {
         endpoint: Option<u8>,
         payload: &serde_json::Value,
     ) {
-        let dev = match devices.find_by_name(name) {
+        // Upstream `resolveEntity` accepts a friendly name or an IEEE address.
+        let dev = match find_device_for_id(devices, name) {
             Some(d) => d,
             None => {
                 warn!("Set command for unknown device: {name}");
@@ -3052,10 +3053,12 @@ impl Bridge {
                 dev.merge_state(optimistic.clone());
                 dev.state.insert("last_seen".into(), json!(now_iso8601()));
             }
-            // Publish the full merged state
-            if let Some(dev) = devices.find_by_name(name) {
+            // Publish the full merged state under the friendly name, even
+            // when the command arrived on the IEEE topic.
+            if let Some(dev) = find_device_for_id(devices, name) {
+                let friendly_name = dev.friendly_name.clone();
                 let full_state = serde_json::Value::Object(dev.state);
-                Self::publish_state(mqtt, output, name, &full_state).await;
+                Self::publish_state(mqtt, output, &friendly_name, &full_state).await;
             }
         }
     }
@@ -4279,6 +4282,18 @@ mod tests {
             lock["baseline"]["zigbee-herdsman"]["resolved_version"], HERDSMAN_COMPAT_VERSION,
             "update HERDSMAN_COMPAT_VERSION when advancing the baseline"
         );
+    }
+
+    #[test]
+    fn find_device_for_id_resolves_friendly_name_and_ieee() {
+        let devices = DeviceRegistry::new();
+        let address = IeeeAddr::from_hex("0x00124b0024c2d400").unwrap();
+        let mut device = Device::new(address, 0x1234);
+        device.friendly_name = "kitchen".into();
+        devices.add(device);
+        assert!(find_device_for_id(&devices, "kitchen").is_some());
+        assert!(find_device_for_id(&devices, "0x00124b0024c2d400").is_some());
+        assert!(find_device_for_id(&devices, "unknown").is_none());
     }
 
     #[test]
