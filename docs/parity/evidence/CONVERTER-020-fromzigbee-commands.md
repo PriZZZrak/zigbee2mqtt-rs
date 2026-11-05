@@ -21,6 +21,31 @@ Behavior: CONVERTER-020; related CONVERTER-005, EVID-004.
 - Command/write parameters are typed by the cluster definition; reads are
   `READ_ATTRIBUTES` requests.
 
+## Read results (async-safe path)
+
+`msg.endpoint.read` now returns the device's response to the waiting converter.
+The bridge still runs a single `select!` event loop and still blocks on the
+converter-session reply, so the read cannot be delegated back to that loop. A
+`ZclIo` handle (`Arc<tokio::sync::Mutex<ZnpHandle>>` + Tokio runtime handle +
+ZCL type metadata) is attached to the converter host; the converter thread
+executes the read with `request_zcl` through the runtime while the bridge waits.
+The ZNP transport and its event pump run as independent Tokio tasks, so the
+waiting bridge loop is not needed and no deadlock occurs.
+
+- The JS host exposes a native synchronous `__zclRead`; `msg.endpoint.read`
+  calls it, decodes the READ_ATTRIBUTES_RSP (bounded primitive types) and
+  resolves the promise with `{attributeName: value}`. Booleans are `0/1` as in
+  herdsman.
+- Without a coordinator (EVID-04 candidate/harness) the native function returns
+  `{disabled: true}` and the call falls back to recording the request, so the
+  ops/wire differentials keep working.
+- The session thread sets a thread-local ZCL context per job; the per-call
+  conversion path does the same.
+- Consequence: the converter thread can block on device I/O; a sleeping/broken
+  device costs the 3 s read timeout and does not stall the bridge event loop's
+  MQTT/coordinator event processing beyond the already-blocking conversion
+  wait.
+
 ## Rust change
 
 - The Boa host records `command`, `write` and `read` calls during conversion,
@@ -52,6 +77,11 @@ Behavior: CONVERTER-020; related CONVERTER-005, EVID-004.
   produces a write `[0x10, 0x00, 0x02, 0x00, 0x00, 0x10, 0x01]` on genOnOff and
   a read `[0x10, 0x02, 0x00, 0x00, 0x00]` on msTemperatureMeasurement, with
   APS transaction ids 1 and 2; the fake device answers the read.
+- `converter_read_returns_the_device_response_without_deadlock`
+  (`multi_thread` test) — converter awaits `msg.endpoint.read`, the fake device
+  answers `measuredValue = 2250`, and the published state contains
+  `read_temperature: 2250` with the read frame
+  `[0x10, 0x00, 0x00, 0x00, 0x00]` observed on the wire.
 - `fromZigbeeOps` differential compares requested operations **and their ZCL
   wire frames** with the pinned Node reference:
   - `leviton-level-config-write` → write cluster 8 `{options: 1}`,
@@ -65,12 +95,11 @@ Behavior: CONVERTER-020; related CONVERTER-005, EVID-004.
 
 ## Gaps
 
-- Reads are forwarded **after** conversion, so the converter does not receive
-  the read result (upstream awaits it). Returning results needs an asynchronous
-  conversion API: the bridge currently blocks on the converter session while the
-  session would have to block on the coordinator — a deadlock, so this is an
-  architectural change and remains open. Converters that branch on the read
-  value are therefore not fully equivalent.
+- Reads now return real data (see above), but the bridge blocks on the converter
+  reply while the read runs; the event loop does not process unrelated MQTT
+  events during that window. Devices that answer slowly cost the 3 s timeout.
+- The native read decoder covers the bounded `AttributeValue` primitives; arrays,
+  structs, Buffers and manufacturer-specific clusters are skipped.
 - Operations are fire-and-forget except reads (writes/commands do not await an
   AF/default-response result); destination is always the source endpoint.
 - Recording order between commands/writes/reads is grouped, not the converter's

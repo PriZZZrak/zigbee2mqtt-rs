@@ -402,6 +402,16 @@ impl Bridge {
 
         // 5. Open coordinator
         let mut coord = open_coordinator(&self.cfg, &self.config_path).await?;
+        // Let `msg.endpoint.read` in converters reach the device without the
+        // bridge event loop acting as an intermediary (avoids a deadlock while
+        // the loop waits for the converter session result).
+        self.external
+            .set_zcl_io(Some(crate::converters::external::ZclIo {
+                inner: Arc::clone(&coord.inner),
+                runtime: tokio::runtime::Handle::current(),
+                types: self.external.zcl_types(),
+                tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            }));
         info!("Coordinator ready");
 
         // 6. Publish retained MQTT state
@@ -1997,6 +2007,7 @@ impl Bridge {
                             if external.ensure_device_files(model, info).await.is_some() {
                                 let message = crate::converters::external::IncomingMessageInfo {
                                     endpoint: src_ep,
+                                    nwk_addr: src_addr,
                                     linkquality: link_quality,
                                     group_id: 0,
                                     tsn: Some(header.sequence),
@@ -2034,6 +2045,7 @@ impl Bridge {
                                     let message =
                                         crate::converters::external::IncomingMessageInfo {
                                             endpoint: src_ep,
+                                            nwk_addr: src_addr,
                                             linkquality: link_quality,
                                             group_id: 0,
                                             tsn: Some(header.sequence),
@@ -5510,6 +5522,108 @@ module.exports = {definitions};
         (devices, ieee)
     }
 
+    /// Converter package whose handler uses the result of `msg.endpoint.read`.
+    fn read_result_fixture() -> (std::path::PathBuf, ExternalConverter) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "z2m-bridge-read-result-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("devices")).unwrap();
+        std::fs::write(
+            dir.join("devices").join("read_result.js"),
+            r#"
+const definitions = [
+    {
+        model: "FixtureReadResult",
+        vendor: "Fixture",
+        description: "fromZigbee read-result fixture",
+        fromZigbee: [
+            {
+                cluster: "genOnOff",
+                type: ["attributeReport"],
+                convert: async (model, msg) => {
+                    const data = await msg.endpoint.read(
+                        "msTemperatureMeasurement",
+                        ["measuredValue"],
+                    );
+                    return {read_temperature: data.measuredValue, read_ok: true};
+                },
+            },
+        ],
+    },
+];
+module.exports = {definitions};
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("registry.json"),
+            serde_json::json!({
+                "lookup": {"fixturereadresult": [["read_result.js", 0]]},
+                "fingerprints": [],
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl.json"),
+            serde_json::json!({
+                "clusters": {"6": "genOnOff", "1026": "msTemperatureMeasurement"},
+                "manufacturerCodes": {},
+                "dataTypes": {},
+                "attributes": {
+                    "genOnOff": {"0": "onOff"},
+                    "msTemperatureMeasurement": {"0": "measuredValue"}
+                },
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("zcl-commands.json"),
+            serde_json::json!({
+                "clusters": {
+                    "6": {
+                        "name": "genOnOff",
+                        "attributes": {"0": {"name": "onOff", "type": 16}},
+                        "commands": {}
+                    },
+                    "1026": {
+                        "name": "msTemperatureMeasurement",
+                        "attributes": {"0": {"name": "measuredValue", "type": 41}},
+                        "commands": {}
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let converter = ExternalConverter::new(&dir, "https://example.invalid/x");
+        (dir, converter)
+    }
+
+    async fn read_result_devices() -> (DeviceRegistry, IeeeAddr) {
+        let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
+        let mut device = Device::new(ieee, 0x5678);
+        device.friendly_name = "reader".into();
+        device.model = Some("FixtureReadResult".into());
+        device.interview_complete = true;
+        device.endpoints.push(EndpointDesc {
+            endpoint: 1,
+            profile_id: 0x0104,
+            device_id: 0x0100,
+            input_clusters: vec![0x0000, 0x0006, 0x0402],
+            output_clusters: vec![],
+        });
+        let devices = DeviceRegistry::new();
+        devices.add(device);
+        (devices, ieee)
+    }
+
     async fn tuya_devices() -> (DeviceRegistry, IeeeAddr) {
         let ieee = IeeeAddr::from_hex("0x00124b0024c1e2f3").unwrap();
         let mut device = Device::new(ieee, 0x5678);
@@ -6136,6 +6250,60 @@ module.exports = {definitions};
         assert_eq!(frames[1].cluster, 0x0402);
         assert_eq!(frames[1].payload, vec![0x10, 0x02, 0x00, 0x00, 0x00]);
         assert_eq!(frames[1].af_trans_id, 2);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn converter_read_returns_the_device_response_without_deadlock() {
+        let (dir, external) = read_result_fixture();
+        let (wire, coord) = fake_coordinator();
+        external.set_zcl_io(Some(crate::converters::external::ZclIo {
+            inner: Arc::clone(&coord.inner),
+            runtime: tokio::runtime::Handle::current(),
+            types: external.zcl_types(),
+            tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+        }));
+        let (mqtt, broker) = test_mqtt().await;
+        let (devices, _ieee) = read_result_devices().await;
+        let mut trans_id = 0u8;
+        let collector = spawn_af_device(wire, 1, |sent| {
+            let tsn = sent.payload[1];
+            vec![
+                success_srsp(),
+                af_incoming_frame(
+                    0x0402,
+                    0x5678,
+                    1,
+                    // measuredValue = 2250 (int16)
+                    vec![0x18, tsn, 0x01, 0x00, 0x00, 0x00, 0x29, 0xCA, 0x08],
+                ),
+            ]
+        });
+
+        Bridge::process_zcl_message(
+            &devices,
+            &external,
+            Some(&coord),
+            &mqtt,
+            OutputMode::Json,
+            &mut trans_id,
+            0x5678,
+            1,
+            0x0006,
+            42,
+            vec![0x18, 0x01, 0x0A, 0x00, 0x00, 0x10, 0x01],
+        )
+        .await;
+
+        let frames = collector.await.expect("collector");
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].cluster, 0x0402);
+        assert_eq!(frames[0].payload, vec![0x10, 0x00, 0x00, 0x00, 0x00]);
+
+        let published = wait_for_publish(&broker, |item| item.topic == "zigbee2mqtt/reader").await;
+        let state: serde_json::Value = serde_json::from_slice(&published.payload).unwrap();
+        assert_eq!(state["read_temperature"], json!(2250));
+        assert_eq!(state["read_ok"], json!(true));
         std::fs::remove_dir_all(&dir).ok();
     }
 }

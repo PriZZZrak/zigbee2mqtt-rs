@@ -1,10 +1,13 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
-use boa_engine::{Context, Source};
+use boa_engine::{js_string, Context, JsString, JsValue, NativeFunction, Source};
 use serde::Deserialize;
+use serde_json::{json, Map, Value};
 use tracing::{debug, warn};
 
 /// On-demand external converters (zigbee-herdsman-converters dist JS).
@@ -29,6 +32,196 @@ pub struct ExternalConverter {
     dir: PathBuf,
     registry_url: String,
     runtime: Arc<Mutex<Option<mpsc::Sender<ConverterJob>>>>,
+    zcl_io: Arc<Mutex<Option<ZclIo>>>,
+}
+
+/// Synchronous ZCL I/O used by converters that call `msg.endpoint.read`.
+#[derive(Clone)]
+pub struct ZclIo {
+    pub inner: Arc<tokio::sync::Mutex<crate::coordinator::znp::ZnpHandle>>,
+    pub runtime: tokio::runtime::Handle,
+    pub types: crate::converters::zcl_types::ZclTypesFile,
+    pub tsn: Arc<AtomicU8>,
+}
+
+#[derive(Clone)]
+struct ZclContext {
+    io: ZclIo,
+    nwk_addr: u16,
+    endpoint: u8,
+}
+
+thread_local! {
+    static ZCL_CONTEXT: RefCell<Option<ZclContext>> = const { RefCell::new(None) };
+}
+
+struct ZclGuard;
+
+impl Drop for ZclGuard {
+    fn drop(&mut self) {
+        ZCL_CONTEXT.with(|cell| *cell.borrow_mut() = None);
+    }
+}
+
+fn install_zcl_context(context: Option<&ZclContext>) -> ZclGuard {
+    ZCL_CONTEXT.with(|cell| *cell.borrow_mut() = context.cloned());
+    ZclGuard
+}
+
+impl ZclIo {
+    fn read(
+        &self,
+        context: &ZclContext,
+        cluster: u16,
+        attributes: &[String],
+        manufacturer_code: Option<u16>,
+        disable_default_response: bool,
+    ) -> std::result::Result<Map<String, Value>, String> {
+        let mut ids = Vec::new();
+        for name in attributes {
+            let id = name
+                .parse::<u16>()
+                .ok()
+                .or_else(|| self.types.attribute_by_name(cluster, name))
+                .ok_or_else(|| format!("unknown attribute '{name}' for cluster 0x{cluster:04X}"))?;
+            ids.push(id);
+        }
+        if ids.is_empty() {
+            return Err("read request has no attributes".into());
+        }
+        let tsn = self.tsn.fetch_add(1, Ordering::Relaxed);
+        let frame = crate::zigbee::zcl::frame::read_attributes_payload_with_options(
+            tsn,
+            manufacturer_code,
+            disable_default_response,
+            &ids,
+        );
+        let inner = Arc::clone(&self.inner);
+        let nwk_addr = context.nwk_addr;
+        let endpoint = context.endpoint;
+        let response = self
+            .runtime
+            .block_on(async move {
+                let handle = inner.lock().await;
+                handle
+                    .request_zcl(
+                        nwk_addr,
+                        endpoint,
+                        cluster,
+                        tsn,
+                        frame,
+                        Duration::from_secs(3),
+                        2,
+                    )
+                    .await
+            })
+            .map_err(|error| error.to_string())?;
+        let (header, offset) = crate::zigbee::zcl::frame::ZclFrameHeader::parse(&response.data)
+            .map_err(|error| error.to_string())?;
+        if header.command_id != crate::zigbee::zcl::frame::global::READ_ATTRIBUTES_RSP {
+            return Err(format!(
+                "unexpected response command 0x{:02X}",
+                header.command_id
+            ));
+        }
+        let mut values = Map::new();
+        for report in crate::zigbee::zcl::parse_read_attr_rsp(&response.data[offset..]) {
+            let Some(info) = self.types.attribute(cluster, report.attr_id) else {
+                continue;
+            };
+            if let Some(value) = attribute_value_json(&report.value) {
+                values.insert(info.name.clone(), value);
+            }
+        }
+        Ok(values)
+    }
+}
+
+fn attribute_value_json(value: &crate::zigbee::zcl::attribute::AttributeValue) -> Option<Value> {
+    use crate::zigbee::zcl::attribute::AttributeValue as V;
+    match value {
+        // Herdsman reads BOOLEAN through `readUInt8`, so converters see 0/1.
+        V::Bool(value) => Some(json!(u8::from(*value))),
+        V::U8(value) => Some(json!(value)),
+        V::U16(value) => Some(json!(value)),
+        V::U24(value) => Some(json!(value)),
+        V::U32(value) => Some(json!(value)),
+        V::I8(value) => Some(json!(value)),
+        V::I16(value) => Some(json!(value)),
+        V::I24(value) => Some(json!(value)),
+        V::I32(value) => Some(json!(value)),
+        V::Float(value) => Some(json!(value)),
+        V::Str(value) => Some(json!(value)),
+        V::Bytes | V::Invalid => None,
+    }
+}
+
+fn zcl_read_json(raw: &str) -> String {
+    let Some(context) = ZCL_CONTEXT.with(|cell| cell.borrow().clone()) else {
+        return json!({"disabled": true}).to_string();
+    };
+    let request: Value = match serde_json::from_str(raw) {
+        Ok(value) => value,
+        Err(error) => {
+            return json!({"error": format!("invalid read request: {error}")}).to_string()
+        }
+    };
+    let cluster = request
+        .get("cluster")
+        .and_then(|value| match value {
+            Value::Number(number) => number.as_u64(),
+            Value::String(name) => context.io.types.cluster_id_by_name(name).map(u64::from),
+            _ => None,
+        })
+        .and_then(|id| u16::try_from(id).ok());
+    let Some(cluster) = cluster else {
+        return json!({"error": "unresolved cluster"}).to_string();
+    };
+    let attributes: Vec<String> = request
+        .get("attributes")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| match value {
+                    Value::String(name) => Some(name.clone()),
+                    Value::Number(number) => Some(number.to_string()),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let options = request.get("options");
+    let manufacturer_code = options
+        .and_then(|options| options.get("manufacturerCode"))
+        .and_then(|value| value.as_u64())
+        .and_then(|value| u16::try_from(value).ok());
+    let disable_default_response = options
+        .and_then(|options| options.get("disableDefaultResponse"))
+        .and_then(|value| value.as_bool())
+        .unwrap_or(true);
+    match context.io.read(
+        &context,
+        cluster,
+        &attributes,
+        manufacturer_code,
+        disable_default_response,
+    ) {
+        Ok(data) => json!({"data": data}).to_string(),
+        Err(error) => json!({"error": error}).to_string(),
+    }
+}
+
+fn register_zcl_read(context: &mut Context) {
+    let read = NativeFunction::from_copy_closure(|_this, args, context| {
+        let raw = args
+            .first()
+            .and_then(|value| value.to_string(context).ok())
+            .map(|value| value.to_std_string_escaped())
+            .unwrap_or_default();
+        Ok(JsValue::from(JsString::from(zcl_read_json(&raw))))
+    });
+    let _ = context.register_global_callable(js_string!("__zclRead"), 1, read);
 }
 
 /// One ZCL operation requested by a converter `convertSet`.
@@ -120,6 +313,7 @@ enum ConverterJob {
         device: ExternalDeviceInfo,
         message: IncomingMessageInfo,
         state: serde_json::Map<String, serde_json::Value>,
+        zcl: Option<ZclContext>,
         reply: mpsc::Sender<Option<ConvertedFrame>>,
     },
     ConvertData {
@@ -130,6 +324,7 @@ enum ConverterJob {
         device: ExternalDeviceInfo,
         message: IncomingMessageInfo,
         state: serde_json::Map<String, serde_json::Value>,
+        zcl: Option<ZclContext>,
         reply: mpsc::Sender<Option<ConvertedFrame>>,
     },
 }
@@ -189,6 +384,7 @@ impl ExternalDeviceInfo {
 #[derive(Debug, Clone, Copy)]
 pub struct IncomingMessageInfo {
     pub endpoint: u8,
+    pub nwk_addr: u16,
     pub linkquality: u8,
     pub group_id: u16,
     /// ZCL transaction sequence number of the received frame, exposed to
@@ -201,6 +397,7 @@ impl Default for IncomingMessageInfo {
     fn default() -> Self {
         Self {
             endpoint: 1,
+            nwk_addr: 0,
             linkquality: 0,
             group_id: 0,
             tsn: None,
@@ -436,7 +633,27 @@ impl ExternalConverter {
             dir: dir.as_ref().to_path_buf(),
             registry_url: registry_url.into(),
             runtime: Arc::new(Mutex::new(None)),
+            zcl_io: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Attach coordinator I/O so `msg.endpoint.read` can return device data.
+    pub fn set_zcl_io(&self, io: Option<ZclIo>) {
+        if let Ok(mut guard) = self.zcl_io.lock() {
+            *guard = io;
+        }
+    }
+
+    fn zcl_context(&self, message: &IncomingMessageInfo) -> Option<ZclContext> {
+        if message.nwk_addr == 0 {
+            return None;
+        }
+        let io = self.zcl_io.lock().ok()?.clone()?;
+        Some(ZclContext {
+            io,
+            nwk_addr: message.nwk_addr,
+            endpoint: message.endpoint,
+        })
     }
 
     pub fn ensure_dir(&self) -> std::io::Result<()> {
@@ -705,6 +922,7 @@ impl ExternalConverter {
         })?;
 
         let mut ctx = Context::default();
+        register_zcl_read(&mut ctx);
         let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
         let bootstrap = format!(
             r#"
@@ -861,6 +1079,8 @@ impl ExternalConverter {
             },
             "options": {},
         });
+        let zcl_context = self.zcl_context(message);
+        let _zcl_guard = install_zcl_context(zcl_context.as_ref());
         let script = format!(
             r#"(function() {{
               try {{
@@ -911,6 +1131,17 @@ const __norm = (v) => {{
                 }};
                 const __reads = [];
                 msg.endpoint.read = (cluster, attributes, options) => {{
+                    if (typeof __zclRead === "function") {{
+                        const response = JSON.parse(__zclRead(JSON.stringify({{
+                            cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                            attributes: Array.isArray(attributes) ? attributes : [attributes],
+                            options: options || {{}},
+                        }})));
+                        if (!response.disabled) {{
+                            if (response.error) return Promise.reject(new Error(response.error));
+                            return Promise.resolve(response.data || {{}});
+                        }}
+                    }}
                     __reads.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         attributes: __norm(Array.isArray(attributes) ? attributes : [attributes]),
@@ -1266,6 +1497,7 @@ impl ExternalConverter {
             .or_else(|| self.load_js(&file))?;
         let sources = collect_sources(&self.dir, &module_src, &file, &zcl)?;
         let mut ctx = Context::default();
+        register_zcl_read(&mut ctx);
         let bootstrap = format!("{}{}", cjs_bootstrap(&sources, &zcl), TIMERS_JS);
         if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
             warn!("external converter: session bootstrap failed");
@@ -1506,6 +1738,17 @@ const __norm = (v) => {{
                 }};
                 const __reads = [];
                 msg.endpoint.read = (cluster, attributes, options) => {{
+                    if (typeof __zclRead === "function") {{
+                        const response = JSON.parse(__zclRead(JSON.stringify({{
+                            cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
+                            attributes: Array.isArray(attributes) ? attributes : [attributes],
+                            options: options || {{}},
+                        }})));
+                        if (!response.disabled) {{
+                            if (response.error) return Promise.reject(new Error(response.error));
+                            return Promise.resolve(response.data || {{}});
+                        }}
+                    }}
                     __reads.push({{
                         cluster: (cluster && cluster.ID !== undefined) ? cluster.ID : cluster,
                         attributes: __norm(Array.isArray(attributes) ? attributes : [attributes]),
@@ -1986,6 +2229,7 @@ const __norm = (v) => {{
                             device,
                             message,
                             state,
+                            zcl,
                             reply,
                         } => {
                             let key = format!("{}|{model}", device.ieee_addr);
@@ -2000,6 +2244,7 @@ const __norm = (v) => {{
                                     }
                                 }
                             }
+                            let _guard = install_zcl_context(zcl.as_ref());
                             let result = sessions.get_mut(&key).and_then(|session| {
                                 converter.dispatch_session(
                                     session, cluster_id, &msg_type, &reports, &device, &message,
@@ -2016,6 +2261,7 @@ const __norm = (v) => {{
                             device,
                             message,
                             state,
+                            zcl,
                             reply,
                         } => {
                             let key = format!("{}|{model}", device.ieee_addr);
@@ -2030,6 +2276,7 @@ const __norm = (v) => {{
                                     }
                                 }
                             }
+                            let _guard = install_zcl_context(zcl.as_ref());
                             let result = sessions.get_mut(&key).and_then(|session| {
                                 converter.dispatch_session_data(
                                     session, cluster_id, &msg_type, data, &device, &message, &state,
@@ -2075,6 +2322,7 @@ const __norm = (v) => {{
             device: device.clone(),
             message: *message,
             state: state.clone(),
+            zcl: self.zcl_context(message),
             reply,
         };
         if sender.send(job).is_err() {
@@ -2136,6 +2384,7 @@ const __norm = (v) => {{
             device: device.clone(),
             message: *message,
             state: state.clone(),
+            zcl: self.zcl_context(message),
             reply,
         };
         if sender.send(job).is_err() {
@@ -3726,6 +3975,7 @@ module.exports = {definitions};
                 &device(),
                 &IncomingMessageInfo {
                     endpoint: 3,
+                    nwk_addr: 0,
                     linkquality: 77,
                     group_id: 0,
                     tsn: None,
@@ -4190,6 +4440,7 @@ module.exports = {definitions};
                 &device(),
                 &IncomingMessageInfo {
                     endpoint: 2,
+                    nwk_addr: 0,
                     linkquality: 10,
                     group_id: 0,
                     tsn: None,

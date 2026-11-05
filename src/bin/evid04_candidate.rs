@@ -120,6 +120,7 @@ fn main() {
     if mode == "fromZigbee" {
         let message = IncomingMessageInfo {
             endpoint,
+            nwk_addr: 0,
             linkquality,
             group_id: 0,
             tsn: input
@@ -171,6 +172,7 @@ fn main() {
     if mode == "fromZigbeeOps" {
         let message = IncomingMessageInfo {
             endpoint,
+            nwk_addr: 0,
             linkquality,
             group_id: 0,
             tsn: input

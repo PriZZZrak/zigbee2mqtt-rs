@@ -32,7 +32,7 @@ R1 — явно ограниченный релиз для проверенно�
 
 - **OPS-02 частично**: artifact **пересобран из текущего SHA** (5 475 952 B,
   sha256 `b9571660…`), **`.ipk` собран через OpenWrt SDK 24.10.8**
-  (5 573 977 B, sha256 `9dc3360f…`, installed 11 950 080 B с app-resolved Windfront 2.15.0,
+  (5 585 084 B, sha256 `af27af09…`, installed 11 960 320 B с app-resolved Windfront 2.15.0,
   `conffiles` сохраняет config, payload `sstrip` объяснён, повторная сборка даёт
   тот же хэш). `check_ipk.py` валидирует пакет (9 тестов). Install/upgrade/
   downgrade **BLOCKED** на Routerich + Dongle-P; CI jobs не запускались;
@@ -58,8 +58,11 @@ R1 — явно ограниченный релиз для проверенно�
   добавлен `console`-шим (иначе logger ломал конвертеры) и `msg.meta.tsn`.
   Добавлен **ZCL-wire differential**: pinned herdsman `Zcl.Frame.create`
   кодирует те же команды/write/read, байты совпадают с Rust для 4 кейсов
-  (gateway/weather/Leviton/Yale). Read-результат конвертеру **не возвращается**
-  (нужен async conversion API — иначе deadlock); write/command fire-and-forget.
+  (gateway/weather/Leviton/Yale). **Read-результат теперь возвращается
+  конвертеру**: `ZclIo` (coordinator Mutex + Tokio handle) выполняет
+  `request_zcl` из converter-потока, пока bridge ждёт сессию; ZNP pump работает
+  независимо, deadlock нет. Fake-coordinator multi-thread тест подтверждает
+  `read_temperature: 2250`. Write/command остаются fire-and-forget.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и
