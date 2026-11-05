@@ -131,16 +131,29 @@ the alternate-key descriptor is missing/different, the bridge resumes with a
 warning instead of refusing (upstream would refuse; refusing makes a known-good
 network unstartable). This never rewrites NV; see `docs/parity/decisions.md`.
 
-## Operational note: duplicate MQTT commands
+## Operational note: duplicate MQTT commands (fixed 2026-11-05)
 
-The router's existing mosquitto configuration contains a bridge to Home
-Assistant (`connection ha-bridge`, `address 192.168.0.30:1883`,
-`topic # both 0`, `try_private false`). With that loop, a single
-`mosquitto_pub` is delivered **twice** to local subscribers (verified with an
-independent subscriber), so the bridge executes each set twice. This is a
-broker configuration loop, not a Rust subscription duplication; upstream would
-also receive both copies. `try_private true` or directional topics would stop
-the echo. The user's broker config was not modified.
+The router's mosquitto bridges all topics to the Home Assistant broker on the
+other side of the VPN (`connection ha-bridge`, `topic # both 0`) so that
+Zigbee2MQTT keeps working when the VPN drops. The bridge was configured with
+`try_private false`, which disabled Mosquitto's bridge loop protection: every
+local publish was forwarded to HA and echoed back, so local subscribers (and
+the bridge) saw each message twice.
+
+Fix applied on the router (backup:
+`/root/z2mback/mosquitto.conf.20261105T210942Z`): `try_private true`, then
+`/etc/init.d/mosquitto restart`. Verification:
+
+- an independent subscriber receives a single copy of a probe publish
+  (`test/loop-probe`, previously two);
+- the HA bridge reconnects (`192.168.0.1:<port> -> 192.168.0.30:1883`
+  ESTABLISHED);
+- Zigbee2MQTT reconnects (`MQTT connected and subscribed`) and continues
+  publishing device state.
+
+The HA broker is Mosquitto and supports the bridge flag, so `try_private true`
+is safe here. If a future remote broker does not support it, use directional
+`topic ... out/in` rules instead.
 
 ## Not yet verified
 
