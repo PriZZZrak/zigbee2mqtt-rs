@@ -556,6 +556,16 @@ struct ConverterSession {
     types: crate::converters::zcl_types::ZclTypesFile,
 }
 
+/// Persisted endpoint data needed by definition generation.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ExternalEndpoint {
+    pub id: u8,
+    pub profile_id: u16,
+    pub device_id: u16,
+    pub input_clusters: Vec<u16>,
+    pub output_clusters: Vec<u16>,
+}
+
 /// Minimal device identity for the `meta.device` stub.
 #[derive(Debug, Clone, Default)]
 pub struct ExternalDeviceInfo {
@@ -572,6 +582,8 @@ pub struct ExternalDeviceInfo {
     pub stack_version: Option<u8>,
     pub zcl_version: Option<u8>,
     pub endpoint_ids: Vec<u8>,
+    /// Full endpoint list (clusters are needed by generated definitions).
+    pub endpoints: Vec<ExternalEndpoint>,
 }
 
 impl ExternalDeviceInfo {
@@ -594,6 +606,17 @@ impl ExternalDeviceInfo {
                 .endpoints
                 .iter()
                 .map(|endpoint| endpoint.endpoint)
+                .collect(),
+            endpoints: device
+                .endpoints
+                .iter()
+                .map(|endpoint| ExternalEndpoint {
+                    id: endpoint.endpoint,
+                    profile_id: endpoint.profile_id,
+                    device_id: endpoint.device_id,
+                    input_clusters: endpoint.input_clusters.clone(),
+                    output_clusters: endpoint.output_clusters.clone(),
+                })
                 .collect(),
         }
     }
@@ -797,6 +820,61 @@ fn fingerprint_matches(fingerprint: &Fingerprint, device: &ExternalDeviceInfo) -
 
 /// Select `[file, index]` exactly as `findDefinition` does for the identity
 /// fields available to the Rust runtime.
+/// `meta.device` JSON shared by definition payload and generation.
+fn device_meta_json(device: &ExternalDeviceInfo) -> serde_json::Value {
+    serde_json::json!({
+        "modelID": device.model_id,
+        "manufacturerID": device.manufacturer_id,
+        "manufacturerName": device.manufacturer_name,
+        "ieeeAddr": device.ieee_addr,
+        "powerSource": device.power_source,
+        "type": device.device_type,
+        "softwareBuildID": device.software_build_id,
+        "applicationVersion": device.application_version,
+        "dateCode": device.date_code,
+        "hardwareVersion": device.hardware_version,
+        "stackVersion": device.stack_version,
+        "zclVersion": device.zcl_version,
+        "meta": {},
+        "endpoints": device
+            .endpoints
+            .iter()
+            .map(|endpoint| {
+                serde_json::json!({
+                    "ID": endpoint.id,
+                    "profileID": endpoint.profile_id,
+                    "deviceID": endpoint.device_id,
+                    "inputClusters": endpoint.input_clusters,
+                    "outputClusters": endpoint.output_clusters,
+                })
+            })
+            .collect::<Vec<_>>(),
+    })
+}
+
+/// `Device.exposes()` always appends the generic linkquality expose
+/// (`lib/model/device.ts`).
+fn append_linkquality_expose(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(exposes) = value
+        .get_mut("exposes")
+        .and_then(|exposes| exposes.as_array_mut())
+    {
+        exposes.push(serde_json::json!({
+            "access": 1,
+            "category": "diagnostic",
+            "description": "Link quality (signal strength)",
+            "label": "Linkquality",
+            "name": "linkquality",
+            "property": "linkquality",
+            "type": "numeric",
+            "unit": "lqi",
+            "value_max": 255,
+            "value_min": 0,
+        }));
+    }
+    value
+}
+
 fn select_definition(
     registry: &RegistryFile,
     model: &str,
@@ -991,74 +1069,30 @@ impl ExternalConverter {
             return None;
         };
         let Some((file, index)) = select_definition(&registry, model, device) else {
+            // Upstream `findByDevice(..., true)` generates a definition for
+            // unknown devices (`generateDefinition.js`).
             debug!(
-                "definition_payload: no definition for {model:?} (mfr {:?}/{:?}, endpoints {:?})",
+                "definition_payload: no definition for {model:?}, generating (mfr {:?}/{:?}, endpoints {:?})",
                 device.manufacturer_name, device.manufacturer_id, device.endpoint_ids
             );
-            return None;
+            return self.generated_definition_payload(device);
         };
         let Some((mut ctx, file)) = self.definition_context(&file) else {
             debug!("definition_payload: cannot load {file} for {model:?}");
             return None;
         };
         let meta = serde_json::json!({
-            "device": {
-                "modelID": device.model_id,
-                "manufacturerID": device.manufacturer_id,
-                "manufacturerName": device.manufacturer_name,
-                "ieeeAddr": device.ieee_addr,
-                "powerSource": device.power_source,
-                "type": device.device_type,
-                "softwareBuildID": device.software_build_id,
-                "endpoints": device.endpoint_ids.iter().map(|id| serde_json::json!({"ID": id})).collect::<Vec<_>>(),
-                "meta": {},
-            },
+            "device": device_meta_json(device),
         });
         let script = format!(
             r#"(function() {{
                 try {{
                     const defs = __require("devices/__entry__.js")("./{file}").definitions;
                     const raw = defs[{index}];
-                    const definition = __prepareDefinition(raw);
                     const meta = JSON.parse({meta});
                     const device = meta.device;
-                    device.meta = device.meta || {{}};
-                    // Missing endpoints must be `undefined` (upstream
-                    // `zh.Device.getEndpoint`), definitions branch on that.
-                    device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id);
-                    for (const endpoint of (device.endpoints || [])) {{
-                        endpoint.getDevice = () => device;
-                        // Endpoint cluster values come from the interview; the
-                        // definition payload only needs the fallback semantics.
-                        endpoint.getClusterAttributeValue = () => undefined;
-                    }}
-                    let exposes = definition.exposes;
-                    if (typeof exposes === "function") exposes = exposes(device, {{}});
-                    if (!Array.isArray(exposes)) exposes = [];
-                    exposes = exposes.filter((entry) => entry !== null && entry !== undefined);
-                    const payload = {{
-                        source: "native",
-                        model: definition.model,
-                        vendor: definition.vendor,
-                        description: definition.description,
-                        exposes: JSON.parse(JSON.stringify(exposes, (key, value) => typeof value === "function" ? undefined : value)),
-                        supports_ota: !!definition.ota,
-                        options: JSON.parse(JSON.stringify(definition.options || [])),
-                        version: definition.version || "0.0.0",
-                    }};
-                    // Upstream `findByDevice`: white-label entries whose
-                    // fingerprint matches override model/vendor/description.
-                    if (Array.isArray(raw.whiteLabel)) {{
-                        const label = raw.whiteLabel.find((entry) =>
-                            Array.isArray(entry.fingerprint) && entry.fingerprint.some((fp) => __fingerprintMatch(fp, device)));
-                        if (label) {{
-                            payload.model = label.model;
-                            if (label.vendor !== undefined) payload.vendor = label.vendor;
-                            if (label.description !== undefined) payload.description = label.description;
-                        }}
-                    }}
-                    if (definition.icon) payload.icon = definition.icon;
-                    return JSON.stringify(payload);
+                    install_endpoint_stubs(device);
+                    return __definitionPayloadJson(raw, device, "native", true);
                 }} catch (error) {{
                     return JSON.stringify({{__error: String((error && error.stack) || error)}});
                 }}
@@ -1073,27 +1107,107 @@ impl ExternalConverter {
             warn!("external converter: cannot build definition payload for {model:?}: {out}");
             return None;
         }
-        let mut value = value;
-        if let Some(exposes) = value
-            .get_mut("exposes")
-            .and_then(|exposes| exposes.as_array_mut())
-        {
-            // `Device.exposes()` always appends the generic linkquality expose
-            // (`lib/model/device.ts`).
-            exposes.push(serde_json::json!({
-                "access": 1,
-                "category": "diagnostic",
-                "description": "Link quality (signal strength)",
-                "label": "Linkquality",
-                "name": "linkquality",
-                "property": "linkquality",
-                "type": "numeric",
-                "unit": "lqi",
-                "value_max": 255,
-                "value_min": 0,
-            }));
+        Some(append_linkquality_expose(value))
+    }
+
+    /// Generate a definition for a device without a matching converter
+    /// definition (upstream `findByDevice(..., true)` ->
+    /// `lib/generateDefinition.js`).
+    #[must_use]
+    pub fn generated_definition_payload(
+        &self,
+        device: &ExternalDeviceInfo,
+    ) -> Option<serde_json::Value> {
+        let zcl = self.load_zcl()?;
+        let entry = r#"module.exports = require("../lib/generateDefinition");"#;
+        let sources = collect_sources(&self.dir, entry, "gendef_probe.js", &zcl)?;
+        let mut ctx = Context::default();
+        register_zcl_natives(&mut ctx);
+        let bootstrap = cjs_bootstrap(&sources, &zcl);
+        if ctx.eval(Source::from_bytes(bootstrap.as_bytes())).is_err() {
+            warn!("external converter: generator bootstrap failed");
+            return None;
         }
-        Some(value)
+        let cluster_names = serde_json::to_string(&zcl.clusters).ok()?;
+        debug!(
+            "generated definition input: model={:?} endpoints={:?}",
+            device.model_id,
+            device
+                .endpoints
+                .iter()
+                .map(|endpoint| (endpoint.id, endpoint.input_clusters.clone()))
+                .collect::<Vec<_>>()
+        );
+        let meta = serde_json::json!({ "device": device_meta_json(device) });
+        let script = format!(
+            r#"(function() {{
+                try {{
+                    const names = {cluster_names};
+                    const gen = __require("devices/__entry__.js")("./gendef_probe.js");
+                    const meta = JSON.parse({meta});
+                    const device = meta.device;
+                    install_endpoint_stubs(device);
+                    for (const endpoint of (device.endpoints || [])) {{
+                        const clusterName = (id) => names[String(id)] || String(id);
+                        endpoint.getInputClusters = () => (endpoint.inputClusters || []).map((id) => ({{name: clusterName(id)}}));
+                        endpoint.getOutputClusters = () => (endpoint.outputClusters || []).map((id) => ({{name: clusterName(id)}}));
+                        endpoint.supportsInputCluster = (name) => (endpoint.inputClusters || []).some((id) => clusterName(id) === name);
+                        endpoint.supportsOutputCluster = (name) => (endpoint.outputClusters || []).some((id) => clusterName(id) === name);
+                    }}
+                    globalThis.__genDevice = device;
+                    Promise.resolve(gen.generateDefinition(device)).then(
+                        (result) => {{ globalThis.__genResult = result; }},
+                        (error) => {{ globalThis.__genError = String((error && error.stack) || error); }});
+                    return "started";
+                }} catch (error) {{
+                    return "ERR:" + String((error && error.stack) || error);
+                }}
+            }})()"#,
+            cluster_names = cluster_names,
+            meta = serde_json::to_string(&serde_json::to_string(&meta).unwrap()).unwrap(),
+        );
+        match eval_string(&mut ctx, &script) {
+            Some(result) if result == "started" => {}
+            Some(error) => {
+                warn!("external converter: generator start failed: {error}");
+                return None;
+            }
+            None => {
+                warn!("external converter: generator start failed");
+                return None;
+            }
+        }
+        ctx.run_jobs();
+        let status = eval_string(
+            &mut ctx,
+            "JSON.stringify({ok: !!globalThis.__genResult && !!globalThis.__genResult.definition, err: String(globalThis.__genError || '')})",
+        )?;
+        let status: serde_json::Value = serde_json::from_str(&status).ok()?;
+        if !status
+            .get("ok")
+            .and_then(|ok| ok.as_bool())
+            .unwrap_or(false)
+        {
+            warn!(
+                "external converter: definition generation failed for {:?}: {}",
+                device.model_id,
+                status.get("err").and_then(|err| err.as_str()).unwrap_or("")
+            );
+            return None;
+        }
+        let out = eval_string(
+            &mut ctx,
+            "__definitionPayloadJson(globalThis.__genResult.definition, globalThis.__genDevice, \"generated\", false)",
+        )?;
+        let value: serde_json::Value = serde_json::from_str(&out).ok()?;
+        if value.get("__error").is_some() {
+            warn!(
+                "external converter: generated payload failed for {:?}: {out}",
+                device.model_id
+            );
+            return None;
+        }
+        Some(append_linkquality_expose(value))
     }
 
     /// Public accessor used by the bridge to encode `convertSet` operations.
@@ -3080,6 +3194,19 @@ const PREPARE_DEFINITION_JS: &str = r#"
             return true;
         }
 
+        function install_endpoint_stubs(device) {
+            device.meta = device.meta || {};
+            // Missing endpoints must be `undefined` (upstream
+            // `zh.Device.getEndpoint`), definitions branch on that.
+            device.getEndpoint = (id) => (device.endpoints || []).find((endpoint) => endpoint.ID === id);
+            for (const endpoint of (device.endpoints || [])) {
+                endpoint.getDevice = () => device;
+                // Endpoint cluster values come from the interview; the
+                // definition payload only needs the fallback semantics.
+                endpoint.getClusterAttributeValue = () => undefined;
+            }
+        }
+
         function __augmentDefinitionOptions(prepared) {
             // Upstream `prepareDefinition`: add calibration/precision and
             // converter-declared device options (deduplicated by name).
@@ -3227,6 +3354,40 @@ const PREPARE_DEFINITION_JS: &str = r#"
                 options,
                 ...definitionWithoutExtend,
             });
+        }
+
+
+        function __definitionPayloadJson(raw, device, source, applyWhiteLabel) {
+            try {
+                const definition = __prepareDefinition(raw);
+                let exposes = definition.exposes;
+                if (typeof exposes === "function") exposes = exposes(device, {});
+                if (!Array.isArray(exposes)) exposes = [];
+                exposes = exposes.filter((entry) => entry !== null && entry !== undefined);
+                const payload = {
+                    source: source,
+                    model: definition.model,
+                    vendor: definition.vendor,
+                    description: definition.description,
+                    exposes: JSON.parse(JSON.stringify(exposes, (key, value) => typeof value === "function" ? undefined : value)),
+                    supports_ota: !!definition.ota,
+                    options: JSON.parse(JSON.stringify(definition.options || [])),
+                    version: definition.version || "0.0.0",
+                };
+                if (applyWhiteLabel && Array.isArray(raw.whiteLabel)) {
+                    const label = raw.whiteLabel.find((entry) =>
+                        Array.isArray(entry.fingerprint) && entry.fingerprint.some((fp) => __fingerprintMatch(fp, device)));
+                    if (label) {
+                        payload.model = label.model;
+                        if (label.vendor !== undefined) payload.vendor = label.vendor;
+                        if (label.description !== undefined) payload.description = label.description;
+                    }
+                }
+                if (definition.icon) payload.icon = definition.icon;
+                return JSON.stringify(payload);
+            } catch (error) {
+                return JSON.stringify({__error: String((error && error.stack) || error)});
+            }
         }
 "#;
 

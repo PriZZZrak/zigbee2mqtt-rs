@@ -1,0 +1,25 @@
+{
+  "id": "generated-temperature-sensor",
+  "input": {
+    "device": {
+      "model_id": "temperature.sensor",
+      "manufacturer_name": null,
+      "manufacturer_id": 4151,
+      "device_type": "EndDevice",
+      "power_source": "Battery",
+      "ieee_addr": "0x0017880104e45561",
+      "endpoints": [
+        {
+          "id": 1,
+          "input_clusters": [
+            0,
+            3,
+            4,
+            1026
+          ],
+          "output_clusters": []
+        }
+      ]
+    }
+  }
+}

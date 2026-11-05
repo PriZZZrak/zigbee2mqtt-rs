@@ -83,8 +83,12 @@ R1 — явно ограниченный релиз для проверенно�
   `String.prototype.substr`** → `Buffer.from(hex)` падал и 12 lumi-устройств не
   загружали definition; fallback каталога игнорировал `zigbeeModel` кандидата
   (registry теперь несёт `lookupCandidates`). Остаётся **генерация definitions**
-  для неизвестных устройств (7 из 62, CONVERTER-021 → known gap), `config_schema`,
-  endpoint bindings/reportings, coordinator meta и HTTP/WS frontend.
+  для неизвестных устройств **реализована** (CONVERTER-021): порт
+  `generateDefinition` с полными endpoint-кластерами, `supported=false` для
+  generated, публикация после join/failed interview; отдельный
+  Node-vs-Rust differential — **5/5 PASS**, API-кейс теперь **5/5** без
+  known-gap. Остаются `config_schema`, endpoint bindings/reportings, coordinator
+  meta и HTTP/WS frontend.
 - **PR-01 — выполнено локально** (`a700832`, `f4ef0f0`): baseline/evidence
   зафиксированы, CSV отремонтирован, неподтверждённые `VERIFIED` и case-счётчики
   переоткрыты, добавлены строгий валидатор, генерация dashboard с CI-check и

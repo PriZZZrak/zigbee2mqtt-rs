@@ -161,6 +161,11 @@ impl Device {
         obj.insert("network_address".into(), json!(self.nwk_addr));
         obj.insert("friendly_name".into(), json!(self.friendly_name));
         let supported = definition.is_some();
+        let definition_source = definition
+            .as_ref()
+            .and_then(|definition| definition.get("source"))
+            .and_then(|source| source.as_str())
+            .map(str::to_string);
         if let Some(definition) = definition {
             obj.insert("definition".into(), definition);
         }
@@ -198,7 +203,9 @@ impl Device {
                     "FAILED"
                 })),
         );
-        // `isSupported` is `!!definition` upstream.
+        // `isSupported` is `!!definition && !definition.generated` upstream
+        // (`lib/model/device.ts`).
+        let supported = supported && definition_source.as_deref() != Some("generated");
         obj.insert("supported".into(), json!(supported));
         obj.insert("disabled".into(), json!(self.disabled));
         let endpoints: serde_json::Map<String, serde_json::Value> = self
@@ -430,6 +437,24 @@ mod tests {
             "vendor": "IKEA",
         })));
         assert_eq!(with_definition["definition"]["vendor"], "IKEA");
+    }
+
+    #[test]
+    fn generated_definitions_are_unsupported() {
+        let mut dev = Device::new(test_ieee(), 0x1234);
+        dev.model = Some("unknown.device".into());
+        let generated = dev.to_z2m_device_json_with_definition(Some(json!({
+            "source": "generated",
+            "model": "unknown.device",
+        })));
+        // Upstream `isSupported` is `!!definition && !definition.generated`.
+        assert_eq!(generated["supported"], false);
+
+        let native = dev.to_z2m_device_json_with_definition(Some(json!({
+            "source": "native",
+            "model": "known.device",
+        })));
+        assert_eq!(native["supported"], true);
     }
 
     #[test]

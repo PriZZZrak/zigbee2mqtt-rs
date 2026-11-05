@@ -25,13 +25,6 @@ except ImportError:  # pragma: no cover
     from evid04_harness import verify_pins
 
 
-def meta_manufacturer_id(upstream: dict, ieee: str):
-    for meta in upstream.get("device_meta", []):
-        if meta.get("ieeeAddr") == ieee:
-            return meta.get("manufId")
-    return None
-
-
 def build_fixture(upstream: dict, directory: Path) -> Path:
     info = upstream["bridge_info"]
     config = info.get("config") or {}
@@ -69,40 +62,46 @@ def build_fixture(upstream: dict, directory: Path) -> Path:
             lines.append(f'    description: "{device["description"]}"')
     (directory / "configuration.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    # The database fixture mirrors the upstream mock devices, including the
+    # endpoint cluster lists the definition generator needs.
     db_lines = []
-    for index, device in enumerate(devices, start=1):
-        endpoint_ids = [int(endpoint_id) for endpoint_id in (device.get("endpoints") or {})]
-        endpoints = {
-            str(endpoint_id): {
+    for index, meta in enumerate(sorted(upstream.get("device_meta", []), key=lambda m: m["ieeeAddr"]), start=1):
+        ieee = meta.get("ieeeAddr", "")
+        if not valid_ieee.match(str(ieee)):
+            continue
+        if (meta.get("nwkAddr") or 0) > 0xFFFF:
+            continue
+        endpoints = {}
+        for endpoint in meta.get("endpoints", []):
+            endpoints[str(endpoint["id"])] = {
                 "profId": 260,
-                "epId": endpoint_id,
+                "epId": endpoint["id"],
                 "devId": 0,
-                "inClusterList": [],
-                "outClusterList": [],
+                "inClusterList": endpoint.get("inputClusters", []),
+                "outClusterList": endpoint.get("outputClusters", []),
                 "clusters": {},
                 "binds": [],
                 "configuredReportings": [],
                 "meta": {},
             }
-            for endpoint_id in endpoint_ids
-        }
         db_lines.append(
             json.dumps(
                 {
                     "id": index + 1,
-                    "type": device.get("type"),
-                    "ieeeAddr": device["ieee_address"],
-                    "nwkAddr": device.get("network_address", 0),
-                    "manufId": meta_manufacturer_id(upstream, device["ieee_address"]),
-                    "manufName": device.get("manufacturer"),
-                    "powerSource": device.get("power_source"),
-                    "modelId": device.get("model_id"),
-                    "swBuildId": device.get("software_build_id"),
-                    "dateCode": device.get("date_code"),
-                    "epList": endpoint_ids,
+                    "type": meta.get("type"),
+                    "ieeeAddr": ieee,
+                    "nwkAddr": meta.get("nwkAddr", 0),
+                    "manufId": meta.get("manufId"),
+                    "manufName": meta.get("manufName"),
+                    "powerSource": meta.get("powerSource"),
+                    "modelId": meta.get("modelId"),
+                    "swBuildId": meta.get("swBuildId"),
+                    "dateCode": meta.get("dateCode"),
+                    "epList": [endpoint["id"] for endpoint in meta.get("endpoints", [])],
                     "endpoints": endpoints,
-                    "interviewCompleted": device.get("interview_completed", False),
-                    "interviewState": device.get("interview_state") or "FAILED",
+                    "interviewCompleted": meta.get("interviewComplete", False),
+                    "interviewState": meta.get("interviewState")
+                    or ("SUCCESSFUL" if meta.get("interviewComplete") else "FAILED"),
                     "meta": {},
                 },
                 separators=(",", ":"),
@@ -158,6 +157,13 @@ def normalize_info(info: dict) -> dict:
 def normalize_definition(value):
     if not isinstance(value, dict):
         return None
+    if value.get("source") == "generated":
+        # The app's test mocks resolve endpoint clusters through a partial
+        # cluster-name map, so the dump's generated definitions omit extenders
+        # for genIdentify/genGroups/etc. Their content is compared with full
+        # ZCL names by scripts/generated_definition_diff.py; here only the
+        # marker (and `supported`, which is false for generated) is compared.
+        return {"source": "generated"}
     exposes = value.get("exposes") or []
     return {
         "source": value.get("source"),

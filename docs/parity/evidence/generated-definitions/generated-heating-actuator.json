@@ -1,0 +1,27 @@
+{
+  "id": "generated-heating-actuator",
+  "input": {
+    "device": {
+      "model_id": "heating.actuator",
+      "manufacturer_name": null,
+      "manufacturer_id": 4151,
+      "device_type": "Router",
+      "power_source": "Mains (single phase)",
+      "ieee_addr": "0x0017880104e45562",
+      "endpoints": [
+        {
+          "id": 1,
+          "input_clusters": [
+            0,
+            3,
+            4,
+            513
+          ],
+          "output_clusters": [
+            1026
+          ]
+        }
+      ]
+    }
+  }
+}

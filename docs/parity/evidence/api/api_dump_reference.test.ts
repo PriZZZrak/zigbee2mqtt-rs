@@ -112,6 +112,7 @@ describe("API dump", () => {
                     swBuildId: device.softwareBuildID ?? null,
                     dateCode: device.dateCode ?? null,
                     interviewComplete: String(device.interviewState).toLowerCase() === "successful",
+                    interviewState: String(device.interviewState).toUpperCase(),
                     endpoints: (device.endpoints || []).map((endpoint: any) => ({
                         id: endpoint.ID,
                         profileId: endpoint.profileID,

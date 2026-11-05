@@ -3274,28 +3274,33 @@ fn device_list_json(
         }));
     }
     for device in devices.all_devices() {
-        let definition = match device.model.as_deref() {
-            Some(model) => {
-                let key = format!(
-                    "{model}|{:?}|{:?}|{:?}",
-                    device.manufacturer_id,
-                    device.manufacturer,
-                    device
-                        .endpoints
-                        .iter()
-                        .map(|ep| ep.endpoint)
-                        .collect::<Vec<_>>()
-                );
-                if let Some(cached) = cache.get(&key) {
-                    cached.clone()
-                } else {
-                    let info = ExternalDeviceInfo::from_device(&device);
-                    let payload = external.definition_payload(model, &info);
-                    cache.insert(key, payload.clone());
-                    payload
-                }
-            }
-            None => None,
+        let key = format!(
+            "{:?}|{:?}|{:?}|{:?}",
+            device.model,
+            device.manufacturer_id,
+            device.manufacturer,
+            device
+                .endpoints
+                .iter()
+                .map(|ep| ep.endpoint)
+                .collect::<Vec<_>>()
+        );
+        // Upstream resolves definitions on join/failed interview, but not
+        // while an interview is still in progress.
+        let definition = if device.interview_state.as_deref() == Some("IN_PROGRESS") {
+            None
+        } else if let Some(cached) = cache.get(&key) {
+            cached.clone()
+        } else {
+            let info = ExternalDeviceInfo::from_device(&device);
+            let payload = match device.model.as_deref().filter(|model| !model.is_empty()) {
+                Some(model) => external.definition_payload(model, &info),
+                // Upstream skips lookup candidates without a modelID and
+                // generates a definition instead.
+                None => external.generated_definition_payload(&info),
+            };
+            cache.insert(key, payload.clone());
+            payload
         };
         list.push(device.to_z2m_device_json_with_definition(definition));
     }

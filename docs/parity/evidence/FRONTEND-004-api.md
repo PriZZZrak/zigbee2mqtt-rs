@@ -71,6 +71,10 @@ converter package can be pointed at a staged build with `Z2M_CONVERTERS_DIR`
   endpoint ids; endpoint clusters/bindings/reportings/scenes remain covered by
   the storage differential.
 - `bridge-devices-definitions`: `definition` + `supported` per device.
+  Generated definitions are compared by marker (`source: "generated"`) because
+  the app's test mocks resolve endpoint clusters through a partial name map; the
+  content is verified with full ZCL names by
+  `scripts/generated_definition_diff.py` (CONVERTER-021).
 - `scripts/tests/test_api_diff.py` covers the harness (matching run, renamed
   device failure, known-gap handling).
 
@@ -80,20 +84,19 @@ converter package can be pointed at a staged build with `Z2M_CONVERTERS_DIR`
 $ Z2M_CONVERTERS_DIR=<staged 26.115.1> python3 scripts/api_diff.py \
     --upstream docs/parity/evidence/api/upstream-dump.json \
     --candidate-cmd "./target/release/evid04_api_candidate" \
-    --require-pins --known-gap bridge-devices-definitions \
+    --require-pins \
     --report docs/parity/reports/api.json
-API: 4 passed, 0 failed, known_gaps=['bridge-devices-definitions'],
-pins=[all four MATCH]
+API: 5 passed, 0 failed, pins=[all four MATCH]
 
 bridge-state                 PASS
 bridge-info                  PASS
 bridge-devices               PASS   (coordinator + 62 devices)
-bridge-devices-definitions   KNOWN_GAP (7 devices, see below)
+bridge-devices-definitions   PASS   (native exact; generated marker + supported)
 permit-join-response         PASS
 ```
 
-The report is checked in at `docs/parity/reports/api.json`; the known-gap case
-records the exact mismatches and is explicitly named.
+The report is checked in at `docs/parity/reports/api.json`. Generated definition
+content is covered by `docs/parity/reports/generated-definitions.json` (5/5).
 
 ## Defects found and fixed by this differential
 
@@ -123,13 +126,15 @@ records the exact mismatches and is explicitly named.
    `findDefinition` (e.g. `Thermostat` → eCozy `1TST-EU`, not the Schneider
    CCTFR6400).
 
-## Known gap
+## Generated definitions
 
-Seven mock devices have **generated** definitions upstream
-(`source: "generated"`, `zhc.findByDevice(..., true)` → `generateDefinition`).
-The Rust converter host does not implement definition generation yet, so those
-devices publish no `definition` and `supported=false`. This is tracked as
-CONVERTER-021 and keeps FRONTEND-004 `IN_PROGRESS`.
+Seven dump devices have upstream **generated** definitions
+(`zhc.findByDevice(..., true)` → `generateDefinition`). Rust now generates them
+too (CONVERTER-021): the bridge publishes the definition after join/failed
+interview (not while `IN_PROGRESS`) and reports `supported=false` because
+upstream `isSupported` excludes generated definitions. All five generated
+differential fixtures match the pinned Node generator byte-for-byte; the API
+case compares the marker and `supported`.
 
 ## Other gaps
 

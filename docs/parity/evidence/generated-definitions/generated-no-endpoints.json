@@ -1,0 +1,14 @@
+{
+  "id": "generated-no-endpoints",
+  "input": {
+    "device": {
+      "model_id": "",
+      "manufacturer_name": null,
+      "manufacturer_id": 4151,
+      "device_type": "Router",
+      "power_source": "Mains (single phase)",
+      "ieee_addr": "0x0017980134e45545",
+      "endpoints": []
+    }
+  }
+}
