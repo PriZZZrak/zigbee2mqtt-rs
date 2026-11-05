@@ -1,10 +1,10 @@
 {
   "status": "PASS",
-  "passed": 3,
+  "passed": 9,
   "failed": 0,
   "database": {
     "path": "docs/parity/evidence/storage/fixtures/upstream-database.db",
-    "sha256": "2992508c902be2967de09695befb44a2487fa04b3387ad782b5f0ccabbfbb2e0"
+    "sha256": "ca8847900df8e9c93f00b6efc56ac554eb8dcb13049bf9a5b1d31aa49979f85c"
   },
   "config": {
     "path": "docs/parity/evidence/storage/fixtures/configuration.yaml",
@@ -53,6 +53,36 @@
     },
     {
       "id": "rewritten-database-import",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "rewrite-preserves-persisted-entries",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "corrupted-database-import",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "corrupted-rewrite-preserves-entries",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "truncated-database-import",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "truncated-rewrite-preserves-entries",
+      "status": "PASS",
+      "mismatches": []
+    },
+    {
+      "id": "stale-temp-write-recovers",
       "status": "PASS",
       "mismatches": []
     }

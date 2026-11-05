@@ -50,7 +50,7 @@
     {
       "command": "python3 scripts/storage_diff.py --require-pins (pinned herdsman Database + z2m config)",
       "exit": 0,
-      "result": "3 passed, 0 failed; database import, rewrite preservation and rewritten import; all 4 pins MATCH"
+      "result": "9 passed, 0 failed; import, rewrite, raw persisted fields, groups/GreenPower, corrupted/truncated/stale tmp; all 4 pins MATCH"
     }
   ]
 }

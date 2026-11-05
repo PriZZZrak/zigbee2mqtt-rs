@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--db")
 parser.add_argument("--config")
 parser.add_argument("--rewrite")
+parser.add_argument("--raw", action="store_true")
 args = parser.parse_args()
 devices = [
     {
@@ -72,7 +73,7 @@ class StorageDiffTests(unittest.TestCase):
             self.assertEqual(code, 0)
             data = json.loads(report.read_text())
             self.assertEqual(data["status"], "PASS")
-            self.assertEqual(data["passed"], 3)
+            self.assertEqual(data["passed"], 9)
             self.assertEqual(data["failed"], 0)
             self.assertEqual(
                 [case["id"] for case in data["cases"]],
@@ -80,6 +81,12 @@ class StorageDiffTests(unittest.TestCase):
                     "import-upstream-database",
                     "rewrite-preserves-reference-view",
                     "rewritten-database-import",
+                    "rewrite-preserves-persisted-entries",
+                    "corrupted-database-import",
+                    "corrupted-rewrite-preserves-entries",
+                    "truncated-database-import",
+                    "truncated-rewrite-preserves-entries",
+                    "stale-temp-write-recovers",
                 ],
             )
 
@@ -105,7 +112,7 @@ class StorageDiffTests(unittest.TestCase):
             self.assertEqual(code, 1)
             data = json.loads(report.read_text())
             self.assertEqual(data["status"], "FAIL")
-            self.assertEqual(data["failed"], 2)
+            self.assertEqual(data["failed"], 4)
             self.assertTrue(
                 any("friendlyName" in mismatch for mismatch in data["cases"][0]["mismatches"])
             )

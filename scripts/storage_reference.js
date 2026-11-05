@@ -29,6 +29,8 @@ function parseArgs(argv) {
         if (arg === "--canonicalize") {
             options.canonicalize = [argv[index + 1], argv[index + 2]];
             index += 2;
+        } else if (arg === "--raw") {
+            options.raw = true;
         } else if (arg === "--db" || arg === "--config") {
             options[arg.slice(2)] = argv[index + 1];
             index += 1;
@@ -47,7 +49,9 @@ function normalize(dbPath, configPath) {
     const configured = config.devices || {};
     const devices = [];
     for (const entry of database.entries.values()) {
-        if (entry.type === "Coordinator" || entry.type === "Group" || entry.type === "GreenPower") continue;
+        // GreenPower devices are real herdsman devices; only the coordinator
+        // and group records are not part of the device view.
+        if (entry.type === "Coordinator" || entry.type === "Group") continue;
         if (!entry.ieeeAddr) continue;
         const deviceConfig = configured[entry.ieeeAddr] || {};
         const endpoints = Object.values(entry.endpoints || {})
@@ -89,5 +93,11 @@ if (options.canonicalize) {
     console.error(`storage-reference: wrote ${output}`);
 } else {
     if (!options.db) fail("--db is required");
-    process.stdout.write(`${JSON.stringify(normalize(options.db, options.config), null, 2)}\n`);
+    if (options.raw) {
+        const database = Database.open(options.db);
+        const entries = [...database.entries.values()].sort((left, right) => left.id - right.id);
+        process.stdout.write(`${JSON.stringify(entries, null, 2)}\n`);
+    } else {
+        process.stdout.write(`${JSON.stringify(normalize(options.db, options.config), null, 2)}\n`);
+    }
 }

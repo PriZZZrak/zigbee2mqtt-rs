@@ -20,7 +20,8 @@ Behavior: STORAGE-001, STORAGE-004; report `docs/parity/reports/storage.json`.
 
 ## Differential
 
-Both sides load the same database and configuration and print a normalized view:
+The fixture also contains a Group record and a GreenPower device so rewrite
+preservation is checked for non-device entries.
 
 - `ieeeAddr`, `nwkAddr`, `friendlyName`, `disabled`, `manufacturerName`,
   `manufacturerId`, `powerSource`, `modelId`, `swBuildId`, `interviewComplete`,
@@ -36,7 +37,18 @@ Cases:
 2. `rewrite-preserves-reference-view` — Node reads the Rust-written database
    (`PersistentDatabase::sync_devices` + `write`) and it must match the original
    view;
-3. `rewritten-database-import` — reference vs Rust both load the rewritten DB.
+3. `rewritten-database-import` — reference vs Rust both load the rewritten DB;
+4. `rewrite-preserves-persisted-entries` — Node `--raw` compares **every**
+   persisted entry before/after the Rust rewrite: endpoint `clusters`, `binds`,
+   `configuredReportings`, `meta`, `lastSeen`, `swBuildId`, Group and GreenPower
+   records (IDs and members included);
+5. `corrupted-database-import` + `corrupted-rewrite-preserves-entries` — a
+   trailing malformed JSON line is ignored by both importers and dropped on
+   rewrite without losing valid entries;
+6. `truncated-database-import` + `truncated-rewrite-preserves-entries` — a
+   truncated final line simulates an interrupted write;
+7. `stale-temp-write-recovers` — a leftover `database.db.tmp` is renamed by the
+   Rust writer and the resulting DB matches the reference entry view.
 
 ```text
 $ python3 scripts/storage_diff.py \
@@ -45,7 +57,7 @@ $ python3 scripts/storage_diff.py \
     --reference-cmd "env Z2M_APP=$PWD/.upstream/zigbee2mqtt node scripts/storage_reference.js" \
     --candidate-cmd ./target/release/evid04_storage_candidate \
     --require-pins --report docs/parity/reports/storage.json
-STORAGE: 3 passed, 0 failed, pins=[all four MATCH]
+STORAGE: 9 passed, 0 failed, pins=[all four MATCH]
 ```
 
 The harness has regression tests with fake commands
@@ -54,10 +66,9 @@ view fails).
 
 ## Gaps
 
-- Compares the normalized import view, not every persisted field: endpoints'
-  `clusters`, `binds`, `configuredReportings`, `meta`, `lastSeen`, and group /
-  GreenPower entries are preserved on rewrite by code paths but not asserted by
-  this differential.
+- Raw-entry comparison covers the persisted fixture fields, but does not test a
+  real power-loss/kill-during-write or backup/restore procedure, only simulated
+  corrupted/truncated/stale-tmp files.
 - The config fixture covers `devices` names/flags; full z2m settings parsing
   (MQTT URI form, advanced options) is not compared.
-- No crash/corruption/backup or interrupted-write scenarios; no hardware/HIL.
+- Group membership/reporting runtime behaviour and hardware remain untested.

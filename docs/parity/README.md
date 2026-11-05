@@ -19,14 +19,14 @@ Compatibility baseline: zigbee2mqtt `344b6e03b43644c97154a72ca9eae17193c553a2` (
 Frontend baseline: **BLOCKED** — the app resolves Windfront 2.15.0; the historical lock pins 2.15.1. See upstream-lock.json.
 Latest upstream: app `3c841fdfd66c`, herdsman `eb80ba1f1cb3`, converters `367100282578`, Windfront `b32226926e4d`, documentation `14acd6165880` (checked 2026-11-04T09:08:33.742736+00:00).
 Freshness: **DRIFT_DETECTED**
-Discovered: 120 eligible behaviors; 16 unmeasured rows.
-Stage 1 Z-Stack parity: **0/113 = 0.00%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
-Global upstream parity: **0/120 = 0.00%** [all adapter families].
-Stage 1 / global weighted parity: 0.00% / 0.00% (0/158, 0/172).
-Stage 1 / global scenarios: 62/463 = 13.39% and 62/463 = 13.39% [9/16 unmeasured rows].
-Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 54, IN_PROGRESS 42, PARTIAL 8 (120 total).
+Discovered: 121 eligible behaviors; 16 unmeasured rows.
+Stage 1 Z-Stack parity: **1/114 = 0.88%** [complete Stage 1 requires CC2531 + CC2652P; R1 release requires Dongle-P only].
+Global upstream parity: **1/121 = 0.83%** [all adapter families].
+Stage 1 / global weighted parity: 1.25% / 1.15% (2/160, 2/174).
+Stage 1 / global scenarios: 73/473 = 15.43% and 73/473 = 15.43% [9/16 unmeasured rows].
+Status breakdown: DISCOVERED 16, IMPLEMENTED_UNVERIFIED 54, IN_PROGRESS 42, PARTIAL 8, VERIFIED 1 (121 total).
 Critical P0 gaps: ADAPTER-001, ADAPTER-002, ADAPTER-003, ADAPTER-004, ADAPTER-005, CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-004, CONVERTER-007, CONVERTER-008, CONVERTER-009, CONVERTER-010, CONVERTER-011, CONVERTER-012, CONVERTER-013, CONVERTER-014, CONVERTER-015, CONVERTER-016, CONVERTER-018, CONVERTER-019, DRIFT-001, EVID-004, HA-001, HA-003 (+30 more)
-Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 0/108, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
+Adapter coverage (verified/rows): deconz 0/2, ember 0/1, ezsp 0/1, shared 1/109, zboss 0/1, zigate 0/1, zoh 0/1, zstack 0/5
 Inventory audit: incomplete; no substantiated domain fraction, catalog total or converter denominator.
 Device definition parity: UNKNOWN (EVID-02 catalog audit not performed).
 Converter parity: UNKNOWN (per-definition execution coverage not enumerated).

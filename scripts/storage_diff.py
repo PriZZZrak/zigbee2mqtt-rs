@@ -48,6 +48,36 @@ def run(command: str, database: Path, config: Path, extra: list[str] | None = No
         raise RuntimeError(f"command output is not JSON: {error}\n{completed.stdout[:500]}")
 
 
+def run_raw(command: str, database: Path) -> list:
+    argv = shlex.split(command) + ["--db", str(database), "--raw"]
+    completed = subprocess.run(argv, capture_output=True, text=True, timeout=120, check=False)
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"command failed ({completed.returncode}): {' '.join(argv)}\n{completed.stderr.strip()}"
+        )
+    return json.loads(completed.stdout)
+
+
+def compare_entries(reference: list, candidate: list) -> list[str]:
+    """Compare raw database entries (dict order-insensitive, IDs sorted)."""
+    expected = {entry.get("id"): entry for entry in reference}
+    actual = {entry.get("id"): entry for entry in candidate}
+    mismatches = []
+    if set(expected) != set(actual):
+        mismatches.append(
+            f"entry ids differ: reference={sorted(expected)} candidate={sorted(actual)}"
+        )
+    for entry_id in sorted(set(expected) & set(actual)):
+        if expected[entry_id] != actual[entry_id]:
+            for key in sorted(set(expected[entry_id]) | set(actual[entry_id])):
+                if expected[entry_id].get(key) != actual[entry_id].get(key):
+                    mismatches.append(
+                        f"id {entry_id}.{key}: reference={expected[entry_id].get(key)!r} "
+                        f"candidate={actual[entry_id].get(key)!r}"
+                    )
+    return mismatches
+
+
 def compare(reference: dict, candidate: dict) -> list[str]:
     """Return human-readable mismatches (empty when equal)."""
     mismatches = []
@@ -95,6 +125,17 @@ def main(argv: list[str]) -> int:
     cases = []
     failures = 0
 
+    def add_raw_case(case_id: str, reference: list, candidate: list) -> None:
+        nonlocal failures
+        mismatches = compare_entries(reference, candidate)
+        status = "PASS" if not mismatches else "FAIL"
+        if mismatches:
+            failures += 1
+            print(f"{case_id}: FAIL", file=sys.stderr)
+            for mismatch in mismatches:
+                print(f"  {mismatch}", file=sys.stderr)
+        cases.append({"id": case_id, "status": status, "mismatches": mismatches})
+
     def add_case(case_id: str, reference: dict, candidate: dict) -> None:
         nonlocal failures
         mismatches = compare(reference, candidate)
@@ -110,14 +151,69 @@ def main(argv: list[str]) -> int:
     candidate_import = run(args.candidate_cmd, args.db, args.config)
     add_case("import-upstream-database", reference_import, candidate_import)
 
+    def rewritten_pair(source: Path, directory: Path, label: str) -> Path:
+        output = directory / f"{label}.db"
+        run(args.candidate_cmd, source, args.config, ["--rewrite", str(output)])
+        return output
+
     with tempfile.TemporaryDirectory(prefix="z2m-storage-") as directory:
-        rewritten = Path(directory) / "database.db"
-        run(args.candidate_cmd, args.db, args.config, ["--rewrite", str(rewritten)])
+        root = Path(directory)
+        rewritten = rewritten_pair(args.db, root, "rewritten")
         reference_rewritten = run(args.reference_cmd, rewritten, args.config)
         candidate_rewritten = run(args.candidate_cmd, rewritten, args.config)
+        add_case("rewrite-preserves-reference-view", reference_import, reference_rewritten)
+        add_case("rewritten-database-import", reference_rewritten, candidate_rewritten)
+        add_raw_case(
+            "rewrite-preserves-persisted-entries",
+            run_raw(args.reference_cmd, args.db),
+            run_raw(args.reference_cmd, rewritten),
+        )
 
-    add_case("rewrite-preserves-reference-view", reference_import, reference_rewritten)
-    add_case("rewritten-database-import", reference_rewritten, candidate_rewritten)
+        # Corrupted line: both importers skip it; rewrite must keep the valid
+        # entries (including Group/GreenPower) and drop only the bad line.
+        corrupt_source = root / "corrupted.db"
+        corrupt_source.write_bytes(
+            args.db.read_bytes() + b'\n{"id": 999, "type":'
+        )
+        add_case(
+            "corrupted-database-import",
+            run(args.reference_cmd, corrupt_source, args.config),
+            run(args.candidate_cmd, corrupt_source, args.config),
+        )
+        corrupt_rewritten = rewritten_pair(corrupt_source, root, "corrupted-rewritten")
+        add_raw_case(
+            "corrupted-rewrite-preserves-entries",
+            run_raw(args.reference_cmd, corrupt_source),
+            run_raw(args.reference_cmd, corrupt_rewritten),
+        )
+
+        # Truncated last line (simulated interrupted write).
+        truncated_source = root / "truncated.db"
+        data = args.db.read_bytes()
+        truncated_source.write_bytes(data[:-12])
+        add_case(
+            "truncated-database-import",
+            run(args.reference_cmd, truncated_source, args.config),
+            run(args.candidate_cmd, truncated_source, args.config),
+        )
+        truncated_rewritten = rewritten_pair(truncated_source, root, "truncated-rewritten")
+        add_raw_case(
+            "truncated-rewrite-preserves-entries",
+            run_raw(args.reference_cmd, truncated_source),
+            run_raw(args.reference_cmd, truncated_rewritten),
+        )
+
+        # Stale .tmp from a previous failed write: Rust must rename it, keep the
+        # source entries and produce a database the reference can read.
+        stale_source = root / "stale.db"
+        stale_source.write_bytes(args.db.read_bytes())
+        (root / "stale.db.tmp").write_bytes(b"partial garbage")
+        stale_rewritten = rewritten_pair(stale_source, root, "stale-rewritten")
+        add_raw_case(
+            "stale-temp-write-recovers",
+            run_raw(args.reference_cmd, args.db),
+            run_raw(args.reference_cmd, stale_rewritten),
+        )
 
     report = {
         "status": "PASS" if failures == 0 else "FAIL",
