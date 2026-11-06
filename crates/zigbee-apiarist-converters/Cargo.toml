@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 zigbee-apiarist = { path = "../zigbee-apiarist" }
+
+[lib]
+path = "src/mod.rs"

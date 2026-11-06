@@ -1,3 +1,4 @@
+#![allow(clippy::module_inception)]
 pub mod adapter;
 pub mod buffalo;
 pub mod controller;

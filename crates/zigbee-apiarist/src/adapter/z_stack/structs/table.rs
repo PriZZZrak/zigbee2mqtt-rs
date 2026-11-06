@@ -8,7 +8,7 @@
 // pub fn inlineHeader() { todo!() }
 // pub fn occupancy() { todo!() }
 // pub fn serialize() { todo!() }
-// pub fn struct() { todo!() }
+// pub fn r#struct() { todo!() }
 
 pub fn table() {
     todo!()
