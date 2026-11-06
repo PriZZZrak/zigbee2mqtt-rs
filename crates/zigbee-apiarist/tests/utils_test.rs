@@ -14,10 +14,22 @@ fn is_number_array() {
 #[test]
 #[ignore = "not implemented yet"]
 fn is_number_array_of_length() {
-    assert!(utils::is_number_array_of_length(&serde_json::json!([1, 2, 3]), 3));
-    assert!(!utils::is_number_array_of_length(&serde_json::json!([1, 2]), 3));
-    assert!(!utils::is_number_array_of_length(&serde_json::json!([1, 2, "3"]), 3));
-    assert!(!utils::is_number_array_of_length(&serde_json::json!("nonarray"), 3));
+    assert!(utils::is_number_array_of_length(
+        &serde_json::json!([1, 2, 3]),
+        3
+    ));
+    assert!(!utils::is_number_array_of_length(
+        &serde_json::json!([1, 2]),
+        3
+    ));
+    assert!(!utils::is_number_array_of_length(
+        &serde_json::json!([1, 2, "3"]),
+        3
+    ));
+    assert!(!utils::is_number_array_of_length(
+        &serde_json::json!("nonarray"),
+        3
+    ));
 }
 
 #[test]
@@ -44,10 +56,19 @@ fn checks_install_codes_of_all_lengths() {
     let code8_invalid_fixed = vec![0xFF, 0xFE, 0xD3, 0x40, 0x7A, 0x93, 0xDE, 0x84];
     let code8_missing_crc = vec![0x83, 0xFE, 0xD3, 0x40, 0x7A, 0x93];
 
-    assert_eq!(check_install_code(&code8_valid, true), (code8_valid.clone(), None));
-    assert_eq!(check_install_code(&code8_invalid, true), (code8_invalid_fixed.clone(), Some("invalid CRC".to_string())));
+    assert_eq!(
+        check_install_code(&code8_valid, true),
+        (code8_valid.clone(), None)
+    );
+    assert_eq!(
+        check_install_code(&code8_invalid, true),
+        (code8_invalid_fixed.clone(), Some("invalid CRC".to_string()))
+    );
     // adjust=false throws on invalid
-    assert_eq!(check_install_code(&code8_missing_crc, true), (code8_valid.clone(), Some("missing CRC".to_string())));
+    assert_eq!(
+        check_install_code(&code8_missing_crc, true),
+        (code8_valid.clone(), Some("missing CRC".to_string()))
+    );
 
     // 10/14/18-byte cases follow the same pattern in upstream; see
     // .upstream/zigbee-herdsman/test/utils.test.ts for the full matrix.

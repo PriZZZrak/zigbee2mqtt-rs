@@ -29,6 +29,9 @@ fn handles_bigint_conversions() {
         let mut reversed = buf.clone();
         reversed.reverse();
         assert_eq!(big_u_int64_to_buffer_be(value), reversed);
-        assert_eq!(u64::from_str_radix(hex.trim_start_matches("0x"), 16).unwrap(), value);
+        assert_eq!(
+            u64::from_str_radix(hex.trim_start_matches("0x"), 16).unwrap(),
+            value
+        );
     }
 }

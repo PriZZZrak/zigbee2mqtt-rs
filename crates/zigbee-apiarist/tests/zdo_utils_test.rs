@@ -31,6 +31,10 @@ fn gets_response_cluster_id_for_request() {
     ];
 
     for (request, response) in cases {
-        assert_eq!(utils::get_response_cluster_id(request), response, "request=0x{request:04x}");
+        assert_eq!(
+            utils::get_response_cluster_id(request),
+            response,
+            "request=0x{request:04x}"
+        );
     }
 }

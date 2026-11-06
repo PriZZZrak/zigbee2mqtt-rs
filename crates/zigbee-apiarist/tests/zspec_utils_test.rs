@@ -89,10 +89,22 @@ fn hashes_using_aes_128_mmo() {
     let val3 = hex_decode("76777475727370717E7F7C7D7A7B7879C0");
     let val4 = hex_decode("1C1D1E1F18191A1B14151617101112133C3D537529A7A9A03F669DCD886CB52C");
 
-    assert_eq!(utils::aes128_mmo_hash(&val1), hex_decode("58C1828CF7F1C3FE29E7B1024AD84BFA"));
-    assert_eq!(utils::aes128_mmo_hash(&val2), hex_decode("66B6900981E1EE3CA4206B6B861C02BB"));
-    assert_eq!(utils::aes128_mmo_hash(&val3), hex_decode("3C3D537529A7A9A03F669DCD886CB52C"));
-    assert_eq!(utils::aes128_mmo_hash(&val4), hex_decode("4512807BF94CB3400F0E2C25FB76E999"));
+    assert_eq!(
+        utils::aes128_mmo_hash(&val1),
+        hex_decode("58C1828CF7F1C3FE29E7B1024AD84BFA")
+    );
+    assert_eq!(
+        utils::aes128_mmo_hash(&val2),
+        hex_decode("66B6900981E1EE3CA4206B6B861C02BB")
+    );
+    assert_eq!(
+        utils::aes128_mmo_hash(&val3),
+        hex_decode("3C3D537529A7A9A03F669DCD886CB52C")
+    );
+    assert_eq!(
+        utils::aes128_mmo_hash(&val4),
+        hex_decode("4512807BF94CB3400F0E2C25FB76E999")
+    );
 }
 
 fn hex_decode(value: &str) -> Vec<u8> {

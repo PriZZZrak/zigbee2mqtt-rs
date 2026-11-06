@@ -17,8 +17,14 @@ fn object_is_empty() {
 #[test]
 #[ignore = "not implemented yet"]
 fn object_has_properties() {
-    assert!(utils::object_has_properties(&json!({"a": 1, "b": 2, "c": 3}), &["a", "b"]));
-    assert!(!utils::object_has_properties(&json!({"a": 1, "b": 2, "c": 3}), &["a", "b", "d"]));
+    assert!(utils::object_has_properties(
+        &json!({"a": 1, "b": 2, "c": 3}),
+        &["a", "b"]
+    ));
+    assert!(!utils::object_has_properties(
+        &json!({"a": 1, "b": 2, "c": 3}),
+        &["a", "b", "d"]
+    ));
 }
 
 #[tokio::test]
@@ -27,11 +33,8 @@ async fn get_z2m_version() {
     // Upstream mocks `exec` and `readFileSync`; those failure paths are not
     // portable to Rust without a process/file abstraction. Happy path only.
     let version = serde_json::from_str::<serde_json::Value>(
-        &std::fs::read_to_string(format!(
-            "{}/package.json",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap_or_default(),
+        &std::fs::read_to_string(format!("{}/package.json", env!("CARGO_MANIFEST_DIR")))
+            .unwrap_or_default(),
     )
     .ok()
     .and_then(|v| v.get("version").cloned());
@@ -53,31 +56,46 @@ async fn get_z2m_version() {
 #[ignore = "not implemented yet"]
 async fn check_dependency_version() {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let herdsman_pkg = format!("{}/../../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman/package.json", manifest_dir);
-    let converters_pkg = format!("{}/../../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman-converters/package.json", manifest_dir);
+    let herdsman_pkg = format!(
+        "{}/../../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman/package.json",
+        manifest_dir
+    );
+    let converters_pkg = format!(
+        "{}/../../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman-converters/package.json",
+        manifest_dir
+    );
 
-    let version_herdsman = serde_json::from_str::<serde_json::Value>(&std::fs::read_to_string(&herdsman_pkg).unwrap())
-        .unwrap()
-        .get("version")
-        .cloned()
-        .unwrap();
-    let version_converters = serde_json::from_str::<serde_json::Value>(&std::fs::read_to_string(&converters_pkg).unwrap())
-        .unwrap()
-        .get("version")
-        .cloned()
-        .unwrap();
+    let version_herdsman =
+        serde_json::from_str::<serde_json::Value>(&std::fs::read_to_string(&herdsman_pkg).unwrap())
+            .unwrap()
+            .get("version")
+            .cloned()
+            .unwrap();
+    let version_converters = serde_json::from_str::<serde_json::Value>(
+        &std::fs::read_to_string(&converters_pkg).unwrap(),
+    )
+    .unwrap()
+    .get("version")
+    .cloned()
+    .unwrap();
 
-    assert_eq!(utils::get_dependency_version("zigbee-herdsman").await["version"], version_herdsman);
-    assert_eq!(utils::get_dependency_version("zigbee-herdsman-converters").await["version"], version_converters);
+    assert_eq!(
+        utils::get_dependency_version("zigbee-herdsman").await["version"],
+        version_herdsman
+    );
+    assert_eq!(
+        utils::get_dependency_version("zigbee-herdsman-converters").await["version"],
+        version_converters
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn to_local_iso_string() {
     let date = 1755644130000i64; // 2025-08-19T23:15:30Z approx
-    // Upstream mocks Date.getTimezoneOffset; Rust has no built-in TZ offset,
-    // so the implementation must accept an offset parameter or use a crate.
-    // Assertions kept as shape checks.
+                                 // Upstream mocks Date.getTimezoneOffset; Rust has no built-in TZ offset,
+                                 // so the implementation must accept an offset parameter or use a crate.
+                                 // Assertions kept as shape checks.
     let s1 = utils::format_date(date, "ISO_8601_local");
     let s2 = utils::format_date(date, "ISO_8601_local");
     assert!(s1.ends_with("-01:00") || s1.ends_with("+01:00"));
@@ -104,13 +122,16 @@ fn removes_null_properties_from_object() {
         "nested": {"homeassistant": {"abcd": true, "xyz": null}, "abc": {}, "def": null}
     });
     utils::remove_null_properties_from_object(&mut obj1, &[]);
-    assert_eq!(obj1, json!({
-        "ab": 0,
-        "cd": false,
-        "gh": "",
-        "homeassistant": {"xyz": "mock"},
-        "nested": {"homeassistant": {"abcd": true}, "abc": {}}
-    }));
+    assert_eq!(
+        obj1,
+        json!({
+            "ab": 0,
+            "cd": false,
+            "gh": "",
+            "homeassistant": {"xyz": "mock"},
+            "nested": {"homeassistant": {"abcd": true}, "abc": {}}
+        })
+    );
 
     let mut obj2 = json!({
         "ab": 0,
@@ -121,13 +142,16 @@ fn removes_null_properties_from_object() {
         "nested": {"homeassistant": {"abcd": true, "xyz": null}, "abc": {}, "def": null}
     });
     utils::remove_null_properties_from_object(&mut obj2, &["homeassistant"]);
-    assert_eq!(obj2, json!({
-        "ab": 0,
-        "cd": false,
-        "gh": "",
-        "homeassistant": {"xyz": "mock", "abcd": null},
-        "nested": {"homeassistant": {"abcd": true, "xyz": null}, "abc": {}}
-    }));
+    assert_eq!(
+        obj2,
+        json!({
+            "ab": 0,
+            "cd": false,
+            "gh": "",
+            "homeassistant": {"xyz": "mock", "abcd": null},
+            "nested": {"homeassistant": {"abcd": true, "xyz": null}, "abc": {}}
+        })
+    );
 }
 
 #[test]
@@ -143,7 +167,10 @@ fn stable_stringify() {
         "ris": [1, null, "b"],
         "ls": null
     });
-    assert_eq!(stringify::stringify(&value), r#"{"3":"c","a":"a","b":2,"ls":null,"ris":[1,null,"b"]}"#);
+    assert_eq!(
+        stringify::stringify(&value),
+        r#"{"3":"c","a":"a","b":2,"ls":null,"ris":[1,null,"b"]}"#
+    );
 
     // circular reference cannot be represented in serde_json::Value without
     // a custom serializer; upstream returns {"a":1,"b":"[Circular]"}.

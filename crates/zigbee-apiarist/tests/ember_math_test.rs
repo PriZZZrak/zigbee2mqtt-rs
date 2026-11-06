@@ -95,8 +95,18 @@ fn bit() {
     assert_eq!(m::bit(26), 67108864);
     assert_eq!(m::bit(11) | m::bit(15) | m::bit(20) | m::bit(25), 34637824);
     assert_eq!(
-        m::bit(12) | m::bit(13) | m::bit(14) | m::bit(16) | m::bit(17) | m::bit(18)
-            | m::bit(19) | m::bit(21) | m::bit(22) | m::bit(23) | m::bit(24) | m::bit(26),
+        m::bit(12)
+            | m::bit(13)
+            | m::bit(14)
+            | m::bit(16)
+            | m::bit(17)
+            | m::bit(18)
+            | m::bit(19)
+            | m::bit(21)
+            | m::bit(22)
+            | m::bit(23)
+            | m::bit(24)
+            | m::bit(26),
         99577856
     );
     assert_eq!(53 & m::bit(0), 1);
@@ -111,11 +121,23 @@ fn bit32() {
     assert_eq!(m::bit32(11), 2048);
     assert_eq!(m::bit32(15), 32768);
     assert_eq!(m::bit32(26), 67108864);
-    assert_eq!(m::bit32(11) | m::bit32(15) | m::bit32(20) | m::bit32(25), 34637824);
     assert_eq!(
-        m::bit32(12) | m::bit32(13) | m::bit32(14) | m::bit32(16) | m::bit32(17)
-            | m::bit32(18) | m::bit32(19) | m::bit32(21) | m::bit32(22) | m::bit32(23)
-            | m::bit32(24) | m::bit32(26),
+        m::bit32(11) | m::bit32(15) | m::bit32(20) | m::bit32(25),
+        34637824
+    );
+    assert_eq!(
+        m::bit32(12)
+            | m::bit32(13)
+            | m::bit32(14)
+            | m::bit32(16)
+            | m::bit32(17)
+            | m::bit32(18)
+            | m::bit32(19)
+            | m::bit32(21)
+            | m::bit32(22)
+            | m::bit32(23)
+            | m::bit32(24)
+            | m::bit32(26),
         99577856
     );
     // Signed 32-bit edge cases from upstream are JS-specific; kept as comments:

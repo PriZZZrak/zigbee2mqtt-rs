@@ -14,8 +14,22 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new(r#type: Type, subsystem: Subsystem, command_id: u8, data: Vec<u8>, length: u8, fcs: u8) -> Self {
-        Self { r#type, subsystem, commandID: command_id, data, length, fcs }
+    pub fn new(
+        r#type: Type,
+        subsystem: Subsystem,
+        command_id: u8,
+        data: Vec<u8>,
+        length: u8,
+        fcs: u8,
+    ) -> Self {
+        Self {
+            r#type,
+            subsystem,
+            commandID: command_id,
+            data,
+            length,
+            fcs,
+        }
     }
 
     pub fn to_buffer(&self) -> Vec<u8> {
