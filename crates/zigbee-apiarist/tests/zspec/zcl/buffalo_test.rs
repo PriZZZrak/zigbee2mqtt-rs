@@ -1,4 +1,8 @@
 // Original: .upstream/zigbee-herdsman/test/zspec/zcl/buffalo.test.ts
+
+use serde_json::json;
+use zigbee_apiarist::zspec::zcl::buffalo_zcl::BuffaloZcl;
+use zigbee_apiarist::zspec::zcl::definition::enums::{BuffaloZclDataType, DataType};
 // Upstream test titles (ported as #[test] #[ignore] stubs):
 //   - GPD Frame
 //   - Reads Mi Struct
@@ -127,13 +131,44 @@ fn reads_multi_cluster_attribute_report() {
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_nothing() {
-    todo!()
+        for data_type in [DataType::NO_DATA as u32, DataType::UNKNOWN as u32] {
+            let buffer = vec![1, 2];
+            let mut buffalo = BuffaloZcl::new(buffer);
+            assert_eq!(buffalo.read(data_type, &json!({})), json!(null));
+            assert_eq!(buffalo.get_position(), 0);
+        }
+    
+        // what ZCL spec calls "empty string"
+        let buffer = vec![0, 2, 3];
+        let mut buffalo = BuffaloZcl::new(buffer);
+        assert_eq!(buffalo.read(DataType::CHAR_STR as u32, &json!({})), json!(""));
+        assert_eq!(buffalo.get_position(), 1);
+    
+        // what ZCL spec calls "empty string"
+        let buffer = vec![0, 2, 3];
+        let mut buffalo = BuffaloZcl::new(buffer);
+        assert_eq!(buffalo.read(DataType::OCTET_STR as u32, &json!({})), json!([]));
+        assert_eq!(buffalo.get_position(), 1);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_partial_buffer_with_length_option() {
-    todo!()
+        let value = vec![1, 2, 3, 4];
+        let length = 2;
+        let mut buffalo = BuffaloZcl::new(vec![0; 255]);
+        buffalo.write(
+            BuffaloZclDataType::BUFFER as u32,
+            &json!(value),
+            &json!({"length": length}),
+        );
+        assert_eq!(buffalo.get_position(), value.len());
+        buffalo.set_position(0);
+        assert_eq!(
+            buffalo.read(BuffaloZclDataType::BUFFER as u32, &json!({"length": length})),
+            json!([value[0], value[1]])
+        );
+        assert_eq!(buffalo.get_position(), length);
 }
 
 #[test]
@@ -157,7 +192,13 @@ fn reads_unhandled_command_as_object_raw_if_buffer_still_has_bytes_to_read() {
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_whole_buffer_without_length_option() {
-    todo!()
+        let value = vec![1, 2, 3, 4];
+        let mut buffalo = BuffaloZcl::new(vec![0; 4]);
+        buffalo.write(BuffaloZclDataType::BUFFER as u32, &json!(value), &json!({}));
+        assert_eq!(buffalo.get_position(), value.len());
+        buffalo.set_position(0);
+        assert_eq!(buffalo.read(BuffaloZclDataType::BUFFER as u32, &json!({})), json!(value));
+        assert_eq!(buffalo.get_position(), value.len());
 }
 
 #[test]
@@ -187,7 +228,17 @@ fn throws_when_write_use_data_type_is_missing_data_type_option_and_value_isnt_bu
 #[test]
 #[ignore = "not implemented yet"]
 fn throws_when_write_read_invalid_data_type_except_for_write_if_buffer_like() {
-    todo!()
+        let write_result = std::panic::catch_unwind(|| {
+            let mut buffalo = BuffaloZcl::new(vec![0; 1]);
+            buffalo.write(99999, &json!(127), &json!({}));
+        });
+        assert!(write_result.is_err());
+    
+        let read_result = std::panic::catch_unwind(|| {
+            let mut buffalo = BuffaloZcl::new(vec![0; 1]);
+            buffalo.read(99999, &json!({}));
+        });
+        assert!(read_result.is_err());
 }
 
 #[test]
@@ -223,25 +274,59 @@ fn writes_reads_big_endian_uint24() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_reads_char_str_from_string() {
-    todo!()
+        let value = "abcd";
+        let expected_value = vec![4, 0x61, 0x62, 0x63, 0x64];
+        let expected_position = 5;
+        let mut buffalo = BuffaloZcl::new(vec![0; 10]);
+        buffalo.write(DataType::CHAR_STR as u32, &json!(value), &json!({}));
+        assert_eq!(buffalo.get_position(), expected_position);
+        assert_eq!(buffalo.get_written(), expected_value);
+        buffalo.set_position(0);
+        assert_eq!(buffalo.read(DataType::CHAR_STR as u32, &json!({})), json!(value));
+        assert_eq!(buffalo.get_position(), expected_position);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_reads_long_char_str() {
-    todo!()
+        let value = "abcd";
+        let expected_value = vec![4, 0, 0x61, 0x62, 0x63, 0x64];
+        let expected_position = 6;
+        let mut buffalo = BuffaloZcl::new(vec![0; 10]);
+        buffalo.write(DataType::LONG_CHAR_STR as u32, &json!(value), &json!({}));
+        assert_eq!(buffalo.get_position(), expected_position);
+        assert_eq!(buffalo.get_written(), expected_value);
+        buffalo.set_position(0);
+        assert_eq!(buffalo.read(DataType::LONG_CHAR_STR as u32, &json!({})), json!(value));
+        assert_eq!(buffalo.get_position(), expected_position);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_reads_long_octet_str() {
-    todo!()
+        let value = vec![0xfe, 0x01, 0xab, 0x98];
+        let expected_position = 6;
+        let mut buffalo = BuffaloZcl::new(vec![0; 10]);
+        buffalo.write(DataType::LONG_OCTET_STR as u32, &json!(value), &json!({}));
+        assert_eq!(buffalo.get_position(), expected_position);
+        assert_eq!(buffalo.get_written(), vec![4, 0, 0xfe, 0x01, 0xab, 0x98]);
+        buffalo.set_position(0);
+        assert_eq!(buffalo.read(DataType::LONG_OCTET_STR as u32, &json!({})), json!(value));
+        assert_eq!(buffalo.get_position(), expected_position);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_reads_octet_str() {
-    todo!()
+        let value = vec![0xfe, 0x01, 0xab, 0x98];
+        let expected_position = 5;
+        let mut buffalo = BuffaloZcl::new(vec![0; 10]);
+        buffalo.write(DataType::OCTET_STR as u32, &json!(value), &json!({}));
+        assert_eq!(buffalo.get_position(), expected_position);
+        assert_eq!(buffalo.get_written(), vec![4, 0xfe, 0x01, 0xab, 0x98]);
+        buffalo.set_position(0);
+        assert_eq!(buffalo.read(DataType::OCTET_STR as u32, &json!({})), json!(value));
+        assert_eq!(buffalo.get_position(), expected_position);
 }
 
 #[test]
@@ -265,7 +350,12 @@ fn writes_channel_configuration_basic() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_char_str_from_number_array() {
-    todo!()
+        let value = vec![0x61, 0x62, 0x63, 0x64];
+        let expected_position = 4;
+        let mut buffalo = BuffaloZcl::new(vec![0; 10]);
+        buffalo.write(DataType::CHAR_STR as u32, &json!(value), &json!({}));
+        assert_eq!(buffalo.get_position(), expected_position);
+        assert_eq!(buffalo.get_written(), value);
 }
 
 #[test]
@@ -289,13 +379,52 @@ fn writes_custom_reply() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_invalida_data_type_as_buffer_if_buffer_like() {
-    todo!()
+        let value = vec![1, 2, 3];
+        let mut buffalo = BuffaloZcl::new(vec![0; 3]);
+        buffalo.write(99999, &json!(value), &json!({}));
+        assert_eq!(buffalo.get_position(), 3);
+        assert_eq!(buffalo.get_buffer(), vec![1, 2, 3]);
+    
+        buffalo.set_position(0);
+        buffalo.write(99999, &json!([1, 2, 3]), &json!({}));
+        assert_eq!(buffalo.get_position(), 3);
+        assert_eq!(buffalo.get_buffer(), vec![1, 2, 3]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_nothing() {
-    todo!()
+        for data_type in [DataType::NO_DATA as u32, DataType::UNKNOWN as u32] {
+            let buffer = vec![0; 3];
+            let mut buffalo = BuffaloZcl::new(buffer.clone());
+            buffalo.write(data_type, &json!(123), &json!({}));
+            assert_eq!(buffalo.get_buffer(), buffer);
+            assert_eq!(buffalo.get_position(), 0);
+        }
+    
+        let buffer = vec![0; 3];
+        let mut buffalo = BuffaloZcl::new(buffer.clone());
+        buffalo.write(
+            BuffaloZclDataType::STRUCTURED_SELECTOR as u32,
+            &json!(null),
+            &json!({}),
+        );
+        assert_eq!(buffalo.get_buffer(), buffer);
+        assert_eq!(buffalo.get_position(), 0);
+    
+        // what ZCL spec calls "empty string"
+        let buffer = vec![0; 3];
+        let mut buffalo = BuffaloZcl::new(buffer.clone());
+        buffalo.write(DataType::CHAR_STR as u32, &json!(""), &json!({}));
+        assert_eq!(buffalo.get_buffer(), buffer);
+        assert_eq!(buffalo.get_position(), 1);
+    
+        // what ZCL spec calls "empty string"
+        let buffer = vec![0; 3];
+        let mut buffalo = BuffaloZcl::new(buffer.clone());
+        buffalo.write(DataType::OCTET_STR as u32, &json!([]), &json!({}));
+        assert_eq!(buffalo.get_buffer(), buffer);
+        assert_eq!(buffalo.get_position(), 1);
 }
 
 #[test]
