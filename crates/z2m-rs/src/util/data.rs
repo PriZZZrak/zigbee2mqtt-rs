@@ -1,3 +1,4 @@
+#![allow(unused)]
 // Original: .upstream/zigbee2mqtt/lib/util/data.ts
 // TODO: port data path resolution.
 

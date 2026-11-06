@@ -1,7 +1,7 @@
+#![allow(unused)]
 // Original: .upstream/zigbee2mqtt/lib/util/stringify.ts
-// TODO: port public API (see original file).
+// TODO: port stringify.
 
-// pub fn stringify() { todo!() }
-pub fn stringify() {
+pub fn stringify(value: &serde_json::Value) -> String {
     todo!()
 }
