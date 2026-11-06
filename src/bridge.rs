@@ -453,6 +453,59 @@ impl Bridge {
         }
     }
 
+    /// Remove a device entry from `configuration.yaml` (upstream
+    /// `settings.removeDevice`). Without this the next start re-seeds a ghost
+    /// device from the config block.
+    async fn remove_device_config(&self, ieee: &str) {
+        let path = &self.config_path;
+        let text = match std::fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) => {
+                warn!(
+                    "Cannot read config for device removal {}: {error}",
+                    path.display()
+                );
+                return;
+            }
+        };
+        let yaml: serde_yml::Value = match serde_yml::from_str(&text) {
+            Ok(yaml) => yaml,
+            Err(error) => {
+                warn!("Cannot parse config for device removal: {error}");
+                return;
+            }
+        };
+        let mut document = match serde_json::to_value(yaml) {
+            Ok(document) => document,
+            Err(error) => {
+                warn!("Cannot convert config for device removal: {error}");
+                return;
+            }
+        };
+        let Some(devices) = document
+            .get_mut("devices")
+            .and_then(|devices| devices.as_object_mut())
+        else {
+            return;
+        };
+        devices.remove(ieee);
+        let yaml = match serde_yml::to_string(&document) {
+            Ok(yaml) => yaml,
+            Err(error) => {
+                warn!("Cannot serialize config for device removal: {error}");
+                return;
+            }
+        };
+        let tmp = path.with_extension("yaml.tmp");
+        if let Err(error) = std::fs::write(&tmp, yaml) {
+            warn!("Cannot write config for device removal: {error}");
+            return;
+        }
+        if let Err(error) = std::fs::rename(&tmp, path) {
+            warn!("Cannot replace config for device removal: {error}");
+        }
+    }
+
     async fn persist_groups_config(&self) {
         // Read current config file, update groups section, write back
         let path = &self.config_path;
@@ -709,13 +762,14 @@ impl Bridge {
                             if let Err(e) = mqtt.publish_bridge_log("info", &format!("Device left: {ieee}")).await {
                                 warn!("Failed to publish bridge log: {e}");
                             }
-                            let list = device_list_json(
-                                &devices,
-                                &external,
-                                &self.definition_cache,
-                                Some(&coordinator_ieee),
-                            );
-                            let _ = mqtt.publish_bridge_devices(&json!(list)).await;
+                            publish_device_list_async(
+                                Arc::clone(&devices),
+                                Arc::clone(&external),
+                                Arc::clone(&self.definition_cache),
+                                &mqtt,
+                                coordinator_ieee.clone(),
+                            )
+                            .await;
                         }
 
                         Some(CoordinatorEvent::AddressResolved { ieee_addr, nwk_addr }) => {
@@ -887,13 +941,14 @@ impl Bridge {
                                 }
                             }
 
-                            let list = device_list_json(
-                                &devices,
-                                &external,
-                                &self.definition_cache,
-                                Some(&coordinator_ieee),
-                            );
-                            let _ = mqtt.publish_bridge_devices(&json!(list)).await;
+                            publish_device_list_async(
+                                Arc::clone(&devices),
+                                Arc::clone(&external),
+                                Arc::clone(&self.definition_cache),
+                                &mqtt,
+                                coordinator_ieee.clone(),
+                            )
+                            .await;
 
                             // Publish HA discovery after interview
                             if ha_enabled && interview_just_completed {
@@ -1192,20 +1247,84 @@ impl Bridge {
                                     }
                                 }
                                 "device/remove" => {
-                                    let removed = process_device_remove(
-                                        &devices,
-                                        &self.external,
-                                        &self.definition_cache,
-                                        Some(&coordinator_ieee),
-                                        self.cfg.homeassistant.enabled(),
-                                        &mqtt,
-                                        &request,
-                                        &payload,
-                                        transaction.as_deref(),
-                                    )
-                                    .await;
-                                    if removed {
-                                        self.persist_database(coord.info.ieee_addr).await;
+                                    let id = payload
+                                        .get("id")
+                                        .and_then(|value| value.as_str())
+                                        .unwrap_or_else(|| payload.as_str().unwrap_or(""));
+                                    let found = devices
+                                        .find_by_name(id)
+                                        .map(|device| device.ieee_addr)
+                                        .or_else(|| {
+                                            crate::zigbee::IeeeAddr::from_hex(id)
+                                                .filter(|address| devices.get_by_ieee(address).is_some())
+                                        });
+                                    match found {
+                                        Some(ieee) => {
+                                            let removed_device =
+                                                devices.get_by_ieee(&ieee).map(|device| device.clone());
+                                            devices.remove_by_ieee(&ieee);
+                                            if let Some(device) = &removed_device {
+                                                let _ = mqtt
+                                                    .clear_device_state(&device.friendly_name)
+                                                    .await;
+                                            }
+                                            self.remove_device_config(&ieee.as_hex()).await;
+                                            // Respond before HA cleanup and the
+                                            // (Boa-backed) device-list rebuild:
+                                            // the UI must not time out while the
+                                            // converter host evaluates modules.
+                                            let resp = mk_resp("ok", json!({"id": id}), None);
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                            self.persist_database(coord.info.ieee_addr).await;
+                                            let bg_devices = Arc::clone(&devices);
+                                            let bg_external = Arc::clone(&external);
+                                            let bg_cache = Arc::clone(&self.definition_cache);
+                                            let bg_mqtt = mqtt.clone();
+                                            let bg_ieee = coordinator_ieee.clone();
+                                            let ha_enabled = self.cfg.homeassistant.enabled();
+                                            tokio::spawn(async move {
+                                                if ha_enabled {
+                                                    if let Some(device) = removed_device {
+                                                        let info = crate::converters::external::ExternalDeviceInfo::from_device(&device);
+                                                        let model = device.model.clone().unwrap_or_default();
+                                                        let exposes_external = Arc::clone(&bg_external);
+                                                        let exposes = tokio::time::timeout(
+                                                            Duration::from_secs(20),
+                                                            tokio::task::spawn_blocking(move || {
+                                                                exposes_external.exposes(&model, &info)
+                                                            }),
+                                                        )
+                                                        .await
+                                                        .ok()
+                                                        .and_then(|result| result.ok())
+                                                        .flatten()
+                                                        .unwrap_or_default();
+                                                        homeassistant::cleanup_discovery(
+                                                            &bg_mqtt,
+                                                            &device,
+                                                            &exposes,
+                                                        )
+                                                        .await;
+                                                    }
+                                                }
+                                                publish_device_list_async(
+                                                    bg_devices,
+                                                    bg_external,
+                                                    bg_cache,
+                                                    &bg_mqtt,
+                                                    bg_ieee,
+                                                )
+                                                .await;
+                                            });
+                                        }
+                                        None => {
+                                            let resp = mk_resp(
+                                                "error",
+                                                json!({}),
+                                                Some("entity not found".into()),
+                                            );
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
                                     }
                                 }
                                 "converter/save" => {
@@ -3286,12 +3405,6 @@ impl Bridge {
                         debug!("convertSet for '{key}' produced no outcome");
                         continue;
                     };
-                    info!(
-                        "DIAG outcome key='{base_key}' handled={} ops={} state={:?}",
-                        outcome.handled,
-                        outcome.ops.len(),
-                        outcome.state
-                    );
                     if !outcome.handled {
                         debug!("no toZigbee converter handles '{base_key}'");
                         continue;
@@ -4003,6 +4116,31 @@ fn device_list_json(
     list
 }
 
+/// Rebuild and publish `bridge/devices` on the blocking pool, bounded so a
+/// stuck Boa evaluation cannot pin an async task forever.
+async fn publish_device_list_async(
+    devices: Arc<DeviceRegistry>,
+    external: Arc<ExternalConverter>,
+    cache: Arc<dashmap::DashMap<String, Option<serde_json::Value>>>,
+    mqtt: &MqttBridge,
+    coordinator_ieee: String,
+) {
+    let list = tokio::time::timeout(
+        Duration::from_secs(40),
+        tokio::task::spawn_blocking(move || {
+            device_list_json(&devices, &external, &cache, Some(&coordinator_ieee))
+        }),
+    )
+    .await;
+    match list {
+        Ok(Ok(list)) => {
+            let _ = mqtt.publish_bridge_devices(&json!(list)).await;
+        }
+        Ok(Err(error)) => warn!("device list task failed: {error}"),
+        Err(_) => warn!("device list rebuild timed out"),
+    }
+}
+
 fn merge_converted_values(
     native: serde_json::Map<String, serde_json::Value>,
     external: Option<serde_json::Map<String, serde_json::Value>>,
@@ -4260,6 +4398,7 @@ fn auto_check_bridge_query(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 async fn process_device_remove(
     devices: &DeviceRegistry,
     external: &ExternalConverter,

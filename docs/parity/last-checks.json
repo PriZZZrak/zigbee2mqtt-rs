@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-06T16:31:27+00:00",
+  "captured_utc": "2026-11-06T17:16:09+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent",
   "commands": [
     {
@@ -101,6 +101,11 @@
       "command": "R1 full HIL on Routerich AX3000 + Dongle-P (2026-11-06)",
       "exit": 0,
       "result": "MQTT API, permit_join, Lytko single/multi-endpoint commands, rename persistence, state cache, converter save/remove/invalid, mosquitto restart, kill -9 respawn, full router reboot, frontend HTTP/WS and HA discovery exercised; see docs/parity/evidence/R1-routerich-full-hil-20261106.md; CC2531 and live HA remain open"
+    },
+    {
+      "command": "device/remove HIL after hang (router 2026-11-06)",
+      "exit": 0,
+      "result": "response 99 ms, health 413 ms, bridge online, config/db entry removed, retained state cleared, restart 2 devices; 13 stale HA configs from the model-less ghost cleared manually"
     }
   ]
 }

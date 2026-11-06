@@ -172,3 +172,45 @@ Bedroom `L101Ze.v2-TT` (two channels):
   `config_schema`, `.ipk` upgrade/rollback and CC2531 remain open.
 - Upstream freshness was not re-fetched during this HIL run; the recorded
   baseline is unchanged (`freshness=DRIFT_DETECTED` from 2026-11-05).
+
+## Post-HIL incident: `device/remove` hang (2026-11-06)
+
+After the HIL run the user removed the Tuya sensor from the UI. The bridge
+stopped answering (process alive, MQTT connection closed, broker LWT set
+`bridge/state=offline`) and had to be SIGKILLed by procd after SIGTERM did not
+complete. Root cause: `device/remove` executed `external.exposes()` and
+`device_list_json()` synchronously on the bridge event loop. `exposes()` also
+waits on the process-wide Boa evaluation lock; the single converter thread was
+busy warming the just-rejoined device, so the event loop deadlocked behind a
+non-async mutex and could not run the MQTT/shutdown tasks.
+
+Fix (deployed binary `3a0a7267…`):
+
+- `device/remove` now removes the entity, clears the old retained state topic,
+  deletes the `configuration.yaml` device entry and answers
+  `{"status":"ok","data":{"id":…},"transaction":…}` **before** any Boa work.
+- HA discovery cleanup and the device-list rebuild run in a spawned task;
+  `exposes`/`device_list_json` use `spawn_blocking` with 20 s/40 s timeouts so a
+  slow converter host can no longer pin the event loop.
+- `DeviceLeft` and the post-interview device-list publish use the same async
+  helper.
+
+Verification on the ghost sensor left by the hang (IEEE
+`0xa4c13887bf43cc0f`, no model/endpoints after the interrupted removal):
+
+```text
+device/remove response: 99 ms, transaction echoed
+health_check immediately after: 413 ms (2 devices)
+bridge/state: online
+configuration.yaml / database.db: 0 occurrences of the IEEE
+service restart: Device registry: 2 devices; sensor does not return
+retained zigbee2mqtt/Датчик температуры: cleared
+```
+
+Residual: because the ghost had no resolvable definition (`model="-"`),
+`cleanup_discovery` could not derive its 13 HA retained configs; they were
+cleared manually from the broker. Devices removed while their definition is
+resolvable clean up automatically. A related data-quality risk remains: the
+interrupted join/interview wrote a stub (empty model/endpoints) for the device
+into `database.db`; preserving the last complete DB record across an
+interrupted interview is a follow-up.
