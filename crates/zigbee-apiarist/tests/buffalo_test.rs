@@ -259,49 +259,77 @@ fn int8_write() {
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint16_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x00, 0x00, 0x04, 0x00, 0x08], 1);
+        let value = buffalo.read_list_uint16(2);
+        assert_eq!(buffalo.get_position(), 5);
+        assert_eq!(value, vec![1024, 2048]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint16_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 5], 1);
+        let payload = vec![1024, 2048];
+        buffalo.write_list_uint16(&payload);
+        assert_eq!(buffalo.get_position(), 5);
+        assert_eq!(buffalo.get_buffer(), vec![0x00, 0x00, 0x04, 0x00, 0x08]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint24_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x00, 0xa0, 0x86, 0x01, 0x1e, 0xae, 0x01, 0x00], 1);
+        let value = buffalo.read_list_uint24(2);
+        assert_eq!(buffalo.get_position(), 7);
+        assert_eq!(value, vec![100000, 110110]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint24_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 8], 1);
+        let payload = vec![100000, 110110];
+        buffalo.write_list_uint24(&payload);
+        assert_eq!(buffalo.get_position(), 7);
+        assert_eq!(buffalo.get_buffer(), vec![0x00, 0xa0, 0x86, 0x01, 0x1e, 0xae, 0x01, 0x00]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint32_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0xff, 0xff, 0xff, 0xff, 0x0a, 0x00, 0x00, 0x00], 0);
+        let value = buffalo.read_list_uint32(2);
+        assert_eq!(buffalo.get_position(), 8);
+        assert_eq!(value, vec![4294967295, 10]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint32_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 8], 0);
+        let payload = vec![4294967295, 10];
+        buffalo.write_list_uint32(&payload);
+        assert_eq!(buffalo.get_position(), 8);
+        assert_eq!(buffalo.get_buffer(), vec![0xff, 0xff, 0xff, 0xff, 0x0a, 0x00, 0x00, 0x00]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint8_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x00, 0x00, 0x04, 0x08], 2);
+        let value = buffalo.read_list_uint8(2);
+        assert_eq!(buffalo.get_position(), 4);
+        assert_eq!(value, vec![4, 8]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint8_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 4], 1);
+        let payload = vec![200, 100];
+        buffalo.write_list_uint8(&payload);
+        assert_eq!(buffalo.get_position(), 3);
+        assert_eq!(buffalo.get_buffer(), vec![0x00, 0xc8, 0x64, 0x00]);
 }
 
 #[test]
