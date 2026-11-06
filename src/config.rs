@@ -305,6 +305,8 @@ pub struct AdvancedConfig {
     pub network_key: [u8; 16],
     pub log_level: String,
     pub cache_state: bool,
+    pub cache_state_persistent: bool,
+    pub cache_state_send_on_startup: bool,
     pub output: OutputMode,
 }
 
@@ -317,6 +319,11 @@ impl std::fmt::Debug for AdvancedConfig {
             .field("network_key", &"<redacted>")
             .field("log_level", &self.log_level)
             .field("cache_state", &self.cache_state)
+            .field("cache_state_persistent", &self.cache_state_persistent)
+            .field(
+                "cache_state_send_on_startup",
+                &self.cache_state_send_on_startup,
+            )
             .field("output", &self.output)
             .finish()
     }
@@ -358,6 +365,8 @@ impl Default for AdvancedConfig {
             network_key: [1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13],
             log_level: "info".to_string(),
             cache_state: true,
+            cache_state_persistent: true,
+            cache_state_send_on_startup: true,
             output: OutputMode::default(),
         }
     }

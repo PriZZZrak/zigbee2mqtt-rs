@@ -356,6 +356,14 @@ impl Bridge {
         });
     }
 
+    /// Path of the persistent entity state cache (`state.json`).
+    fn state_file(&self) -> PathBuf {
+        self.config_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("state.json")
+    }
+
     async fn persist_groups_config(&self) {
         // Read current config file, update groups section, write back
         let path = &self.config_path;
@@ -396,6 +404,26 @@ impl Bridge {
 
         // 2. Apply device configs (friendly names override database)
         self.apply_device_configs();
+
+        // 2b. Restore cached entity state (`state.json`) before the startup
+        // publish, so sleepy devices show their last known values instead of
+        // appearing empty until the next (possibly 30-60 min) report.
+        if self.cfg.advanced.cache_state && self.cfg.advanced.cache_state_persistent {
+            if let Some(cache) = crate::state::load(&self.state_file()) {
+                let mut restored = 0usize;
+                for (ieee, cached) in cache {
+                    if let Some(address) = IeeeAddr::from_hex(&ieee) {
+                        if let Some(mut device) = self.devices.get_mut_by_ieee(&address) {
+                            device.merge_state(cached);
+                            restored += 1;
+                        }
+                    }
+                }
+                if restored > 0 {
+                    info!("Restored cached state for {restored} device(s)");
+                }
+            }
+        }
 
         // 3. Log device summary
         let all = self.devices.all_devices();
@@ -473,6 +501,27 @@ impl Bridge {
 
         // 6. Publish retained MQTT state
         self.republish_mqtt_state(&mqtt, &coord).await;
+
+        // 6b. Persist state periodically (atomic write only when it changed).
+        if self.cfg.advanced.cache_state && self.cfg.advanced.cache_state_persistent {
+            let devices = Arc::clone(&self.devices);
+            let path = self.state_file();
+            tokio::spawn(async move {
+                let mut last = String::new();
+                loop {
+                    tokio::time::sleep(Duration::from_secs(30)).await;
+                    let snapshot = crate::state::snapshot(&devices);
+                    let serialized = serde_json::to_string(&snapshot).unwrap_or_default();
+                    if serialized == last {
+                        continue;
+                    }
+                    match crate::state::save(&path, &snapshot) {
+                        Ok(()) => last = serialized,
+                        Err(error) => warn!("Failed to write state.json: {error}"),
+                    }
+                }
+            });
+        }
 
         // 7. Permit join if configured
         if self.cfg.permit_join {
@@ -1345,6 +1394,12 @@ impl Bridge {
 
         if let Err(e) = mqtt.publish_bridge_state(false).await {
             warn!("Failed to publish offline state: {e}");
+        }
+        if self.cfg.advanced.cache_state && self.cfg.advanced.cache_state_persistent {
+            let snapshot = crate::state::snapshot(&self.devices);
+            if let Err(error) = crate::state::save(&self.state_file(), &snapshot) {
+                warn!("Failed to write state.json on shutdown: {error}");
+            }
         }
         self.flush_database().await;
         Ok(())

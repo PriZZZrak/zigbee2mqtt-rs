@@ -63,6 +63,11 @@ Working:
   `source: external`, `supported: true` with 20/34 exposes.
 - The coordinator resumes its existing network; NV is **not** rewritten and
   `ZDO_STARTUP_FROM_APP` reports "restored network state from NV".
+- The original `state.json` was copied and the bridge restored cached state for
+  all 3 devices on startup. The sleepy Tuya sensor immediately published
+  `temperature: 26.4`, `humidity: 45`, `battery: 45`, the alarm thresholds and
+  the report intervals instead of an empty payload; `state.json` is persisted
+  atomically every 30 s and on shutdown.
 - MQTT commands resolve both friendly names and IEEE addresses (upstream
   `resolveEntity`): `zigbee2mqtt/0x404ccafffe5c4ce0/set
   {"system_mode":"heat"}` and `{"sensor_type":"10 кОм"}` now reach the device
@@ -71,9 +76,13 @@ Working:
 
 Partial / failing:
 
-- Tuya `TH01Z` sensor publishes only `max_temperature`, `linkquality`,
-  `last_seen`; `temperature`/`humidity`/`battery` are missing. The legacy
-  Nous/Tuya frame path is not fully decoded. (The `unsupported attribute type
+- The Tuya `TH01Z` **live** frames observed so far contain only DP 10
+  (`max_temperature`), a ~5 s heartbeat; temperature/humidity are reported at
+  the device's configured 30/60-minute intervals. The original `state.json`
+  also had its last temperature at 08:16 before shutdown, so the cached values
+  are the upstream behavior between reports. The state cache restores them,
+  but a fresh temperature/humidity report has not yet been observed on this
+  bridge. (The `unsupported attribute type
   Invalid` warning was **not** from this sensor: it came from the Lytko
   thermostats' `seMetering` uint48 report and is fixed.)
 - Lytko definitions are `source: generated` and `supported=false` (10 generated

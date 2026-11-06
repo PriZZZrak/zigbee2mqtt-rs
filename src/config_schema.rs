@@ -96,6 +96,8 @@ pub fn config_schema() -> Value {
                 "last_seen": enumeration("Last seen", "Format of the last_seen field", &["disable", "ISO_8601", "ISO_8601_local", "epoch"]),
                 "output": enumeration("Output", "State payload format", &["json", "attribute", "attribute_and_json"]),
                 "cache_state": boolean("Cache state", "Cache device state"),
+                "cache_state_persistent": boolean("Persistent cache", "Store cached state in state.json"),
+                "cache_state_send_on_startup": boolean("Send cached state on startup", "Publish cached state after restart"),
                 "timestamp_format": enumeration("Timestamp format", "Timestamp format", &["ISO_8601", "ISO_8601_local", "epoch"]),
             })),
             "blocklist": json!({"type": "array", "title": "Blocklist", "description": "Devices that may not join", "items": {"type": "string"}}),

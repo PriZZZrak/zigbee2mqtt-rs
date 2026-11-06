@@ -12,4 +12,5 @@ pub mod homeassistant;
 pub mod migration;
 pub mod mqtt;
 pub mod ota;
+pub mod state;
 pub mod zigbee;
