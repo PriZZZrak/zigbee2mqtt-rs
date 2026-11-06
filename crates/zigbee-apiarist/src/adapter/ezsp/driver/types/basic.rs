@@ -1,4 +1,11 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ezsp/driver/types/basic.ts
+// TODO: port the full EzspStatus enum.
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EzspStatus {
+    ASH_ACK_TIMEOUT,
+}
+// Original: .upstream/zigbee-herdsman/src/adapter/ezsp/driver/types/basic.ts
 // TODO: port public API from the original file.
 
 // pub fn Bytes() { todo!() }

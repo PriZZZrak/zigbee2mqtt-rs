@@ -1,8 +1,19 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ember/ezspError.ts
-// TODO: port public API from the original file.
+// TODO: port EzspError.
 
-// pub fn EzspError() { todo!() }
+use crate::adapter::ezsp::driver::types::basic::EzspStatus;
 
-pub fn ezsp_error() {
-    todo!()
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EzspError {
+    pub code: EzspStatus,
+}
+
+impl EzspError {
+    pub fn new(code: EzspStatus) -> Self {
+        Self { code }
+    }
+
+    pub fn message(&self) -> String {
+        format!("{:?}", self.code)
+    }
 }
