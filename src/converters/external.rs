@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
@@ -35,6 +35,34 @@ const EXTERNAL_WRAPPER: &str = r#"
 ;(function() { var __m = module.exports; if (__m && typeof __m === "object" && __m.default !== undefined) __m = __m.default; module.exports = {definitions: Array.isArray(__m) ? __m : [__m]}; })();
 "#;
 
+/// Bound on how long the bridge event loop waits for an incoming frame to be
+/// converted by the single converter thread.
+///
+/// The single converter thread can be busy warming another device for ~10 s
+/// on the 2-core router. Waiting that long freezes MQTT/frontend requests past
+/// the frontend's 20 s timeout, so a frame that cannot be converted promptly is
+/// skipped (the session keeps warming up and later frames are converted).
+/// Frames are frequent (heartbeats every few seconds), so a skipped frame is
+/// followed by a converted one. Command handling (`convert_set`) keeps the
+/// longer timeout because silently dropping a user command is worse than a
+/// short UI stall.
+const INCOMING_SESSION_TIMEOUT: Duration = Duration::from_millis(500);
+
+/// Serializes CPU-heavy Boa evaluations that are not on the event loop
+/// (definition/exposes generation and session warmup).
+///
+/// The router has 2 cores; evaluating several upstream converter modules at
+/// once starves the bridge/MQTT tasks and makes frontend requests miss their
+/// 20 s timeout. One background evaluation at a time leaves a core for the
+/// event loop. Fast per-frame conversions are not serialized here.
+static BOA_BACKGROUND_LOCK: Mutex<()> = Mutex::new(());
+
+fn boa_background_guard() -> std::sync::MutexGuard<'static, ()> {
+    BOA_BACKGROUND_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 pub struct ExternalConverter {
     dir: PathBuf,
     /// User external converters (`<config-dir>/external_converters`).
@@ -42,6 +70,19 @@ pub struct ExternalConverter {
     registry_url: String,
     runtime: Arc<Mutex<Option<mpsc::Sender<ConverterJob>>>>,
     zcl_io: Arc<Mutex<Option<ZclIo>>>,
+    /// Session keys (`<ieee>|<model>`) whose Boa context finished loading.
+    /// Frames for other keys are converted natively until the warmup job
+    /// completes, so the event loop never waits for a cold session.
+    ready: Arc<Mutex<HashSet<String>>>,
+    /// Keys with a warmup job already queued, to avoid flooding the queue.
+    warming: Arc<Mutex<HashSet<String>>>,
+    /// Cached parsed `registry.json` + `external_registry.json` (3 MB on the
+    /// router); re-parsed only when either file's mtime changes.
+    registry_cache: Mutex<Option<(u128, Arc<RegistryFile>)>>,
+    /// `<ieee>|<model>` -> device module whose dependencies were verified.
+    verified_files: Mutex<HashMap<String, String>>,
+    zcl_cache: Mutex<Option<Arc<ZclMaps>>>,
+    zcl_types_cache: Mutex<Option<Arc<crate::converters::zcl_types::ZclTypesFile>>>,
 }
 
 /// Synchronous ZCL I/O used by converters that call `msg.endpoint.read`.
@@ -535,6 +576,13 @@ pub struct ConvertedFrame {
 }
 
 enum ConverterJob {
+    /// Open the Boa session for a device without converting a frame.
+    Warmup {
+        model: String,
+        device: ExternalDeviceInfo,
+    },
+    /// Drop all cached sessions after external converters changed.
+    Reset,
     ConvertSet {
         model: String,
         endpoint: u8,
@@ -990,6 +1038,12 @@ impl ExternalConverter {
             registry_url: registry_url.into(),
             runtime: Arc::new(Mutex::new(None)),
             zcl_io: Arc::new(Mutex::new(None)),
+            ready: Arc::new(Mutex::new(HashSet::new())),
+            warming: Arc::new(Mutex::new(HashSet::new())),
+            registry_cache: Mutex::new(None),
+            verified_files: Mutex::new(HashMap::new()),
+            zcl_cache: Mutex::new(None),
+            zcl_types_cache: Mutex::new(None),
         }
     }
 
@@ -1049,7 +1103,33 @@ impl ExternalConverter {
         u.strip_suffix("/registry.json").unwrap_or(u).to_string()
     }
 
-    fn load_registry(&self) -> Option<RegistryFile> {
+    fn registry_stamp(&self) -> Option<u128> {
+        let stamp = |path: &Path| {
+            std::fs::metadata(path)
+                .ok()
+                .and_then(|meta| meta.modified().ok())
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0)
+        };
+        Some(
+            stamp(&self.registry_path())
+                .wrapping_mul(1_000_000_007)
+                .wrapping_add(stamp(&self.dir.join("external_registry.json"))),
+        )
+    }
+
+    fn load_registry(&self) -> Option<Arc<RegistryFile>> {
+        let stamp = self.registry_stamp();
+        if let Some(stamp) = stamp {
+            if let Ok(cache) = self.registry_cache.lock() {
+                if let Some((cached, registry)) = cache.as_ref() {
+                    if *cached == stamp {
+                        return Some(Arc::clone(registry));
+                    }
+                }
+            }
+        }
         let text = std::fs::read_to_string(self.registry_path()).ok()?;
         let mut registry: RegistryFile = serde_json::from_str(&text).ok()?;
         // External definitions take precedence over the packaged catalog.
@@ -1069,6 +1149,10 @@ impl ExternalConverter {
                 fingerprints.extend(registry.fingerprints);
                 registry.fingerprints = fingerprints;
             }
+        }
+        let registry = Arc::new(registry);
+        if let (Some(stamp), Ok(mut cache)) = (stamp, self.registry_cache.lock()) {
+            *cache = Some((stamp, Arc::clone(&registry)));
         }
         Some(registry)
     }
@@ -1120,6 +1204,7 @@ impl ExternalConverter {
     /// metadata (model, zigbeeModel, fingerprint). The module is wrapped so
     /// existing package loaders see `{definitions: [...]}`.
     fn external_metadata(&self, synthetic: &str) -> Option<Vec<serde_json::Value>> {
+        let _boa_guard = boa_background_guard();
         let zcl = self.load_zcl()?;
         let module_src = self.load_js(&format!("devices/{synthetic}"))?;
         let sources = collect_sources(&self.dir, &module_src, synthetic, &zcl)?;
@@ -1154,6 +1239,10 @@ impl ExternalConverter {
     /// Rebuild synthetic device files and `external_registry.json` from
     /// `<config-dir>/external_converters/*.{js,cjs}`.
     pub fn sync_external_converters(&self) -> Result<Vec<(String, String)>, String> {
+        self.reset_sessions();
+        if let Ok(mut cache) = self.verified_files.lock() {
+            cache.clear();
+        }
         std::fs::create_dir_all(&self.external_dir)
             .map_err(|error| format!("cannot create external_converters: {error}"))?;
         let devices_dir = self.dir.join("devices");
@@ -1412,6 +1501,7 @@ impl ExternalConverter {
         &self,
         device: &ExternalDeviceInfo,
     ) -> Option<serde_json::Value> {
+        let _boa_guard = boa_background_guard();
         let zcl = self.load_zcl()?;
         let entry = r#"module.exports = require("../lib/generateDefinition");"#;
         let sources = collect_sources(&self.dir, entry, "gendef_probe.js", &zcl)?;
@@ -1506,20 +1596,40 @@ impl ExternalConverter {
 
     /// Public accessor used by the bridge to encode `convertSet` operations.
     #[must_use]
-    pub fn zcl_types(&self) -> crate::converters::zcl_types::ZclTypesFile {
+    pub fn zcl_types(&self) -> Arc<crate::converters::zcl_types::ZclTypesFile> {
         self.load_zcl_types()
     }
 
-    fn load_zcl_types(&self) -> crate::converters::zcl_types::ZclTypesFile {
-        std::fs::read_to_string(self.dir.join("zcl-commands.json"))
-            .ok()
-            .and_then(|text| crate::converters::zcl_types::ZclTypesFile::from_json(&text).ok())
-            .unwrap_or_default()
+    fn load_zcl_types(&self) -> Arc<crate::converters::zcl_types::ZclTypesFile> {
+        if let Ok(cache) = self.zcl_types_cache.lock() {
+            if let Some(types) = cache.as_ref() {
+                return Arc::clone(types);
+            }
+        }
+        let types = Arc::new(
+            std::fs::read_to_string(self.dir.join("zcl-commands.json"))
+                .ok()
+                .and_then(|text| crate::converters::zcl_types::ZclTypesFile::from_json(&text).ok())
+                .unwrap_or_default(),
+        );
+        if let Ok(mut cache) = self.zcl_types_cache.lock() {
+            *cache = Some(Arc::clone(&types));
+        }
+        types
     }
 
-    fn load_zcl(&self) -> Option<ZclMaps> {
+    fn load_zcl(&self) -> Option<Arc<ZclMaps>> {
+        if let Ok(cache) = self.zcl_cache.lock() {
+            if let Some(zcl) = cache.as_ref() {
+                return Some(Arc::clone(zcl));
+            }
+        }
         let text = std::fs::read_to_string(self.zcl_path()).ok()?;
-        serde_json::from_str(&text).ok()
+        let zcl = Arc::new(serde_json::from_str::<ZclMaps>(&text).ok()?);
+        if let Ok(mut cache) = self.zcl_cache.lock() {
+            *cache = Some(Arc::clone(&zcl));
+        }
+        Some(zcl)
     }
 
     /// Resolve a registry-provided relative path inside the cache.
@@ -1586,7 +1696,13 @@ impl ExternalConverter {
         }
         let url = format!("{}/zcl.json", self.root_url());
         let text = fetch_url(&url).await?;
-        std::fs::write(&path, text).ok()
+        let written = std::fs::write(&path, text).ok();
+        if written.is_some() {
+            if let Ok(mut cache) = self.zcl_cache.lock() {
+                *cache = None;
+            }
+        }
+        written
     }
 
     /// Fetch a dist-relative JS file (e.g. `devices/lytko.js`) into the local
@@ -1613,6 +1729,12 @@ impl ExternalConverter {
         model: &str,
         device: &ExternalDeviceInfo,
     ) -> Option<String> {
+        let key = Self::session_key(model, device);
+        if let Ok(cache) = self.verified_files.lock() {
+            if let Some(file) = cache.get(&key) {
+                return Some(file.clone());
+            }
+        }
         let registry = self.load_registry()?;
         let (file, _) = select_definition(&registry, model, device)?;
         let mut pending = vec![format!("devices/{file}")];
@@ -1657,7 +1779,11 @@ impl ExternalConverter {
                 return None;
             }
         }
-        Some(format!("devices/{file}"))
+        let resolved = format!("devices/{file}");
+        if let Ok(mut cache) = self.verified_files.lock() {
+            cache.insert(key, resolved.clone());
+        }
+        Some(resolved)
     }
 
     /// Real fromZigbee dispatch for one received frame.
@@ -1692,6 +1818,7 @@ impl ExternalConverter {
     /// Build a Boa context with the CJS loader and `__prepareDefinition`
     /// installed for `file`, and verify the module loads.
     fn definition_context(&self, file: &str) -> Option<(Context, String)> {
+        let _boa_guard = boa_background_guard();
         let file = file.to_string();
         let zcl = self.load_zcl()?;
         let module_src = self
@@ -2237,8 +2364,8 @@ impl ExternalConverter {
             ctx,
             file,
             index,
-            zcl,
-            types: self.load_zcl_types(),
+            zcl: (*zcl).clone(),
+            types: (*self.load_zcl_types()).clone(),
         })
     }
 
@@ -2919,6 +3046,79 @@ const __norm = (v) => {{
         }
     }
 
+    /// Session key used by the converter thread and the readiness set.
+    fn session_key(model: &str, device: &ExternalDeviceInfo) -> String {
+        format!("{}|{model}", device.ieee_addr)
+    }
+
+    /// True when the Boa session for this device is loaded and can convert a
+    /// frame without a cold-start wait.
+    #[must_use]
+    pub fn session_ready(&self, model: &str, device: &ExternalDeviceInfo) -> bool {
+        let key = Self::session_key(model, device);
+        self.ready
+            .lock()
+            .map(|set| set.contains(&key))
+            .unwrap_or(false)
+    }
+
+    /// Queue a background session load. Safe to call for every frame: at most
+    /// one warmup job is outstanding per device/model.
+    pub fn ensure_session(&self, model: &str, device: &ExternalDeviceInfo) {
+        let key = Self::session_key(model, device);
+        if self.session_ready(model, device) {
+            return;
+        }
+        if let Ok(mut set) = self.warming.lock() {
+            if !set.insert(key.clone()) {
+                return;
+            }
+        }
+        let Some(sender) = self.runtime_sender() else {
+            if let Ok(mut set) = self.warming.lock() {
+                set.remove(&key);
+            }
+            return;
+        };
+        if sender
+            .send(ConverterJob::Warmup {
+                model: model.to_string(),
+                device: device.clone(),
+            })
+            .is_err()
+        {
+            if let Ok(mut set) = self.warming.lock() {
+                set.remove(&key);
+            }
+        }
+    }
+
+    /// Test helper: queue a warmup and block until the session is ready.
+    #[cfg(test)]
+    pub fn warm_for_tests(&self, model: &str, device: &ExternalDeviceInfo) {
+        self.ensure_session(model, device);
+        for _ in 0..1000 {
+            if self.session_ready(model, device) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("external converter session did not warm up for {model:?}");
+    }
+
+    /// Drop cached Boa sessions after converter files changed. Queued behind
+    /// any in-flight job, so the thread never evaluates two contexts at once.
+    fn reset_sessions(&self) {
+        let sender = self
+            .runtime
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().cloned());
+        if let Some(sender) = sender {
+            let _ = sender.send(ConverterJob::Reset);
+        }
+    }
+
     fn runtime_sender(&self) -> Option<mpsc::Sender<ConverterJob>> {
         let mut guard = self.runtime.lock().ok()?;
         if let Some(sender) = guard.as_ref() {
@@ -2927,6 +3127,8 @@ const __norm = (v) => {{
         let (sender, receiver) = mpsc::channel::<ConverterJob>();
         let dir = self.dir.clone();
         let registry_url = self.registry_url.clone();
+        let ready = Arc::clone(&self.ready);
+        let warming = Arc::clone(&self.warming);
         std::thread::Builder::new()
             .name("z2m-converters".into())
             .spawn(move || {
@@ -2934,6 +3136,35 @@ const __norm = (v) => {{
                 let mut sessions: HashMap<String, ConverterSession> = HashMap::new();
                 while let Ok(job) = receiver.recv() {
                     match job {
+                        ConverterJob::Warmup { model, device } => {
+                            let key = format!("{}|{model}", device.ieee_addr);
+                            if !sessions.contains_key(&key) {
+                                let session = {
+                                    let _boa_guard = boa_background_guard();
+                                    converter.open_session(&model, &device)
+                                };
+                                if let Some(session) = session {
+                                    sessions.insert(key.clone(), session);
+                                }
+                            }
+                            if sessions.contains_key(&key) {
+                                if let Ok(mut set) = ready.lock() {
+                                    set.insert(key.clone());
+                                }
+                            }
+                            if let Ok(mut set) = warming.lock() {
+                                set.remove(&key);
+                            }
+                        }
+                        ConverterJob::Reset => {
+                            sessions.clear();
+                            if let Ok(mut set) = ready.lock() {
+                                set.clear();
+                            }
+                            if let Ok(mut set) = warming.lock() {
+                                set.clear();
+                            }
+                        }
                         ConverterJob::ConvertSet {
                             model,
                             endpoint,
@@ -2949,6 +3180,9 @@ const __norm = (v) => {{
                                 match converter.open_session(&model, &device) {
                                     Some(session) => {
                                         sessions.insert(session_key.clone(), session);
+                                        if let Ok(mut set) = ready.lock() {
+                                            set.insert(session_key.clone());
+                                        }
                                     }
                                     None => {
                                         let _ = reply.send(None);
@@ -2985,6 +3219,9 @@ const __norm = (v) => {{
                                 match converter.open_session(&model, &device) {
                                     Some(session) => {
                                         sessions.insert(key.clone(), session);
+                                        if let Ok(mut set) = ready.lock() {
+                                            set.insert(key.clone());
+                                        }
                                     }
                                     None => {
                                         let _ = reply.send(None);
@@ -3017,6 +3254,9 @@ const __norm = (v) => {{
                                 match converter.open_session(&model, &device) {
                                     Some(session) => {
                                         sessions.insert(key.clone(), session);
+                                        if let Ok(mut set) = ready.lock() {
+                                            set.insert(key.clone());
+                                        }
                                     }
                                     None => {
                                         let _ = reply.send(None);
@@ -3078,10 +3318,10 @@ const __norm = (v) => {{
                 model, cluster_id, msg_type, reports, device, message, state,
             );
         }
-        match receiver.recv_timeout(Duration::from_secs(10)) {
+        match receiver.recv_timeout(INCOMING_SESSION_TIMEOUT) {
             Ok(result) => result,
             Err(error) => {
-                warn!("external converter session timed out: {error}");
+                debug!("external converter session busy: {error}");
                 None
             }
         }
@@ -3140,10 +3380,10 @@ const __norm = (v) => {{
                 model, cluster_id, msg_type, data, device, message, state,
             );
         }
-        match receiver.recv_timeout(Duration::from_secs(10)) {
+        match receiver.recv_timeout(INCOMING_SESSION_TIMEOUT) {
             Ok(result) => result,
             Err(error) => {
-                warn!("external converter session timed out: {error}");
+                debug!("external converter session busy: {error}");
                 None
             }
         }
@@ -3755,6 +3995,7 @@ impl ExternalConverter {
         model: &str,
         device: &ExternalDeviceInfo,
     ) -> Option<Vec<serde_json::Value>> {
+        let _boa_guard = boa_background_guard();
         let registry = self.load_registry()?;
         let (file, index) = select_definition(&registry, model, device)?;
         let zcl = self.load_zcl()?;

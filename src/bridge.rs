@@ -291,15 +291,26 @@ impl Bridge {
     /// Publish HA discovery using upstream exposes when available, otherwise
     /// the cluster-inference fallback.
     async fn publish_device_discovery(
-        &self,
+        external: Arc<ExternalConverter>,
         mqtt: &MqttBridge,
         device: &Device,
         base_topic: &str,
         coordinator_ieee: &str,
     ) {
-        let info = crate::converters::external::ExternalDeviceInfo::from_device(device);
-        let model = device.model.clone().unwrap_or_default();
-        match self.external.exposes(&model, &info) {
+        // Definition/exposes evaluation is synchronous Boa work; run it on the
+        // blocking pool so it cannot starve the bridge event loop.
+        let device_for_exposes = device.clone();
+        let external_for_exposes = Arc::clone(&external);
+        let exposes = tokio::task::spawn_blocking(move || {
+            let info =
+                crate::converters::external::ExternalDeviceInfo::from_device(&device_for_exposes);
+            let model = device_for_exposes.model.clone().unwrap_or_default();
+            external_for_exposes.exposes(&model, &info)
+        })
+        .await
+        .ok()
+        .flatten();
+        match exposes {
             Some(exposes) if !exposes.is_empty() => {
                 homeassistant::publish_exposes_discovery(
                     mqtt,
@@ -347,11 +358,21 @@ impl Bridge {
                 let mut p = pending_clone.lock().await;
                 *p = false;
             }
-            let db = db_clone.lock().await;
-            if let Err(e) = db.write() {
-                // Keep the in-memory records; the next mutation or the shutdown
-                // flush retries the write. Never report success to the caller.
-                error!("Failed to write database.db (batched): {e}");
+            // `sync_all` on the router's flash can take seconds; keep it off
+            // the async worker so the event loop and MQTT tasks still run.
+            let result = tokio::task::spawn_blocking(move || {
+                let db = db_clone.blocking_lock();
+                db.write()
+            })
+            .await;
+            match result {
+                Ok(Err(error)) => {
+                    // Keep the in-memory records; the next mutation or the
+                    // shutdown flush retries the write.
+                    error!("Failed to write database.db (batched): {error}");
+                }
+                Err(error) => error!("database write task failed: {error}"),
+                Ok(Ok(())) => {}
             }
         });
     }
@@ -494,7 +515,7 @@ impl Bridge {
             .set_zcl_io(Some(crate::converters::external::ZclIo {
                 inner: Arc::clone(&coord.inner),
                 runtime: tokio::runtime::Handle::current(),
-                types: self.external.zcl_types(),
+                types: (*self.external.zcl_types()).clone(),
                 tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
             }));
         info!("Coordinator ready");
@@ -515,9 +536,16 @@ impl Bridge {
                     if serialized == last {
                         continue;
                     }
-                    match crate::state::save(&path, &snapshot) {
-                        Ok(()) => last = serialized,
-                        Err(error) => warn!("Failed to write state.json: {error}"),
+                    let write_path = path.clone();
+                    let write_snapshot = snapshot.clone();
+                    match tokio::task::spawn_blocking(move || {
+                        crate::state::save(&write_path, &write_snapshot)
+                    })
+                    .await
+                    {
+                        Ok(Ok(())) => last = serialized,
+                        Ok(Err(error)) => warn!("Failed to write state.json: {error}"),
+                        Err(error) => warn!("state.json write task failed: {error}"),
                     }
                 }
             });
@@ -529,8 +557,16 @@ impl Bridge {
             info!("Permit join enabled (254 s)");
         }
         info!("Startup complete, entering main loop");
-        // Warm registry cache (gh-pages, 24h)
-        let _ = self.external.fetch_registry().await;
+        // Warm the definition-registry cache in the background. The refresh
+        // checks the gh-pages copy (24 h TTL); awaiting it here previously
+        // stalled the event loop before the first select! iteration, so MQTT
+        // and frontend requests timed out behind a slow/unreachable fetch.
+        let registry_refresh = Arc::clone(&self.external);
+        tokio::spawn(async move {
+            if registry_refresh.fetch_registry().await.is_some() {
+                debug!("definition registry cache checked");
+            }
+        });
 
         let devices = Arc::clone(&self.devices);
         let groups = Arc::clone(&self.groups);
@@ -780,7 +816,7 @@ impl Bridge {
                             // Publish HA discovery after interview
                             if ha_enabled && interview_just_completed {
                                 if let Some(dev) = devices.get_by_nwk(nwk_addr) {
-                                    self.publish_device_discovery(&mqtt, &dev, &base_topic, &coordinator_ieee).await;
+                                    Self::publish_device_discovery(Arc::clone(&self.external), &mqtt, &dev, &base_topic, &coordinator_ieee).await;
                                 }
                             }
                         }
@@ -1011,7 +1047,7 @@ impl Bridge {
                                             let exposes = self.external.exposes(&model, &info).unwrap_or_default();
                                             homeassistant::cleanup_discovery(&mqtt, &old_device, &exposes).await;
                                             if let Some(new_device) = devices.get_by_ieee(&ieee).map(|device| device.clone()) {
-                                                self.publish_device_discovery(&mqtt, &new_device, &base_topic, &coordinator_ieee).await;
+                                                Self::publish_device_discovery(Arc::clone(&self.external), &mqtt, &new_device, &base_topic, &coordinator_ieee).await;
                                             }
                                         }
                                         let list = device_list_json(
@@ -1066,8 +1102,19 @@ impl Bridge {
                                 "converter/save" => {
                                     let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("");
                                     let code = payload.get("code").and_then(|v| v.as_str()).unwrap_or("");
-                                    match self.external.save_external_converter(name, code) {
-                                        Ok(()) => {
+                                    // Loading evaluates every converter in Boa,
+                                    // which takes seconds per model on the
+                                    // router; keep the bridge responsive.
+                                    let external_for_save = Arc::clone(&self.external);
+                                    let save_name = name.to_string();
+                                    let save_code = code.to_string();
+                                    let result = tokio::task::spawn_blocking(move || {
+                                        external_for_save
+                                            .save_external_converter(&save_name, &save_code)
+                                    })
+                                    .await;
+                                    match result {
+                                        Ok(Ok(())) => {
                                             info!("converter/save: {name} synchronized");
                                             self.definition_cache.clear();
                                             let files = self.external.list_external_converters();
@@ -1078,12 +1125,16 @@ impl Bridge {
                                             let list_mqtt = mqtt.clone();
                                             let ieee = coordinator_ieee.clone();
                                             tokio::spawn(async move {
-                                                let list = device_list_json(
-                                                    &devices,
-                                                    &external,
-                                                    &cache,
-                                                    Some(&ieee),
-                                                );
+                                                let list = tokio::task::spawn_blocking(move || {
+                                                    device_list_json(
+                                                        &devices,
+                                                        &external,
+                                                        &cache,
+                                                        Some(&ieee),
+                                                    )
+                                                })
+                                                .await
+                                                .unwrap_or_default();
                                                 let _ = list_mqtt
                                                     .publish_bridge_devices(&json!(list))
                                                     .await;
@@ -1091,16 +1142,30 @@ impl Bridge {
                                             let resp = mk_resp("ok", json!({}), None);
                                             let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                         }
-                                        Err(error) => {
+                                        Ok(Err(error)) => {
                                             let resp = mk_resp("error", json!({}), Some(error));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        Err(error) => {
+                                            let resp = mk_resp(
+                                                "error",
+                                                json!({}),
+                                                Some(format!("converter save task failed: {error}")),
+                                            );
                                             let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                         }
                                     }
                                 }
                                 "converter/remove" => {
                                     let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                                    match self.external.remove_external_converter(name) {
-                                        Ok(()) => {
+                                    let external_for_remove = Arc::clone(&self.external);
+                                    let remove_name = name.to_string();
+                                    let result = tokio::task::spawn_blocking(move || {
+                                        external_for_remove.remove_external_converter(&remove_name)
+                                    })
+                                    .await;
+                                    match result {
+                                        Ok(Ok(())) => {
                                             self.definition_cache.clear();
                                             let files = self.external.list_external_converters();
                                             let _ = mqtt.publish_bridge_converters(&files).await;
@@ -1110,12 +1175,16 @@ impl Bridge {
                                             let list_mqtt = mqtt.clone();
                                             let ieee = coordinator_ieee.clone();
                                             tokio::spawn(async move {
-                                                let list = device_list_json(
-                                                    &devices,
-                                                    &external,
-                                                    &cache,
-                                                    Some(&ieee),
-                                                );
+                                                let list = tokio::task::spawn_blocking(move || {
+                                                    device_list_json(
+                                                        &devices,
+                                                        &external,
+                                                        &cache,
+                                                        Some(&ieee),
+                                                    )
+                                                })
+                                                .await
+                                                .unwrap_or_default();
                                                 let _ = list_mqtt
                                                     .publish_bridge_devices(&json!(list))
                                                     .await;
@@ -1123,8 +1192,16 @@ impl Bridge {
                                             let resp = mk_resp("ok", json!({}), None);
                                             let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                         }
-                                        Err(error) => {
+                                        Ok(Err(error)) => {
                                             let resp = mk_resp("error", json!({}), Some(error));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        Err(error) => {
+                                            let resp = mk_resp(
+                                                "error",
+                                                json!({}),
+                                                Some(format!("converter remove task failed: {error}")),
+                                            );
                                             let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                         }
                                     }
@@ -1143,9 +1220,33 @@ impl Bridge {
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     }
                                 }
-                                "device/options" | "group/options" | "options" | "bridge/options" => {
-                                    // Stub: accept options, return ok
-                                    let resp = mk_resp("ok", json!({}), None);
+                                "options" | "bridge/options" => {
+                                    let Some(options) = payload.get("options") else {
+                                        let resp = mk_resp("error", json!({}), Some("Invalid payload".into()));
+                                        let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        continue;
+                                    };
+                                    match apply_options(&self.config_path, options) {
+                                        Ok(restart_required) => {
+                                            self.publish_bridge_info(&mqtt, &coord).await;
+                                            let resp = mk_resp(
+                                                "ok",
+                                                json!({"restart_required": restart_required}),
+                                                None,
+                                            );
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                        Err(error) => {
+                                            let resp = mk_resp("error", json!({}), Some(error));
+                                            let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        }
+                                    }
+                                }
+                                "device/options" | "group/options" => {
+                                    // Entity options are persisted by the
+                                    // dedicated handlers in a later change;
+                                    // acknowledge with the current options.
+                                    let resp = mk_resp("ok", json!({"restart_required": false}), None);
                                     let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                 }
                                 "group/add" => {
@@ -1573,23 +1674,51 @@ impl Bridge {
 
         let coordinator_ieee_str = coord.info.ieee_addr.map(|a| a.as_hex()).unwrap_or_default();
 
+        // Device states are cheap; publish them synchronously before the
+        // command loop starts.
         for dev in self.devices.all_devices() {
             let state = serde_json::Value::Object(dev.state.clone());
             Self::publish_state(mqtt, self.cfg.advanced.output, &dev.friendly_name, &state).await;
-
-            if self.cfg.homeassistant.enabled() && dev.interview_complete {
-                self.publish_device_discovery(
-                    mqtt,
-                    &dev,
-                    &self.cfg.mqtt.base_topic,
-                    &coordinator_ieee_str,
-                )
-                .await;
-            }
         }
 
-        self.publish_device_list(mqtt, Some(&coordinator_ieee_str))
-            .await;
+        // HA discovery and the definition payloads evaluate the converter
+        // host (Boa takes seconds per external model on the router). Do that
+        // off the startup path so MQTT/frontend requests are answered while it
+        // runs.
+        let devices = Arc::clone(&self.devices);
+        let external = Arc::clone(&self.external);
+        let cache = Arc::clone(&self.definition_cache);
+        let publish_mqtt = mqtt.clone();
+        let base_topic = self.cfg.mqtt.base_topic.clone();
+        let ha_enabled = self.cfg.homeassistant.enabled();
+        let coordinator_ieee = coordinator_ieee_str.clone();
+        tokio::spawn(async move {
+            if ha_enabled {
+                for device in devices.all_devices() {
+                    if device.interview_complete {
+                        Bridge::publish_device_discovery(
+                            Arc::clone(&external),
+                            &publish_mqtt,
+                            &device,
+                            &base_topic,
+                            &coordinator_ieee,
+                        )
+                        .await;
+                    }
+                }
+            }
+            let list_devices = Arc::clone(&devices);
+            let list_external = Arc::clone(&external);
+            let list_cache = Arc::clone(&cache);
+            let list_ieee = coordinator_ieee.clone();
+            let list = tokio::task::spawn_blocking(move || {
+                device_list_json(&list_devices, &list_external, &list_cache, Some(&list_ieee))
+            })
+            .await
+            .unwrap_or_default();
+            let _ = publish_mqtt.publish_bridge_devices(&json!(list)).await;
+        });
+
         let _ = mqtt.publish_bridge_groups(&self.groups).await;
         let _ = mqtt.publish_bridge_extensions().await;
     }
@@ -2340,21 +2469,32 @@ impl Bridge {
                     if !reports.is_empty() {
                         if let Some((model, info, state)) = prepared.as_ref() {
                             if external.ensure_device_files(model, info).await.is_some() {
-                                let message = crate::converters::external::IncomingMessageInfo {
-                                    endpoint: src_ep,
-                                    nwk_addr: src_addr,
-                                    linkquality: link_quality,
-                                    group_id: 0,
-                                    tsn: Some(header.sequence),
-                                    manufacturer_code: header.mfr_code,
-                                };
-                                if let Some(frame) = external.convert_from_zigbee_session_full(
-                                    model, cluster_id, msg_type, &reports, info, &message, state,
-                                ) {
-                                    external_values = Some(frame.state);
-                                    frame_commands.extend(frame.commands);
-                                    frame_writes.extend(frame.writes);
-                                    frame_reads.extend(frame.reads);
+                                if external.session_ready(model, info) {
+                                    let message =
+                                        crate::converters::external::IncomingMessageInfo {
+                                            endpoint: src_ep,
+                                            nwk_addr: src_addr,
+                                            linkquality: link_quality,
+                                            group_id: 0,
+                                            tsn: Some(header.sequence),
+                                            manufacturer_code: header.mfr_code,
+                                        };
+                                    if let Some(frame) = external.convert_from_zigbee_session_full(
+                                        model, cluster_id, msg_type, &reports, info, &message,
+                                        state,
+                                    ) {
+                                        external_values = Some(frame.state);
+                                        frame_commands.extend(frame.commands);
+                                        frame_writes.extend(frame.writes);
+                                        frame_reads.extend(frame.reads);
+                                    }
+                                } else {
+                                    // Cold Boa session: warm it in the
+                                    // background and keep the event loop free.
+                                    external.ensure_session(model, info);
+                                    debug!(
+                                        "external converter session warming for {model:?}; using native conversion"
+                                    );
                                 }
                             } else {
                                 debug!("external converter: no candidates for model {model:?}");
@@ -2377,24 +2517,31 @@ impl Bridge {
                         Ok(Some(parsed)) => {
                             if let Some((model, info, state)) = prepared.as_ref() {
                                 if external.ensure_device_files(model, info).await.is_some() {
-                                    let message =
-                                        crate::converters::external::IncomingMessageInfo {
-                                            endpoint: src_ep,
-                                            nwk_addr: src_addr,
-                                            linkquality: link_quality,
-                                            group_id: 0,
-                                            tsn: Some(header.sequence),
-                                            manufacturer_code: header.mfr_code,
-                                        };
-                                    let data_map = Self::tuya_command_data(&parsed);
-                                    if let Some(frame) = external
-                                        .convert_from_zigbee_session_with_data_full(
-                                            model, cluster_id, msg_type, &data_map, info, &message,
-                                            state,
-                                        )
-                                    {
-                                        external_values = Some(frame.state);
-                                        frame_commands.extend(frame.commands);
+                                    if external.session_ready(model, info) {
+                                        let message =
+                                            crate::converters::external::IncomingMessageInfo {
+                                                endpoint: src_ep,
+                                                nwk_addr: src_addr,
+                                                linkquality: link_quality,
+                                                group_id: 0,
+                                                tsn: Some(header.sequence),
+                                                manufacturer_code: header.mfr_code,
+                                            };
+                                        let data_map = Self::tuya_command_data(&parsed);
+                                        if let Some(frame) = external
+                                            .convert_from_zigbee_session_with_data_full(
+                                                model, cluster_id, msg_type, &data_map, info,
+                                                &message, state,
+                                            )
+                                        {
+                                            external_values = Some(frame.state);
+                                            frame_commands.extend(frame.commands);
+                                        }
+                                    } else {
+                                        external.ensure_session(model, info);
+                                        debug!(
+                                            "external converter session warming for {model:?}; using native conversion"
+                                        );
                                     }
                                 } else {
                                     debug!("external converter: no candidates for model {model:?}");
@@ -2963,6 +3110,7 @@ impl Bridge {
                     };
                     let endpoint_name = endpoint_suffix(&dev, target_endpoint)
                         .or_else(|| Some(target_endpoint.to_string()));
+                    external.ensure_session(&model, &info);
                     let Some(outcome) = external.convert_set(
                         &model,
                         target_endpoint,
@@ -3265,6 +3413,9 @@ impl Bridge {
         }
     }
 
+    /// Synchronous-build device-list publisher kept for the differential
+    /// harness; the startup path builds the list on the blocking pool instead.
+    #[allow(dead_code)]
     async fn publish_device_list(&self, mqtt: &MqttBridge, coordinator_ieee: Option<&str>) {
         let list = device_list_json(
             &self.devices,
@@ -3389,6 +3540,37 @@ fn mqtt_server_uri(cfg: &crate::config::MqttConfig) -> String {
 }
 
 /// Host OS information for `bridge/info.os` (upstream `osInfo`).
+/// Merge `bridge/request/options` into the YAML configuration file.
+///
+/// Upstream `settings.apply` deep-merges the runtime settings and saves the
+/// file. This implementation keeps unknown/user keys by merging the raw YAML
+/// document, and reports that a restart is required because most settings are
+/// consumed at startup.
+fn apply_options(
+    config_path: &std::path::Path,
+    options: &serde_json::Value,
+) -> std::result::Result<bool, String> {
+    if !options.is_object() {
+        return Err("Invalid payload".into());
+    }
+    let text = std::fs::read_to_string(config_path)
+        .map_err(|error| format!("cannot read config: {error}"))?;
+    let yaml: serde_yml::Value =
+        serde_yml::from_str(&text).map_err(|error| format!("invalid config: {error}"))?;
+    let mut document =
+        serde_json::to_value(yaml).map_err(|error| format!("cannot convert config: {error}"))?;
+    document = merge_json(document, options.clone());
+    let yaml = serde_yml::to_string(&document)
+        .map_err(|error| format!("cannot serialize config: {error}"))?;
+    let tmp = config_path.with_extension("yaml.tmp");
+    std::fs::write(&tmp, yaml).map_err(|error| format!("cannot write config: {error}"))?;
+    std::fs::rename(&tmp, config_path)
+        .map_err(|error| format!("cannot replace config: {error}"))?;
+    // Log level/HA toggles are not applied live by this implementation yet, so
+    // report a restart conservatively instead of pretending they took effect.
+    Ok(true)
+}
+
 /// Deep-merge `overlay` into `base`; objects merge recursively and scalars/arrays
 /// from `overlay` win.
 fn merge_json(mut base: serde_json::Value, overlay: serde_json::Value) -> serde_json::Value {
@@ -4337,6 +4519,35 @@ mod tests {
             lock["baseline"]["zigbee-herdsman"]["resolved_version"], HERDSMAN_COMPAT_VERSION,
             "update HERDSMAN_COMPAT_VERSION when advancing the baseline"
         );
+    }
+
+    #[test]
+    fn apply_options_merges_and_preserves_unknown_keys() {
+        let dir = std::env::temp_dir().join(format!(
+            "z2m-options-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("configuration.yaml");
+        std::fs::write(
+            &path,
+            "mqtt:\n  base_topic: zigbee2mqtt\ncustom_option: 1\n",
+        )
+        .unwrap();
+        let restart =
+            apply_options(&path, &json!({"advanced": {"last_seen": "ISO_8601"}})).unwrap();
+        assert!(restart);
+        let text = std::fs::read_to_string(&path).unwrap();
+        let parsed: serde_json::Value =
+            serde_json::to_value(serde_yml::from_str::<serde_yml::Value>(&text).unwrap()).unwrap();
+        assert_eq!(parsed["custom_option"], 1);
+        assert_eq!(parsed["mqtt"]["base_topic"], "zigbee2mqtt");
+        assert_eq!(parsed["advanced"]["last_seen"], "ISO_8601");
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
@@ -5891,6 +6102,13 @@ module.exports = {definitions};
         (devices, ieee)
     }
 
+    fn warm_external(external: &ExternalConverter, devices: &DeviceRegistry, nwk: u16) {
+        let device = devices.get_by_nwk(nwk).expect("fixture device");
+        let model = device.model.clone().unwrap_or_default();
+        let info = crate::converters::external::ExternalDeviceInfo::from_device(&device);
+        external.warm_for_tests(&model, &info);
+    }
+
     async fn wait_for_publish(
         broker: &crate::mqtt::fake_broker::FakeBroker,
         predicate: impl Fn(&crate::mqtt::fake_broker::Published) -> bool,
@@ -6744,6 +6962,7 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
 
         Bridge::process_zcl_message(
@@ -6822,6 +7041,7 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
 
         let mut frame = tuya_data_report_frame();
@@ -6859,6 +7079,7 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
 
         Bridge::process_zcl_message(
@@ -6888,6 +7109,7 @@ module.exports = {definitions};
         let (dir, external) = tuya_fixture();
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_devices().await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
         let payload = [0x00, 0x00, 0x01, 0x00, 0x12, 0x05, 0x01, 0x00];
 
@@ -6952,6 +7174,7 @@ module.exports = {definitions};
         let (wire, coord) = fake_coordinator();
         let (mqtt, _broker) = test_mqtt().await;
         let (devices, _ieee) = tuya_reply_devices().await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
         let collector = spawn_af_device(wire, 1, |_sent| vec![success_srsp()]);
 
@@ -6990,6 +7213,7 @@ module.exports = {definitions};
         let (wire, coord) = fake_coordinator();
         let (mqtt, _broker) = test_mqtt().await;
         let (devices, _ieee) = io_ops_devices().await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
         let collector = spawn_af_device(wire, 2, |sent| {
             if sent.cluster == 0x0402 {
@@ -7050,11 +7274,12 @@ module.exports = {definitions};
         external.set_zcl_io(Some(crate::converters::external::ZclIo {
             inner: Arc::clone(&coord.inner),
             runtime: tokio::runtime::Handle::current(),
-            types: external.zcl_types(),
+            types: (*external.zcl_types()).clone(),
             tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         }));
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = read_result_devices().await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
         let collector = spawn_af_device(wire, 1, |sent| {
             let tsn = sent.payload[1];
@@ -7113,11 +7338,12 @@ module.exports = {definitions};
         external.set_zcl_io(Some(crate::converters::external::ZclIo {
             inner: Arc::clone(&coord.inner),
             runtime: tokio::runtime::Handle::current(),
-            types: external.zcl_types(),
+            types: (*external.zcl_types()).clone(),
             tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         }));
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = ack_devices("FixtureAck").await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
         let collector = spawn_af_device(wire, 1, |sent| {
             let tsn = sent.payload[1];
@@ -7162,11 +7388,12 @@ module.exports = {definitions};
         external.set_zcl_io(Some(crate::converters::external::ZclIo {
             inner: Arc::clone(&coord.inner),
             runtime: tokio::runtime::Handle::current(),
-            types: external.zcl_types(),
+            types: (*external.zcl_types()).clone(),
             tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         }));
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = ack_devices("FixtureAck").await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
         let collector = spawn_af_device(wire, 1, |sent| {
             let tsn = sent.payload[1];
@@ -7207,11 +7434,12 @@ module.exports = {definitions};
         external.set_zcl_io(Some(crate::converters::external::ZclIo {
             inner: Arc::clone(&coord.inner),
             runtime: tokio::runtime::Handle::current(),
-            types: external.zcl_types(),
+            types: (*external.zcl_types()).clone(),
             tsn: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         }));
         let (mqtt, broker) = test_mqtt().await;
         let (devices, _ieee) = ack_devices("FixtureAckAf").await;
+        warm_external(&external, &devices, 0x5678);
         let mut trans_id = 0u8;
         let collector = spawn_af_device(wire, 1, |_sent| {
             vec![crate::coordinator::znp::frame::ZnpFrame::new(

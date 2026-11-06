@@ -126,6 +126,20 @@ R1 — явно ограниченный релиз для проверенно�
   (Nous/TH01Z) больше не отбрасываются с `ZCL type 0x03F3 needs command
   context`. Полное декодирование TH01Z (`temperature`/`humidity`) остаётся
   отдельной проблемой.
+- **`bridge/request/options`**: реализован разбор/слияние/атомарная запись
+  YAML, повторная публикация `bridge/info` и ответ
+  `{"status":"ok","data":{"restart_required":true},"transaction":...}`.
+  Раньше запрос попадал в заглушку, и фронтенд ловил `Request timed out`.
+  HIL: `last_seen: ISO_8601` записан в config.yaml, ответ получен.
+- **Отзывчивость event loop**: HA discovery, список устройств,
+  `converter/save|remove` и пересборка `device_list_json` переведены на
+  `spawn_blocking`; `fetch_registry` унесён в фон после «Startup complete»,
+  холодные Boa-сессии не блокируют обработку кадров (readiness + warmup,
+  ожидание 500 мс), фоновые Boa-оценки сериализованы, а `registry.json`/
+  `zcl.json`/`zcl-commands.json` кэшируются. Запись `database.db` (`sync_all`)
+  и `state.json` — на blocking pool. HIL: 35 запросов options во время старта —
+  p50 56 мс, max 585 мс (было 20–30 с и таймаут фронтенда); `health_check`
+  во время сохранения 28 КБ конвертера ~4.5 с, `converter/save` = `ok`.
 - **State cache (STORAGE-010)**: добавлены загрузка/сохранение `state.json`
   (атомарно, раз в 30 с и при shutdown), восстановление до стартовой публикации
   и `cache_state`/`cache_state_persistent`/`cache_state_send_on_startup`.

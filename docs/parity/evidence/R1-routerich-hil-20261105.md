@@ -172,6 +172,65 @@ The HA broker is Mosquitto and supports the bridge flag, so `try_private true`
 is safe here. If a future remote broker does not support it, use directional
 `topic ... out/in` rules instead.
 
+## Bridge options and event-loop responsiveness (2026-11-06)
+
+The frontend Settings page timed out on `bridge/request/options`: the old
+binary had no handler for the request. Implemented:
+
+- `options` / `bridge/options` validates that `options` is an object, deep-merges
+  it into the raw YAML `configuration.yaml` (preserving unknown/user keys),
+  writes the file atomically, republishes `bridge/info` and replies
+  `{"status":"ok","data":{"restart_required":true},"transaction":…}`.
+- `restart_required` is reported conservatively because most settings are
+  consumed at startup; live application of log level / HA toggles is still a
+  gap (MQTT-016, 2/3 scenarios).
+
+HIL verification (aarch64 binary `b5017d83…`, router, 2026-11-06):
+
+```text
+bridge/request/options {"options":{"advanced":{"last_seen":"ISO_8601"}},"transaction":"t6"}
+bridge/response/options {"data":{"restart_required":true},"status":"ok","transaction":"t6"}
+grep last_seen /etc/zigbee2mqtt-rs/config.yaml -> last_seen: ISO_8601
+```
+
+### Event-loop starvation (fixed)
+
+The settings request used to wait behind long synchronous work on the event
+loop. Each of these was reproduced and removed:
+
+1. `external.fetch_registry().await` ran **after** "Startup complete" but before
+   the first `select!`, so a slow gh-pages refresh blocked MQTT/frontend for the
+   whole HTTP timeout. It is now a spawned background task.
+2. The startup HA/device-list task called `device_list_json` directly; Boa
+   definition evaluation (~10-30 s for the installed definitions on this
+   2-core router) blocked the worker running the bridge. It now uses
+   `tokio::task::spawn_blocking`.
+3. `publish_device_discovery` (`external.exposes`), `converter/save`,
+   `converter/remove`, and the post-save device-list rebuild also use the
+   blocking pool.
+4. Incoming frames no longer wait for a cold Boa session on the event loop:
+   `session_ready()` gates conversion, `ensure_session()` queues a warmup job,
+   and a frame for a not-yet-ready session is converted natively. Incoming
+   session waits are bounded to 500 ms (command `convert_set` keeps 10 s).
+5. Background Boa evaluations and session warmups are serialized with a
+   process-wide lock so at most one core is consumed by module evaluation.
+6. `registry.json` (3.0 MB), `zcl.json` (77 KB) and `zcl-commands.json`
+   (209 KB) were parsed on nearly every frame. They are now cached (registry
+   invalidated by mtime, externally changed files clear the verified-file
+   cache).
+7. `database.db` (`sync_all`) and periodic `state.json` writes moved to
+   `spawn_blocking`, so slow flash I/O cannot block an async worker.
+
+Measured over 35 `bridge/request/options` requests at 2 s intervals spanning
+startup of the final binary: **min 32 ms, p50 56 ms, max 585 ms**, with all
+requests answered (previously stalls of 20-30 s and a hard frontend timeout).
+A concurrent `health_check` during a 28 750-byte converter save was answered in
+~4.5 s, and `converter/save` returned `{"status":"ok"}`. Retained
+`bridge/devices` contains all 4 entities; the Lytko definitions resolve as
+`source=external`, the Tuya sensor uses the packaged catalog definition, and
+live Lytko `local_temperature`/`energy` and the Tuya heartbeat continue to
+update.
+
 ## Not yet verified
 
 - Full sensor decoding, external-converter loading, stale retained-topic cleanup.

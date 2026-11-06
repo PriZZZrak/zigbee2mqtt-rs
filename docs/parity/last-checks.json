@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-05T08:56:14+00:00",
+  "captured_utc": "2026-11-06T13:39:14+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent",
   "commands": [
     {
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "450 library + 2 binary + 30 compatibility = 482 passed, 0 failed"
+      "result": "451 library + 2 binary + 30 compatibility = 483 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -30,7 +30,7 @@
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
       "exit": 0,
-      "result": "static aarch64 ELF built from the current tree (sha256 e06ef69d..., binary-only deploy; .ipk not rebuilt at user request)"
+      "result": "static aarch64 ELF built from the current tree (sha256 b5017d83..., binary-only deploy; .ipk not rebuilt at user request)"
     },
     {
       "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",
@@ -86,6 +86,16 @@
       "command": "copy original /etc/zigbee2mqtt/state.json -> /etc/zigbee2mqtt-rs/state.json + restart (HIL)",
       "exit": 0,
       "result": "Restored cached state for 3 devices; sensor published temperature=26.4 humidity=45 battery=45 immediately; state.json persisted"
+    },
+    {
+      "command": "MQTT bridge/request/options x35 at 2 s intervals across startup (HIL, router 2026-11-06)",
+      "exit": 0,
+      "result": "all 35 answered; min 32 ms, p50 56 ms, max 585 ms; config.yaml merged; options response {\"status\":\"ok\",\"data\":{\"restart_required\":true}}"
+    },
+    {
+      "command": "MQTT health_check during 28 KB converter/save (HIL, router 2026-11-06)",
+      "exit": 0,
+      "result": "health_check answered in ~4.5 s, converter/save returned {\"status\":\"ok\"}; save/remove/device-list now use spawn_blocking"
     }
   ]
 }
