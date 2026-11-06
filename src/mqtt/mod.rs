@@ -120,11 +120,13 @@ pub(crate) fn parse_device_command(
     })
 }
 
+#[allow(dead_code)] // used by the broker-free remove tests
 pub(crate) type MqttFuture<'a, T> =
     std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send + 'a>>;
 
 /// Publishing seam used by bridge request handlers, allowing a recording fake in
 /// broker-free tests.
+#[allow(dead_code)] // used by the broker-free remove tests
 pub(crate) trait MqttPublishIo {
     fn publish<'a>(
         &'a self,
