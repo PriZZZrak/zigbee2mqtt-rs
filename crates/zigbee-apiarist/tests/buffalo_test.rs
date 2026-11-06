@@ -60,13 +60,20 @@ use zigbee_apiarist::buffalo::buffalo::Buffalo;
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09], 2);
+        let value = buffalo.read_buffer(5);
+        assert_eq!(buffalo.get_position(), 7);
+        assert_eq!(value, vec![0x02, 0x03, 0x04, 0x05, 0x06]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 5], 1);
+        let payload = vec![0x00, 0x01, 0x02];
+        buffalo.write_buffer(&payload, payload.len());
+        assert_eq!(buffalo.get_position(), 4);
+        assert_eq!(buffalo.get_buffer(), vec![0x00, 0x00, 0x01, 0x02, 0x00]);
 }
 
 #[test]
@@ -84,37 +91,55 @@ fn buffalo() {
 #[test]
 #[ignore = "not implemented yet"]
 fn doublele_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x33, 0x33, 0x33, 0x33, 0x31, 0xb7, 0x28, 0x41], 0);
+        let value = buffalo.read_double_le();
+        assert_eq!(buffalo.get_position(), 8);
+        assert_eq!(value, 809880.6);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn doublele_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 8], 0);
+        buffalo.write_double_le(809880.6);
+        assert_eq!(buffalo.get_position(), 8);
+        assert_eq!(buffalo.get_buffer(), vec![0x33, 0x33, 0x33, 0x33, 0x31, 0xb7, 0x28, 0x41]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn floatle_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x00, 0x40, 0xc8, 0x43], 0);
+        let value = buffalo.read_float_le();
+        assert_eq!(buffalo.get_position(), 4);
+        assert_eq!(value, 400.5);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn floatle_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 4], 0);
+        buffalo.write_float_le(400.5);
+        assert_eq!(buffalo.get_position(), 4);
+        assert_eq!(buffalo.get_buffer(), vec![0x00, 0x40, 0xc8, 0x43]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn ieeeaddr_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x00, 0x12, 0x4b, 0x00, 0x12, 0x01, 0x44, 0xae], 0);
+        let value = buffalo.read_ieee_addr();
+        assert_eq!(buffalo.get_position(), 8);
+        assert_eq!(value, "0xae440112004b1200");
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn ieeeaddr_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 8], 0);
+        buffalo.write_ieee_addr("0xae440112004b1200");
+        assert_eq!(buffalo.get_position(), 8);
+        assert_eq!(buffalo.get_buffer(), vec![0x00, 0x12, 0x4b, 0x00, 0x12, 0x01, 0x44, 0xae]);
 }
 
 #[test]
@@ -390,13 +415,19 @@ fn uint8_write() {
 #[test]
 #[ignore = "not implemented yet"]
 fn utf8_string_read() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0x61, 0x62, 0x63, 0x64], 0);
+        let value = buffalo.read_utf8_string(4);
+        assert_eq!(buffalo.get_position(), 4);
+        assert_eq!(value, "abcd");
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn utf8_string_write() {
-    todo!()
+        let mut buffalo = Buffalo::new(vec![0; 4], 0);
+        buffalo.write_utf8_string("abcd");
+        assert_eq!(buffalo.get_position(), 4);
+        assert_eq!(buffalo.get_buffer(), vec![0x61, 0x62, 0x63, 0x64]);
 }
 
 #[test]
