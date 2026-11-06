@@ -1,12 +1,20 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/unpi/parser.ts
-// TODO: port public API from the original file.
+// TODO: port Parser.
 
-// pub fn Parser() { todo!() }
-// pub fn constructor() { todo!() }
+use super::frame::Frame;
 
-pub fn parser() {
-    todo!()
+#[derive(Default)]
+pub struct Parser {
+    buffer: Vec<u8>,
 }
-pub fn constructor() {
-    todo!()
+
+impl Parser {
+    pub fn new() -> Self {
+        Self { buffer: Vec::new() }
+    }
+
+    /// Append `chunk` and return every complete, checksum-valid frame.
+    pub fn transform(&mut self, chunk: &[u8]) -> Vec<Frame> {
+        todo!()
+    }
 }
