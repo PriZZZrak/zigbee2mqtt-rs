@@ -140,6 +140,9 @@ pub struct Bridge {
     ota_provider: crate::ota::OtaIndexProvider,
     /// Epoch milliseconds when permit-join expires (`None` = closed).
     permit_join_end: Arc<std::sync::Mutex<Option<u64>>>,
+    /// Runtime blocklist (config `blocklist`) so a removed/blocked device is
+    /// rejected immediately, without waiting for a restart.
+    blocked: Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
 }
 
 /// Converter package directory.
@@ -184,12 +187,26 @@ async fn shutdown_signal() {
 }
 
 impl Bridge {
-    fn device_allowed(cfg: &Config, ieee: &str) -> bool {
+    fn device_allowed(&self, ieee: &str) -> bool {
         let ieee = ieee.to_lowercase();
-        if cfg.blocklist.iter().any(|b| b.to_lowercase() == ieee) {
+        if self
+            .blocked
+            .lock()
+            .map(|set| set.contains(&ieee))
+            .unwrap_or(false)
+        {
             return false;
         }
-        if !cfg.passlist.is_empty() && !cfg.passlist.iter().any(|p| p.to_lowercase() == ieee) {
+        if self.cfg.blocklist.iter().any(|b| b.to_lowercase() == ieee) {
+            return false;
+        }
+        if !self.cfg.passlist.is_empty()
+            && !self
+                .cfg
+                .passlist
+                .iter()
+                .any(|pass| pass.to_lowercase() == ieee)
+        {
             return false;
         }
         true
@@ -248,6 +265,12 @@ impl Bridge {
                 }
             }
         }
+        let blocked = Arc::new(std::sync::Mutex::new(
+            cfg.blocklist
+                .iter()
+                .map(|entry| entry.to_lowercase())
+                .collect::<std::collections::HashSet<_>>(),
+        ));
         let external = ExternalConverter::new(
             converter_dir(),
             "https://prizzzrak.github.io/zigbee2mqtt-rs/herdsman-converters/latest",
@@ -269,6 +292,7 @@ impl Bridge {
                 Box::new(crate::ota::CommandFetcher),
             ),
             permit_join_end: Arc::new(std::sync::Mutex::new(None)),
+            blocked,
         }
     }
 
@@ -506,6 +530,71 @@ impl Bridge {
         }
     }
 
+    /// Add an IEEE address to the runtime and persisted blocklist
+    /// (upstream `settings.blockDevice`).
+    async fn add_to_blocklist(&self, ieee: &str) {
+        let ieee = ieee.to_lowercase();
+        if let Ok(mut set) = self.blocked.lock() {
+            set.insert(ieee.clone());
+        }
+        let path = &self.config_path;
+        let text = match std::fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) => {
+                warn!(
+                    "Cannot read config for blocklist {}: {error}",
+                    path.display()
+                );
+                return;
+            }
+        };
+        let yaml: serde_yml::Value = match serde_yml::from_str(&text) {
+            Ok(yaml) => yaml,
+            Err(error) => {
+                warn!("Cannot parse config for blocklist: {error}");
+                return;
+            }
+        };
+        let mut document = match serde_json::to_value(yaml) {
+            Ok(document) => document,
+            Err(error) => {
+                warn!("Cannot convert config for blocklist: {error}");
+                return;
+            }
+        };
+        let Some(root) = document.as_object_mut() else {
+            return;
+        };
+        let list = root
+            .entry("blocklist".to_string())
+            .or_insert_with(|| json!([]));
+        let Some(list) = list.as_array_mut() else {
+            warn!("Config 'blocklist' is not an array; not persisting block");
+            return;
+        };
+        if !list
+            .iter()
+            .any(|value| value.as_str() == Some(ieee.as_str()))
+        {
+            list.push(json!(ieee));
+        }
+        let yaml = match serde_yml::to_string(&document) {
+            Ok(yaml) => yaml,
+            Err(error) => {
+                warn!("Cannot serialize config for blocklist: {error}");
+                return;
+            }
+        };
+        let tmp = path.with_extension("yaml.tmp");
+        if let Err(error) = std::fs::write(&tmp, yaml) {
+            warn!("Cannot write config for blocklist: {error}");
+            return;
+        }
+        if let Err(error) = std::fs::rename(&tmp, path) {
+            warn!("Cannot replace config for blocklist: {error}");
+        }
+    }
+
     async fn persist_groups_config(&self) {
         // Read current config file, update groups section, write back
         let path = &self.config_path;
@@ -727,7 +816,7 @@ impl Bridge {
                         Some(CoordinatorEvent::DeviceJoined { ieee_addr, nwk_addr }) => {
                             let ieee = ieee_addr;
                             unknown_devices.identified(nwk_addr);
-                            if !Self::device_allowed(&self.cfg, &ieee.as_hex()) {
+                            if !self.device_allowed(&ieee.as_hex()) {
                                 info!("Device {ieee} is blocked/filtered, skipping");
                                 continue;
                             }
@@ -781,7 +870,7 @@ impl Bridge {
                             if known {
                                 info!("Linking {ieee} to NWK 0x{nwk_addr:04X}");
                                 devices.update_nwk_addr(&ieee, nwk_addr);
-                            } else if Self::device_allowed(&self.cfg, &ieee.as_hex()) {
+                            } else if self.device_allowed(&ieee.as_hex()) {
                                 // Unknown IEEE -- create a new device entry
                                 let mut dev = Device::new(ieee, nwk_addr);
                                 if let Some(cfg) = device_configs.get(&ieee.as_hex()) {
@@ -1258,22 +1347,78 @@ impl Bridge {
                                             crate::zigbee::IeeeAddr::from_hex(id)
                                                 .filter(|address| devices.get_by_ieee(address).is_some())
                                         });
+                                    let block = payload
+                                        .get("block")
+                                        .and_then(|value| value.as_bool())
+                                        .unwrap_or(false);
+                                    let force = payload
+                                        .get("force")
+                                        .and_then(|value| value.as_bool())
+                                        .unwrap_or(false);
+                                    let keep_config = payload
+                                        .get("keep_config")
+                                        .and_then(|value| value.as_bool())
+                                        .unwrap_or(false);
+                                    let clear_cache = payload
+                                        .get("clear_cache")
+                                        .and_then(|value| value.as_bool())
+                                        .unwrap_or(false);
                                     match found {
                                         Some(ieee) => {
                                             let removed_device =
                                                 devices.get_by_ieee(&ieee).map(|device| device.clone());
+                                            // Upstream `removeFromNetwork` sends a
+                                            // ZDO Leave (WITHOUT_REJOIN) unless
+                                            // `force` is set; otherwise the device
+                                            // stays on the network and announces
+                                            // itself again.
+                                            if !force {
+                                                if let Some(device) = &removed_device {
+                                                    if device.nwk_addr != 0 {
+                                                        let leave = {
+                                                            let inner = coord.inner.lock().await;
+                                                            inner
+                                                                .mgmt_leave(
+                                                                    ieee.0,
+                                                                    device.nwk_addr,
+                                                                )
+                                                                .await
+                                                        };
+                                                        if let Err(error) = leave {
+                                                            warn!(
+                                                                "ZDO leave failed for {ieee}: {error}"
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if block {
+                                                self.add_to_blocklist(&ieee.as_hex()).await;
+                                            }
                                             devices.remove_by_ieee(&ieee);
                                             if let Some(device) = &removed_device {
                                                 let _ = mqtt
                                                     .clear_device_state(&device.friendly_name)
                                                     .await;
                                             }
-                                            self.remove_device_config(&ieee.as_hex()).await;
+                                            if !keep_config {
+                                                self.remove_device_config(&ieee.as_hex()).await;
+                                            }
                                             // Respond before HA cleanup and the
                                             // (Boa-backed) device-list rebuild:
                                             // the UI must not time out while the
                                             // converter host evaluates modules.
-                                            let resp = mk_resp("ok", json!({"id": id}), None);
+                                            let resp = mk_resp(
+                                                "ok",
+                                                json!({
+                                                    "id": id,
+                                                    "block": block,
+                                                    "force": force,
+                                                    "keep_config": keep_config,
+                                                    "clear_cache": clear_cache,
+                                                }),
+                                                None,
+                                            );
                                             let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                             self.persist_database(coord.info.ieee_addr).await;
                                             let bg_devices = Arc::clone(&devices);
@@ -1836,7 +1981,7 @@ impl Bridge {
         if let Some(db_path) = database::find_database(&self.config_path) {
             let (devices, _coord_ieee) = database::load_database(&db_path, &self.cfg.devices);
             for dev in devices {
-                if Self::device_allowed(&self.cfg, &dev.ieee_addr.as_hex()) {
+                if self.device_allowed(&dev.ieee_addr.as_hex()) {
                     self.devices.add(dev);
                 }
             }

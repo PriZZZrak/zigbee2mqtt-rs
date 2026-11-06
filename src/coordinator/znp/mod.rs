@@ -745,6 +745,21 @@ impl ZnpHandle {
     }
 
     #[allow(clippy::too_many_arguments)]
+    /// Ask `ieee`/`nwk` to leave the network (ZDO Mgmt_LeaveReq).
+    pub async fn mgmt_leave(&self, ieee: [u8; 8], nwk: u16) -> Result<()> {
+        let rsp = self
+            .transport
+            .request(crate::coordinator::znp::commands::zdo_mgmt_leave_req(
+                nwk, ieee,
+            ))
+            .await?;
+        match rsp.data.first().copied() {
+            Some(0) => Ok(()),
+            Some(status) => Err(Error::Znp(format!("mgmt leave status 0x{status:02X}"))),
+            None => Err(Error::Znp("mgmt leave empty response".into())),
+        }
+    }
+
     pub async fn request_bind(
         &self,
         dst_addr: u16,

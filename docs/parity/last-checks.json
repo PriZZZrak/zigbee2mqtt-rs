@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-06T17:16:09+00:00",
+  "captured_utc": "2026-11-06T17:42:34+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent",
   "commands": [
     {
@@ -106,6 +106,11 @@
       "command": "device/remove HIL after hang (router 2026-11-06)",
       "exit": 0,
       "result": "response 99 ms, health 413 ms, bridge online, config/db entry removed, retained state cleared, restart 2 devices; 13 stale HA configs from the model-less ghost cleared manually"
+    },
+    {
+      "command": "device/remove block:true after sensor re-announced (router 2026-11-06)",
+      "exit": 0,
+      "result": "115 ms response, ZDO leave logged, blocklist persisted, 60 s + restart no re-add, HA retained configs 0"
     }
   ]
 }

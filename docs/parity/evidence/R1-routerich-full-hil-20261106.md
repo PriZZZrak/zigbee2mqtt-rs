@@ -214,3 +214,34 @@ resolvable clean up automatically. A related data-quality risk remains: the
 interrupted join/interview wrote a stub (empty model/endpoints) for the device
 into `database.db`; preserving the last complete DB record across an
 interrupted interview is a follow-up.
+
+### Follow-up: the removed sensor returned (2026-11-06)
+
+After the first remove, the sensor announced itself again and the bridge
+re-created it as a ghost (empty model/endpoints), so HA rediscovered it. Two
+behaviours were missing compared with upstream:
+
+- `Device.removeFromNetwork` sends a **ZDO Mgmt_LeaveReq** with
+  `WITHOUT_REJOIN`; without it the device stays on the network and re-announces.
+- `device/remove` honours `block` (persist the IEEE in `blocklist`), `force`
+  (skip the leave), `keep_config` and `clear_cache`; the response includes
+  those flags.
+
+Implemented and verified on the same sensor:
+
+```text
+device/remove {"id":"0xa4c13887bf43cc0f","block":true}
+  -> 115 ms, {"id":...,"block":true,"force":false,"keep_config":false,"clear_cache":false}
+health_check -> 221 ms, devices=2
+config.yaml -> blocklist: ['0xa4c13887bf43cc0f']
+log -> Device left: 0xa4c13887bf43cc0f
+60 s later -> device list still 2 devices (no re-add)
+restart -> Device registry: 2 devices, bridge online
+retained HA discovery topics for the IEEE -> 0
+```
+
+The runtime blocklist is checked for joins/announces before a device can be
+recreated, and it is loaded from config at startup. If Home Assistant still
+shows the old device card after this, reload the MQTT integration (or restart
+HA); the retained discovery configs are gone, but HA can keep an orphaned
+device-registry entry until it reloads.

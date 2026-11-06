@@ -261,6 +261,7 @@ mod zdo {
     pub const SIMPLE_DESC_REQ: u8 = 0x04;
     pub const ACTIVE_EP_REQ: u8 = 0x05;
     pub const BIND_REQ: u8 = 0x21;
+    pub const MGMT_LEAVE_REQ: u8 = 0x34;
     pub const PERMIT_JOIN_REQ: u8 = 0x36;
     pub const STARTUP_FROM_APP: u8 = 0x40;
     pub const EXT_NWK_INFO: u8 = 0x50;
@@ -355,6 +356,19 @@ pub fn zdo_ieee_addr_req(nwk_addr: u16) -> ZnpFrame {
     data.push(0x00); // ReqType: single device response
     data.push(0x00); // StartIndex
     ZnpFrame::sreq(Subsystem::Zdo, zdo::IEEE_ADDR_REQ, data)
+}
+
+/// ZDO Mgmt_LeaveReq (cluster 0x0034) for `ieee` at `dst_addr`.
+///
+/// Herdsman `Device.removeFromNetwork` sends a ZDO Leave with
+/// `LeaveRequestFlags.WITHOUT_REJOIN` so the device does not immediately
+/// rejoin; the ZNP SREQ wraps that request with the destination address.
+pub fn zdo_mgmt_leave_req(dst_addr: u16, ieee: [u8; 8]) -> ZnpFrame {
+    let mut data = Vec::with_capacity(2 + 8 + 1);
+    data.extend_from_slice(&dst_addr.to_le_bytes());
+    data.extend_from_slice(&ieee);
+    data.push(0x00); // RemoveChildren/Rejoin: WITHOUT_REJOIN
+    ZnpFrame::sreq(Subsystem::Zdo, zdo::MGMT_LEAVE_REQ, data)
 }
 
 /// Bind `cluster_id` on `src_ieee`'s `src_ep` to `dst_ieee`'s `dst_ep`
