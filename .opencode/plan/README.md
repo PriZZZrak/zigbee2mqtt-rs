@@ -126,6 +126,16 @@ R1 — явно ограниченный релиз для проверенно�
   (Nous/TH01Z) больше не отбрасываются с `ZCL type 0x03F3 needs command
   context`. Полное декодирование TH01Z (`temperature`/`humidity`) остаётся
   отдельной проблемой.
+- **Полный HIL (2026-11-06)**: проверены MQTT API, permit_join с
+  transaction/`permit_join_end`, команды Lytko (включая `_l1`), переименование
+  с сохранением в `configuration.yaml`, state cache, save/remove/ошибочный
+  внешний конвертер, рестарт mosquitto, `kill -9`/procd respawn и полная
+  перезагрузка роутера. Найдены и исправлены: отсутствие ответов фронтенду по
+  WebSocket, блокирующий rename, неснятый endpoint-суффикс перед toZigbee,
+  отсутствие optimistic-постфикса, permit_join без transaction, устаревший
+  retained `bridge/devices` на старте. Открыто: задержка set-команд первые
+  ~30–40 с после старта (холодные Boa-сессии), `last_seen`-настройка/формат,
+  пустые links networkmap, CC2531 и live HA.
 - **`bridge/request/options`**: реализован разбор/слияние/атомарная запись
   YAML, повторная публикация `bridge/info` и ответ
   `{"status":"ok","data":{"restart_required":true},"transaction":...}`.

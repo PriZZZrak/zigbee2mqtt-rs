@@ -335,6 +335,12 @@ impl MqttBridge {
         self.publish_retained(&topic, &payload).await
     }
 
+    /// Clear the retained state topic of a renamed/removed entity.
+    pub async fn clear_device_state(&self, friendly_name: &str) -> Result<()> {
+        let topic = format!("{}/{}", self.base_topic, friendly_name);
+        self.publish_retained(&topic, b"").await
+    }
+
     pub async fn publish_device_state(
         &self,
         friendly_name: &str,
@@ -396,10 +402,8 @@ impl MqttBridge {
     pub async fn publish_bridge_health(&self, health: &serde_json::Value) -> Result<()> {
         let topic = format!("{}/bridge/health", self.base_topic);
         let bytes = serde_json::to_vec(health)?;
-        self.client
-            .publish(&topic, QoS::AtLeastOnce, false, bytes)
+        self.publish_bus(&topic, QoS::AtLeastOnce, false, bytes)
             .await
-            .map_err(Error::Mqtt)
     }
 
     pub async fn publish_bridge_response(
@@ -409,10 +413,8 @@ impl MqttBridge {
     ) -> Result<()> {
         let topic = bridge_response_topic(&self.base_topic, request);
         let bytes = serde_json::to_vec(payload)?;
-        self.client
-            .publish(&topic, QoS::AtLeastOnce, false, bytes)
+        self.publish_bus(&topic, QoS::AtLeastOnce, false, bytes)
             .await
-            .map_err(Error::Mqtt)
     }
 
     pub async fn publish_bridge_networkmap(
@@ -433,10 +435,8 @@ impl MqttBridge {
             .collect();
         let payload = json!({ "nodes": nodes, "links": [] });
         let bytes = serde_json::to_vec(&payload)?;
-        self.client
-            .publish(&topic, QoS::AtLeastOnce, false, bytes)
+        self.publish_bus(&topic, QoS::AtLeastOnce, false, bytes)
             .await
-            .map_err(Error::Mqtt)
     }
 
     pub async fn publish_availability(&self, friendly_name: &str, online: bool) -> Result<()> {
@@ -523,12 +523,11 @@ impl MqttBridge {
         let topic = ha_discovery_topic(component, node_id, object_id);
         tracing::debug!("HA discovery → {topic}");
         let payload = serde_json::to_vec(config)?;
-        self.client
-            .publish(&topic, QoS::AtLeastOnce, true, payload)
+        self.publish_bus(&topic, QoS::AtLeastOnce, true, payload)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to publish HA discovery to {topic}: {e}");
-                Error::Mqtt(e)
+                e
             })
     }
 
@@ -552,11 +551,28 @@ impl MqttBridge {
     }
 
     async fn publish_retained(&self, topic: &str, payload: &[u8]) -> Result<()> {
+        self.publish_bus(topic, QoS::AtLeastOnce, true, payload.to_vec())
+            .await
+    }
+
+    /// Publish to MQTT and forward the same message to the frontend bus.
+    ///
+    /// The WebSocket server is the frontend's MQTT transport: every publish
+    /// that a browser must observe (responses, health, availability, HA
+    /// discovery) has to go through here, otherwise the UI times out even
+    /// though MQTT subscribers received the payload.
+    async fn publish_bus(
+        &self,
+        topic: &str,
+        qos: QoS,
+        retain: bool,
+        payload: Vec<u8>,
+    ) -> Result<()> {
         self.client
-            .publish(topic, QoS::AtLeastOnce, true, payload.to_vec())
+            .publish(topic, qos, retain, payload.clone())
             .await
             .map_err(Error::Mqtt)?;
-        self.emit(topic, payload, true);
+        self.emit(topic, &payload, retain);
         Ok(())
     }
 

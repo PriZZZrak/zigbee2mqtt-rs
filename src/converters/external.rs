@@ -1,8 +1,8 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use boa_engine::{js_string, Context, JsString, JsValue, NativeFunction, Source};
@@ -68,7 +68,7 @@ pub struct ExternalConverter {
     /// User external converters (`<config-dir>/external_converters`).
     external_dir: PathBuf,
     registry_url: String,
-    runtime: Arc<Mutex<Option<mpsc::Sender<ConverterJob>>>>,
+    runtime: Arc<Mutex<Option<JobQueue>>>,
     zcl_io: Arc<Mutex<Option<ZclIo>>>,
     /// Session keys (`<ieee>|<model>`) whose Boa context finished loading.
     /// Frames for other keys are converted natively until the warmup job
@@ -615,6 +615,24 @@ enum ConverterJob {
         zcl: Option<ZclContext>,
         reply: mpsc::Sender<Option<ConvertedFrame>>,
     },
+}
+
+type JobQueue = Arc<(Mutex<VecDeque<ConverterJob>>, Condvar)>;
+
+/// Enqueue a converter job. User commands and live frames go to the front so
+/// they are not stuck behind a cold-session warmup; background warmups and
+/// resets go to the back.
+fn enqueue_job(queue: &JobQueue, job: ConverterJob, front: bool) {
+    let (lock, cvar) = &**queue;
+    let mut jobs = lock
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if front {
+        jobs.push_front(job);
+    } else {
+        jobs.push_back(job);
+    }
+    cvar.notify_one();
 }
 
 struct ConverterSession {
@@ -3036,7 +3054,7 @@ const __norm = (v) => {{
             state: state.clone(),
             reply,
         };
-        sender.send(job).ok()?;
+        enqueue_job(&sender, job, true);
         match receiver.recv_timeout(Duration::from_secs(10)) {
             Ok(result) => result,
             Err(error) => {
@@ -3080,17 +3098,14 @@ const __norm = (v) => {{
             }
             return;
         };
-        if sender
-            .send(ConverterJob::Warmup {
+        enqueue_job(
+            &sender,
+            ConverterJob::Warmup {
                 model: model.to_string(),
                 device: device.clone(),
-            })
-            .is_err()
-        {
-            if let Ok(mut set) = self.warming.lock() {
-                set.remove(&key);
-            }
-        }
+            },
+            false,
+        );
     }
 
     /// Test helper: queue a warmup and block until the session is ready.
@@ -3115,16 +3130,17 @@ const __norm = (v) => {{
             .ok()
             .and_then(|guard| guard.as_ref().cloned());
         if let Some(sender) = sender {
-            let _ = sender.send(ConverterJob::Reset);
+            enqueue_job(&sender, ConverterJob::Reset, false);
         }
     }
 
-    fn runtime_sender(&self) -> Option<mpsc::Sender<ConverterJob>> {
+    fn runtime_sender(&self) -> Option<JobQueue> {
         let mut guard = self.runtime.lock().ok()?;
-        if let Some(sender) = guard.as_ref() {
-            return Some(sender.clone());
+        if let Some(queue) = guard.as_ref() {
+            return Some(Arc::clone(queue));
         }
-        let (sender, receiver) = mpsc::channel::<ConverterJob>();
+        let queue: JobQueue = Arc::new((Mutex::new(VecDeque::new()), Condvar::new()));
+        let thread_queue = Arc::clone(&queue);
         let dir = self.dir.clone();
         let registry_url = self.registry_url.clone();
         let ready = Arc::clone(&self.ready);
@@ -3134,7 +3150,21 @@ const __norm = (v) => {{
             .spawn(move || {
                 let converter = ExternalConverter::new(dir, registry_url);
                 let mut sessions: HashMap<String, ConverterSession> = HashMap::new();
-                while let Ok(job) = receiver.recv() {
+                loop {
+                    let job = {
+                        let (lock, cvar) = &*thread_queue;
+                        let mut jobs = lock
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        loop {
+                            if let Some(job) = jobs.pop_front() {
+                                break job;
+                            }
+                            jobs = cvar
+                                .wait(jobs)
+                                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        }
+                    };
                     match job {
                         ConverterJob::Warmup { model, device } => {
                             let key = format!("{}|{model}", device.ieee_addr);
@@ -3276,8 +3306,8 @@ const __norm = (v) => {{
                 }
             })
             .ok()?;
-        *guard = Some(sender.clone());
-        Some(sender)
+        *guard = Some(Arc::clone(&queue));
+        Some(queue)
     }
 
     /// Convert a frame using the persistent per-device Boa session.
@@ -3313,11 +3343,7 @@ const __norm = (v) => {{
             zcl: self.zcl_context(message),
             reply,
         };
-        if sender.send(job).is_err() {
-            return self.convert_from_zigbee_with_message_full(
-                model, cluster_id, msg_type, reports, device, message, state,
-            );
-        }
+        enqueue_job(&sender, job, false);
         match receiver.recv_timeout(INCOMING_SESSION_TIMEOUT) {
             Ok(result) => result,
             Err(error) => {
@@ -3375,11 +3401,7 @@ const __norm = (v) => {{
             zcl: self.zcl_context(message),
             reply,
         };
-        if sender.send(job).is_err() {
-            return self.convert_from_zigbee_with_data_full(
-                model, cluster_id, msg_type, data, device, message, state,
-            );
-        }
+        enqueue_job(&sender, job, false);
         match receiver.recv_timeout(INCOMING_SESSION_TIMEOUT) {
             Ok(result) => result,
             Err(error) => {

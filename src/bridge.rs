@@ -138,6 +138,8 @@ pub struct Bridge {
     definition_cache: Arc<dashmap::DashMap<String, Option<serde_json::Value>>>,
     ota: Arc<Mutex<crate::ota::OtaManager>>,
     ota_provider: crate::ota::OtaIndexProvider,
+    /// Epoch milliseconds when permit-join expires (`None` = closed).
+    permit_join_end: Arc<std::sync::Mutex<Option<u64>>>,
 }
 
 /// Converter package directory.
@@ -266,6 +268,7 @@ impl Bridge {
                 None,
                 Box::new(crate::ota::CommandFetcher),
             ),
+            permit_join_end: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 
@@ -385,6 +388,71 @@ impl Bridge {
             .join("state.json")
     }
 
+    /// Persist device friendly names into `configuration.yaml` (upstream
+    /// `settings.changeFriendlyName`). Without this a rename is lost on the
+    /// next start because config names override the in-memory registry.
+    async fn persist_device_configs(&self) {
+        let path = &self.config_path;
+        let text = match std::fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) => {
+                warn!(
+                    "Cannot read config for device persist {}: {error}",
+                    path.display()
+                );
+                return;
+            }
+        };
+        let yaml: serde_yml::Value = match serde_yml::from_str(&text) {
+            Ok(yaml) => yaml,
+            Err(error) => {
+                warn!("Cannot parse config for device persist: {error}");
+                return;
+            }
+        };
+        let mut document = match serde_json::to_value(yaml) {
+            Ok(document) => document,
+            Err(error) => {
+                warn!("Cannot convert config for device persist: {error}");
+                return;
+            }
+        };
+        let Some(root) = document.as_object_mut() else {
+            warn!("Config root is not a mapping; device rename not persisted");
+            return;
+        };
+        let devices = root
+            .entry("devices".to_string())
+            .or_insert_with(|| json!({}));
+        let Some(devices) = devices.as_object_mut() else {
+            warn!("Config 'devices' is not a mapping; device rename not persisted");
+            return;
+        };
+        for device in self.devices.all_devices() {
+            let entry = devices
+                .entry(device.ieee_addr.as_hex())
+                .or_insert_with(|| json!({}));
+            if let Some(entry) = entry.as_object_mut() {
+                entry.insert("friendly_name".into(), json!(device.friendly_name));
+            }
+        }
+        let yaml = match serde_yml::to_string(&document) {
+            Ok(yaml) => yaml,
+            Err(error) => {
+                warn!("Cannot serialize config for device persist: {error}");
+                return;
+            }
+        };
+        let tmp = path.with_extension("yaml.tmp");
+        if let Err(error) = std::fs::write(&tmp, yaml) {
+            warn!("Cannot write config for device persist: {error}");
+            return;
+        }
+        if let Err(error) = std::fs::rename(&tmp, path) {
+            warn!("Cannot replace config for device persist: {error}");
+        }
+    }
+
     async fn persist_groups_config(&self) {
         // Read current config file, update groups section, write back
         let path = &self.config_path;
@@ -425,6 +493,19 @@ impl Bridge {
 
         // 2. Apply device configs (friendly names override database)
         self.apply_device_configs();
+
+        // 2a. Kick converter-session warmup in the background. Opening a Boa
+        // session takes seconds on the router; starting before the
+        // coordinator/MQTT startup hides most of that latency.
+        for device in self.devices.all_devices() {
+            if device.disabled || !device.interview_complete {
+                continue;
+            }
+            if let Some(model) = device.model.as_deref().filter(|model| !model.is_empty()) {
+                let info = crate::converters::external::ExternalDeviceInfo::from_device(&device);
+                self.external.ensure_session(model, &info);
+            }
+        }
 
         // 2b. Restore cached entity state (`state.json`) before the startup
         // publish, so sleepy devices show their last known values instead of
@@ -554,6 +635,7 @@ impl Bridge {
         // 7. Permit join if configured
         if self.cfg.permit_join {
             coord.permit_join(254).await?;
+            self.set_permit_join_end(254);
             info!("Permit join enabled (254 s)");
         }
         info!("Startup complete, entering main loop");
@@ -1039,27 +1121,54 @@ impl Bridge {
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
                                     } else if let Some(ieee) = devices.find_by_name(from).map(|d| d.ieee_addr).or_else(|| crate::zigbee::IeeeAddr::from_hex(from)) {
                                         let old_device = devices.get_by_ieee(&ieee).map(|device| device.clone());
+                                        let old_name = old_device
+                                            .as_ref()
+                                            .map(|device| device.friendly_name.clone())
+                                            .unwrap_or_default();
                                         devices.rename(&ieee, to.clone());
-                                        let ha_rename = self.cfg.homeassistant.enabled();
-                                        if let (true, Some(old_device)) = (ha_rename, old_device) {
-                                            let info = crate::converters::external::ExternalDeviceInfo::from_device(&old_device);
-                                            let model = old_device.model.clone().unwrap_or_default();
-                                            let exposes = self.external.exposes(&model, &info).unwrap_or_default();
-                                            homeassistant::cleanup_discovery(&mqtt, &old_device, &exposes).await;
-                                            if let Some(new_device) = devices.get_by_ieee(&ieee).map(|device| device.clone()) {
-                                                Self::publish_device_discovery(Arc::clone(&self.external), &mqtt, &new_device, &base_topic, &coordinator_ieee).await;
-                                            }
+                                        // Upstream clears the old retained state topic.
+                                        if !old_name.is_empty() {
+                                            let _ = mqtt.clear_device_state(&old_name).await;
                                         }
-                                        let list = device_list_json(
-                                &devices,
-                                &external,
-                                &self.definition_cache,
-                                Some(&coordinator_ieee),
-                            );
-                            let _ = mqtt.publish_bridge_devices(&json!(list)).await;
-                                        self.persist_database(coord.info.ieee_addr).await;
+                                        let ha_rename = self.cfg.homeassistant.enabled();
                                         let resp = mk_resp("ok", json!({"from": from, "to": to, "homeassistant_rename": ha_rename}), None);
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
+                                        // HA cleanup/discovery and the device list
+                                        // evaluate Boa; do them off the event loop.
+                                        let bg_devices = Arc::clone(&devices);
+                                        let bg_external = Arc::clone(&self.external);
+                                        let bg_cache = Arc::clone(&self.definition_cache);
+                                        let bg_mqtt = mqtt.clone();
+                                        let bg_base = base_topic.clone();
+                                        let bg_ieee = coordinator_ieee.clone();
+                                        tokio::spawn(async move {
+                                            if ha_rename {
+                                                if let Some(old_device) = old_device {
+                                                    let info = crate::converters::external::ExternalDeviceInfo::from_device(&old_device);
+                                                    let model = old_device.model.clone().unwrap_or_default();
+                                                    let exposes_external = Arc::clone(&bg_external);
+                                                    let exposes = tokio::task::spawn_blocking(move || {
+                                                        exposes_external.exposes(&model, &info)
+                                                    })
+                                                    .await
+                                                    .ok()
+                                                    .flatten()
+                                                    .unwrap_or_default();
+                                                    homeassistant::cleanup_discovery(&bg_mqtt, &old_device, &exposes).await;
+                                                    if let Some(new_device) = bg_devices.get_by_ieee(&ieee).map(|device| device.clone()) {
+                                                        Self::publish_device_discovery(Arc::clone(&bg_external), &bg_mqtt, &new_device, &bg_base, &bg_ieee).await;
+                                                    }
+                                                }
+                                            }
+                                            let list = tokio::task::spawn_blocking(move || {
+                                                device_list_json(&bg_devices, &bg_external, &bg_cache, Some(&bg_ieee))
+                                            })
+                                            .await
+                                            .unwrap_or_default();
+                                            let _ = bg_mqtt.publish_bridge_devices(&json!(list)).await;
+                                        });
+                                        self.persist_database(coord.info.ieee_addr).await;
+                                        self.persist_device_configs().await;
                                     } else {
                                         let resp = mk_resp("error", json!({}), Some("entity not found".into()));
                                         let _ = mqtt.publish_bridge_response(&request, &resp).await;
@@ -1457,10 +1566,18 @@ impl Bridge {
                                         });
                                     match duration {
                                         Some(duration) => {
-                                            let resp = Self::permit_join_request(
-                                                &mqtt, &coord, duration,
-                                            )
-                                            .await;
+                                            let resp = self
+                                                .permit_join_request(
+                                                    &mqtt,
+                                                    &coord,
+                                                    duration,
+                                                    transaction.as_deref(),
+                                                )
+                                                .await;
+                                            // Upstream publishes bridge/info on
+                                            // permitJoinChanged so the UI sees
+                                            // permit_join/permit_join_end.
+                                            self.publish_bridge_info(&mqtt, &coord).await;
                                             let _ = mqtt
                                                 .publish_bridge_response("permit_join", &resp)
                                                 .await;
@@ -1538,7 +1655,35 @@ impl Bridge {
         coord: &CoordinatorHandle,
         duration: u8,
     ) -> serde_json::Value {
-        Self::permit_join_request(mqtt, coord, duration).await
+        self.permit_join_request(mqtt, coord, duration, None).await
+    }
+
+    fn set_permit_join_end(&self, duration: u8) {
+        let end = if duration == 0 {
+            None
+        } else {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_millis() as u64)
+                .unwrap_or(0);
+            Some(now + u64::from(duration) * 1000)
+        };
+        if let Ok(mut guard) = self.permit_join_end.lock() {
+            *guard = end;
+        }
+    }
+
+    /// Runtime permit-join state published in `bridge/info`.
+    fn permit_join_state(&self) -> (bool, Option<u64>) {
+        let end = self.permit_join_end.lock().ok().and_then(|guard| *guard);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis() as u64)
+            .unwrap_or(0);
+        match end {
+            Some(end) if end > now => (true, Some(end)),
+            _ => (false, None),
+        }
     }
 
     /// Handle a `bridge/request/permit_join` request.
@@ -1547,17 +1692,24 @@ impl Bridge {
     /// coordinator call is best effort (a request failure still reports the
     /// duration that was attempted, matching the MQTT contract tests).
     async fn permit_join_request(
+        &self,
         mqtt: &MqttBridge,
         coord: &CoordinatorHandle,
         duration: u8,
+        transaction: Option<&str>,
     ) -> serde_json::Value {
         if let Err(error) = coord.permit_join(duration).await {
             warn!("Failed to set permit join: {error}");
         }
+        self.set_permit_join_end(duration);
         let _ = mqtt
             .publish_bridge_log("info", &format!("Permit join: {duration}s"))
             .await;
-        json!({"status": "ok", "data": {"time": duration}})
+        let mut resp = json!({"status": "ok", "data": {"time": duration}});
+        if let Some(transaction) = transaction {
+            resp["transaction"] = json!(transaction);
+        }
+        resp
     }
 
     /// Import devices from an existing zigbee2mqtt database.db file.
@@ -1627,6 +1779,7 @@ impl Bridge {
         let coord_ieee = coord.info.ieee_addr.map(|a| a.as_hex()).unwrap_or_default();
 
         let config = self.bridge_info_config();
+        let (permit_join, permit_join_end) = self.permit_join_state();
 
         let mut info = json!({
             "version": env!("CARGO_PKG_VERSION"),
@@ -1650,7 +1803,8 @@ impl Bridge {
             },
             "os": os_info(),
             "log_level": self.cfg.advanced.log_level,
-            "permit_join": self.cfg.permit_join,
+            "permit_join": permit_join,
+            "permit_join_end": permit_join_end,
             "restart_required": false,
             "config": config,
             "config_schema": crate::config_schema::config_schema(),
@@ -1693,6 +1847,21 @@ impl Bridge {
         let ha_enabled = self.cfg.homeassistant.enabled();
         let coordinator_ieee = coordinator_ieee_str.clone();
         tokio::spawn(async move {
+            // Publish the device list first: until it is replaced, the broker
+            // keeps serving the previous retained payload (possibly a
+            // `generated` definition from a converter-remove phase). HA
+            // discovery is only needed by Home Assistant and can follow.
+            let list_devices = Arc::clone(&devices);
+            let list_external = Arc::clone(&external);
+            let list_cache = Arc::clone(&cache);
+            let list_ieee = coordinator_ieee.clone();
+            let list = tokio::task::spawn_blocking(move || {
+                device_list_json(&list_devices, &list_external, &list_cache, Some(&list_ieee))
+            })
+            .await
+            .unwrap_or_default();
+            let _ = publish_mqtt.publish_bridge_devices(&json!(list)).await;
+
             if ha_enabled {
                 for device in devices.all_devices() {
                     if device.interview_complete {
@@ -1707,16 +1876,6 @@ impl Bridge {
                     }
                 }
             }
-            let list_devices = Arc::clone(&devices);
-            let list_external = Arc::clone(&external);
-            let list_cache = Arc::clone(&cache);
-            let list_ieee = coordinator_ieee.clone();
-            let list = tokio::task::spawn_blocking(move || {
-                device_list_json(&list_devices, &list_external, &list_cache, Some(&list_ieee))
-            })
-            .await
-            .unwrap_or_default();
-            let _ = publish_mqtt.publish_bridge_devices(&json!(list)).await;
         });
 
         let _ = mqtt.publish_bridge_groups(&self.groups).await;
@@ -3097,11 +3256,15 @@ impl Bridge {
                     let Some(value) = object.get(&key) else {
                         continue;
                     };
+                    // Upstream splits the endpoint suffix before calling
+                    // toZigbee: `system_mode_l1` reaches the converter as
+                    // `system_mode` plus `meta.endpoint_name = "l1"`.
+                    let (base_key, key_suffix) = split_set_key(&key);
                     let target_endpoint = endpoint
                         .or_else(|| {
-                            parse_endpoint_key(&key).and_then(|(_, suffix)| {
-                                crate::mqtt::endpoint_index(&suffix)
-                                    .or_else(|| endpoint_named(&endpoints, &suffix))
+                            key_suffix.as_deref().and_then(|suffix| {
+                                crate::mqtt::endpoint_index(suffix)
+                                    .or_else(|| endpoint_named(&endpoints, suffix))
                             })
                         })
                         .or_else(|| endpoints.first().map(|candidate| candidate.endpoint));
@@ -3115,7 +3278,7 @@ impl Bridge {
                         &model,
                         target_endpoint,
                         endpoint_name.as_deref(),
-                        &key,
+                        &base_key,
                         value,
                         &info,
                         &cached_state,
@@ -3123,12 +3286,24 @@ impl Bridge {
                         debug!("convertSet for '{key}' produced no outcome");
                         continue;
                     };
+                    info!(
+                        "DIAG outcome key='{base_key}' handled={} ops={} state={:?}",
+                        outcome.handled,
+                        outcome.ops.len(),
+                        outcome.state
+                    );
                     if !outcome.handled {
-                        debug!("no toZigbee converter handles '{key}'");
+                        debug!("no toZigbee converter handles '{base_key}'");
                         continue;
                     }
                     for (state_key, state_value) in &outcome.state {
-                        optimistic.insert(state_key.clone(), state_value.clone());
+                        // Upstream `publish.ts` postfixes optimistic state
+                        // keys with the endpoint name supplied by the topic.
+                        let state_key = match &key_suffix {
+                            Some(suffix) => format!("{state_key}_{suffix}"),
+                            None => state_key.clone(),
+                        };
+                        optimistic.insert(state_key, state_value.clone());
                     }
                     for op in &outcome.ops {
                         match op {
@@ -4385,6 +4560,21 @@ fn parse_endpoint_key(key: &str) -> Option<(&str, String)> {
         return None;
     }
     Some((base, suffix.to_string()))
+}
+
+/// Split a set key into its property and endpoint suffix, but only when the
+/// suffix is a real endpoint selector. `system_mode` must stay intact even
+/// though it contains an underscore.
+fn split_set_key(key: &str) -> (String, Option<String>) {
+    match parse_endpoint_key(key) {
+        Some((base, suffix))
+            if crate::mqtt::endpoint_index(&suffix).is_some()
+                || suffix.parse::<u8>().is_ok_and(|endpoint| endpoint > 0) =>
+        {
+            (base.to_string(), Some(suffix))
+        }
+        _ => (key.to_string(), None),
+    }
 }
 
 /// Resolve an endpoint name used by a definition expose.
@@ -5768,6 +5958,29 @@ mod tests {
             }}"#,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn endpoint_suffixed_set_keys_are_split_before_convert_set() {
+        assert_eq!(
+            split_set_key("occupied_heating_setpoint_l1"),
+            (
+                "occupied_heating_setpoint".to_string(),
+                Some("l1".to_string())
+            )
+        );
+        assert_eq!(
+            split_set_key("system_mode_l2"),
+            ("system_mode".to_string(), Some("l2".to_string()))
+        );
+        assert_eq!(
+            split_set_key("system_mode"),
+            ("system_mode".to_string(), None)
+        );
+        assert_eq!(
+            split_set_key("indicator_button"),
+            ("indicator".to_string(), Some("button".to_string()))
+        );
     }
 
     #[test]

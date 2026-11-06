@@ -1,5 +1,5 @@
 {
-  "captured_utc": "2026-11-06T13:39:14+00:00",
+  "captured_utc": "2026-11-06T16:31:27+00:00",
   "environment": "Linux 6.18.38-Unraid x86_64, rustc 1.99.1, zig 0.13.0/cargo-zigbuild, Node v22.14.0 + pnpm, pinned checkouts at baseline, app node_modules (herdsman 10.10.0, converters 26.115.1); mosquitto absent",
   "commands": [
     {
@@ -10,7 +10,7 @@
     {
       "command": "cargo test --locked",
       "exit": 0,
-      "result": "451 library + 2 binary + 30 compatibility = 483 passed, 0 failed"
+      "result": "452 library + 2 binary + 30 compatibility = 484 passed, 0 failed"
     },
     {
       "command": "cargo clippy --all-targets --locked",
@@ -30,7 +30,7 @@
     {
       "command": "cargo zigbuild --release --locked --target aarch64-unknown-linux-musl",
       "exit": 0,
-      "result": "static aarch64 ELF built from the current tree (sha256 b5017d83..., binary-only deploy; .ipk not rebuilt at user request)"
+      "result": "static aarch64 ELF built from the current tree (sha256 9b3bc165..., binary-only deploy; .ipk not rebuilt at user request)"
     },
     {
       "command": "python3 scripts/evid04_harness.py --require-pins (real Node reference, app-resolved herdsman 10.10.0)",
@@ -96,6 +96,11 @@
       "command": "MQTT health_check during 28 KB converter/save (HIL, router 2026-11-06)",
       "exit": 0,
       "result": "health_check answered in ~4.5 s, converter/save returned {\"status\":\"ok\"}; save/remove/device-list now use spawn_blocking"
+    },
+    {
+      "command": "R1 full HIL on Routerich AX3000 + Dongle-P (2026-11-06)",
+      "exit": 0,
+      "result": "MQTT API, permit_join, Lytko single/multi-endpoint commands, rename persistence, state cache, converter save/remove/invalid, mosquitto restart, kill -9 respawn, full router reboot, frontend HTTP/WS and HA discovery exercised; see docs/parity/evidence/R1-routerich-full-hil-20261106.md; CC2531 and live HA remain open"
     }
   ]
 }
