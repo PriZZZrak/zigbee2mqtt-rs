@@ -6,15 +6,19 @@
 // pub fn isNumberArrayOfLength() { todo!() }
 // pub fn isObjectEmpty() { todo!() }
 
-pub fn assert_string() {
+#[allow(unused)]
+pub fn assert_string(value: &serde_json::Value, property: &str) {
     todo!()
 }
-pub fn is_number_array() {
+#[allow(unused)]
+pub fn is_number_array(value: &serde_json::Value) -> bool {
     todo!()
 }
-pub fn is_number_array_of_length() {
+#[allow(unused)]
+pub fn is_number_array_of_length(value: &serde_json::Value, length: usize) -> bool {
     todo!()
 }
-pub fn is_object_empty() {
+#[allow(unused)]
+pub fn is_object_empty(value: &serde_json::Value) -> bool {
     todo!()
 }
