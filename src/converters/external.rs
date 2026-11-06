@@ -48,21 +48,6 @@ const EXTERNAL_WRAPPER: &str = r#"
 /// short UI stall.
 const INCOMING_SESSION_TIMEOUT: Duration = Duration::from_millis(500);
 
-/// Serializes CPU-heavy Boa evaluations that are not on the event loop
-/// (definition/exposes generation and session warmup).
-///
-/// The router has 2 cores; evaluating several upstream converter modules at
-/// once starves the bridge/MQTT tasks and makes frontend requests miss their
-/// 20 s timeout. One background evaluation at a time leaves a core for the
-/// event loop. Fast per-frame conversions are not serialized here.
-static BOA_BACKGROUND_LOCK: Mutex<()> = Mutex::new(());
-
-fn boa_background_guard() -> std::sync::MutexGuard<'static, ()> {
-    BOA_BACKGROUND_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
 pub struct ExternalConverter {
     dir: PathBuf,
     /// User external converters (`<config-dir>/external_converters`).
@@ -1222,7 +1207,6 @@ impl ExternalConverter {
     /// metadata (model, zigbeeModel, fingerprint). The module is wrapped so
     /// existing package loaders see `{definitions: [...]}`.
     fn external_metadata(&self, synthetic: &str) -> Option<Vec<serde_json::Value>> {
-        let _boa_guard = boa_background_guard();
         let zcl = self.load_zcl()?;
         let module_src = self.load_js(&format!("devices/{synthetic}"))?;
         let sources = collect_sources(&self.dir, &module_src, synthetic, &zcl)?;
@@ -1519,7 +1503,6 @@ impl ExternalConverter {
         &self,
         device: &ExternalDeviceInfo,
     ) -> Option<serde_json::Value> {
-        let _boa_guard = boa_background_guard();
         let zcl = self.load_zcl()?;
         let entry = r#"module.exports = require("../lib/generateDefinition");"#;
         let sources = collect_sources(&self.dir, entry, "gendef_probe.js", &zcl)?;
@@ -1836,7 +1819,6 @@ impl ExternalConverter {
     /// Build a Boa context with the CJS loader and `__prepareDefinition`
     /// installed for `file`, and verify the module loads.
     fn definition_context(&self, file: &str) -> Option<(Context, String)> {
-        let _boa_guard = boa_background_guard();
         let file = file.to_string();
         let zcl = self.load_zcl()?;
         let module_src = self
@@ -3169,10 +3151,7 @@ const __norm = (v) => {{
                         ConverterJob::Warmup { model, device } => {
                             let key = format!("{}|{model}", device.ieee_addr);
                             if !sessions.contains_key(&key) {
-                                let session = {
-                                    let _boa_guard = boa_background_guard();
-                                    converter.open_session(&model, &device)
-                                };
+                                let session = { converter.open_session(&model, &device) };
                                 if let Some(session) = session {
                                     sessions.insert(key.clone(), session);
                                 }
@@ -4017,7 +3996,6 @@ impl ExternalConverter {
         model: &str,
         device: &ExternalDeviceInfo,
     ) -> Option<Vec<serde_json::Value>> {
-        let _boa_guard = boa_background_guard();
         let registry = self.load_registry()?;
         let (file, index) = select_definition(&registry, model, device)?;
         let zcl = self.load_zcl()?;

@@ -303,8 +303,13 @@ impl Bridge {
     /// state in memory and is reported as an error, not swallowed.
     async fn flush_database(&self) {
         let result = {
-            let db = self.database.lock().await;
-            db.write()
+            match tokio::time::timeout(Duration::from_secs(5), self.database.lock()).await {
+                Ok(db) => db.write(),
+                Err(_) => {
+                    error!("database busy for 5 s during shutdown flush");
+                    return;
+                }
+            }
         };
         match result {
             Ok(()) => {
@@ -355,23 +360,44 @@ impl Bridge {
     }
 
     async fn persist_database(&self, coordinator_ieee: Option<IeeeAddr>) {
-        // Batching: update in-memory immediately, debounce disk write to save memory/I/O (upstream Entity.database.update(write:false))
+        // Batching: update in-memory immediately, debounce disk write to save memory/I/O (upstream Entity.database.update(write:false)).
+        // Never wait indefinitely for the database mutex on the event loop:
+        // a background writer may be in fsync() on slow flash, and blocking
+        // here freezes MQTT/UI handling. A skipped sync is retried on the next
+        // mutation (or the shutdown flush).
         {
             let devices = self.devices.all_devices();
             let groups = self.groups.all();
-            let assigned = {
-                let mut db = self.database.lock().await;
-                let assigned = db.sync_devices(&devices, coordinator_ieee);
-                db.sync_groups(&groups);
-                assigned
-            };
+            let assigned =
+                match tokio::time::timeout(Duration::from_secs(1), self.database.lock()).await {
+                    Ok(mut db) => {
+                        let assigned = db.sync_devices(&devices, coordinator_ieee);
+                        db.sync_groups(&groups);
+                        assigned
+                    }
+                    Err(_) => {
+                        warn!("database busy; deferring persistence to the next change");
+                        return;
+                    }
+                };
             // Keep the assigned ids on the live entities so the next
             // synchronization does not allocate a fresh record for them.
             for (ieee, id) in assigned {
                 self.devices.set_database_id(&ieee, id);
             }
         }
-        let mut pending = self.db_write_pending.lock().await;
+        let mut pending = match tokio::time::timeout(
+            Duration::from_secs(1),
+            self.db_write_pending.lock(),
+        )
+        .await
+        {
+            Ok(pending) => pending,
+            Err(_) => {
+                warn!("database write flag busy; deferring persistence");
+                return;
+            }
+        };
         if *pending {
             return;
         }
@@ -851,14 +877,23 @@ impl Bridge {
                             if let Err(e) = mqtt.publish_bridge_log("info", &format!("Device left: {ieee}")).await {
                                 warn!("Failed to publish bridge log: {e}");
                             }
-                            publish_device_list_async(
-                                Arc::clone(&devices),
-                                Arc::clone(&external),
-                                Arc::clone(&self.definition_cache),
-                                &mqtt,
-                                coordinator_ieee.clone(),
-                            )
-                            .await;
+                            {
+                                let list_devices = Arc::clone(&devices);
+                                let list_external = Arc::clone(&external);
+                                let list_cache = Arc::clone(&self.definition_cache);
+                                let list_mqtt = mqtt.clone();
+                                let list_ieee = coordinator_ieee.clone();
+                                tokio::spawn(async move {
+                                    publish_device_list_async(
+                                        list_devices,
+                                        list_external,
+                                        list_cache,
+                                        &list_mqtt,
+                                        list_ieee,
+                                    )
+                                    .await;
+                                });
+                            }
                         }
 
                         Some(CoordinatorEvent::AddressResolved { ieee_addr, nwk_addr }) => {
@@ -1030,19 +1065,43 @@ impl Bridge {
                                 }
                             }
 
-                            publish_device_list_async(
-                                Arc::clone(&devices),
-                                Arc::clone(&external),
-                                Arc::clone(&self.definition_cache),
-                                &mqtt,
-                                coordinator_ieee.clone(),
-                            )
-                            .await;
+                            {
+                                let list_devices = Arc::clone(&devices);
+                                let list_external = Arc::clone(&external);
+                                let list_cache = Arc::clone(&self.definition_cache);
+                                let list_mqtt = mqtt.clone();
+                                let list_ieee = coordinator_ieee.clone();
+                                tokio::spawn(async move {
+                                    publish_device_list_async(
+                                        list_devices,
+                                        list_external,
+                                        list_cache,
+                                        &list_mqtt,
+                                        list_ieee,
+                                    )
+                                    .await;
+                                });
+                            }
 
-                            // Publish HA discovery after interview
+                            // Publish HA discovery after interview. Never await
+                            // Boa evaluation on the event loop: a slow/hung
+                            // converter host must not stop MQTT.
                             if ha_enabled && interview_just_completed {
-                                if let Some(dev) = devices.get_by_nwk(nwk_addr) {
-                                    Self::publish_device_discovery(Arc::clone(&self.external), &mqtt, &dev, &base_topic, &coordinator_ieee).await;
+                                if let Some(dev) = devices.get_by_nwk(nwk_addr).map(|dev| dev.clone()) {
+                                    let external = Arc::clone(&self.external);
+                                    let mqtt = mqtt.clone();
+                                    let base_topic = base_topic.clone();
+                                    let coordinator_ieee = coordinator_ieee.clone();
+                                    tokio::spawn(async move {
+                                        Self::publish_device_discovery(
+                                            external,
+                                            &mqtt,
+                                            &dev,
+                                            &base_topic,
+                                            &coordinator_ieee,
+                                        )
+                                        .await;
+                                    });
                                 }
                             }
                         }
@@ -4241,18 +4300,21 @@ fn device_list_json(
         );
         // Upstream resolves definitions on join/failed interview, but not
         // while an interview is still in progress.
-        let definition = if device.interview_state.as_deref() == Some("IN_PROGRESS") {
+        let definition = if device.interview_state.as_deref() == Some("IN_PROGRESS")
+            || device.model.as_deref().is_none_or(str::is_empty)
+            || device.endpoints.is_empty()
+        {
+            // A joined-but-not-interviewed stub has no model/endpoints; running
+            // the Boa definition generator for it is very expensive and can
+            // wedge the converter host. Report it as unsupported until the
+            // interview fills in the identity.
             None
         } else if let Some(cached) = cache.get(&key) {
             cached.clone()
         } else {
             let info = ExternalDeviceInfo::from_device(&device);
-            let payload = match device.model.as_deref().filter(|model| !model.is_empty()) {
-                Some(model) => external.definition_payload(model, &info),
-                // Upstream skips lookup candidates without a modelID and
-                // generates a definition instead.
-                None => external.generated_definition_payload(&info),
-            };
+            let model = device.model.clone().unwrap_or_default();
+            let payload = external.definition_payload(&model, &info);
             cache.insert(key, payload.clone());
             payload
         };
