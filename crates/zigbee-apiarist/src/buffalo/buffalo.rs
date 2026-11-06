@@ -18,22 +18,22 @@ impl Buffalo {
     pub fn get_written(&self) -> Vec<u8> { todo!() }
     pub fn is_more(&self) -> bool { todo!() }
 
-    pub fn write_uint8(&mut self, value: i64) { todo!() }
-    pub fn read_uint8(&mut self) -> i64 { todo!() }
-    pub fn write_uint16(&mut self, value: i64) { todo!() }
-    pub fn read_uint16(&mut self) -> i64 { todo!() }
-    pub fn write_uint24(&mut self, value: i64) { todo!() }
-    pub fn read_uint24(&mut self) -> i64 { todo!() }
-    pub fn write_uint32(&mut self, value: i64) { todo!() }
-    pub fn read_uint32(&mut self) -> i64 { todo!() }
-    pub fn write_uint40(&mut self, value: i64) { todo!() }
-    pub fn read_uint40(&mut self) -> i64 { todo!() }
-    pub fn write_uint48(&mut self, value: i64) { todo!() }
-    pub fn read_uint48(&mut self) -> i64 { todo!() }
-    pub fn write_uint56(&mut self, value: i64) { todo!() }
-    pub fn read_uint56(&mut self) -> i64 { todo!() }
-    pub fn write_uint64(&mut self, value: i64) { todo!() }
-    pub fn read_uint64(&mut self) -> i64 { todo!() }
+    pub fn write_uint8(&mut self, value: u64) { todo!() }
+    pub fn read_uint8(&mut self) -> u64 { todo!() }
+    pub fn write_uint16(&mut self, value: u64) { todo!() }
+    pub fn read_uint16(&mut self) -> u64 { todo!() }
+    pub fn write_uint24(&mut self, value: u64) { todo!() }
+    pub fn read_uint24(&mut self) -> u64 { todo!() }
+    pub fn write_uint32(&mut self, value: u64) { todo!() }
+    pub fn read_uint32(&mut self) -> u64 { todo!() }
+    pub fn write_uint40(&mut self, value: u64) { todo!() }
+    pub fn read_uint40(&mut self) -> u64 { todo!() }
+    pub fn write_uint48(&mut self, value: u64) { todo!() }
+    pub fn read_uint48(&mut self) -> u64 { todo!() }
+    pub fn write_uint56(&mut self, value: u64) { todo!() }
+    pub fn read_uint56(&mut self) -> u64 { todo!() }
+    pub fn write_uint64(&mut self, value: u64) { todo!() }
+    pub fn read_uint64(&mut self) -> u64 { todo!() }
 
     pub fn write_int8(&mut self, value: i64) { todo!() }
     pub fn read_int8(&mut self) -> i64 { todo!() }
