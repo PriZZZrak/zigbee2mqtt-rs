@@ -88,10 +88,6 @@ fn buffer_write_as_array() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn buffalo() {
-    todo!()
-}
-
 #[test]
 #[ignore = "not implemented yet"]
 fn doublele_read() {
