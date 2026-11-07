@@ -3,9 +3,11 @@
 
 use std::collections::HashMap;
 
-use serde_json::Value;
+use serde_json::{json, Value};
 
+use crate::zspec::zcl::definition::{cluster, enums::DataType, status::Status};
 use crate::zspec::zcl::zcl_frame::Frame;
+use crate::zspec::zcl::zcl_header::{Direction, FrameType};
 
 /// Upstream `ZclPayload`.
 #[derive(Debug, Clone, PartialEq)]
@@ -83,6 +85,8 @@ pub struct Device {
     pub meta: Value,
     /// Stored ZCL attributes.
     pub attrs: HashMap<(u16, u16), Value>,
+    /// Last default response emitted, used to de-duplicate handling of duplicate frames.
+    pub last_default_response: Option<Value>,
 }
 
 impl Device {
@@ -113,6 +117,7 @@ impl Device {
             options: Value::Null,
             meta: Value::Null,
             attrs: HashMap::new(),
+            last_default_response: None,
         };
         if let Some(endpoints) = endpoints {
             for id in endpoints {
@@ -143,10 +148,178 @@ impl Device {
     pub async fn on_zcl_data(
         &mut self,
         _data_payload: &ZclPayload,
-        _frame: &Frame,
-        _endpoint_index: usize,
-        _options: Value,
+        frame: &Frame,
+        endpoint_index: usize,
+        options: Value,
     ) {
-        todo!()
+        let cluster_name = frame.cluster.name;
+        let command_name = frame.command.name;
+
+        if command_name == "defaultRsp" {
+            return;
+        }
+
+        if command_name == "read" {
+            if self.custom_read_response == Some(true) {
+                return;
+            }
+            let mut attributes = serde_json::Map::new();
+            if let Some(items) = frame.payload.as_array() {
+                for item in items {
+                    let attr_id = item
+                        .get("attrId")
+                        .and_then(Value::as_u64)
+                        .unwrap_or_default();
+                    attributes.insert(
+                        attr_id.to_string(),
+                        json!({"value": null, "type": DataType::NO_DATA as u8}),
+                    );
+                }
+            }
+            self.endpoints[endpoint_index]
+                .read_response_calls
+                .push(json!([
+                    frame.cluster.ID,
+                    frame.header.transaction_sequence_number,
+                    Value::Object(attributes),
+                ]));
+            return;
+        }
+
+        if cluster_name == "ssIasZone" && command_name == "enrollReq" {
+            let endpoint = &mut self.endpoints[endpoint_index];
+            endpoint.command_calls.push(json!([
+                "ssIasZone",
+                "enrollRsp",
+                {"enrollrspcode": 0, "zoneid": 23},
+                {
+                    "transactionSequenceNumber": frame.header.transaction_sequence_number,
+                    "disableDefaultResponse": true,
+                },
+            ]));
+            if endpoint.fail_next_command {
+                endpoint.fail_next_command = false;
+                self.emit_default_response(frame, endpoint_index, Status::FAILURE);
+            }
+            return;
+        }
+
+        if cluster_name == "genPollCtrl" && command_name == "checkin" {
+            let has_read = self.checkin_interval.is_none()
+                && !self.endpoints[endpoint_index].next_read_result.is_null();
+
+            self.endpoints[endpoint_index].command_calls.push(json!([
+                "genPollCtrl",
+                "checkinRsp",
+                {
+                    "startFastPolling": if has_read { 1 } else { 0 },
+                    "fastPollTimeout": 0,
+                },
+                {
+                    "transactionSequenceNumber": frame.header.transaction_sequence_number,
+                    "disableDefaultResponse": true,
+                    "sendPolicy": "immediate",
+                },
+            ]));
+
+            if !has_read {
+                if self.endpoints[endpoint_index].fail_next_command {
+                    self.endpoints[endpoint_index].fail_next_command = false;
+                    self.emit_default_response(frame, endpoint_index, Status::FAILURE);
+                }
+                return;
+            }
+
+            let read_result = self.endpoints[endpoint_index].next_read_result.clone();
+            self.endpoints[endpoint_index].read_calls.push(json!([
+                "genPollCtrl",
+                ["checkinInterval"],
+                {}
+            ]));
+            if let Some(interval) = read_result.get("checkinInterval").and_then(Value::as_u64) {
+                self.checkin_interval = Some(interval);
+            }
+
+            self.endpoints[endpoint_index].command_calls.push(json!([
+                "genPollCtrl",
+                "fastPollStop",
+                {},
+                {"sendPolicy": "immediate"},
+            ]));
+            self.endpoints[endpoint_index].fail_next_command = false;
+            return;
+        }
+
+        let direction = Direction::CLIENT_TO_SERVER as u8;
+        let disable_default_response = frame.header.frame_control.disable_default_response;
+        let device_disables = self
+            .options
+            .get("disableDefaultResponse")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let tuya_device =
+            self.model_id.starts_with("TS0601") && self.manufacturer_name.starts_with("_TZE");
+
+        let requested = options.get("defaultResponse").cloned();
+        let status = match &requested {
+            Some(Value::Bool(true)) => Some(Status::SUCCESS as u8),
+            Some(Value::Number(number)) => number.as_u64().map(|value| value as u8),
+            _ => None,
+        };
+
+        if tuya_device || (device_disables && status.is_none()) {
+            return;
+        }
+        if disable_default_response && requested.is_none() {
+            return;
+        }
+
+        emit_default_response_at(
+            &mut self.endpoints[endpoint_index],
+            frame,
+            endpoint_index,
+            self.last_default_response.as_ref(),
+            status.unwrap_or(Status::SUCCESS as u8),
+            direction,
+        )
+        .map(|value| self.last_default_response = Some(value));
+
+        if frame.header.frame_control.frame_type == FrameType::GLOBAL && command_name == "read" {
+            return;
+        }
     }
+
+    fn emit_default_response(&mut self, frame: &Frame, endpoint_index: usize, status: Status) {
+        let value = default_response_value(frame, status as u8, Direction::CLIENT_TO_SERVER as u8);
+        self.endpoints[endpoint_index]
+            .default_response_calls
+            .push(value.clone());
+        self.last_default_response = Some(value);
+    }
+}
+
+fn default_response_value(frame: &Frame, status: u8, direction: u8) -> Value {
+    json!([
+        frame.command.ID,
+        status,
+        frame.cluster.ID,
+        frame.header.transaction_sequence_number,
+        {"direction": direction},
+    ])
+}
+
+fn emit_default_response_at(
+    endpoint: &mut Endpoint,
+    frame: &Frame,
+    _endpoint_index: usize,
+    last: Option<&Value>,
+    status: u8,
+    direction: u8,
+) -> Option<Value> {
+    let value = default_response_value(frame, status, direction);
+    if last == Some(&value) {
+        return None;
+    }
+    endpoint.default_response_calls.push(value.clone());
+    Some(value)
 }

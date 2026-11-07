@@ -5,7 +5,6 @@ use zigbee_apiarist::adapter::zoh::adapter::utils::{
 };
 
 #[test]
-#[ignore = "not implemented yet"]
 fn handles_bigint_conversions() {
     let v1_0x = "0x90395efffec7fd21";
     let v1_buf = vec![0x21, 0xfd, 0xc7, 0xfe, 0xff, 0x5e, 0x39, 0x90];

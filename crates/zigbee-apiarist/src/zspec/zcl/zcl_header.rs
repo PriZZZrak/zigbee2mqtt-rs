@@ -69,13 +69,62 @@ impl Header {
     }
 
     /// Upstream `ZclHeader.fromBuffer(buffer)`.
-    pub fn from_buffer(_buffer: &[u8]) -> Option<Self> {
-        todo!()
+    pub fn from_buffer(buffer: &[u8]) -> Option<Self> {
+        let control = *buffer.first()?;
+        let frame_type = match control & 0x03 {
+            0 => FrameType::GLOBAL,
+            1 => FrameType::SPECIFIC,
+            _ => return None,
+        };
+        let manufacturer_specific = control & 0x04 != 0;
+        let direction = if control & 0x08 != 0 {
+            Direction::SERVER_TO_CLIENT
+        } else {
+            Direction::CLIENT_TO_SERVER
+        };
+        let frame_control = FrameControl {
+            reserved_bits: (control >> 5) & 0x07,
+            frame_type,
+            direction,
+            disable_default_response: control & 0x10 != 0,
+            manufacturer_specific,
+        };
+        let mut offset = 1;
+        let manufacturer_code = if manufacturer_specific {
+            let bytes = [*buffer.get(offset)?, *buffer.get(offset + 1)?];
+            offset += 2;
+            Some(u16::from_le_bytes(bytes))
+        } else {
+            None
+        };
+        let transaction_sequence_number = *buffer.get(offset)?;
+        let command_identifier = *buffer.get(offset + 1)?;
+        Some(Self::new(
+            frame_control,
+            manufacturer_code,
+            transaction_sequence_number,
+            command_identifier,
+        ))
     }
 
     /// Upstream `header.write(buffalo)` returning the encoded header bytes.
     pub fn to_buffer(&self) -> Vec<u8> {
-        todo!()
+        let control = self.frame_control;
+        let mut byte = control.reserved_bits << 5;
+        byte |= (control.frame_type as u8) & 0x03;
+        byte |= (control.manufacturer_specific as u8) << 2;
+        byte |= (control.direction as u8) << 3;
+        byte |= (control.disable_default_response as u8) << 4;
+
+        let mut buffer = vec![byte];
+        if control.manufacturer_specific {
+            if let Some(code) = self.manufacturer_code {
+                buffer.extend_from_slice(&code.to_le_bytes());
+            }
+        }
+        buffer.push(self.transaction_sequence_number);
+        buffer.push(self.command_identifier);
+        buffer
     }
 
     /// Upstream getter `isGlobal`.

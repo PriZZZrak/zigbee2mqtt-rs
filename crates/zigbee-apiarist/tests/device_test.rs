@@ -59,7 +59,6 @@ fn frame(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_basic_read() {
     let mut device = device();
     let frame = frame(
@@ -88,7 +87,6 @@ async fn replies_to_basic_read() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_time_read() {
     let mut device = device();
     let frame = frame(
@@ -114,7 +112,6 @@ async fn replies_to_time_read() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_unsupported_read() {
     let mut device = device();
     let frame = frame(
@@ -140,7 +137,6 @@ async fn replies_to_unsupported_read() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_read_with_custom_response() {
     let mut device = device();
     device.custom_read_response = Some(false);
@@ -163,7 +159,6 @@ async fn replies_to_read_with_custom_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_read_with_override_custom_response() {
     let mut device = device();
     device.custom_read_response = Some(true);
@@ -186,7 +181,6 @@ async fn replies_to_read_with_override_custom_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_send_default_response_for_default_response() {
     let mut device = device();
     let frame = frame(
@@ -208,7 +202,6 @@ async fn does_not_send_default_response_for_default_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_ias_zone_enroll_request() {
     let mut device = device();
     let frame = frame(
@@ -239,7 +232,6 @@ async fn replies_to_ias_zone_enroll_request() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fails_to_reply_to_ias_zone_enroll_request() {
     let mut device = device();
     device.endpoints[0].fail_next_command = true;
@@ -266,7 +258,6 @@ async fn fails_to_reply_to_ias_zone_enroll_request() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_poll_control_checkin() {
     let mut device = device();
     device.checkin_interval = None;
@@ -323,7 +314,6 @@ async fn replies_to_poll_control_checkin() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fails_to_reply_to_poll_control_checkin() {
     let mut device = device();
     device.checkin_interval = None;
@@ -346,7 +336,6 @@ async fn fails_to_reply_to_poll_control_checkin() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fails_to_stop_fast_poll() {
     let mut device = device();
     device.checkin_interval = None;
@@ -370,7 +359,6 @@ async fn fails_to_stop_fast_poll() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_global_with_success_default_response_by_default() {
     let mut device = device();
     let frame = frame(
@@ -396,7 +384,6 @@ async fn replies_to_global_with_success_default_response_by_default() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_specific_from_server_with_success_default_response_by_default() {
     let mut device = device();
     let frame = frame(
@@ -415,7 +402,6 @@ async fn replies_to_specific_from_server_with_success_default_response_by_defaul
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_to_specific_from_client_with_success_default_response_by_default() {
     let mut device = device();
     let frame = frame(
@@ -434,7 +420,6 @@ async fn replies_to_specific_from_client_with_success_default_response_by_defaul
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_with_default_response_from_caller() {
     let mut device = device();
     let frame = frame(
@@ -458,7 +443,6 @@ async fn replies_with_default_response_from_caller() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn replies_with_non_success_default_response_even_when_disable_default_response_is_on() {
     let mut device = device();
     let mut frame = frame(
@@ -487,7 +471,6 @@ async fn replies_with_non_success_default_response_even_when_disable_default_res
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn skips_replying_with_default_response_when_device_option_set() {
     let mut device = device();
     device.options = json!({"disableDefaultResponse": true});
@@ -507,7 +490,6 @@ async fn skips_replying_with_default_response_when_device_option_set() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn de_duplicates_replying_with_default_response() {
     let mut device = device();
     let frame = frame(
@@ -529,7 +511,6 @@ async fn de_duplicates_replying_with_default_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn skips_replying_with_default_response_when_tuya_device_option_set() {
     let mut device = device();
     device.model_id = "TS0601".to_string();
