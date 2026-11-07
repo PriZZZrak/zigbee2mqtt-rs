@@ -20,11 +20,22 @@ pub struct PublishDevice {
     pub friendly_name: String,
     pub endpoints: BTreeMap<String, PublishEndpoint>,
     pub has_set_converter: bool,
+    pub optimistic: bool,
+    pub filtered_optimistic: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PublishGroup {
+    pub id: Option<u32>,
+    pub members: Vec<(String, String)>,
+    pub commands: Vec<(String, String, Value, Value)>,
+    pub optimistic: bool,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Publish {
     pub devices: BTreeMap<String, PublishDevice>,
+    pub groups: BTreeMap<String, PublishGroup>,
     pub group_commands: BTreeMap<String, usize>,
     /// `(topic, payload, options)`.
     pub published: Vec<(String, Value, Value)>,
@@ -47,8 +58,32 @@ impl Publish {
                 friendly_name: friendly_name.to_string(),
                 endpoints,
                 has_set_converter: true,
+                optimistic: true,
+                filtered_optimistic: Vec::new(),
             },
         );
+    }
+
+    pub fn add_group(&mut self, friendly_name: &str) {
+        self.groups.insert(
+            friendly_name.to_string(),
+            PublishGroup {
+                optimistic: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    pub fn add_group_member(&mut self, group: &str, device: &str, endpoint: &str) {
+        self.groups
+            .get_mut(group)
+            .expect("group")
+            .members
+            .push((device.to_string(), endpoint.to_string()));
+    }
+
+    pub fn group(&mut self, group: &str) -> &mut PublishGroup {
+        self.groups.get_mut(group).expect("group")
     }
 
     pub fn endpoint(&mut self, device: &str, endpoint: &str) -> &mut PublishEndpoint {
