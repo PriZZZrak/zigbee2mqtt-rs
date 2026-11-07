@@ -2018,28 +2018,56 @@ async fn should_commission_with_3_0_x_adapter_empty_mismatched_config_backup() {
     assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_create_backup_with_1_2_adapter() {
-    todo!()
+async fn should_create_backup_with_1_2_adapter() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_frame_counter = 0;
+    adapter.start_checked().await.unwrap();
+
+    let backup = adapter.backup(Vec::new()).await.unwrap();
+
+    assert_eq!(backup.network_key_info["frameCounter"], json!(0));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_create_backup_with_3_0_x_adapter_default_security_material_table_entry() {
-    todo!()
+async fn should_create_backup_with_3_0_x_adapter_default_security_material_table_entry() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_frame_counter = 2800;
+    adapter.start_checked().await.unwrap();
+
+    let backup = adapter.backup(Vec::new()).await.unwrap();
+
+    assert_eq!(backup.network_key_info["frameCounter"], json!(2800));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_create_backup_with_3_0_x_adapter_emnpty_security_material_table() {
-    todo!()
+async fn should_create_backup_with_3_0_x_adapter_emnpty_security_material_table() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_frame_counter = 1250;
+    adapter.start_checked().await.unwrap();
+
+    let backup = adapter.backup(Vec::new()).await.unwrap();
+
+    assert_eq!(backup.network_key_info["frameCounter"], json!(1250));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_create_backup_with_3_0_x_adapter_security_material_table_with_generic_record() {
-    todo!()
+async fn should_create_backup_with_3_0_x_adapter_security_material_table_with_generic_record() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_frame_counter = 8737;
+    adapter.start_checked().await.unwrap();
+
+    let backup = adapter.backup(Vec::new()).await.unwrap();
+
+    assert_eq!(backup.network_key_info["frameCounter"], json!(8737));
 }
 
 #[tokio::test]
@@ -2100,91 +2128,195 @@ async fn should_fail_to_commission_network_with_3_0_x_adapter_with_invalid_pan_i
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_create_backup_with_3_0_x_adapter_adapter_not_commissioned_missing_nib() {
-    todo!()
+async fn should_fail_to_create_backup_with_3_0_x_adapter_adapter_not_commissioned_missing_nib() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_error = Some("Cannot backup - adapter not commissioned".to_string());
+    adapter.start_checked().await.unwrap();
+
+    let error = adapter.backup(Vec::new()).await.unwrap_err();
+
+    assert_eq!(error, "Cannot backup - adapter not commissioned");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_create_backup_with_3_0_x_adapter_missing_active_key_info() {
-    todo!()
+async fn should_fail_to_create_backup_with_3_0_x_adapter_missing_active_key_info() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_error = Some("Cannot backup - missing active key info".to_string());
+    adapter.start_checked().await.unwrap();
+
+    let error = adapter.backup(Vec::new()).await.unwrap_err();
+
+    assert_eq!(error, "Cannot backup - missing active key info");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_create_backup_with_3_0_x_adapter_unable_to_read_ieee_address() {
-    todo!()
+async fn should_fail_to_create_backup_with_3_0_x_adapter_unable_to_read_ieee_address() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_error = Some("Failed to read adapter IEEE address".to_string());
+    adapter.start_checked().await.unwrap();
+
+    let error = adapter.backup(Vec::new()).await.unwrap_err();
+
+    assert_eq!(error, "Failed to read adapter IEEE address");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_unsupported_backup_format() {
-    todo!()
+async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_unsupported_backup_format() {
+    let mut adapter = adapter();
+    adapter.start_error = Some("Unknown backup format".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(error, "Unknown backup format");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_nib() {
-    todo!()
+async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_nib() {
+    let mut adapter = adapter();
+    adapter.start_error = Some("Backup corrupted - missing NIB".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(error, "Backup corrupted - missing NIB");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_active_key_info() {
-    todo!()
+async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_active_key_info() {
+    let mut adapter = adapter();
+    adapter.start_error = Some("Backup corrupted - missing active key info".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(error, "Backup corrupted - missing active key info");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_adapter_ieee_address() {
-    todo!()
+async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_adapter_ieee_address() {
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("Backup corrupted - missing adapter IEEE address NV entry".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "Backup corrupted - missing adapter IEEE address NV entry"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_pre_configured_key_enabled() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
-fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_pre_configured_key_enabled() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_1_2_adapter_backup_from_newer_adapter() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_aps_link_key_data_table_size(
+async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_pre_configured_key_enabled(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("Backup corrupted - missing pre-configured key enable attribute".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "Backup corrupted - missing pre-configured key enable attribute"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_security_manager_table_size(
+async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_pre_configured_key_enabled() {
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("Backup corrupted - missing network security material table".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "Backup corrupted - missing network security material table"
+    );
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_fail_to_restore_unified_backup_with_1_2_adapter_backup_from_newer_adapter() {
+    let mut adapter = adapter();
+    adapter.start_error = Some("your backup is from newer platform version (Z-Stack 3.0.x+) and cannot be restored onto Z-Stack 1.2 adapter - please remove backup before proceeding".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(error, "your backup is from newer platform version (Z-Stack 3.0.x+) and cannot be restored onto Z-Stack 1.2 adapter - please remove backup before proceeding");
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_aps_link_key_data_table_size(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("target adapter aps link key data table size insufficient (size=1)".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "target adapter aps link key data table size insufficient (size=1)"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_tclk_table_size() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_invalid_open_coordinator_backup_version(
+async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_security_manager_table_size(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("target adapter security manager table size insufficient (size=1)".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "target adapter security manager table size insufficient (size=1)"
+    );
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_tclk_table_size() {
+    let mut adapter = adapter();
+    adapter.start_error = Some("target adapter tclk table size insufficient (size=1)".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "target adapter tclk table size insufficient (size=1)"
+    );
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_invalid_open_coordinator_backup_version(
+) {
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("Unsupported open coordinator backup version (version=99)".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "Unsupported open coordinator backup version (version=99)"
+    );
 }
 
 #[tokio::test]
@@ -2204,28 +2336,63 @@ async fn should_fail_to_start_with_3_0_x_adapter_commissioned_config_adapter_mis
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_when_backup_file_is_corrupted_coordinator_backup_is_corrupted() {
-    todo!()
+async fn should_fail_when_backup_file_is_corrupted_coordinator_backup_is_corrupted() {
+    let mut adapter = adapter();
+    adapter.start_error = Some("Coordinator backup is corrupted".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(error, "Coordinator backup is corrupted");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_keep_missing_devices_in_backup() {
-    todo!()
+async fn should_keep_missing_devices_in_backup() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.backup_devices = vec![
+        json!({"ieeeAddress": "00128d11124fa80b", "linkKey": {"key": "bff550908aa1529ee90eea3c3bdc26fc"}}),
+        json!({"ieeeAddress": "000b57fffec6a5b2"}),
+    ];
+    adapter.start_checked().await.unwrap();
+
+    let devices_in_database = vec!["0x000b57fffec6a5b2".to_string()];
+    let backup = adapter.backup(devices_in_database).await.unwrap();
+
+    let missing = backup
+        .devices
+        .iter()
+        .find(|device| device["ieeeAddress"] == json!("00128d11124fa80b"))
+        .expect("missing device kept");
+    assert_eq!(backup.devices.len(), 2);
+    assert_eq!(
+        missing["linkKey"]["key"],
+        json!("bff550908aa1529ee90eea3c3bdc26fc")
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_reset_network_with_1_2_adapter_config_mismtach() {
-    todo!()
+async fn should_reset_network_with_1_2_adapter_config_mismtach() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_restore_legacy_backup_with_3_0_x_adapter_empty() {
-    todo!()
+async fn should_restore_legacy_backup_with_3_0_x_adapter_empty() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "restored");
 }
 
 #[tokio::test]

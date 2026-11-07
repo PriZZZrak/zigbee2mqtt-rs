@@ -91,6 +91,12 @@ pub fn wait_for() {
     todo!()
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Backup {
+    pub network_key_info: serde_json::Value,
+    pub devices: Vec<serde_json::Value>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZStackWaitResult {
     pub endpoint: u8,
@@ -149,6 +155,9 @@ pub struct ZStackAdapter {
     pub start_error: Option<String>,
     /// `(level, message)` emitted while starting.
     pub logs: Vec<(String, String)>,
+    pub backup_frame_counter: u64,
+    pub backup_devices: Vec<serde_json::Value>,
+    pub backup_error: Option<String>,
 }
 
 impl ZStackAdapter {
@@ -203,6 +212,9 @@ impl ZStackAdapter {
             ping_error: None,
             start_error: None,
             logs: Vec::new(),
+            backup_frame_counter: 0,
+            backup_devices: Vec::new(),
+            backup_error: None,
         }
     }
 
@@ -345,6 +357,11 @@ impl ZStackAdapter {
         _source_endpoint: u8,
         _broadcast_address: u16,
     ) {
+        todo!()
+    }
+
+    /// Upstream: `adapter.backup(devicesInDatabase)`.
+    pub async fn backup(&mut self, _devices_in_database: Vec<String>) -> Result<Backup, String> {
         todo!()
     }
 
