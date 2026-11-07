@@ -6,7 +6,6 @@ use zigbee_apiarist::adapter::z_stack::unpi::parser::Parser;
 use zigbee_apiarist::adapter::z_stack::unpi::writer::Writer;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn parse_simple_message() {
     let buffer = vec![
         0xfe, 0x0e, 0x61, 0x02, 0x02, 0x00, 0x02, 0x06, 0x03, 0xd9, 0x14, 0x34, 0x01, 0x02, 0x00,
@@ -28,7 +27,6 @@ fn parse_simple_message() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn parse_two_messages() {
     let buffer = vec![
         0xfe, 0x0e, 0x61, 0x02, 0x02, 0x00, 0x02, 0x06, 0x03, 0xd9, 0x14, 0x34, 0x01, 0x02, 0x00,
@@ -56,7 +54,6 @@ fn parse_two_messages() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn dont_throw_error_on_fcs_mismatch() {
     let buffer = vec![0xfe, 0x03, 0x61, 0x08, 0x00, 0x01, 0x55, 0x3f];
     let mut parser = Parser::new();
@@ -64,7 +61,6 @@ fn dont_throw_error_on_fcs_mismatch() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn message_in_two_chunks() {
     let mut parser = Parser::new();
     assert!(parser
@@ -82,7 +78,6 @@ fn message_in_two_chunks() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn message_in_two_chunks_fcs_as_separate() {
     let mut parser = Parser::new();
     assert!(parser
@@ -96,7 +91,6 @@ fn message_in_two_chunks_fcs_as_separate() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn parse_message_when_it_does_not_start_with_sof() {
     let buffer = vec![
         95, 27, 37, 254, 3, 69, 196, 212, 23, 0, 65, 254, 27, 68, 129, 0, 0, 8, 0, 212, 23, 1, 1,
@@ -122,7 +116,6 @@ fn parse_message_when_it_does_not_start_with_sof() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn continue_parsing_on_fcs_mismatch() {
     let mut parser = Parser::new();
     parser.transform(&[
@@ -147,7 +140,6 @@ fn continue_parsing_on_fcs_mismatch() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn frame_to_buffer() {
     let frame = Frame::new(Type::SRSP, Subsystem::SYS, 3, vec![0x06, 0x01], 0, 0);
     assert_eq!(
@@ -157,7 +149,6 @@ fn frame_to_buffer() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_frame() {
     let frame = Frame::new(Type::SRSP, Subsystem::SYS, 3, vec![0x06, 0x01], 0, 0);
     let mut writer = Writer::default();
@@ -167,7 +158,6 @@ fn write_frame() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_buffer() {
     let buffer = vec![0x01, 0x02];
     let mut writer = Writer::default();
@@ -177,7 +167,6 @@ fn write_buffer() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_should_do_nothing() {
     let mut writer = Writer::default();
     writer.read();

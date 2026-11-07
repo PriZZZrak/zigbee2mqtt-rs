@@ -17,6 +17,18 @@ pub enum Type {
     SRSP = 3,
 }
 
+impl Type {
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::POLL),
+            1 => Some(Self::SREQ),
+            2 => Some(Self::AREQ),
+            3 => Some(Self::SRSP),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Subsystem {
@@ -32,4 +44,24 @@ pub enum Subsystem {
     APP = 9,
     APP_CNF = 15,
     GREENPOWER = 21,
+}
+
+impl Subsystem {
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::RESERVED),
+            1 => Some(Self::SYS),
+            2 => Some(Self::MAC),
+            3 => Some(Self::NWK),
+            4 => Some(Self::AF),
+            5 => Some(Self::ZDO),
+            6 => Some(Self::SAPI),
+            7 => Some(Self::UTIL),
+            8 => Some(Self::DEBUG),
+            9 => Some(Self::APP),
+            15 => Some(Self::APP_CNF),
+            21 => Some(Self::GREENPOWER),
+            _ => None,
+        }
+    }
 }

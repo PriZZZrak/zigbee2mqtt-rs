@@ -1,5 +1,5 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/unpi/writer.ts
-// TODO: port Writer.
+// TODO: port the stream writer.
 
 use super::frame::Frame;
 
@@ -14,14 +14,12 @@ impl Writer {
     }
 
     pub fn write_frame(&mut self, frame: &Frame) {
-        todo!()
+        self.push(frame.to_buffer());
     }
 
     pub fn write_buffer(&mut self, buffer: &[u8]) {
-        todo!()
+        self.push(buffer.to_vec());
     }
 
-    pub fn read(&mut self) {
-        todo!()
-    }
+    pub fn read(&mut self) {}
 }
