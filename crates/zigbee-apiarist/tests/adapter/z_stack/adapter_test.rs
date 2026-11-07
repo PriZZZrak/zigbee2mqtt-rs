@@ -1012,10 +1012,32 @@ fn send_zcl_frame_network_address_data_confirm_fails_without_default_response() 
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_data_confirm_fails() {
-    todo!()
+async fn send_zcl_frame_network_address_data_confirm_fails() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 201;
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let error = adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+            0,
+            1,
+            0x0104,
+            false,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Data request failed with error: 'NWK_UNSUPPORTED_ATTRIBUTE' (0xc9)"
+    );
 }
 
 #[test]
@@ -1051,10 +1073,27 @@ fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_should_re
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_requested_profile_id_is_not_configured() {
-    todo!()
+async fn send_zcl_frame_network_address_fails_because_requested_profile_id_is_not_configured() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    let error = adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+            0,
+            1,
+            9999,
+            false,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Profile ID 9999 is not supported by this adapter.");
 }
 
 #[test]
@@ -1075,10 +1114,30 @@ fn send_zcl_frame_network_address_retry_on_mac_channel_access_failure() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_should_retry_on_dataconfirm_timeout() {
-    todo!()
+async fn send_zcl_frame_network_address_should_retry_on_dataconfirm_timeout() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 9999;
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let error = adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+            0,
+            1,
+            0x0104,
+            false,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Data request failed with error: 'TIMEOUT'");
+    assert_eq!(adapter.znp_calls.len(), 1);
 }
 
 #[test]
@@ -1100,17 +1159,72 @@ fn send_zcl_frame_network_address_transaction_number_shouldnt_go_higher_than_255
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_with_default_response() {
-    todo!()
+async fn send_zcl_frame_network_address_with_default_response() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+            0,
+            1,
+            0x0104,
+            false,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(adapter.send_zcl_calls, 1);
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequest".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0x05, 0x00, 0x00, 0x00],
+                "destendpoint": 20,
+                "dstaddr": 2,
+                "len": 6,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+            }),
+        }]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_care_because_command_has_response(
+async fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_care_because_command_has_response(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 9999;
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+            0,
+            1,
+            0x0104,
+            true,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(adapter.znp_calls.len(), 1);
 }
 
 #[tokio::test]
@@ -1559,10 +1673,45 @@ async fn soft_reset() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn source_endpoint_is_selected_based_on_profile_id() {
-    todo!()
+async fn source_endpoint_is_selected_based_on_profile_id() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+            0,
+            1,
+            0x0109,
+            false,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequest".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0x05, 0x00, 0x00, 0x00],
+                "destendpoint": 20,
+                "dstaddr": 2,
+                "len": 6,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 6,
+                "transid": 1,
+            }),
+        }]
+    );
 }
 
 #[tokio::test]

@@ -142,7 +142,7 @@ pub struct ZStackAdapter {
     pub disconnected: usize,
     pub route_disc_calls: Vec<serde_json::Value>,
     pub led_firmware: bool,
-    pub data_confirm_code: u8,
+    pub data_confirm_code: u16,
     pub data_request_ext_code: u8,
     pub interpan_response: Option<serde_json::Value>,
     pub ping_error: Option<String>,
@@ -258,6 +258,21 @@ impl ZStackAdapter {
         _options: u8,
         _transaction_id: u8,
     ) {
+        todo!()
+    }
+
+    /// Upstream `sendZclFrameToEndpoint` surfacing data-confirm/profile errors.
+    pub async fn send_zcl_frame_to_endpoint_checked(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _endpoint: u8,
+        _data: Vec<u8>,
+        _options: u8,
+        _transaction_id: u8,
+        _profile_id: u16,
+        _has_response: bool,
+    ) -> Result<(), String> {
         todo!()
     }
 
