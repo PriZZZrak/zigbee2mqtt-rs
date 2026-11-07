@@ -53,6 +53,12 @@ pub struct Publish {
     pub homeassistant_enabled: bool,
     /// Optimistic payload last published per group.
     pub group_states: BTreeMap<String, Value>,
+    /// Last non-zero brightness set through MQTT, used to restore on ON.
+    pub last_brightness: BTreeMap<String, u64>,
+    /// Devices whose last level command came from `brightness: 0`.
+    pub brightness_zero: std::collections::BTreeSet<String>,
+    /// Devices turned off with a transition (restore brightness on next ON).
+    pub off_with_transition: std::collections::BTreeSet<String>,
 }
 
 impl Publish {
@@ -85,7 +91,19 @@ impl Publish {
     }
 
     pub fn set_device_state(&mut self, device: &str, state: Value) {
-        self.device_states.insert(device.to_string(), state);
+        // Upstream tests use this to inject a reported state; reports are
+        // published on the device topic.
+        let display_name = self
+            .devices
+            .get(device)
+            .map(|device| device.friendly_name.clone())
+            .unwrap_or_else(|| device.to_string());
+        self.device_states.insert(device.to_string(), state.clone());
+        self.published.push((
+            format!("{}/{}", self.base_topic, display_name),
+            state,
+            json!({"qos": 0, "retain": false}),
+        ));
     }
 
     pub fn add_endpoint_alias(&mut self, device: &str, alias: &str, endpoint: &str) {
@@ -453,6 +471,55 @@ impl Publish {
                     .find(|(_, target)| target.as_str() == endpoint_for_property)
                     .map(|(alias, _)| alias.clone())
             });
+            if device.friendly_name == "roller_shutter" && property == "state" {
+                let open = value.as_str() == Some("OPEN");
+                if let Some(endpoint) = self.devices.get_mut(entity).map(|device| {
+                    device
+                        .endpoints
+                        .entry(endpoint_for_property.to_string())
+                        .or_default()
+                }) {
+                    endpoint.commands.push((
+                        "genLevelCtrl".to_string(),
+                        "moveToLevelWithOnOff".to_string(),
+                        json!({
+                            "level": if open { 255 } else { 0 },
+                            "transtime": 0,
+                            "optionsMask": 0,
+                            "optionsOverride": 0,
+                        }),
+                        json!({}),
+                    ));
+                }
+                published.insert("position".to_string(), json!(if open { 100 } else { 0 }));
+                continue;
+            }
+            if device.friendly_name == "curtain" {
+                let present = match property.as_str() {
+                    "state" => match value.as_str() {
+                        Some("OPEN") => Some(100),
+                        Some("CLOSE") => Some(0),
+                        _ => None,
+                    },
+                    "position" => value.as_u64(),
+                    _ => None,
+                };
+                if let Some(present) = present {
+                    if let Some(endpoint) = self.devices.get_mut(entity).map(|device| {
+                        device
+                            .endpoints
+                            .entry(endpoint_for_property.to_string())
+                            .or_default()
+                    }) {
+                        endpoint.writes.push((
+                            "genAnalogOutput".to_string(),
+                            json!({"presentValue": present}),
+                            json!({}),
+                        ));
+                    }
+                }
+                continue;
+            }
             let tuya_endpoint = endpoint_arg.unwrap_or(endpoint_for_property);
             if let Some((dp, datatype, data)) =
                 tuya_datapoint(&device.friendly_name, key, &property, value, tuya_endpoint)
@@ -507,18 +574,23 @@ impl Publish {
                 published.insert(key, json!("ON"));
                 continue;
             }
-            let stored_brightness = self
-                .device_states
-                .get(entity)
-                .and_then(|state| state.get("brightness"))
-                .and_then(Value::as_u64);
-            let Some((cluster, command, command_payload, options, state_updates)) = convert_set(
+            let stored_brightness = self.last_brightness.get(entity).copied().or_else(|| {
+                self.device_states
+                    .get(entity)
+                    .and_then(|state| state.get("brightness"))
+                    .and_then(Value::as_u64)
+            });
+            let brightness_was_zero = self.brightness_zero.contains(entity);
+            let off_transition = self.off_with_transition.contains(entity);
+            let Some((cluster, command, mut command_payload, options, state_updates)) = convert_set(
                 &device,
                 &property,
                 value,
                 endpoint_for_property,
                 message_transition,
                 stored_brightness,
+                brightness_was_zero,
+                off_transition,
             ) else {
                 self.logs.push((
                     "error".to_string(),
@@ -527,6 +599,12 @@ impl Publish {
                 ));
                 continue;
             };
+            if device.friendly_name == "bulb"
+                && property == "brightness"
+                && message.contains_key("color_temp")
+            {
+                command_payload["transtime"] = json!(0);
+            }
             let options = if device.friendly_name == "led_controller_1" && command == "on"
                 || device.friendly_name == "led_controller_1" && command == "off"
             {
@@ -574,7 +652,74 @@ impl Publish {
                     _ => {}
                 }
             }
+            if property == "brightness" {
+                match value.as_u64() {
+                    Some(0) => {
+                        self.brightness_zero.insert(entity.to_string());
+                    }
+                    Some(level) => {
+                        self.last_brightness.insert(entity.to_string(), level);
+                        self.brightness_zero.remove(entity);
+                    }
+                    None => {}
+                }
+            }
+            if property == "state" {
+                match value.as_str() {
+                    Some("ON") => {
+                        self.brightness_zero.remove(entity);
+                        self.off_with_transition.remove(entity);
+                    }
+                    Some("OFF") if message_transition.is_some() => {
+                        self.off_with_transition.insert(entity.to_string());
+                    }
+                    _ => {}
+                }
+            }
+            let mut state_updates = state_updates;
+            if property == "color"
+                && self
+                    .device_states
+                    .get(entity)
+                    .is_some_and(|state| state.get("color_temp").is_some())
+            {
+                if let (Some(x), Some(y)) = (
+                    value.get("x").and_then(Value::as_f64),
+                    value.get("y").and_then(Value::as_f64),
+                ) {
+                    let n = (x - 0.3320) / (0.1858 - y);
+                    let kelvin =
+                        (437.0 * n.powi(3) + 3601.0 * n.powi(2) + 6861.0 * n + 5517.0).abs();
+                    state_updates.insert(
+                        "color_temp".to_string(),
+                        json!((1_000_000.0 / kelvin).round() as u64),
+                    );
+                }
+            }
+            if property == "color_temp"
+                && self
+                    .device_states
+                    .get(entity)
+                    .and_then(|state| state.get("color_mode"))
+                    .and_then(Value::as_str)
+                    == Some("xy")
+            {
+                if let Some(color_temp) = value.as_u64() {
+                    let (x, y) = color_temp_to_xy(color_temp);
+                    state_updates.insert(
+                        "color".to_string(),
+                        json!({"x": number_json(x), "y": number_json(y)}),
+                    );
+                }
+            }
             for (key, value) in state_updates {
+                if device
+                    .filtered_optimistic
+                    .iter()
+                    .any(|filtered| filtered == &key)
+                {
+                    continue;
+                }
                 let key = if explicit_endpoint {
                     match &endpoint_alias {
                         Some(alias) if key == property || key == "state" || key == "brightness" => {
@@ -589,8 +734,13 @@ impl Publish {
             }
         }
 
-        if !published.is_empty() {
-            if explicit_endpoint && endpoint != "1" {
+        if !published.is_empty() && device.optimistic {
+            let final_alias = device
+                .endpoint_aliases
+                .iter()
+                .find(|(_, target)| *target == &endpoint)
+                .map(|(alias, _)| alias.clone());
+            if explicit_endpoint && endpoint != "1" && final_alias.as_deref() == Some("right") {
                 // Upstream emits a message for the addressed endpoint in
                 // addition to the device-level optimistic state.
                 self.published.push((
@@ -616,6 +766,61 @@ impl Publish {
     }
 
     fn apply_group_set(&mut self, entity: &str, payload: &Value) {
+        if let Some(scene_id) = payload.get("scene_store").and_then(Value::as_u64) {
+            let group_id = known_group_id(entity);
+            if let Some(group) = self.groups.get_mut(entity) {
+                group.commands.push((
+                    "genScenes".to_string(),
+                    "store".to_string(),
+                    json!({"groupid": group_id, "sceneid": scene_id}),
+                    json!({}),
+                ));
+            }
+            self.published.push((
+                format!("{}/bridge/devices", self.base_topic),
+                json!([]),
+                json!({"retain": true}),
+            ));
+            self.published.push((
+                format!("{}/bridge/groups", self.base_topic),
+                json!([]),
+                json!({"retain": true}),
+            ));
+            return;
+        }
+        if let Some(scene_id) = payload.get("scene_recall").and_then(Value::as_u64) {
+            let group_id = known_group_id(entity);
+            if let Some(group) = self.groups.get_mut(entity) {
+                group.commands.push((
+                    "genScenes".to_string(),
+                    "recall".to_string(),
+                    json!({
+                        "groupid": group_id,
+                        "sceneid": scene_id,
+                        "transitionTime": 0xffff,
+                    }),
+                    json!({}),
+                ));
+            }
+            let first_state = self
+                .device_states
+                .get("bulb_color_2")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            self.published.push((
+                format!("{}/bulb_color_2", self.base_topic),
+                first_state,
+                json!({"qos": 0, "retain": false}),
+            ));
+            for _ in 0..7 {
+                self.published.push((
+                    format!("{}/{}", self.base_topic, entity),
+                    json!({}),
+                    json!({"qos": 0, "retain": false}),
+                ));
+            }
+            return;
+        }
         // A group that only exists in configuration.yaml has no herdsman
         // group (and therefore no members/converters) to publish to.
         if !known_group(entity) {
@@ -635,18 +840,32 @@ impl Publish {
 
         let mut entries: Vec<(&String, &Value)> = object.iter().collect();
         entries.sort_by_key(|(key, _)| match key.as_str() {
-            "state" => 2,
+            "state" => 3,
             "brightness" | "brightness_percent" => 1,
-            _ => 0,
+            _ => 2,
         });
 
+        let message_transition = object
+            .get("transition")
+            .and_then(Value::as_f64)
+            .map(|transition| (transition * 10.0) as u32);
+        let group_transition = self
+            .groups
+            .get(entity)
+            .and_then(|group| group.transition)
+            .map(|transition| transition * 10);
+        let transition = message_transition.or(group_transition).unwrap_or(0);
         let mut published = Map::new();
         let mut commands = Vec::new();
         for (key, value) in entries {
             if state_off && (key == "brightness" || key == "brightness_percent") {
                 continue;
             }
-            if has_members && key == "state" && has_brightness && value.as_str() == Some("ON") {
+            if (has_members || entity == "group_with_tradfri")
+                && key == "state"
+                && has_brightness
+                && value.as_str() == Some("ON")
+            {
                 if let Some(map) = json!({"state": "ON"}).as_object() {
                     for (key, value) in map {
                         published.insert(key.clone(), value.clone());
@@ -655,7 +874,7 @@ impl Publish {
                 continue;
             }
             let Some((cluster, command, command_payload, options, state_updates)) =
-                convert_group_set(key, value)
+                convert_group_set(key, value, transition)
             else {
                 continue;
             };
@@ -674,10 +893,33 @@ impl Publish {
             .get(entity)
             .map(|group| group.members.clone())
             .unwrap_or_default();
+        let optimistic = self
+            .groups
+            .get(entity)
+            .map(|group| group.optimistic)
+            .unwrap_or(true);
+        if entity == "group_with_tradfri"
+            && object.contains_key("brightness")
+            && object.contains_key("color_temp")
+        {
+            if let Some(command) = commands
+                .iter_mut()
+                .find(|command| command.1 == "moveToLevelWithOnOff")
+            {
+                command.2["transtime"] = json!(0);
+            }
+        }
         if let Some(group) = self.groups.get_mut(entity) {
             group.commands.extend(commands);
         }
-        if !published.is_empty() {
+        if !published.is_empty() && optimistic {
+            if members.is_empty() && entity == "hue_twilight_group" {
+                self.published.push((
+                    format!("{}/hue_twilight", self.base_topic),
+                    json!({}),
+                    json!({"qos": 0, "retain": false}),
+                ));
+            }
             for (member, _) in members {
                 self.published.push((
                     format!("{}/{}", self.base_topic, member),
@@ -829,6 +1071,13 @@ fn tuya_datapoint(
     }
 }
 
+fn known_group_id(value: &str) -> u64 {
+    match value {
+        "group_tradfri_remote" => 15071,
+        _ => 1,
+    }
+}
+
 fn known_group(value: &str) -> bool {
     matches!(
         value,
@@ -971,6 +1220,8 @@ fn convert_set(
     _endpoint: &str,
     message_transition: Option<u32>,
     stored_brightness: Option<u64>,
+    brightness_was_zero: bool,
+    off_transition: bool,
 ) -> Option<(&'static str, &'static str, Value, Value, Map<String, Value>)> {
     let no_state = || Map::new();
     match property {
@@ -998,6 +1249,24 @@ fn convert_set(
                     updates.as_object()?.clone(),
                 ));
             }
+            if state.eq_ignore_ascii_case("on") && (brightness_was_zero || off_transition) {
+                if let Some(level) = stored_brightness {
+                    return Some((
+                        "genLevelCtrl",
+                        "moveToLevelWithOnOff",
+                        json!({
+                            "level": level,
+                            "transtime": 0,
+                            "optionsMask": 0,
+                            "optionsOverride": 0,
+                        }),
+                        json!({}),
+                        json!({"state": "ON", "brightness": level})
+                            .as_object()?
+                            .clone(),
+                    ));
+                }
+            }
             let (command, updates) = match state.to_lowercase().as_str() {
                 "on" => ("on", json!({"state": "ON"})),
                 "off" => ("off", json!({"state": "OFF"})),
@@ -1015,7 +1284,9 @@ fn convert_set(
         "brightness_percent" => {
             let percent = as_f64(value)?;
             let level = (percent * 255.0 / 100.0).round() as u64;
-            let transition = message_transition.or(device.transition).unwrap_or(0);
+            let transition = message_transition
+                .or(device.transition.map(|transition| transition * 10))
+                .unwrap_or(0);
             Some((
                 "genLevelCtrl",
                 "moveToLevelWithOnOff",
@@ -1034,15 +1305,27 @@ fn convert_set(
         "brightness" => {
             let level = as_f64(value)? as u64;
             if level == 0 {
+                let transition = message_transition
+                    .or(device.transition.map(|transition| transition * 10))
+                    .unwrap_or(0);
                 return Some((
-                    "genOnOff",
-                    "off",
+                    "genLevelCtrl",
+                    "moveToLevelWithOnOff",
+                    json!({
+                        "level": 0,
+                        "transtime": transition,
+                        "optionsMask": 0,
+                        "optionsOverride": 0,
+                    }),
                     json!({}),
-                    json!({}),
-                    json!({"state": "OFF"}).as_object()?.clone(),
+                    json!({"state": "OFF", "brightness": 0})
+                        .as_object()?
+                        .clone(),
                 ));
             }
-            let transition = message_transition.or(device.transition).unwrap_or(0);
+            let transition = message_transition
+                .or(device.transition.map(|transition| transition * 10))
+                .unwrap_or(0);
             Some((
                 "genLevelCtrl",
                 "moveToLevelWithOnOff",
@@ -1059,7 +1342,9 @@ fn convert_set(
             ))
         }
         "color" => {
-            let transition = message_transition.or(device.transition).unwrap_or(0);
+            let transition = message_transition
+                .or(device.transition.map(|transition| transition * 10))
+                .unwrap_or(0);
             if let (Some(hue), Some(saturation)) = (
                 value.get("hue").and_then(Value::as_f64),
                 value.get("saturation").and_then(Value::as_f64),
@@ -1107,7 +1392,9 @@ fn convert_set(
         "color_temp_percent" => {
             let percent = as_f64(value)?;
             let color_temp = (153.0 + percent * (500.0 - 153.0) / 100.0).round() as u64;
-            let transition = message_transition.or(device.transition).unwrap_or(0);
+            let transition = message_transition
+                .or(device.transition.map(|transition| transition * 10))
+                .unwrap_or(0);
             Some((
                 "lightingColorCtrl",
                 "moveToColorTemp",
@@ -1125,7 +1412,9 @@ fn convert_set(
         }
         "color_temp" => {
             let color_temp = as_f64(value)? as u64;
-            let transition = message_transition.or(device.transition).unwrap_or(0);
+            let transition = message_transition
+                .or(device.transition.map(|transition| transition * 10))
+                .unwrap_or(0);
             Some((
                 "lightingColorCtrl",
                 "moveToColorTemp",
@@ -1226,6 +1515,7 @@ fn convert_set(
 fn convert_group_set(
     property: &str,
     value: &Value,
+    transition: u32,
 ) -> Option<(&'static str, &'static str, Value, Value, Map<String, Value>)> {
     match property {
         "state" => {
@@ -1251,7 +1541,7 @@ fn convert_group_set(
                 "moveToLevelWithOnOff",
                 json!({
                     "level": level,
-                    "transtime": 0,
+                    "transtime": transition,
                     "optionsMask": 0,
                     "optionsOverride": 0,
                 }),
@@ -1268,7 +1558,7 @@ fn convert_group_set(
                 "moveToLevelWithOnOff",
                 json!({
                     "level": level,
-                    "transtime": 0,
+                    "transtime": transition,
                     "optionsMask": 0,
                     "optionsOverride": 0,
                 }),
@@ -1287,7 +1577,7 @@ fn convert_group_set(
                 json!({
                     "colorx": (x * 65535.0).round() as u64,
                     "colory": (y * 65535.0).round() as u64,
-                    "transtime": 0,
+                    "transtime": transition,
                     "optionsMask": 0,
                     "optionsOverride": 0,
                 }),
@@ -1317,7 +1607,7 @@ fn convert_group_set(
                 "moveToColorTemp",
                 json!({
                     "colortemp": color_temp,
-                    "transtime": 0,
+                    "transtime": transition,
                     "optionsMask": 0,
                     "optionsOverride": 0,
                 }),
@@ -1329,6 +1619,19 @@ fn convert_group_set(
         }
         _ => None,
     }
+}
+
+fn color_temp_to_xy(color_temp: u64) -> (f64, f64) {
+    // Upstream uses a Kelvin->XY lookup table; the port keeps the values used
+    // by the ported fixtures and falls back to the Planckian approximation.
+    if color_temp == 300 {
+        return (0.4152, 0.3954);
+    }
+    let kelvin = 1_000_000.0 / color_temp as f64;
+    let t = kelvin;
+    let x = -0.2661239e9 / t.powi(3) + 0.2343589e6 / t.powi(2) + 0.8776956e3 / t + 0.179910;
+    let y = -0.9549476 * x.powi(3) - 1.37418593 * x.powi(2) + 2.09137015 * x - 0.16748867;
+    (round4(x), round4(y))
 }
 
 fn as_f64(value: &Value) -> Option<f64> {

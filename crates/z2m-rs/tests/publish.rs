@@ -398,9 +398,10 @@ async fn message_transition_should_overrule_options_transition() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn scenes() {
     let mut publish = setup();
+    publish.add_device("bulb_color_2", &["1"]);
+    publish.add_device("bulb_2", &["1"]);
     publish.add_group("group_tradfri_remote");
     publish.add_group_member("group_tradfri_remote", "bulb_color_2", "1");
     publish.add_group_member("group_tradfri_remote", "bulb_2", "1");
@@ -1120,7 +1121,6 @@ async fn should_publish_messages_to_tuya_switch_with_dummy_endpoints() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_group_with_just_1_hue_twilight_in_int_convers_have_an_endpoint_on_it(
 ) {
     let mut publish = setup();
@@ -1838,7 +1838,6 @@ async fn should_publish_messages_with_options_disable_default_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_separate_gen_on_off_to_gl_s_007_zs_when_setting_state_and_brightness_as_bulb_doesnt_turn_on_with_move_to_level_with_on_off(
 ) {
     let mut publish = setup();
@@ -1873,7 +1872,6 @@ async fn should_publish_separate_gen_on_off_to_gl_s_007_zs_when_setting_state_an
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_to_roller_shutter() {
     let mut publish = setup();
 
@@ -1993,7 +1991,6 @@ async fn should_restore_brightness_when_its_turned_on_with_transition_z2_m_is_re
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_send_state_update_on_toggle_specific_endpoint() {
     let mut publish = setup();
 
@@ -2079,7 +2076,6 @@ async fn should_set_state_with_brightness_before_color() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_sync_colors() {
     let mut publish = setup();
 
@@ -2106,7 +2102,6 @@ async fn should_sync_colors() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_turn_bulb_on_with_correct_brightness_when_device_is_turned_off_twice_and_brightness_is_reported(
 ) {
     let mut publish = setup();
@@ -2221,7 +2216,6 @@ async fn should_turn_bulb_on_with_full_brightness_when_transition_is_used_and_no
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_turn_device_off_when_brightness_0_is_send() {
     let mut publish = setup();
 
@@ -2271,7 +2265,6 @@ async fn should_turn_device_off_when_brightness_0_is_send() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_turn_device_off_when_brightness_0_is_send_with_transition() {
     let mut publish = setup();
 
@@ -2376,7 +2369,6 @@ async fn should_turn_device_on_with_on_off_with_transition_when_transition_0_is_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_use_transition_from_device_options_on_brightness_command() {
     let mut publish = setup();
     publish.devices.get_mut("bulb_color").unwrap().transition = Some(20);
@@ -2395,7 +2387,6 @@ async fn should_use_transition_from_device_options_on_brightness_command() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_use_transition_on_brightness_command() {
     let mut publish = setup();
     publish.devices.get_mut("bulb_color").unwrap().transition = Some(20);
@@ -2414,7 +2405,6 @@ async fn should_use_transition_on_brightness_command() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_use_transition_only_once_when_setting_brightness_and_color_temperature_for_tradfri()
 {
     let mut publish = setup();
@@ -2444,7 +2434,6 @@ async fn should_use_transition_only_once_when_setting_brightness_and_color_tempe
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_use_transition_only_once_when_setting_brightness_and_color_temperature_for_group_which_contains_tradfri(
 ) {
     let mut publish = setup();
@@ -2474,7 +2463,6 @@ async fn should_use_transition_only_once_when_setting_brightness_and_color_tempe
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_use_transition_when_brightness_with_group() {
     let mut publish = setup();
     publish.add_group_member("group_1", "bulb_color", "1");
@@ -2500,7 +2488,6 @@ async fn should_use_transition_when_brightness_with_group() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_use_transition_when_color_temp() {
     let mut publish = setup();
     publish.devices.get_mut("bulb_color").unwrap().transition = Some(20);
@@ -2519,7 +2506,6 @@ async fn should_use_transition_when_color_temp() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_do_anything_when_device_is_not_supported() {
     let mut publish = setup();
 
@@ -2529,7 +2515,6 @@ async fn shouldnt_do_anything_when_device_is_not_supported() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_publish_new_brightness_state_when_filtered_optimistic_is_used() {
     let mut publish = setup();
     publish
@@ -2554,7 +2539,6 @@ async fn shouldnt_publish_new_brightness_state_when_filtered_optimistic_is_used(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_publish_new_state_when_optimistic_false() {
     let mut publish = setup();
     publish.devices.get_mut("bulb_color").unwrap().optimistic = false;
@@ -2574,7 +2558,6 @@ async fn shouldnt_publish_new_state_when_optimistic_false() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_publish_new_state_when_optimistic_false_for_group() {
     let mut publish = setup();
     publish.group("group_2").optimistic = false;
@@ -2585,7 +2568,6 @@ async fn shouldnt_publish_new_state_when_optimistic_false_for_group() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_use_move_to_level_with_on_off_on_turn_on_when_no_transition_has_been_used_as_some_devices_do_not_turn_on_in_that_case(
 ) {
     let mut publish = setup();
@@ -2641,7 +2623,6 @@ async fn shouldnt_use_move_to_level_with_on_off_on_turn_on_when_no_transition_ha
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn transition_parameter_should_not_influence_brightness_on_state_on() {
     let mut publish = setup();
 
@@ -2681,7 +2662,6 @@ async fn transition_parameter_should_not_influence_brightness_on_state_on() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn when_device_is_turned_off_and_on_with_transition_with_report_enabled_it_should_restore_correct_brightness(
 ) {
     let mut publish = setup();
@@ -2731,7 +2711,6 @@ async fn when_device_is_turned_off_and_on_with_transition_with_report_enabled_it
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn when_device_is_turned_off_with_transition_and_turned_on_without_transition_it_should_restore_the_brightness(
 ) {
     let mut publish = setup();
@@ -2775,7 +2754,6 @@ async fn when_device_is_turned_off_with_transition_and_turned_on_without_transit
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zncldj11_lm_open() {
     let mut publish = setup();
 
@@ -2792,7 +2770,6 @@ async fn zncldj11_lm_open() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zncldj11_lm_position() {
     let mut publish = setup();
 
@@ -2810,7 +2787,6 @@ async fn zncldj11_lm_position() {
 
 // Upstream has several additional tests with the same title `Should handle non-valid topics`.
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_non_valid_topics_2() {
     let mut publish = setup();
     publish.on_mqtt("zigbee2mqtt1/bulb_color/sett", &json!({"state": "ON"}));
@@ -2818,7 +2794,6 @@ async fn should_handle_non_valid_topics_2() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_non_valid_topics_3() {
     let mut publish = setup();
     publish.on_mqtt("zigbee2mqtt/bulb_color/write", &json!({"state": "ON"}));
@@ -2826,7 +2801,6 @@ async fn should_handle_non_valid_topics_3() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_non_valid_topics_4() {
     let mut publish = setup();
     publish.on_mqtt("zigbee2mqtt/set", &json!({"state": "ON"}));
@@ -2834,7 +2808,6 @@ async fn should_handle_non_valid_topics_4() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_non_valid_topics_5() {
     let mut publish = setup();
     publish.on_mqtt("set", &json!({"state": "ON"}));
