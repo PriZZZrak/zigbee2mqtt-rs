@@ -445,3 +445,408 @@ fn workaround_reads_char_str_as_mi_struct_for_xiaomi_attrid_id_65281() {
     todo!()
 }
 
+// Upstream: it.each([...])("Writes & Reads using base class for %s", ...)
+// The table rows keep the upstream `%s` names. `write_method`/`read_method`
+// are the upstream spied method names.
+#[test]
+#[ignore = "not implemented yet"]
+fn writes_reads_using_base_class_for() {
+    #[allow(clippy::type_complexity)]
+    let cases: Vec<(
+        &str,
+        serde_json::Value,
+        Vec<u32>,
+        usize,
+        &str,
+        &str,
+    )> = vec![
+        (
+            "boolean",
+            json!(1),
+            vec![DataType::BOOLEAN as u32],
+            1,
+            "writeUInt8",
+            "readUInt8",
+        ),
+        (
+            "boolean",
+            json!(0),
+            vec![DataType::BOOLEAN as u32],
+            1,
+            "writeUInt8",
+            "readUInt8",
+        ),
+        (
+            "uint8-like",
+            json!(250),
+            vec![
+                DataType::DATA8 as u32,
+                DataType::BITMAP8 as u32,
+                DataType::UINT8 as u32,
+                DataType::ENUM8 as u32,
+            ],
+            1,
+            "writeUInt8",
+            "readUInt8",
+        ),
+        (
+            "uint16-like",
+            json!(65530),
+            vec![
+                DataType::DATA16 as u32,
+                DataType::BITMAP16 as u32,
+                DataType::UINT16 as u32,
+                DataType::ENUM16 as u32,
+                DataType::CLUSTER_ID as u32,
+                DataType::ATTR_ID as u32,
+            ],
+            2,
+            "writeUInt16",
+            "readUInt16",
+        ),
+        (
+            "uint24-like",
+            json!(16777210),
+            vec![
+                DataType::DATA24 as u32,
+                DataType::BITMAP24 as u32,
+                DataType::UINT24 as u32,
+            ],
+            3,
+            "writeUInt24",
+            "readUInt24",
+        ),
+        (
+            "uint32-like",
+            json!(4294967290u64),
+            vec![
+                DataType::DATA32 as u32,
+                DataType::BITMAP32 as u32,
+                DataType::UINT32 as u32,
+                DataType::UTC as u32,
+                DataType::BAC_OID as u32,
+            ],
+            4,
+            "writeUInt32",
+            "readUInt32",
+        ),
+        (
+            "uint40-like",
+            json!(1099511627770u64),
+            vec![
+                DataType::DATA40 as u32,
+                DataType::BITMAP40 as u32,
+                DataType::UINT40 as u32,
+            ],
+            5,
+            "writeUInt40",
+            "readUInt40",
+        ),
+        (
+            "uint48-like",
+            json!(281474976710650u64),
+            vec![
+                DataType::DATA48 as u32,
+                DataType::BITMAP48 as u32,
+                DataType::UINT48 as u32,
+            ],
+            6,
+            "writeUInt48",
+            "readUInt48",
+        ),
+        (
+            "uint56-like",
+            json!(72057594037927935u64),
+            vec![
+                DataType::DATA56 as u32,
+                DataType::BITMAP56 as u32,
+                DataType::UINT56 as u32,
+            ],
+            7,
+            "writeUInt56",
+            "readUInt56",
+        ),
+        (
+            "uint64-like",
+            json!(18446744073709551610u64),
+            vec![
+                DataType::DATA64 as u32,
+                DataType::BITMAP64 as u32,
+                DataType::UINT64 as u32,
+            ],
+            8,
+            "writeUInt64",
+            "readUInt64",
+        ),
+        (
+            "int8-like",
+            json!(-120),
+            vec![DataType::INT8 as u32],
+            1,
+            "writeInt8",
+            "readInt8",
+        ),
+        (
+            "int16-like",
+            json!(-32760),
+            vec![DataType::INT16 as u32],
+            2,
+            "writeInt16",
+            "readInt16",
+        ),
+        (
+            "int24-like",
+            json!(-8388600),
+            vec![DataType::INT24 as u32],
+            3,
+            "writeInt24",
+            "readInt24",
+        ),
+        (
+            "int32-like",
+            json!(-2147483640),
+            vec![DataType::INT32 as u32],
+            4,
+            "writeInt32",
+            "readInt32",
+        ),
+        (
+            "int40-like",
+            json!(-549755813887i64),
+            vec![DataType::INT40 as u32],
+            5,
+            "writeInt40",
+            "readInt40",
+        ),
+        (
+            "int48-like",
+            json!(-140737488355320i64),
+            vec![DataType::INT48 as u32],
+            6,
+            "writeInt48",
+            "readInt48",
+        ),
+        (
+            "int56-like",
+            json!(-36028797018963960i64),
+            vec![DataType::INT56 as u32],
+            7,
+            "writeInt56",
+            "readInt56",
+        ),
+        (
+            "int64-like",
+            json!(-9223372036854775800i64),
+            vec![DataType::INT64 as u32],
+            8,
+            "writeInt64",
+            "readInt64",
+        ),
+        (
+            "float-like",
+            json!(1.539989614439558e-36_f64),
+            vec![DataType::SINGLE_PREC as u32],
+            4,
+            "writeFloatLE",
+            "readFloatLE",
+        ),
+        (
+            "double-like",
+            json!(5.447603722011605e-270_f64),
+            vec![DataType::DOUBLE_PREC as u32],
+            8,
+            "writeDoubleLE",
+            "readDoubleLE",
+        ),
+        (
+            "IEEE address",
+            json!("0xfe1234abcd9876ff"),
+            vec![DataType::IEEE_ADDR as u32],
+            8,
+            "writeIeeeAddr",
+            "readIeeeAddr",
+        ),
+        (
+            "uint8-like list",
+            json!([250, 25, 50]),
+            vec![BuffaloZclDataType::LIST_UINT8 as u32],
+            3,
+            "writeListUInt8",
+            "readListUInt8",
+        ),
+        (
+            "uint16-like list",
+            json!([65530, 6553, 5530]),
+            vec![BuffaloZclDataType::LIST_UINT16 as u32],
+            6,
+            "writeListUInt16",
+            "readListUInt16",
+        ),
+        (
+            "uint24-like list",
+            json!([16777210, 1677721, 6777210]),
+            vec![BuffaloZclDataType::LIST_UINT24 as u32],
+            9,
+            "writeListUInt24",
+            "readListUInt24",
+        ),
+        (
+            "uint32-like list",
+            json!([4294967290u64, 429496729u64, 294967290u64]),
+            vec![BuffaloZclDataType::LIST_UINT32 as u32],
+            12,
+            "writeListUInt32",
+            "readListUInt32",
+        ),
+        (
+            "buffer",
+            json!([1, 2, 3, 4]),
+            vec![BuffaloZclDataType::BUFFER as u32],
+            4,
+            "writeBuffer",
+            "readBuffer",
+        ),
+        (
+            "security key",
+            json!([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
+            vec![DataType::SEC_KEY as u32],
+            16,
+            "writeBuffer",
+            "readBuffer",
+        ),
+    ];
+
+    for (name, payload, types, position, write_method, read_method) in cases {
+        let mut read_options = serde_json::Map::new();
+
+        if let Some(array) = payload.as_array() {
+            read_options.insert("length".to_string(), json!(array.len()));
+        }
+
+        let read_options = serde_json::Value::Object(read_options);
+
+        for data_type in types {
+            let mut buffalo = BuffaloZcl::new(vec![0; 255]);
+
+            buffalo.write(data_type, &payload, &json!({}));
+            assert_eq!(
+                buffalo.get_position(),
+                position,
+                "{name}: {write_method} should advance to {position}"
+            );
+
+            buffalo.set_position(0);
+
+            assert_eq!(
+                buffalo.read(data_type, &read_options),
+                payload,
+                "{name}: {read_method} should round-trip"
+            );
+            assert_eq!(
+                buffalo.get_position(),
+                position,
+                "{name}: {read_method} should advance to {position}"
+            );
+        }
+    }
+}
+
+// Upstream: it.each([...])("Writes & Reads non-value for %s", ...)
+// `written` is the raw non-value prefix expected in the buffer.
+#[test]
+#[ignore = "not implemented yet"]
+fn writes_reads_non_value_for() {
+    #[allow(clippy::type_complexity)]
+    let cases: Vec<(
+        &str,
+        Vec<u32>,
+        Vec<u8>,
+        serde_json::Value,
+        usize,
+        &str,
+        &str,
+    )> = vec![
+        (
+            "octectStr",
+            vec![DataType::OCTET_STR as u32],
+            vec![0xff],
+            json!([]),
+            1,
+            "writeUInt8",
+            "readUInt8",
+        ),
+        (
+            "longOctectStr",
+            vec![DataType::LONG_OCTET_STR as u32],
+            vec![0xff, 0xff],
+            json!([]),
+            2,
+            "writeUInt16",
+            "readUInt16",
+        ),
+        (
+            "charStr",
+            vec![DataType::CHAR_STR as u32],
+            vec![0xff],
+            json!(""),
+            1,
+            "writeUInt8",
+            "readUInt8",
+        ),
+        (
+            "longCharStr",
+            vec![DataType::LONG_CHAR_STR as u32],
+            vec![0xff, 0xff],
+            json!(""),
+            2,
+            "writeUInt16",
+            "readUInt16",
+        ),
+        (
+            "array",
+            vec![DataType::ARRAY as u32],
+            vec![0x00, 0xff, 0xff],
+            json!([]),
+            3,
+            "writeUInt16",
+            "readUInt16",
+        ),
+        (
+            "struct",
+            vec![DataType::STRUCT as u32],
+            vec![0xff, 0xff],
+            json!([]),
+            2,
+            "writeUInt16",
+            "readUInt16",
+        ),
+    ];
+
+    for (name, types, written, value_read, position, write_method, read_method) in cases {
+        for data_type in types {
+            let mut buffalo = BuffaloZcl::new(vec![0; 255]);
+
+            buffalo.write(data_type, &serde_json::Value::Null, &json!({}));
+            assert_eq!(
+                buffalo.get_position(),
+                position,
+                "{name}: {write_method} should advance to {position}"
+            );
+            assert_eq!(buffalo.get_written(), written, "{name}: written prefix");
+
+            buffalo.set_position(0);
+
+            assert_eq!(
+                buffalo.read(data_type, &json!({})),
+                value_read,
+                "{name}: {read_method} should return the non-value"
+            );
+            assert_eq!(
+                buffalo.get_position(),
+                position,
+                "{name}: {read_method} should advance to {position}"
+            );
+        }
+    }
+}
+
