@@ -68,7 +68,6 @@ fn onboarding() -> Onboarding {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn extracts_uploaded_zip_files_into_the_data_path() {
     let mut onboarding = onboarding();
 
@@ -85,7 +84,6 @@ async fn extracts_uploaded_zip_files_into_the_data_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn rejects_non_zip_upload_payloads() {
     let mut onboarding = onboarding();
     onboarding.onboard().await;
@@ -100,7 +98,6 @@ async fn rejects_non_zip_upload_payloads() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn rejects_zip_upload_payloads_with_invalid_entry_paths() {
     let mut onboarding = onboarding();
     onboarding.onboard().await;
@@ -114,7 +111,6 @@ async fn rejects_zip_upload_payloads_with_invalid_entry_paths() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn rejects_zip_upload_payloads_with_unsafe_relative_entry_paths() {
     let mut onboarding = onboarding();
     onboarding.onboard().await;
@@ -128,7 +124,6 @@ async fn rejects_zip_upload_payloads_with_unsafe_relative_entry_paths() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_empty_zip_upload_payloads() {
     let mut onboarding = onboarding();
     onboarding.onboard().await;
@@ -144,7 +139,6 @@ async fn handles_empty_zip_upload_payloads() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_request_stream_errors_for_submit_endpoint() {
     let mut onboarding = onboarding();
     onboarding
@@ -163,7 +157,6 @@ async fn handles_request_stream_errors_for_submit_endpoint() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_request_stream_errors_for_submit_zip_endpoint() {
     let mut onboarding = onboarding();
     onboarding.onboard().await;
@@ -179,7 +172,6 @@ async fn handles_request_stream_errors_for_submit_zip_endpoint() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn passes_unknown_onboarding_routes_to_static_file_server() {
     let mut onboarding = onboarding();
     onboarding.onboard().await;
@@ -191,7 +183,6 @@ async fn passes_unknown_onboarding_routes_to_static_file_server() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn passes_unknown_failure_pages_routes_to_static_file_server() {
     let mut onboarding = onboarding();
     // invalid serial type
@@ -209,7 +200,6 @@ async fn passes_unknown_failure_pages_routes_to_static_file_server() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_false_when_onboarding_server_emits_an_error() {
     let mut onboarding = onboarding();
     onboarding.listen_error("listen failed");
@@ -220,7 +210,6 @@ async fn returns_false_when_onboarding_server_emits_an_error() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_empty_config_submit() {
     let mut onboarding = onboarding();
     onboarding
@@ -242,7 +231,6 @@ async fn handles_empty_config_submit() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn creates_config_file_and_sets_given_settings() {
     let mut onboarding = Onboarding::new(json!({}));
     let result = onboarding.onboard().await;
@@ -260,7 +248,6 @@ async fn creates_config_file_and_sets_given_settings() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn creates_config_file_and_sets_given_unusual_settings() {
     let mut onboarding = Onboarding::new(json!({}));
     onboarding.env.insert(
@@ -303,7 +290,6 @@ async fn creates_config_file_and_sets_given_unusual_settings() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn reruns_onboard_via_env_and_sets_given_settings() {
     let mut onboarding = onboarding();
     onboarding
@@ -328,7 +314,6 @@ async fn reruns_onboard_via_env_and_sets_given_settings() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn reruns_onboard_on_failed_start() {
     let mut onboarding = onboarding();
     onboarding.config["onboarding"] = json!(true);
@@ -347,7 +332,6 @@ async fn reruns_onboard_on_failed_start() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sets_given_settings_no_frontend_redirect() {
     let mut onboarding = Onboarding::new(json!({}));
     onboarding.onboard().await;
@@ -365,7 +349,6 @@ async fn sets_given_settings_no_frontend_redirect() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sets_given_settings_no_frontend_redirect_via_env() {
     let mut onboarding = Onboarding::new(json!({}));
     onboarding
@@ -382,7 +365,6 @@ async fn sets_given_settings_no_frontend_redirect_via_env() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sets_given_settings_frontend_ssl_redirect() {
     let mut onboarding = Onboarding::new(json!({}));
     onboarding.onboard().await;
@@ -408,7 +390,6 @@ async fn sets_given_settings_frontend_ssl_redirect() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_saving_errors() {
     let mut onboarding = onboarding();
     onboarding
@@ -430,7 +411,6 @@ async fn handles_saving_errors() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_configuring_onboarding_via_env() {
     let mut onboarding = Onboarding::new(json!({}));
     onboarding.env.insert(
@@ -452,7 +432,6 @@ async fn handles_configuring_onboarding_via_env() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_disabling_onboarding_server_via_env() {
     let mut onboarding = Onboarding::new(json!({}));
     onboarding
@@ -474,7 +453,6 @@ async fn handles_disabling_onboarding_server_via_env() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_configuring_onboarding_with_config_env_overrides() {
     let mut onboarding = onboarding();
     onboarding
@@ -521,7 +499,6 @@ async fn handles_configuring_onboarding_with_config_env_overrides() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn runs_migrations() {
     let mut onboarding = onboarding();
     onboarding.config["version"] = json!(4);
@@ -533,7 +510,6 @@ async fn runs_migrations() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn runs_1_x_x_conflict_migrations() {
     let mut onboarding = Onboarding::new(json!({
         "mqtt": {"server": "mqtt://core-mosquitto:1883"},
@@ -565,7 +541,6 @@ async fn runs_1_x_x_conflict_migrations() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_validation_failure() {
     let mut onboarding = onboarding();
     onboarding.config["serial"]["adapter"] = json!("emberz");
@@ -580,7 +555,6 @@ async fn handles_validation_failure() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_non_required_validation_failure_before_applying_envs() {
     let mut onboarding = onboarding();
     onboarding.config["serial"] = json!("/dev/ttyUSB0");
@@ -595,7 +569,6 @@ async fn handles_non_required_validation_failure_before_applying_envs() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_invalid_yaml_file() {
     let mut onboarding = onboarding();
     onboarding
@@ -613,7 +586,6 @@ async fn handles_invalid_yaml_file() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_error_while_loading_yaml_file() {
     let mut onboarding = onboarding();
     onboarding
@@ -630,11 +602,12 @@ async fn handles_error_while_loading_yaml_file() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_creating_data_path() {
     let mut onboarding = Onboarding::new(json!({}));
 
     let result = onboarding.onboard().await;
+    // Upstream runs onboarding with `SAMPLE_SETTINGS_SAVE` here.
+    onboarding.submit(sample_save());
 
     assert!(result);
     assert_eq!(onboarding.read_config(), sample_save());
