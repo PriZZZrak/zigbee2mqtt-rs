@@ -84,7 +84,6 @@ fn has_groups_publish(groups: &Groups) -> bool {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn add_to_group_via_mqtt() {
     let mut groups = setup();
     groups.published.clear();
@@ -111,7 +110,6 @@ async fn add_to_group_via_mqtt() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn add_to_group_via_mqtt_fails() {
     let mut groups = setup();
     groups.fail_add = Some("timeout".to_string());
@@ -129,7 +127,6 @@ async fn add_to_group_via_mqtt_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn add_to_group_via_mqtt_with_postfix() {
     let mut groups = setup();
     groups.published.clear();
@@ -155,7 +152,6 @@ async fn add_to_group_via_mqtt_with_postfix() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn add_to_group_via_mqtt_with_postfix_shouldnt_add_it_twice() {
     let mut groups = setup();
     groups.published.clear();
@@ -176,7 +172,6 @@ async fn add_to_group_via_mqtt_with_postfix_shouldnt_add_it_twice() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn add_to_group_with_slashes_via_mqtt() {
     let mut groups = setup();
     groups.add_group("group/with/slashes");
@@ -203,7 +198,6 @@ async fn add_to_group_with_slashes_via_mqtt() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_when_add_remove_with_invalid_payload() {
     let mut groups = setup();
     groups.published.clear();
@@ -219,7 +213,6 @@ async fn error_when_add_remove_with_invalid_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_when_adding_a_non_existing_device() {
     let mut groups = setup();
     groups.published.clear();
@@ -238,7 +231,6 @@ async fn error_when_adding_a_non_existing_device() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_when_adding_a_non_existing_endpoint() {
     let mut groups = setup();
     groups.published.clear();
@@ -257,7 +249,6 @@ async fn error_when_adding_a_non_existing_endpoint() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_when_adding_to_non_existing_group() {
     let mut groups = Groups::new();
     groups.add_device("bulb_color", &[("default", "1")]);
@@ -277,7 +268,6 @@ async fn error_when_adding_to_non_existing_group() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_when_invalid_payload() {
     let mut groups = setup();
     groups.published.clear();
@@ -293,7 +283,6 @@ async fn error_when_invalid_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn remove_from_group_all() {
     let mut groups = setup();
     groups
@@ -316,7 +305,6 @@ async fn remove_from_group_all() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn remove_from_group_via_mqtt() {
     let mut groups = setup();
     groups.member("group_1").push("bulb_color:1".to_string());
@@ -337,7 +325,6 @@ async fn remove_from_group_via_mqtt() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn remove_from_group_via_mqtt_fails() {
     let mut groups = setup();
     groups.member("group_1").push("bulb_color:1".to_string());
@@ -356,7 +343,6 @@ async fn remove_from_group_via_mqtt_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn remove_from_group_via_mqtt_keeping_device_reporting() {
     let mut groups = setup();
     groups.member("group_1").push("bulb_color:1".to_string());
@@ -380,7 +366,6 @@ async fn remove_from_group_via_mqtt_keeping_device_reporting() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn remove_from_group_via_mqtt_with_postfix_variant_1() {
     let mut groups = setup();
     groups
@@ -406,7 +391,6 @@ async fn remove_from_group_via_mqtt_with_postfix_variant_1() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn remove_from_group_via_mqtt_with_postfix_variant_2() {
     let mut groups = setup();
     groups
@@ -432,7 +416,6 @@ async fn remove_from_group_via_mqtt_with_postfix_variant_2() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn remove_from_group_via_mqtt_with_postfix_variant_3() {
     let mut groups = setup();
     groups
@@ -458,7 +441,6 @@ async fn remove_from_group_via_mqtt_with_postfix_variant_3() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_publish_state_change_off_if_any_lights_within_are_still_on_when_changed_via_device(
 ) {
     let mut state = GroupState::new();
@@ -480,7 +462,6 @@ async fn should_not_publish_state_change_off_if_any_lights_within_are_still_on_w
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_publish_state_change_off_if_any_lights_within_are_still_on_when_changed_via_device_with_non_default_ep(
 ) {
     let mut state = GroupState::new();
@@ -503,7 +484,6 @@ async fn should_not_publish_state_change_off_if_any_lights_within_are_still_on_w
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_publish_state_change_off_if_any_lights_within_are_still_on_when_changed_via_shared_group(
 ) {
     let mut state = GroupState::new();
@@ -532,7 +512,6 @@ async fn should_not_publish_state_change_off_if_any_lights_within_are_still_on_w
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_publish_state_change_off_if_any_lights_within_with_non_default_ep_are_still_on_when_changed_via_device(
 ) {
     let mut state = GroupState::new();
@@ -554,7 +533,6 @@ async fn should_not_publish_state_change_off_if_any_lights_within_with_non_defau
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_publish_state_change_when_group_changes_state_and_device_is_disabled() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -572,7 +550,6 @@ async fn should_not_publish_state_change_when_group_changes_state_and_device_is_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_republish_identical_optimistic_group_states() {
     let mut state = GroupState::new();
     for group in [
@@ -611,7 +588,6 @@ async fn should_not_republish_identical_optimistic_group_states() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_only_include_relevant_properties_when_publishing_member_states() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -660,7 +636,6 @@ async fn should_only_include_relevant_properties_when_publishing_member_states()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_only_update_group_state_with_changed_properties() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -693,7 +668,6 @@ async fn should_only_update_group_state_with_changed_properties() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_group_state_change_when_a_device_in_it_changes_state() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -715,7 +689,6 @@ async fn should_publish_group_state_change_when_a_device_in_it_changes_state() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_for_group_when_members_state_change() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -764,7 +737,6 @@ async fn should_publish_state_change_for_group_when_members_state_change() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_of_all_members_when_a_group_changes_its_state() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -786,7 +758,6 @@ async fn should_publish_state_change_of_all_members_when_a_group_changes_its_sta
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_of_all_members_when_a_group_changes_its_state_filtered() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -816,7 +787,6 @@ async fn should_publish_state_change_of_all_members_when_a_group_changes_its_sta
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_of_another_group_with_shared_device_when_a_group_changes_its_state(
 ) {
     let mut state = GroupState::new();
@@ -846,7 +816,6 @@ async fn should_publish_state_change_of_another_group_with_shared_device_when_a_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_off_even_when_missing_current_state() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -873,7 +842,6 @@ async fn should_publish_state_change_off_even_when_missing_current_state() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_off_if_all_lights_within_turn_off() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -906,7 +874,6 @@ async fn should_publish_state_change_off_if_all_lights_within_turn_off() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_off_if_all_lights_within_turn_off_with_non_default_ep() {
     let mut state = GroupState::new();
     state.add_group("group_1");
@@ -938,7 +905,6 @@ async fn should_publish_state_change_off_if_all_lights_within_turn_off_with_non_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_off_if_all_lights_within_turn_off_with_non_default_ep_but_device_state_does_not_use_them(
 ) {
     let mut state = GroupState::new();
@@ -971,7 +937,6 @@ async fn should_publish_state_change_off_if_all_lights_within_turn_off_with_non_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_change_off_if_any_lights_within_are_still_on_when_changed_via_device_when_off_state_last_member_state_is_used(
 ) {
     let mut state = GroupState::new();
@@ -1012,7 +977,6 @@ async fn should_publish_state_change_off_if_any_lights_within_are_still_on_when_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_of_device_with_endpoint_name() {
     let mut state = GroupState::new();
     state.add_group("gledopto_group");
@@ -1035,7 +999,6 @@ async fn should_publish_state_of_device_with_endpoint_name() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_state_of_group_when_specific_state_of_specific_endpoint_is_changed() {
     let mut state = GroupState::new();
     state.add_group("gledopto_group");
@@ -1065,7 +1028,6 @@ async fn should_publish_state_of_group_when_specific_state_of_specific_endpoint_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_publish_group_state_change_when_a_group_is_not_optimistic() {
     let mut state = GroupState::new();
     state.add_group("group_1");
