@@ -37,8 +37,13 @@ impl BuffaloZcl {
         value: &serde_json::Value,
         _options: &serde_json::Value,
     ) {
-        crate::zspec::zcl::zcl_frame::write_data_type(&mut self.buffer, data_type as u8, value);
-        self.position = self.buffer.len();
+        let mut encoded = Vec::new();
+        crate::zspec::zcl::zcl_frame::write_data_type(&mut encoded, data_type as u8, value);
+        if self.position + encoded.len() > self.buffer.len() {
+            self.buffer.resize(self.position + encoded.len(), 0);
+        }
+        self.buffer[self.position..self.position + encoded.len()].copy_from_slice(&encoded);
+        self.position += encoded.len();
     }
 
     pub fn read(&mut self, data_type: u32, _options: &serde_json::Value) -> serde_json::Value {
