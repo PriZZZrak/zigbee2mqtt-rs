@@ -1,16 +1,22 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/utils.ts
 // TODO: port public API from the original file.
 
-// pub fn isTcpPath() { todo!() }
-// pub fn parseTcpPath() { todo!() }
-// pub fn readBackup() { todo!() }
+/// Upstream `parseTcpPath()` result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TcpPath {
+    pub host: String,
+    pub port: u16,
+}
 
-pub fn is_tcp_path() {
+pub fn is_tcp_path(_path: &str) -> bool {
     todo!()
 }
-pub fn parse_tcp_path() {
+
+/// Upstream `parseTcpPath(path)`, accepts IPv4/IPv6/hostname.
+pub fn parse_tcp_path(_path: &str) -> TcpPath {
     todo!()
 }
+
 pub fn read_backup() {
     todo!()
 }

@@ -3,6 +3,10 @@
 
 pub mod adapter;
 pub mod adapter_discovery;
+pub use adapter::{Adapter, AdapterInstance, AdapterKind};
+pub use adapter_discovery::{find_all_devices, DiscoveredAdapter, DiscoveryContext, MdnsService};
+pub use serial_port::SerialPortInfo;
+pub use utils::{parse_tcp_path, TcpPath};
 pub mod r#const;
 pub mod deconz;
 pub mod ember;
