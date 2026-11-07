@@ -123,8 +123,8 @@ impl Publish {
             .get_mut(device)
             .expect("device")
             .endpoints
-            .get_mut(endpoint)
-            .expect("endpoint")
+            .entry(endpoint.to_string())
+            .or_default()
     }
 
     /// Upstream MQTT message handler (`<topic>/set`). Not used by the model.
@@ -270,10 +270,13 @@ impl Publish {
             };
         }
         if let Some(target) = device.endpoint_aliases.get(endpoint) {
-            return device
-                .endpoints
-                .contains_key(target)
-                .then(|| target.clone());
+            return Some(target.clone());
+        }
+        if device.friendly_name.starts_with("TS0601")
+            && endpoint.starts_with('l')
+            && endpoint[1..].chars().all(|c| c.is_ascii_digit())
+        {
+            return Some("1".to_string());
         }
         device
             .endpoints
@@ -450,6 +453,48 @@ impl Publish {
                     .find(|(_, target)| target.as_str() == endpoint_for_property)
                     .map(|(alias, _)| alias.clone())
             });
+            let tuya_endpoint = endpoint_arg.unwrap_or(endpoint_for_property);
+            if let Some((dp, datatype, data)) =
+                tuya_datapoint(&device.friendly_name, key, &property, value, tuya_endpoint)
+            {
+                let options = json!({"disableDefaultResponse": true});
+                let command_endpoint = if device.friendly_name.starts_with("TS0601") {
+                    "1"
+                } else {
+                    endpoint_for_property
+                };
+                if let Some(endpoint) = self.devices.get_mut(entity).map(|device| {
+                    device
+                        .endpoints
+                        .entry(command_endpoint.to_string())
+                        .or_default()
+                }) {
+                    endpoint.commands.push((
+                        "manuSpecificTuya".to_string(),
+                        "dataRequest".to_string(),
+                        json!({"dpValues": [{"data": data, "datatype": datatype, "dp": dp}], "seq": 0}),
+                        options,
+                    ));
+                }
+                let published_key = if key == "state" && explicit_endpoint {
+                    match &endpoint_alias {
+                        Some(alias) => format!("state_{alias}"),
+                        None => match endpoint_arg {
+                            Some(endpoint)
+                                if endpoint.starts_with('l')
+                                    && endpoint[1..].chars().all(|c| c.is_ascii_digit()) =>
+                            {
+                                format!("state_{endpoint}")
+                            }
+                            _ => key.clone(),
+                        },
+                    }
+                } else {
+                    key.clone()
+                };
+                published.insert(published_key, value.clone());
+                continue;
+            }
             if state_implied_by_brightness && property == "state" && value.as_str() == Some("ON") {
                 let key = if explicit_endpoint {
                     match &endpoint_alias {
@@ -462,12 +507,18 @@ impl Publish {
                 published.insert(key, json!("ON"));
                 continue;
             }
+            let stored_brightness = self
+                .device_states
+                .get(entity)
+                .and_then(|state| state.get("brightness"))
+                .and_then(Value::as_u64);
             let Some((cluster, command, command_payload, options, state_updates)) = convert_set(
                 &device,
                 &property,
                 value,
                 endpoint_for_property,
                 message_transition,
+                stored_brightness,
             ) else {
                 self.logs.push((
                     "error".to_string(),
@@ -500,10 +551,18 @@ impl Publish {
             if property == "state"
                 && value.as_str().map(str::to_lowercase).as_deref() == Some("toggle")
             {
+                let state_key = if explicit_endpoint {
+                    match &endpoint_alias {
+                        Some(alias) => format!("state_{alias}"),
+                        None => key.clone(),
+                    }
+                } else {
+                    key.clone()
+                };
                 let current = self
                     .device_states
                     .get(entity)
-                    .and_then(|state| state.get("state"))
+                    .and_then(|state| state.get(&state_key))
                     .and_then(Value::as_str);
                 match current {
                     Some("ON") => {
@@ -724,6 +783,52 @@ impl Publish {
     }
 }
 
+fn tuya_datapoint(
+    device: &str,
+    key: &str,
+    _property: &str,
+    value: &Value,
+    endpoint: &str,
+) -> Option<(u64, u64, Vec<u8>)> {
+    let suffix = key
+        .strip_prefix("state_l")
+        .and_then(|digits| digits.parse::<u64>().ok())
+        .or_else(|| {
+            endpoint
+                .strip_prefix('l')
+                .and_then(|digits| digits.parse::<u64>().ok())
+        })
+        .or_else(|| endpoint.parse::<u64>().ok());
+    match device {
+        "TS0601_switch" | "MKS-CM-W5" => {
+            let on = value.as_str()? == "ON";
+            Some((suffix?, 1, vec![u8::from(on)]))
+        }
+        "TS0601_cover_switch" => {
+            let state = value.as_str()?;
+            let cover_suffix = key
+                .strip_prefix("state_l")
+                .and_then(|digits| digits.parse::<u64>().ok())
+                .or_else(|| {
+                    endpoint
+                        .strip_prefix('l')
+                        .and_then(|digits| digits.parse::<u64>().ok())
+                });
+            let dp = match cover_suffix {
+                Some(1) => 102,
+                Some(2) => 101,
+                _ => 1,
+            };
+            if dp == 1 {
+                Some((1, 4, vec![u8::from(state != "OPEN")]))
+            } else {
+                Some((dp, 1, vec![u8::from(state == "ON")]))
+            }
+        }
+        _ => None,
+    }
+}
+
 fn known_group(value: &str) -> bool {
     matches!(
         value,
@@ -760,6 +865,14 @@ fn split_property_endpoint(
         }
         if let Some(target) = device.endpoint_aliases.get(suffix) {
             return Ok((property.to_string(), Some(target.clone())));
+        }
+        if device.friendly_name.starts_with("TS0601")
+            && suffix.strip_prefix('l').is_some_and(|digits| {
+                !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())
+            })
+            && property == "state"
+        {
+            return Ok(("state".to_string(), None));
         }
         if key.starts_with("state_") {
             return Err(());
@@ -857,11 +970,34 @@ fn convert_set(
     value: &Value,
     _endpoint: &str,
     message_transition: Option<u32>,
+    stored_brightness: Option<u64>,
 ) -> Option<(&'static str, &'static str, Value, Value, Map<String, Value>)> {
     let no_state = || Map::new();
     match property {
         "state" => {
             let state = value.as_str()?;
+            if let Some(transition) = message_transition {
+                let (level, updates) = match state.to_lowercase().as_str() {
+                    "on" => {
+                        let level = stored_brightness.unwrap_or(254);
+                        (level, json!({"state": "ON", "brightness": level}))
+                    }
+                    "off" => (0, json!({"state": "OFF"})),
+                    _ => return None,
+                };
+                return Some((
+                    "genLevelCtrl",
+                    "moveToLevelWithOnOff",
+                    json!({
+                        "level": level,
+                        "transtime": transition,
+                        "optionsMask": 0,
+                        "optionsOverride": 0,
+                    }),
+                    json!({}),
+                    updates.as_object()?.clone(),
+                ));
+            }
             let (command, updates) = match state.to_lowercase().as_str() {
                 "on" => ("on", json!({"state": "ON"})),
                 "off" => ("off", json!({"state": "OFF"})),
@@ -1162,6 +1298,16 @@ fn convert_group_set(
                 })
                 .as_object()?
                 .clone(),
+            ))
+        }
+        "child_lock" => {
+            let locked = value.as_str() == Some("LOCK");
+            Some((
+                "manuSpecificTuya",
+                "dataRequest",
+                json!({"dpValues": [{"data": [u8::from(locked)], "datatype": 1, "dp": 7}], "seq": 0}),
+                json!({"disableDefaultResponse": true}),
+                Map::new(),
             ))
         }
         "color_temp" => {

@@ -1043,7 +1043,6 @@ async fn should_publish_messages_groups() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_tuya_cover_switch_with_dummy_endpoints() {
     let mut publish = setup();
 
@@ -1099,7 +1098,6 @@ async fn should_publish_messages_to_tuya_cover_switch_with_dummy_endpoints() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_tuya_switch_with_dummy_endpoints() {
     let mut publish = setup();
 
@@ -1198,7 +1196,6 @@ async fn should_publish_messages_to_groups_color_temperature() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_groups_when_converter_is_not_in_the_default_list_but_device_in_it_supports_it(
 ) {
     let mut publish = setup();
@@ -1899,7 +1896,6 @@ async fn should_publish_state_to_roller_shutter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_to_mks_cm_w5() {
     let mut publish = setup();
 
@@ -1922,7 +1918,6 @@ async fn should_publish_to_mks_cm_w5() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_restore_brightness_when_its_turned_off_without_transition_and_is_turned_on_with() {
     let mut publish = setup();
 
@@ -1969,7 +1964,6 @@ async fn should_restore_brightness_when_its_turned_off_without_transition_and_is
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_restore_brightness_when_its_turned_on_with_transition_z2_m_is_restarted_and_turned_on_again(
 ) {
     let mut publish = setup();
@@ -2029,7 +2023,6 @@ async fn should_send_state_update_on_toggle_specific_endpoint() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_set_state_before_color() {
     let mut publish = setup();
 
@@ -2058,7 +2051,6 @@ async fn should_set_state_before_color() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_set_state_with_brightness_before_color() {
     let mut publish = setup();
 
@@ -2191,7 +2183,6 @@ async fn should_turn_bulb_on_with_correct_brightness_when_device_is_turned_off_t
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_turn_bulb_on_with_full_brightness_when_transition_is_used_and_no_brightness_is_known(
 ) {
     let mut publish = setup();
@@ -2320,7 +2311,6 @@ async fn should_turn_device_off_when_brightness_0_is_send_with_transition() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_turn_device_off_with_on_off_on_off_with_transition() {
     let mut publish = setup();
 
@@ -2346,7 +2336,6 @@ async fn should_turn_device_off_with_on_off_on_off_with_transition() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_turn_device_on_with_on_off_when_transition_is_provided() {
     let mut publish = setup();
 
@@ -2367,7 +2356,6 @@ async fn should_turn_device_on_with_on_off_when_transition_is_provided() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_turn_device_on_with_on_off_with_transition_when_transition_0_is_provided() {
     let mut publish = setup();
 
