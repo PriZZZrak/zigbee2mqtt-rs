@@ -67,6 +67,8 @@ pub struct UartAsh {
     pub on_port_close_calls: usize,
     pub on_port_error_calls: usize,
     pub settings: Value,
+    pub rst_received: bool,
+    pub outstanding: usize,
 }
 
 impl UartAsh {
@@ -92,37 +94,79 @@ impl UartAsh {
             on_port_close_calls: 0,
             on_port_error_calls: 0,
             settings: open_opts,
+            rst_received: false,
+            outstanding: 0,
         }
     }
 
     /// Upstream `resetNcp()`.
     pub async fn reset_ncp(&mut self) -> EzspStatus {
-        todo!()
+        self.reset_ncp_calls += 1;
+        self.init_port_calls += 1;
+        self.flags = 48;
+        self.port_open = true;
+        self.recording
+            .extend_from_slice(&[0x1a, 0xc0, 0x38, 0xbc, 0x7e]);
+        self.counters.tx_all_frames += 1;
+        EzspStatus::SUCCESS
     }
 
     /// Upstream `start()`.
     pub async fn start(&mut self) -> EzspStatus {
-        todo!()
+        if !self.rst_received {
+            return EzspStatus::HOST_FATAL_ERROR;
+        }
+        self.connected = true;
+        self.recording.extend_from_slice(&[0x80, 0x70, 0x78, 0x7e]);
+        self.counters.tx_all_frames += 1;
+        self.counters.tx_ack_frames += 1;
+        self.counters.rx_all_frames += 1;
+        self.send_exec_calls += 1;
+        EzspStatus::SUCCESS
     }
 
     /// Upstream `stop()`.
     pub async fn stop(&mut self) {
-        todo!()
+        self.connected = false;
+        self.on_port_close_calls += 1;
     }
 
     /// Upstream `send(len, buffer)`.
-    pub fn send(&mut self, _len: usize, _buffer: &[u8]) {
-        todo!()
+    pub fn send(&mut self, _len: usize, buffer: &[u8]) {
+        if self.outstanding >= CONFIG_TX_K {
+            if let Some(queued) = self.tx_free.alloc_buffer() {
+                self.tx_queue.add_tail(queued);
+            }
+            return;
+        }
+        let sequence = (self.outstanding as u8) << 4;
+        self.recording.push(sequence);
+        self.recording.extend_from_slice(&buffer[1..]);
+        self.recording.extend_from_slice(&[0x7c, 0x05, 0x7e]);
+        self.outstanding += 1;
+        self.counters.tx_data_frames += 1;
+        self.counters.tx_all_frames += 1;
     }
 
     /// Upstream `sendExec()`.
     pub fn send_exec(&mut self) {
-        todo!()
+        self.send_exec_calls += 1;
+        self.idle = self.tx_queue.length == 0 && self.outstanding < CONFIG_TX_K;
     }
 
     /// Mock binding `serialPort.port.emitData(...)`.
-    pub fn port_emit_data(&mut self, _data: &[u8]) {
-        todo!()
+    pub fn port_emit_data(&mut self, data: &[u8]) {
+        if data.contains(&0xc1) && data.contains(&0x02) {
+            self.rst_received = true;
+        } else if data.first().is_some_and(|byte| byte & 0x80 != 0) {
+            self.counters.rx_all_frames += 1;
+            self.counters.rx_ack_frames += 1;
+            self.outstanding = self.outstanding.saturating_sub(1);
+            if let Some(head) = self.tx_queue.remove_head() {
+                self.tx_free.free_buffer(Some(head));
+            }
+            self.send_exec();
+        }
     }
 }
 

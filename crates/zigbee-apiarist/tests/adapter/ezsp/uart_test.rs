@@ -19,7 +19,6 @@ fn expected_options() -> SerialPortOptions {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn connect() {
     let mut serial_driver = SerialDriver::new();
 
@@ -33,7 +32,6 @@ async fn connect() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_data() {
     let mut serial_driver = SerialDriver::new();
     serial_driver.connect(json!("/dev/ttyACM0")).await;
@@ -51,7 +49,6 @@ async fn send_data() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn receive_data() {
     let mut parser = Parser::new();
 
@@ -81,7 +78,6 @@ async fn receive_data() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn message_in_two_chunks() {
     let mut parser = Parser::new();
 
@@ -100,7 +96,6 @@ async fn message_in_two_chunks() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn two_messages_in_one_chunk() {
     let mut parser = Parser::new();
 

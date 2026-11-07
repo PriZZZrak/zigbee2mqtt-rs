@@ -39,7 +39,6 @@ fn hex_decode(value: &str) -> Vec<u8> {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_active_endpoint() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::ACTIVE_ENDPOINTS_REQUEST;
@@ -54,7 +53,6 @@ async fn zi_gate_command_code_active_endpoint() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_bind_multicast() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::BIND_REQUEST;
@@ -81,7 +79,6 @@ async fn zi_gate_command_code_bind_multicast() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_bind_unicast() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::BIND_REQUEST;
@@ -111,7 +108,6 @@ async fn zi_gate_command_code_bind_unicast() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_leave_request() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::LEAVE_REQUEST;
@@ -130,7 +126,6 @@ async fn zi_gate_command_code_leave_request() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_management_lqi() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::LQI_TABLE_REQUEST;
@@ -145,7 +140,6 @@ async fn zi_gate_command_code_management_lqi() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_node_descriptor() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::NODE_DESCRIPTOR_REQUEST;
@@ -160,7 +154,6 @@ async fn zi_gate_command_code_node_descriptor() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_permit_join() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::PERMIT_JOINING_REQUEST;
@@ -176,7 +169,6 @@ async fn zi_gate_command_code_permit_join() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_simple_descriptor() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::SIMPLE_DESCRIPTOR_REQUEST;
@@ -191,7 +183,6 @@ async fn zi_gate_command_code_simple_descriptor() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_un_bind_multicast() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::UNBIND_REQUEST;
@@ -218,7 +209,6 @@ async fn zi_gate_command_code_un_bind_multicast() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn zi_gate_command_code_un_bind_unicast() {
     let adapter = create_adapter();
     let cluster_id = ClusterId::UNBIND_REQUEST;

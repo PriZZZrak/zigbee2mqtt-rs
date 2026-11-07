@@ -14,7 +14,6 @@ fn hex_decode(value: &str) -> Vec<u8> {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn frame_parsing() {
     let frame = EZSPFrameData::create_frame(9, 0x00c4, false, &hex_decode("0b044e")).unwrap();
     assert_eq!(frame.cls, "incomingNetworkStatusHandler");
@@ -24,7 +23,6 @@ fn frame_parsing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn change_source_route_handler() {
     let frame = EZSPFrameData::create_frame(8, 0x00c4, false, &hex_decode("05e399a000")).unwrap();
     assert_eq!(frame.cls, "changeSourceRouteHandler");
@@ -34,7 +32,6 @@ fn change_source_route_handler() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn incoming_network_status_handler() {
     let frame = EZSPFrameData::create_frame(9, 0x00c4, false, &hex_decode("05e399a000")).unwrap();
     assert_eq!(frame.cls, "incomingNetworkStatusHandler");
@@ -45,7 +42,6 @@ fn incoming_network_status_handler() {
 
 // Upstream has a second test with the same title `incomingNetworkStatusHandler`.
 #[test]
-#[ignore = "not implemented yet"]
 fn incoming_network_status_handler_2() {
     let frame = EZSPFrameData::create_frame(8, 0x00c4, false, &hex_decode("0b044e"));
     assert!(frame.is_none());

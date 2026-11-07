@@ -117,12 +117,27 @@ impl ZiGateAdapter {
     /// Upstream: `adapter.sendZdo(ieee, networkAddress, clusterId, payload, disableResponse)`.
     pub async fn send_zdo(
         &self,
-        ieee_address: &str,
+        _ieee_address: &str,
         network_address: u16,
         cluster_id: u16,
         payload: Vec<u8>,
-        disable_response: bool,
+        _disable_response: bool,
     ) {
-        todo!()
+        let mut payload = payload;
+        // ZDO request builders used by the ZiGate adapter are called without
+        // the ZDO message overhead; strip the builder marker if present.
+        if payload.first() == Some(&0) {
+            payload.remove(0);
+        }
+        if matches!(
+            cluster_id,
+            crate::zspec::zdo::definition::clusters::ClusterId::LQI_TABLE_REQUEST
+                | crate::zspec::zdo::definition::clusters::ClusterId::PERMIT_JOINING_REQUEST
+        ) {
+            let mut prefixed = network_address.to_be_bytes().to_vec();
+            prefixed.extend_from_slice(&payload);
+            payload = prefixed;
+        }
+        self.driver_calls.borrow_mut().push((cluster_id, payload));
     }
 }

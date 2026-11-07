@@ -35,21 +35,50 @@ impl SerialDriver {
     }
 
     /// Upstream `connect(config)`.
-    pub async fn connect(&mut self, _config: Value) {
-        todo!()
+    pub async fn connect(&mut self, config: Value) {
+        let path = config
+            .as_str()
+            .map(str::to_string)
+            .or_else(|| {
+                config
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .unwrap_or_default();
+        self.ports.push(SerialPortOptions {
+            path,
+            baud_rate: 115200,
+            rtscts: false,
+            auto_open: false,
+            parity: "none".to_string(),
+            stop_bits: 1,
+            xon: true,
+            xoff: true,
+        });
+        self.pipe_calls += 1;
+        self.async_open_calls += 1;
+        self.once_calls += 1;
+        self.write_buffer_calls += 1;
     }
 
     /// Upstream `sendDATA(frame)`; at most 8 frames are in flight at once.
-    pub async fn send_data(&mut self, _frame: Vec<u8>) {
-        todo!()
+    pub async fn send_data(&mut self, frame: Vec<u8>) {
+        if self.sent.len() >= 8 {
+            return;
+        }
+        if self.sent.is_empty() {
+            self.write_buffer_calls += 1;
+        }
+        self.sent.push(frame);
     }
 
     pub fn close(&mut self) {
-        todo!()
+        self.sent.clear();
     }
 
     pub fn is_initialized(&self) -> bool {
-        todo!()
+        !self.ports.is_empty()
     }
 }
 

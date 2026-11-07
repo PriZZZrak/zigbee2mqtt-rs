@@ -16,14 +16,12 @@ use zigbee_apiarist::adapter::ember::ezsp::consts::{
 use zigbee_apiarist::adapter::ember::ezsp::enums::EzspFrameID;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn is_empty_after_init() {
     let buffalo = EzspBuffalo::new(vec![0; EZSP_MAX_FRAME_LENGTH]);
     assert_eq!(buffalo.get_written(), Vec::<u8>::new());
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn maps_ember_status_ezsp_status_to_slstatus() {
     let mut buffalo = EzspBuffalo::new(vec![0; EZSP_MAX_FRAME_LENGTH]);
     buffalo.set_command_byte(0, 0x00);
@@ -70,7 +68,6 @@ fn maps_ember_status_ezsp_status_to_slstatus() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_read_at_position_without_altering_internal_position_tracker() {
     let mut buffalo = EzspBuffalo::new(vec![0; EZSP_MAX_FRAME_LENGTH]);
     buffalo.set_position(EZSP_PARAMETERS_INDEX);

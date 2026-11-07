@@ -76,7 +76,38 @@ impl EZSPFrameData {
         is_request: bool,
         buffer: &[u8],
     ) -> Option<EzspFrame> {
-        todo!()
+        if is_request || frame_id != 0x00c4 {
+            return None;
+        }
+        match version {
+            8 => {
+                if buffer.len() < 4 {
+                    return None;
+                }
+                Some(EzspFrame {
+                    cls: "changeSourceRouteHandler",
+                    id: frame_id,
+                    fields: serde_json::json!({
+                        "newChildId": u16::from_le_bytes([buffer[0], buffer[1]]),
+                        "newParentId": u16::from_le_bytes([buffer[2], buffer[3]]),
+                    }),
+                })
+            }
+            9 => {
+                if buffer.len() < 3 {
+                    return None;
+                }
+                Some(EzspFrame {
+                    cls: "incomingNetworkStatusHandler",
+                    id: frame_id,
+                    fields: serde_json::json!({
+                        "errorCode": buffer[0],
+                        "target": u16::from_le_bytes([buffer[1], buffer[2]]),
+                    }),
+                })
+            }
+            _ => None,
+        }
     }
 }
 

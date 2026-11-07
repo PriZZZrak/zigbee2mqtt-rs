@@ -423,6 +423,9 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
                 buffer.push(u64_arg(&args[6]) as u8);
             } else if mode == 1 {
                 push_u16(&mut buffer, u16_arg(&args[5]), be);
+                if be {
+                    buffer.push(u64_arg(&args[6]) as u8);
+                }
             } else {
                 panic!("Invalid binding type");
             }
@@ -438,6 +441,9 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
             buffer.push(0);
             push_eui64(&mut buffer, &args[0], be);
             buffer.push(u64_arg(&args[1]) as u8);
+            if be {
+                buffer.push(0);
+            }
         }
         ClusterId::PERMIT_JOINING_REQUEST => {
             buffer.push(0);
