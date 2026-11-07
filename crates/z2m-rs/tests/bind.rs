@@ -33,34 +33,109 @@
 //   - throw on invalid clears bindings payload
 //   - throw on invalid clears bindings target
 
-#[test]
-#[ignore = "not implemented yet"]
-fn error_bind_fails_when_source_device() {
-    todo!()
+use serde_json::json;
+use z2m_rs::extension::bind::Bind;
+
+fn setup() -> Bind {
+    let mut bind = Bind::new();
+    bind.add_device("remote", "0x0017880104e45517", &["default", "1", "2"]);
+    bind.add_device("bulb_color", "0x000b57fffec6a5b3", &["default", "1"]);
+    bind.add_device("bulb", "0x000b57fffec6a5b2", &["default", "1"]);
+    bind.add_group("group_1");
+    bind
 }
 
-#[test]
-#[ignore = "not implemented yet"]
-fn error_bind_fails_when_source_device_does_not_exist() {
-    todo!()
+fn has(bind: &Bind, topic: &str, payload: serde_json::Value) -> bool {
+    bind.published
+        .contains(&(topic.to_string(), payload, json!({})))
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn error_bind_fails_when_target_device() {
-    todo!()
+async fn error_bind_fails_when_source_device() {
+    let mut bind = setup();
+    bind.published.clear();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "from_endpoint": "not_existing_endpoint", "to": "bulb_color"}),
+    );
+
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {},
+            "status": "error",
+            "error": "Source device 'remote' does not have endpoint 'not_existing_endpoint'",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn error_bind_fails_when_target_device_or_group_does_not_exist() {
-    todo!()
+async fn error_bind_fails_when_source_device_does_not_exist() {
+    let mut bind = setup();
+    bind.published.clear();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote_not_existing", "to": "bulb_color"}),
+    );
+
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {},
+            "status": "error",
+            "error": "Source device 'remote_not_existing' does not exist",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn extension_bind() {
-    todo!()
+async fn error_bind_fails_when_target_device() {
+    let mut bind = setup();
+    bind.published.clear();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "bulb_color", "to_endpoint": "not_existing_endpoint"}),
+    );
+
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {},
+            "status": "error",
+            "error": "Target device 'bulb_color' does not have endpoint 'not_existing_endpoint'",
+        })
+    ));
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn error_bind_fails_when_target_device_or_group_does_not_exist() {
+    let mut bind = setup();
+    bind.published.clear();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "bulb_color_not_existing"}),
+    );
+
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {},
+            "status": "error",
+            "error": "Target device or group 'bulb_color_not_existing' does not exist",
+        })
+    ));
 }
 
 #[test]
@@ -159,10 +234,22 @@ fn should_poll_grouped_hue_bulb_when_receiving_message_from_tradfri_remote() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_throw_error_on_invalid_payload() {
-    todo!()
+async fn should_throw_error_on_invalid_payload() {
+    let mut bind = setup();
+    bind.published.clear();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"fromz": "remote", "to": "bulb_color"}),
+    );
+
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({"data": {}, "status": "error", "error": "Invalid payload"})
+    ));
 }
 
 #[test]
@@ -201,26 +288,106 @@ fn should_unbind_from_group_with_skip_disable_reporting_true() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn clears_all_bindings() {
-    todo!()
+async fn clears_all_bindings() {
+    let mut bind = setup();
+    bind.published.clear();
+    bind.devices_changed = 0;
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/binds/clear",
+        &json!({"transaction": "1234", "target": "remote"}),
+    );
+
+    assert_eq!(bind.clear_bindings_calls.get("remote").copied(), Some(1));
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/binds/clear",
+        json!({
+            "transaction": "1234",
+            "data": {
+                "target": "remote",
+                "ieee_list": ["0xffffffffffffffff"],
+            },
+            "status": "ok",
+        })
+    ));
+    assert!(bind
+        .published
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/devices"));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn clears_targeted_bindings() {
-    todo!()
+async fn clears_targeted_bindings() {
+    let mut bind = setup();
+    bind.published.clear();
+    bind.devices_changed = 0;
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/binds/clear",
+        &json!({
+            "transaction": "1234",
+            "target": "remote",
+            "ieee_list": ["0x000b57fffec6a5b3"],
+        }),
+    );
+
+    assert_eq!(bind.clear_bindings_calls.get("remote").copied(), Some(1));
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/binds/clear",
+        json!({
+            "transaction": "1234",
+            "data": {
+                "target": "remote",
+                "ieee_list": ["0x000b57fffec6a5b3"],
+            },
+            "status": "ok",
+        })
+    ));
+    assert!(bind
+        .published
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/devices"));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn throw_on_invalid_clears_bindings_payload() {
-    todo!()
+async fn throw_on_invalid_clears_bindings_payload() {
+    let mut bind = setup();
+    bind.published.clear();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/binds/clear",
+        &json!({"targetz": "remote"}),
+    );
+
+    assert!(bind.clear_bindings_calls.is_empty());
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/binds/clear",
+        json!({"data": {}, "status": "error", "error": "Invalid payload"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn throw_on_invalid_clears_bindings_target() {
-    todo!()
+async fn throw_on_invalid_clears_bindings_target() {
+    let mut bind = setup();
+    bind.published.clear();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/binds/clear",
+        &json!({"target": "remotez"}),
+    );
+
+    assert!(bind.clear_bindings_calls.is_empty());
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/binds/clear",
+        json!({"data": {}, "status": "error", "error": "Invalid target"})
+    ));
 }
