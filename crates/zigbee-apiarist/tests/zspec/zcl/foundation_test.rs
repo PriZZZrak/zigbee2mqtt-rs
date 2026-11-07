@@ -40,7 +40,6 @@ fn create_frame(
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_on_invalid_payload_type_when_writing() {
     let cases: [(&'static str, serde_json::Value); 23] = [
         ("read", json!({"a": 1})),
@@ -79,7 +78,6 @@ fn throws_on_invalid_payload_type_when_writing() {
 // ---------------------------------- read ----------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_parses_writes() {
     let frame = create_frame(
         Direction::CLIENT_TO_SERVER,
@@ -100,7 +98,6 @@ fn read_parses_writes() {
 // --------------------------------- readRsp ---------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -135,7 +132,6 @@ fn read_rsp_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_rsp_workaround_parses_char_str_as_mi_struct_for_attribute_0xff01() {
     let raw_frame = vec![
         0x18, 0x0a, 0x01, 0x01, 0xff, 0x00, 0x42, 34, 1, 33, 213, 12, 3, 40, 33, 4, 33, 168, 19, 5,
@@ -173,7 +169,6 @@ fn read_rsp_workaround_parses_char_str_as_mi_struct_for_attribute_0xff01() {
 // ---------------------------------- write ----------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -203,7 +198,6 @@ fn write_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_undiv_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -233,7 +227,6 @@ fn write_undiv_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -261,7 +254,6 @@ fn write_rsp_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_rsp_handles_success_payload() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -279,7 +271,6 @@ fn write_rsp_handles_success_payload() {
 // -------------------------------- writeNoRsp --------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_no_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -311,7 +302,6 @@ fn write_no_rsp_parses_writes() {
 // ------------------------------- configReport -------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn config_report_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -356,7 +346,6 @@ fn config_report_parses_writes() {
 // ----------------------------- configReportRsp ------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn config_report_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -386,7 +375,6 @@ fn config_report_rsp_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn config_report_rsp_handles_success_payload() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -404,7 +392,6 @@ fn config_report_rsp_handles_success_payload() {
 // ----------------------------- readReportConfig -----------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_report_config_parses_writes() {
     let frame = create_frame(
         Direction::CLIENT_TO_SERVER,
@@ -434,7 +421,6 @@ fn read_report_config_parses_writes() {
 // --------------------------- readReportConfigRsp ----------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_report_config_rsp_parses_writes() {
     let frame = create_frame(
         Direction::CLIENT_TO_SERVER,
@@ -493,7 +479,6 @@ fn read_report_config_rsp_parses_writes() {
 // --------------------------------- report ----------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn report_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -526,11 +511,13 @@ fn report_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn report_workaround_parses_char_str_as_mi_struct_for_attribute_0xff01() {
+    // Upstream uses a `report` frame here; the port originally carried the
+    // `readRsp` status byte, which made the input indistinguishable from the
+    // readRsp workaround case.
     let raw_frame = vec![
-        0x18, 0x0a, 0x01, 0x01, 0xff, 0x00, 0x42, 34, 1, 33, 213, 12, 3, 40, 33, 4, 33, 168, 19, 5,
-        33, 43, 0, 6, 36, 0, 0, 5, 0, 0, 8, 33, 4, 2, 10, 33, 0, 0, 100, 16, 0,
+        0x18, 0x0a, 0x0a, 0x01, 0xff, 0x42, 34, 1, 33, 213, 12, 3, 40, 33, 4, 33, 168, 19, 5, 33,
+        43, 0, 6, 36, 0, 0, 5, 0, 0, 8, 33, 4, 2, 10, 33, 0, 0, 100, 16, 0,
     ];
 
     let frame = Frame::from_buffer(
@@ -563,7 +550,6 @@ fn report_workaround_parses_char_str_as_mi_struct_for_attribute_0xff01() {
 // -------------------------------- defaultRsp --------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn default_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -584,7 +570,6 @@ fn default_rsp_parses_writes() {
 // --------------------------------- discover ---------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -600,7 +585,6 @@ fn discover_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -633,7 +617,6 @@ fn discover_rsp_parses_writes() {
 // ------------------------------ readStructured ------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_structured_parses_writes() {
     let frame = create_frame(
         Direction::CLIENT_TO_SERVER,
@@ -663,7 +646,6 @@ fn read_structured_parses_writes() {
 // ----------------------------- writeStructured ------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_structured_parses_writes() {
     let frame = create_frame(
         Direction::CLIENT_TO_SERVER,
@@ -700,7 +682,6 @@ fn write_structured_parses_writes() {
 // --------------------------- writeStructuredRsp -----------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_structured_rsp_parses_writes() {
     let frame = create_frame(
         Direction::CLIENT_TO_SERVER,
@@ -730,7 +711,6 @@ fn write_structured_rsp_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_structured_rsp_handles_success_payload() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -748,7 +728,6 @@ fn write_structured_rsp_handles_success_payload() {
 // ----------------------------- discoverCommands -----------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_commands_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -764,7 +743,6 @@ fn discover_commands_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_commands_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -786,7 +764,6 @@ fn discover_commands_rsp_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_commands_gen_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -802,7 +779,6 @@ fn discover_commands_gen_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_commands_gen_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -826,7 +802,6 @@ fn discover_commands_gen_rsp_parses_writes() {
 // -------------------------------- discoverExt -------------------------------
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_ext_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,
@@ -842,7 +817,6 @@ fn discover_ext_parses_writes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn discover_ext_rsp_parses_writes() {
     let frame = create_frame(
         Direction::SERVER_TO_CLIENT,

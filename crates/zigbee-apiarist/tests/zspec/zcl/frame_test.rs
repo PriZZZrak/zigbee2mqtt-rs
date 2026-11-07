@@ -1052,7 +1052,6 @@ fn writes_reads_oneof_strategy() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Frametype '3' not valid")]
 fn throws_when_writting_invalid_frame_type() {
     let frame = Frame::create(
@@ -1072,7 +1071,6 @@ fn throws_when_writting_invalid_frame_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Unsupported frameType '2'")]
 fn throws_when_reading_invalid_frame_type() {
     let header = Header::from_buffer(&[2, 123, 0]);
@@ -1080,14 +1078,12 @@ fn throws_when_reading_invalid_frame_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Invalid ZclHeader.")]
 fn throws_when_reading_frame_without_header() {
     Frame::from_buffer(cluster::genBasic::ID, None, &[], json!({}));
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Parameter 'clusterid' is missing")]
 fn throws_when_writting_missing_payload() {
     let frame = Frame::create(
@@ -1298,7 +1294,6 @@ fn reads_writes_touchlink_scan_response_with_different_size_payloads() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "INVALID_FIELD")]
 fn throws_when_payload_too_short_to_continue_reading() {
     let buffer = vec![1, 3, 3, 0, 33, 16, 18, 0, 255, 69, 81, 0, 62, 0, 0, 0];
@@ -1424,7 +1419,6 @@ fn allows_omitting_parameters_with_false_conditions() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Parameter 'manufacturerCode' is missing")]
 fn requires_parameters_when_conditions_are_true() {
     // queryNextImageResponse with status=SUCCESS requires manufacturerCode
