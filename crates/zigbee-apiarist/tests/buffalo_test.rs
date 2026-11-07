@@ -58,7 +58,6 @@ use zigbee_apiarist::buffalo::buffalo::Buffalo;
 //   - is more
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer_read() {
     let mut buffalo = Buffalo::new(
         vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09],
@@ -70,7 +69,6 @@ fn buffer_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer_write() {
     let mut buffalo = Buffalo::new(vec![0; 5], 1);
     let payload = vec![0x00, 0x01, 0x02];
@@ -80,7 +78,6 @@ fn buffer_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer_write_as_array() {
     let mut buffalo = Buffalo::new(vec![0; 5], 1);
     let payload = vec![0x00, 0x01, 0x02];
@@ -90,9 +87,7 @@ fn buffer_write_as_array() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[test]
-#[ignore = "not implemented yet"]
 fn doublele_read() {
     let mut buffalo = Buffalo::new(vec![0x33, 0x33, 0x33, 0x33, 0x31, 0xb7, 0x28, 0x41], 0);
     let value = buffalo.read_double_le();
@@ -101,7 +96,6 @@ fn doublele_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn doublele_write() {
     let mut buffalo = Buffalo::new(vec![0; 8], 0);
     buffalo.write_double_le(809880.6);
@@ -113,7 +107,6 @@ fn doublele_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn floatle_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0x40, 0xc8, 0x43], 0);
     let value = buffalo.read_float_le();
@@ -122,7 +115,6 @@ fn floatle_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn floatle_write() {
     let mut buffalo = Buffalo::new(vec![0; 4], 0);
     buffalo.write_float_le(400.5);
@@ -131,7 +123,6 @@ fn floatle_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieeeaddr_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0x12, 0x4b, 0x00, 0x12, 0x01, 0x44, 0xae], 0);
     let value = buffalo.read_ieee_addr();
@@ -140,7 +131,6 @@ fn ieeeaddr_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieeeaddr_write() {
     let mut buffalo = Buffalo::new(vec![0; 8], 0);
     buffalo.write_ieee_addr("0xae440112004b1200");
@@ -152,7 +142,6 @@ fn ieeeaddr_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int16_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0xff, 0xff, 0x00], 1);
     let value = buffalo.read_int16();
@@ -161,7 +150,6 @@ fn int16_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int16_write() {
     let mut buffalo = Buffalo::new(vec![0; 3], 1);
     buffalo.write_int16(256);
@@ -170,7 +158,6 @@ fn int16_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int24_read() {
     let mut buffalo = Buffalo::new(vec![0x7f, 0xff, 0xff, 0x7f], 1);
     let value = buffalo.read_int24();
@@ -179,7 +166,6 @@ fn int24_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int24_read_2() {
     let mut buffalo = Buffalo::new(vec![0x00, 0x00, 0xff], 0);
     let value = buffalo.read_int24();
@@ -188,7 +174,6 @@ fn int24_read_2() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int24_write() {
     let mut buffalo = Buffalo::new(vec![0; 3], 0);
     buffalo.write_int24(65536);
@@ -197,7 +182,6 @@ fn int24_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int24_write_2() {
     let mut buffalo = Buffalo::new(vec![0; 3], 0);
     buffalo.write_int24(-65536);
@@ -206,7 +190,6 @@ fn int24_write_2() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int32_read() {
     let mut buffalo = Buffalo::new(vec![0x01, 0x03, 0xff, 0xff], 0);
     let value = buffalo.read_int32();
@@ -215,7 +198,6 @@ fn int32_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int32_write() {
     let mut buffalo = Buffalo::new(vec![0; 6], 2);
     buffalo.write_int32(1065283);
@@ -227,7 +209,6 @@ fn int32_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int40_read() {
     let mut buffalo = Buffalo::new(vec![1, 2, 3, 4, 5], 0);
     let value = buffalo.read_int40();
@@ -236,7 +217,6 @@ fn int40_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int40_write() {
     let mut buffalo = Buffalo::new(vec![0; 7], 2);
     buffalo.write_int40(21542142465);
@@ -245,7 +225,6 @@ fn int40_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int48_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0xff, 0x03, 0xff, 0x03, 0xff], 0);
     let value = buffalo.read_int48();
@@ -254,7 +233,6 @@ fn int48_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int48_write() {
     let mut buffalo = Buffalo::new(vec![0; 6], 0);
     buffalo.write_int48(-1082348273920);
@@ -266,7 +244,6 @@ fn int48_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int64_read() {
     let mut buffalo = Buffalo::new(vec![254, 255, 255, 255, 255, 255, 255, 127], 0);
     let value = buffalo.read_int64();
@@ -275,7 +252,6 @@ fn int64_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int64_write() {
     let mut buffalo = Buffalo::new(vec![0; 10], 2);
     buffalo.write_int64(9223372036854775806);
@@ -287,7 +263,6 @@ fn int64_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int8_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0xf0, 0x00, 0x00], 1);
     let value = buffalo.read_int8();
@@ -296,7 +271,6 @@ fn int8_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int8_write() {
     let mut buffalo = Buffalo::new(vec![0; 3], 1);
     buffalo.write_int8(127);
@@ -305,7 +279,6 @@ fn int8_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint16_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0x00, 0x04, 0x00, 0x08], 1);
     let value = buffalo.read_list_uint16(2);
@@ -314,7 +287,6 @@ fn list_uint16_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint16_write() {
     let mut buffalo = Buffalo::new(vec![0; 5], 1);
     let payload = vec![1024, 2048];
@@ -324,7 +296,6 @@ fn list_uint16_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint24_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0xa0, 0x86, 0x01, 0x1e, 0xae, 0x01, 0x00], 1);
     let value = buffalo.read_list_uint24(2);
@@ -333,7 +304,6 @@ fn list_uint24_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint24_write() {
     let mut buffalo = Buffalo::new(vec![0; 8], 1);
     let payload = vec![100000, 110110];
@@ -346,7 +316,6 @@ fn list_uint24_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint32_read() {
     let mut buffalo = Buffalo::new(vec![0xff, 0xff, 0xff, 0xff, 0x0a, 0x00, 0x00, 0x00], 0);
     let value = buffalo.read_list_uint32(2);
@@ -355,7 +324,6 @@ fn list_uint32_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint32_write() {
     let mut buffalo = Buffalo::new(vec![0; 8], 0);
     let payload = vec![4294967295, 10];
@@ -368,7 +336,6 @@ fn list_uint32_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint8_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0x00, 0x04, 0x08], 2);
     let value = buffalo.read_list_uint8(2);
@@ -377,7 +344,6 @@ fn list_uint8_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint8_write() {
     let mut buffalo = Buffalo::new(vec![0; 4], 1);
     let payload = vec![200, 100];
@@ -387,7 +353,6 @@ fn list_uint8_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint16_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0x03, 0xff, 0x00], 1);
     let value = buffalo.read_uint16();
@@ -396,7 +361,6 @@ fn uint16_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint16_write() {
     let mut buffalo = Buffalo::new(vec![0; 3], 1);
     buffalo.write_uint16(1020);
@@ -405,7 +369,6 @@ fn uint16_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint24_read() {
     let mut buffalo = Buffalo::new(vec![0x01, 0xa0, 0x86, 0x01, 0x02], 1);
     let value = buffalo.read_uint24();
@@ -414,7 +377,6 @@ fn uint24_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint24_write() {
     let mut buffalo = Buffalo::new(vec![0; 4], 1);
     buffalo.write_uint24(16777200);
@@ -423,7 +385,6 @@ fn uint24_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint32_read() {
     let mut buffalo = Buffalo::new(vec![0x01, 0x03, 0xff, 0xff], 0);
     let value = buffalo.read_uint32();
@@ -432,7 +393,6 @@ fn uint32_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint32_write() {
     let mut buffalo = Buffalo::new(vec![0; 6], 2);
     buffalo.write_uint32(1065283);
@@ -444,7 +404,6 @@ fn uint32_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint40_read() {
     let mut buffalo = Buffalo::new(vec![1, 2, 3, 4, 5], 0);
     let value = buffalo.read_uint40();
@@ -453,7 +412,6 @@ fn uint40_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint40_write() {
     let mut buffalo = Buffalo::new(vec![0; 7], 2);
     buffalo.write_uint40(21542142465);
@@ -462,7 +420,6 @@ fn uint40_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint48_read() {
     let mut buffalo = Buffalo::new(vec![1, 2, 3, 4, 5, 6], 0);
     let value = buffalo.read_uint48();
@@ -471,7 +428,6 @@ fn uint48_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint48_write() {
     let mut buffalo = Buffalo::new(vec![0; 8], 2);
     buffalo.write_uint48(6618611909121);
@@ -480,7 +436,6 @@ fn uint48_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint56_read() {
     let mut buffalo = Buffalo::new(vec![254, 255, 255, 255, 255, 255, 255], 0);
     let value = buffalo.read_uint56();
@@ -489,7 +444,6 @@ fn uint56_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint56_write() {
     let mut buffalo = Buffalo::new(vec![0; 9], 2);
     buffalo.write_uint56(72057594037927934);
@@ -501,7 +455,6 @@ fn uint56_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint64_read() {
     let mut buffalo = Buffalo::new(vec![253, 255, 255, 255, 255, 255, 255, 255], 0);
     let value = buffalo.read_uint64();
@@ -510,7 +463,6 @@ fn uint64_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint64_write() {
     let mut buffalo = Buffalo::new(vec![0; 10], 2);
     buffalo.write_uint64(18446744073709551613);
@@ -522,7 +474,6 @@ fn uint64_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint8_read() {
     let mut buffalo = Buffalo::new(vec![0x00, 0x03, 0x00, 0x00], 1);
     let value = buffalo.read_uint8();
@@ -531,7 +482,6 @@ fn uint8_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint8_write() {
     let mut buffalo = Buffalo::new(vec![0; 3], 1);
     buffalo.write_uint8(240);
@@ -540,7 +490,6 @@ fn uint8_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn utf8_string_read() {
     let mut buffalo = Buffalo::new(vec![0x61, 0x62, 0x63, 0x64], 0);
     let value = buffalo.read_utf8_string(4);
@@ -549,7 +498,6 @@ fn utf8_string_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn utf8_string_write() {
     let mut buffalo = Buffalo::new(vec![0; 4], 0);
     buffalo.write_utf8_string("abcd");
@@ -558,7 +506,6 @@ fn utf8_string_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_written() {
     let mut buffalo = Buffalo::new(vec![0; 3], 1);
     buffalo.write_uint8(240);
@@ -566,7 +513,6 @@ fn gets_written() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn is_more() {
     let mut buffalo = Buffalo::new(vec![0, 1, 2], 1);
     assert_eq!(buffalo.get_position(), 1);
