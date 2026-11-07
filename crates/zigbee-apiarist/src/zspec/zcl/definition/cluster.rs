@@ -188,7 +188,9 @@ pub mod genGroups {
             Parameter::new("grouplist", DataType::UNKNOWN),
         ];
 
-        pub const getMembership: Command = Command::new("getMembership", 2).with_parameters(PARAMS);
+        pub const getMembership: Command = Command::new("getMembership", 2)
+            .with_parameters(PARAMS)
+            .with_response(2);
     }
 }
 
@@ -211,7 +213,7 @@ pub mod genAlarms {
 
         pub const PARAMS: &[Parameter] = &[
             Parameter::new("alarmcode", DataType::ENUM8),
-            Parameter::new("clusterid", DataType::UINT16),
+            Parameter::new("clusterid", DataType::CLUSTER_ID),
         ];
 
         pub const alarm: Command = Command::new("alarm", 0).with_parameters(PARAMS);

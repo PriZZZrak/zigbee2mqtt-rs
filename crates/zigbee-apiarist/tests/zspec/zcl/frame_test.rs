@@ -452,7 +452,6 @@ fn list_frame() -> Frame {
 const LIST_STRING: &str = r#"{"header":{"frameControl":{"reservedBits":0,"frameType":1,"direction":0,"disableDefaultResponse":false,"manufacturerSpecific":false},"transactionSequenceNumber":43,"commandIdentifier":2},"payload":{"groupcount":2,"grouplist":[10,20]},"command":{"name":"getMembership","ID":2,"response":2,"parameters":[{"name":"groupcount","type":32},{"name":"grouplist","type":1002}],"required":true}}"#;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn minimum_remaining_buffer_bytes() {
     const CONDITIONS: &[ParameterCondition] =
         &[ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(3)];
@@ -476,7 +475,6 @@ fn minimum_remaining_buffer_bytes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn bitmask_set() {
     let parameter = cluster::greenPower::commands::notification.parameters[8];
 
@@ -503,7 +501,6 @@ fn bitmask_set() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn bitfield_enum() {
     // {param:'options', offset: 0, size: 3, value: 0b000}
     let parameter = cluster::greenPower::commands::notification.parameters[1];
@@ -541,7 +538,6 @@ fn bitfield_enum() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn field_equal() {
     const CONDITIONS: &[ParameterCondition] = &[ParameterCondition::FIELD_EQUAL {
         field: "status",
@@ -636,7 +632,6 @@ fn field_equal() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn header() {
     struct HeaderCase {
         name: &'static str,
@@ -819,7 +814,6 @@ fn header() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_non_compliant_header_as_undefined() {
     // basic
     assert_eq!(Header::from_buffer(&[0, 234]), None);
@@ -831,7 +825,6 @@ fn reads_non_compliant_header_as_undefined() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zcl_frame() {
     struct FrameCase {
         name: &'static str,
@@ -932,7 +925,6 @@ fn zcl_frame() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_repetitive_strategy() {
     let expected = json!([{"attrId": 256}, {"attrId": 127}]);
     let header = Header::new(
@@ -970,7 +962,6 @@ fn writes_reads_repetitive_strategy() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_flat_strategy() {
     let expected = json!({"cmdId": 253, "statusCode": 127});
     let header = Header::new(
@@ -1008,7 +999,6 @@ fn writes_reads_flat_strategy() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_oneof_strategy() {
     let expected = json!({
         "discComplete": 123,
@@ -1052,7 +1042,6 @@ fn writes_reads_oneof_strategy() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Frametype '3' not valid")]
 fn throws_when_writting_invalid_frame_type() {
     let frame = Frame::create(
@@ -1072,22 +1061,20 @@ fn throws_when_writting_invalid_frame_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Unsupported frameType '2'")]
 fn throws_when_reading_invalid_frame_type() {
-    let header = Header::from_buffer(&[2, 123, 0]);
-    Frame::from_buffer(cluster::genBasic::ID, header, &[], json!({}));
+    let buffer = [2u8, 123, 0];
+    let header = Header::from_buffer(&buffer);
+    Frame::from_buffer(cluster::genBasic::ID, header, &buffer, json!({}));
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Invalid ZclHeader.")]
 fn throws_when_reading_frame_without_header() {
     Frame::from_buffer(cluster::genBasic::ID, None, &[], json!({}));
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Parameter 'clusterid' is missing")]
 fn throws_when_writting_missing_payload() {
     let frame = Frame::create(
@@ -1107,7 +1094,6 @@ fn throws_when_writting_missing_payload() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_cluster_match_by_name() {
     let global_frame = global_frame();
     assert!(global_frame.is_cluster("genBasic"));
@@ -1121,7 +1107,6 @@ fn checks_cluster_match_by_name() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_command_match_by_name() {
     let global_frame = global_frame();
     assert!(global_frame.is_command("read"));
@@ -1135,7 +1120,6 @@ fn checks_command_match_by_name() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn workaround_reads_foundation_char_str_as_mi_struct_for_xiaomi_attrid_id_65281() {
     let expected = json!([
         {"attrId": 5, "dataType": DataType::CHAR_STR as u8, "attrData": "lumi.sensor_wleak.aq1"},
@@ -1215,7 +1199,6 @@ fn workaround_reads_foundation_char_str_as_mi_struct_for_xiaomi_attrid_id_65281(
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn workaround_reads_foundation_struct_with_extra_payload_to_match_zcl_packet() {
     let expected = json!([{
         "attrId": 65282,
@@ -1252,7 +1235,6 @@ fn workaround_reads_foundation_struct_with_extra_payload_to_match_zcl_packet() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_writes_touchlink_scan_response_with_different_size_payloads() {
     let full = vec![
         0x19, 0x0, 0x1, 0xe0, 0xde, 0x5e, 0x2f, 0xa, 0x5, 0x0, 0x12, 0x0, 0x3d, 0x30, 0x1d, 0x4a,
@@ -1298,7 +1280,6 @@ fn reads_writes_touchlink_scan_response_with_different_size_payloads() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "INVALID_FIELD")]
 fn throws_when_payload_too_short_to_continue_reading() {
     let buffer = vec![1, 3, 3, 0, 33, 16, 18, 0, 255, 69, 81, 0, 62, 0, 0, 0];
@@ -1312,7 +1293,6 @@ fn throws_when_payload_too_short_to_continue_reading() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn workaround_reads_gen_ota_image_block_request_even_if_minimum_block_period_is_missing() {
     let buffer = vec![1, 3, 3, 2, 33, 16, 18, 0, 255, 69, 81, 0, 62, 0, 0, 0, 8];
     let frame = Frame::from_buffer(
@@ -1336,7 +1316,6 @@ fn workaround_reads_gen_ota_image_block_request_even_if_minimum_block_period_is_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn keeps_minimum_remaining_buffer_bytes_parameters_when_present() {
     // moveToLevelWithOnOff with optionsMask/optionsOverride
     let payload = json!({"level": 150, "transtime": 0, "optionsMask": 0, "optionsOverride": 1});
@@ -1358,7 +1337,6 @@ fn keeps_minimum_remaining_buffer_bytes_parameters_when_present() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn allows_omitting_minimum_remaining_buffer_bytes_parameters() {
     // moveToLevelWithOnOff without optionsMask/optionsOverride
     let payload = json!({"level": 150, "transtime": 0});
@@ -1380,7 +1358,6 @@ fn allows_omitting_minimum_remaining_buffer_bytes_parameters() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn allows_omitting_parameters_with_false_conditions() {
     // Touchlink scanResponse without sub-device fields when numberOfSubDevices != 1
     let payload = json!({
@@ -1424,7 +1401,6 @@ fn allows_omitting_parameters_with_false_conditions() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 #[should_panic(expected = "Parameter 'manufacturerCode' is missing")]
 fn requires_parameters_when_conditions_are_true() {
     // queryNextImageResponse with status=SUCCESS requires manufacturerCode

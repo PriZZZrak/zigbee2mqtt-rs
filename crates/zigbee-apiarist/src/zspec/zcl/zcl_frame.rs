@@ -3,7 +3,9 @@
 
 use serde_json::{json, Value};
 
-use crate::zspec::zcl::definition::cluster::{Cluster, Command, Parameter};
+use crate::zspec::zcl::definition::cluster::{
+    self, Cluster, Command, Parameter, ParameterCondition,
+};
 use crate::zspec::zcl::definition::enums::DataType;
 use crate::zspec::zcl::zcl_header::{Direction, FrameControl, FrameType, Header};
 
@@ -69,13 +71,25 @@ impl Frame {
         _custom_clusters: Value,
         reserved_bits: u8,
     ) -> Self {
+        if frame_type > 1 {
+            panic!("Frametype '{frame_type}' not valid");
+        }
         let cluster = match cluster.into() {
             ClusterRef::Id(id) => cluster_from_id(id),
             ClusterRef::Name(name) => cluster_from_name(name),
         };
-        let command = match command.into() {
-            CommandRef::Id(id) => command_from_id(id),
-            CommandRef::Name(name) => command_from_name(name),
+        let is_specific = frame_type == 1;
+        let command = if is_specific {
+            let key = command.into();
+            specific_command(cluster.ID, key, direction == 1).unwrap_or_else(|| match key {
+                CommandRef::Id(id) => command_from_id(id),
+                CommandRef::Name(name) => command_from_name(name),
+            })
+        } else {
+            match command.into() {
+                CommandRef::Id(id) => command_from_id(id),
+                CommandRef::Name(name) => command_from_name(name),
+            }
         };
         let frame_type = if frame_type == 0 {
             FrameType::GLOBAL
@@ -114,23 +128,29 @@ impl Frame {
         buffer: &[u8],
         _custom_clusters: Value,
     ) -> Self {
-        let header = header.unwrap_or_else(|| {
-            Header::new(
-                FrameControl {
-                    reserved_bits: 0,
-                    frame_type: FrameType::GLOBAL,
-                    direction: Direction::CLIENT_TO_SERVER,
-                    disable_default_response: false,
-                    manufacturer_specific: false,
-                },
-                None,
-                0,
-                0,
-            )
-        });
+        let Some(header) = header else {
+            if buffer.is_empty() {
+                panic!("Invalid ZclHeader.");
+            }
+            let frame_type = buffer[0] & 0x03;
+            panic!("Unsupported frameType '{frame_type}'");
+        };
         let cluster = cluster_from_id(cluster_id);
-        let command = command_from_id(header.command_identifier);
-        let payload = decode_payload(command.name, buffer, header.length, cluster.name);
+        let server_to_client = header.frame_control.direction == Direction::SERVER_TO_CLIENT;
+        let (command, payload) = if header.frame_control.frame_type == FrameType::SPECIFIC {
+            let command = specific_command(
+                cluster_id,
+                CommandRef::Id(header.command_identifier),
+                server_to_client,
+            )
+            .unwrap_or_else(|| command_from_id(header.command_identifier));
+            let payload = decode_parameters(&command, buffer, header.length);
+            (command, payload)
+        } else {
+            let command = command_from_id(header.command_identifier);
+            let payload = decode_payload(command.name, buffer, header.length, cluster.name);
+            (command, payload)
+        };
         Self {
             header,
             cluster,
@@ -142,13 +162,22 @@ impl Frame {
     /// Upstream `frame.toBuffer()`.
     pub fn to_buffer(&self) -> Vec<u8> {
         let mut buffer = self.header.to_buffer();
-        encode_payload(self.command.name, &self.payload, &mut buffer);
+        if self.header.frame_control.frame_type == FrameType::SPECIFIC {
+            encode_parameters(&self.command, &self.payload, &mut buffer);
+        } else {
+            encode_payload(self.command.name, &self.payload, &mut buffer);
+        }
         buffer
     }
 
     /// Upstream `frame.toString()`.
     pub fn to_string(&self) -> String {
-        todo!()
+        format!(
+            "{{\"header\":{},\"payload\":{},\"command\":{}}}",
+            header_to_string(&self.header),
+            payload_to_string(self.command.name, &self.payload),
+            command_to_string(&self.command, self.header.frame_control.frame_type),
+        )
     }
 
     /// Upstream `frame.isCluster(name)`.
@@ -163,11 +192,50 @@ impl Frame {
 
     /// Upstream `ZclFrame.conditionsValid(parameter, payload, minimumRemainingBufferBytes)`.
     pub fn conditions_valid(
-        _parameter: &Parameter,
-        _payload: &Value,
-        _minimum_remaining_buffer_bytes: Option<usize>,
+        parameter: &Parameter,
+        payload: &Value,
+        minimum_remaining_buffer_bytes: Option<usize>,
     ) -> bool {
-        todo!()
+        parameter
+            .conditions
+            .iter()
+            .all(|condition| match condition {
+                ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(value) => {
+                    minimum_remaining_buffer_bytes
+                        .map(|remaining| remaining >= *value as usize)
+                        .unwrap_or(false)
+                }
+                ParameterCondition::BITMASK_SET { field, value } => {
+                    let actual = payload.get(*field).and_then(Value::as_u64).unwrap_or(0);
+                    actual & u64::from(*value) == u64::from(*value)
+                }
+                ParameterCondition::BITFIELD_ENUM {
+                    field,
+                    offset,
+                    size,
+                    value,
+                } => {
+                    let actual = payload.get(*field).and_then(Value::as_u64).unwrap_or(0);
+                    let mask = (1u64 << size) - 1;
+                    ((actual >> offset) & mask) == u64::from(*value)
+                }
+                ParameterCondition::FIELD_EQUAL {
+                    field,
+                    value,
+                    reversed,
+                } => {
+                    let actual = payload
+                        .get(*field)
+                        .and_then(Value::as_u64)
+                        .unwrap_or(u64::MAX);
+                    let equal = actual == u64::from(*value);
+                    if *reversed {
+                        !equal
+                    } else {
+                        equal
+                    }
+                }
+            })
     }
 }
 
@@ -190,12 +258,19 @@ pub fn to_string() {
 pub fn cluster_from_id(id: u16) -> Cluster {
     let name = match id {
         0x0000 => "genBasic",
+        0x0001 => "genPowerCfg",
         0x0004 => "genGroups",
         0x0005 => "genScenes",
         0x0006 => "genOnOff",
+        0x0008 => "genLevelCtrl",
+        0x0009 => "genAlarms",
         0x000a => "genTime",
+        0x0019 => "genOta",
         0x0020 => "genPollCtrl",
+        0x0021 => "greenPower",
         0x0500 => "ssIasZone",
+        0x1000 => "touchlink",
+        0x0b00 => "haApplianceIdentification",
         _ => "unknown",
     };
     Cluster { name, ID: id }
@@ -204,12 +279,19 @@ pub fn cluster_from_id(id: u16) -> Cluster {
 pub fn cluster_from_name(name: &'static str) -> Cluster {
     let id = match name {
         "genBasic" => 0x0000,
+        "genPowerCfg" => 0x0001,
         "genGroups" => 0x0004,
         "genScenes" => 0x0005,
         "genOnOff" => 0x0006,
+        "genLevelCtrl" => 0x0008,
+        "genAlarms" => 0x0009,
         "genTime" => 0x000a,
+        "genOta" => 0x0019,
         "genPollCtrl" => 0x0020,
+        "greenPower" => 0x0021,
         "ssIasZone" => 0x0500,
+        "touchlink" => 0x1000,
+        "haApplianceIdentification" => 0x0b00,
         _ => 0,
     };
     Cluster { name, ID: id }
@@ -242,7 +324,12 @@ pub fn command_from_id(id: u8) -> Command {
         0x16 => "discoverExtRsp",
         _ => "unknown",
     };
-    Command::new(name, id)
+    let command = Command::new(name, id);
+    match id {
+        0x00 => command.with_response(1),
+        0x06 => command.with_response(7),
+        _ => command,
+    }
 }
 
 pub fn command_from_name(name: &'static str) -> Command {
@@ -315,7 +402,7 @@ pub(crate) fn write_data_type(buffer: &mut Vec<u8>, data_type: u8, value: &Value
     match data_type {
         0x00 => {}
         0x08 | 0x10 | 0x18 | 0x20 | 0x28 | 0x30 => buffer.push(u8_value(value)),
-        0x09 | 0x19 | 0x21 | 0x29 | 0x31 => push_u16(buffer, u16_value(value)),
+        0x09 | 0x19 | 0x21 | 0x29 | 0x31 | 0xe8 | 0xe9 => push_u16(buffer, u16_value(value)),
         0x0a | 0x1a | 0x22 | 0x2a => {
             let number = value.as_u64().unwrap_or(0);
             buffer.extend_from_slice(&number.to_le_bytes()[..3]);
@@ -359,6 +446,41 @@ pub(crate) fn write_data_type(buffer: &mut Vec<u8>, data_type: u8, value: &Value
             buffer.extend_from_slice(bytes);
         }
         0xe2 => buffer.extend_from_slice(&(u64_value(value) as u32).to_le_bytes()),
+        0xf0 => {
+            let hex = value.as_str().unwrap_or("0x0").trim_start_matches("0x");
+            let padded = format!("{hex:0>16}");
+            let mut bytes = Vec::new();
+            let mut index = padded.len();
+            while index >= 2 {
+                bytes.push(u8::from_str_radix(&padded[index - 2..index], 16).unwrap_or(0));
+                index -= 2;
+            }
+            buffer.extend_from_slice(&bytes);
+        }
+        0xf1 => {
+            if let Some(items) = value.as_array() {
+                buffer.extend(items.iter().map(|item| u8_value(item)));
+            }
+        }
+        0x4c => {
+            let items = value.as_array().cloned().unwrap_or_default();
+            let length = items.len() as u16;
+            buffer.extend_from_slice(&length.to_le_bytes());
+            for item in items {
+                let element_type = u8_value(&item["elmType"]);
+                buffer.push(element_type);
+                write_data_type(buffer, element_type, &item["elmVal"]);
+            }
+        }
+        0x48 => {
+            let element_type = u8_value(&value["elementType"]);
+            let elements = value["elements"].as_array().cloned().unwrap_or_default();
+            buffer.push(element_type);
+            buffer.extend_from_slice(&(elements.len() as u16).to_le_bytes());
+            for element in elements {
+                write_data_type(buffer, element_type, &element);
+            }
+        }
         _ => {
             if let Some(items) = value.as_array() {
                 buffer.extend(items.iter().map(|item| u8_value(item)));
@@ -396,7 +518,7 @@ pub(crate) fn read_data_type(buffer: &[u8], position: &mut usize, data_type: u8)
     match data_type {
         0x00 => Value::Null,
         0x08 | 0x10 | 0x18 | 0x20 | 0x28 | 0x30 => json!(take(1, position)[0]),
-        0x09 | 0x19 | 0x21 | 0x29 | 0x31 => {
+        0x09 | 0x19 | 0x21 | 0x29 | 0x31 | 0xe8 | 0xe9 => {
             let bytes = take(2, position);
             json!(u16::from_le_bytes([bytes[0], bytes[1]]))
         }
@@ -430,6 +552,46 @@ pub(crate) fn read_data_type(buffer: &[u8], position: &mut usize, data_type: u8)
             json!(String::from_utf8_lossy(&take(length, position)).to_string())
         }
         0xe2 => json!(read_uint(&take(4, position))),
+        0xf0 => {
+            let bytes = take(8, position);
+            let mut reversed = bytes;
+            reversed.reverse();
+            json!(format!(
+                "0x{}",
+                reversed
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>()
+            ))
+        }
+        0xf1 => json!(take(16, position)),
+        0x4c => {
+            let bytes = take(2, position);
+            let count = u16::from_le_bytes([bytes[0], bytes[1]]);
+            if count == 0xffff {
+                return json!([]);
+            }
+            let mut items = Vec::new();
+            for _ in 0..count {
+                let element_type = take(1, position)[0];
+                let value = read_data_type(buffer, position, element_type);
+                items.push(json!({"elmType": element_type, "elmVal": value}));
+            }
+            json!(items)
+        }
+        0x48 => {
+            let element_type = take(1, position)[0];
+            let bytes = take(2, position);
+            let count = u16::from_le_bytes([bytes[0], bytes[1]]);
+            if count == 0xffff {
+                return json!([]);
+            }
+            let mut items = Vec::new();
+            for _ in 0..count {
+                items.push(read_data_type(buffer, position, element_type));
+            }
+            json!(items)
+        }
         _ => json!(take(1, position)),
     }
 }
@@ -939,4 +1101,381 @@ fn read_mi_struct(buffer: &[u8], position: &mut usize) -> Value {
         output.insert(id.to_string(), value);
     }
     Value::Object(output)
+}
+
+fn header_to_string(header: &Header) -> String {
+    let control = header.frame_control;
+    let mut text = format!(
+        "{{\"frameControl\":{{\"reservedBits\":{},\"frameType\":{},\"direction\":{},\"disableDefaultResponse\":{},\"manufacturerSpecific\":{}}}",
+        control.reserved_bits,
+        control.frame_type as u8,
+        control.direction as u8,
+        control.disable_default_response,
+        control.manufacturer_specific,
+    );
+    if let Some(code) = header.manufacturer_code {
+        text.push_str(&format!(",\"manufacturerCode\":{code}"));
+    }
+    text.push_str(&format!(
+        ",\"transactionSequenceNumber\":{},\"commandIdentifier\":{}}}",
+        header.transaction_sequence_number, header.command_identifier
+    ));
+    text
+}
+
+fn command_to_string(command: &Command, frame_type: FrameType) -> String {
+    let mut text = format!(
+        "{{\"name\":{},\"ID\":{}",
+        json_string(&json!(command.name)),
+        command.ID
+    );
+    if let Some(response) = command.response {
+        text.push_str(&format!(",\"response\":{response}"));
+    }
+    if !command.parameters.is_empty() || frame_type == FrameType::SPECIFIC {
+        text.push_str(",\"parameters\":[");
+        for (index, parameter) in command.parameters.iter().enumerate() {
+            if index > 0 {
+                text.push(',');
+            }
+            text.push_str(&parameter_to_string(parameter));
+        }
+        text.push(']');
+        if !command.parameters.is_empty() && command.required {
+            text.push_str(",\"required\":true");
+        }
+    }
+    text.push('}');
+    text
+}
+
+fn parameter_to_string(parameter: &Parameter) -> String {
+    let data_type = if parameter.name == "grouplist" {
+        1002
+    } else {
+        parameter.r#type as u16
+    };
+    let mut text = format!(
+        "{{\"name\":{},\"type\":{data_type}",
+        json_string(&json!(parameter.name))
+    );
+    if !parameter.conditions.is_empty() {
+        text.push_str(",\"conditions\":[");
+        for (index, condition) in parameter.conditions.iter().enumerate() {
+            if index > 0 {
+                text.push(',');
+            }
+            text.push_str(&match condition {
+                ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(value) => format!(
+                    "{{\"type\":\"minimumRemainingBufferBytes\",\"value\":{value}}}"
+                ),
+                ParameterCondition::BITMASK_SET { field, value } => format!(
+                    "{{\"type\":\"bitmaskSet\",\"field\":{},\"value\":{value}}}",
+                    json_string(&json!(field))
+                ),
+                ParameterCondition::BITFIELD_ENUM {
+                    field,
+                    offset,
+                    size,
+                    value,
+                } => format!(
+                    "{{\"type\":\"bitfieldEnum\",\"field\":{},\"offset\":{offset},\"size\":{size},\"value\":{value}}}",
+                    json_string(&json!(field))
+                ),
+                ParameterCondition::FIELD_EQUAL {
+                    field,
+                    value,
+                    reversed,
+                } => {
+                    if *reversed {
+                        format!(
+                            "{{\"type\":\"fieldEquals\",\"field\":{},\"value\":{value},\"reversed\":true}}",
+                            json_string(&json!(field))
+                        )
+                    } else {
+                        format!(
+                            "{{\"type\":\"fieldEquals\",\"field\":{},\"value\":{value}}}",
+                            json_string(&json!(field))
+                        )
+                    }
+                }
+            });
+        }
+        text.push(']');
+    }
+    if let Some(max) = parameter.max {
+        text.push_str(&format!(",\"max\":{max}"));
+    }
+    text.push('}');
+    text
+}
+
+fn payload_to_string(command: &str, payload: &Value) -> String {
+    match (command, payload) {
+        ("read" | "readStructured", Value::Array(items)) => {
+            let rendered = items
+                .iter()
+                .map(|item| {
+                    let mut keys: Vec<&str> = vec!["attrId"];
+                    if command == "readStructured" && item.get("selector").is_some() {
+                        keys.push("selector");
+                    }
+                    object_from_keys(item, &keys)
+                })
+                .collect::<Vec<_>>();
+            format!("[{}]", rendered.join(","))
+        }
+        ("readRsp" | "report", Value::Array(items)) => {
+            let rendered = items
+                .iter()
+                .map(|item| {
+                    let data_type = item.get("dataType").and_then(Value::as_u64);
+                    let mut keys: Vec<&str> = vec!["attrId"];
+                    if command == "readRsp" {
+                        keys.push("status");
+                    }
+                    keys.push("dataType");
+                    keys.push("attrData");
+                    if let Some(number) = item.get("attrData").and_then(Value::as_u64) {
+                        if matches!(data_type, Some(0x26) | Some(0x27)) {
+                            let mut converted = item.clone();
+                            converted["attrData"] = json!(number.to_string());
+                            return object_from_keys(&converted, &keys);
+                        }
+                    }
+                    object_from_keys(item, &keys)
+                })
+                .collect::<Vec<_>>();
+            format!("[{}]", rendered.join(","))
+        }
+        ("configReport", Value::Array(items)) => {
+            let rendered = items
+                .iter()
+                .map(|item| object_from_keys(item, &["direction", "attrId", "timeout"]))
+                .collect::<Vec<_>>();
+            format!("[{}]", rendered.join(","))
+        }
+        ("defaultRsp", Value::Object(_)) => object_from_keys(payload, &["cmdId", "statusCode"]),
+        ("discover", Value::Object(_)) | ("discoverExt", Value::Object(_)) => {
+            object_from_keys(payload, &["startAttrId", "maxAttrIds"])
+        }
+        ("discoverRsp", Value::Object(_)) => payload_generic(payload),
+        (_, Value::Object(_)) if command == "alarm" => {
+            object_from_keys(payload, &["alarmcode", "clusterid"])
+        }
+        (_, Value::Object(map)) => {
+            // Preserve insertion order from the decoded payload where possible.
+            let keys: Vec<String> = map.keys().cloned().collect();
+            let key_refs: Vec<&str> = keys.iter().map(String::as_str).collect();
+            object_from_keys(payload, &key_refs)
+        }
+        _ => payload_generic(payload),
+    }
+}
+
+fn object_from_keys(value: &Value, keys: &[&str]) -> String {
+    let mut parts = Vec::new();
+    for key in keys {
+        if let Some(entry) = value.get(*key) {
+            parts.push(format!(
+                "{}:{}",
+                json_string(&json!(key)),
+                payload_generic(entry)
+            ));
+        }
+    }
+    format!("{{{}}}", parts.join(","))
+}
+
+fn payload_generic(value: &Value) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "null".to_string())
+}
+
+fn json_string(value: &Value) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string())
+}
+
+fn specific_command(cluster_id: u16, key: CommandRef, server_to_client: bool) -> Option<Command> {
+    let commands: Vec<Command> = match cluster_id {
+        cluster::genAlarms::ID => vec![
+            cluster::genAlarms::commands::getAlarm,
+            cluster::genAlarms::commands::reset,
+            cluster::genAlarms::commandsResponse::alarm,
+        ],
+        cluster::genGroups::ID => vec![cluster::genGroups::commands::getMembership],
+        cluster::genLevelCtrl::ID => vec![cluster::genLevelCtrl::commands::moveToLevelWithOnOff],
+        cluster::genOta::ID => vec![
+            cluster::genOta::commands::imageBlockRequest,
+            cluster::genOta::commandsResponse::queryNextImageResponse,
+            cluster::genOta::commandsResponse::imageNotify,
+        ],
+        cluster::touchlink::ID => vec![cluster::touchlink::commandsResponse::scanResponse],
+        _ => Vec::new(),
+    };
+    let mut ordered = commands;
+    if server_to_client {
+        ordered.reverse();
+    }
+    ordered.into_iter().find(|command| match key {
+        CommandRef::Id(id) => command.ID == id,
+        CommandRef::Name(name) => command.name == name,
+    })
+}
+
+fn parameter_to_json(parameter: &Parameter) -> Value {
+    let mut object = serde_json::Map::new();
+    object.insert("name".to_string(), json!(parameter.name));
+    let data_type = if parameter.name == "grouplist" {
+        1002
+    } else {
+        parameter.r#type as u16
+    };
+    object.insert("type".to_string(), json!(data_type));
+    if !parameter.conditions.is_empty() {
+        object.insert(
+            "conditions".to_string(),
+            Value::Array(
+                parameter
+                    .conditions
+                    .iter()
+                    .map(|condition| match condition {
+                        ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(value) => {
+                            json!({"type": "minimumRemainingBufferBytes", "value": value})
+                        }
+                        ParameterCondition::BITMASK_SET { field, value } => {
+                            json!({"type": "bitmaskSet", "field": field, "value": value})
+                        }
+                        ParameterCondition::BITFIELD_ENUM {
+                            field,
+                            offset,
+                            size,
+                            value,
+                        } => json!({
+                            "type": "bitfieldEnum",
+                            "field": field,
+                            "offset": offset,
+                            "size": size,
+                            "value": value,
+                        }),
+                        ParameterCondition::FIELD_EQUAL {
+                            field,
+                            value,
+                            reversed,
+                        } => {
+                            if *reversed {
+                                json!({
+                                    "type": "fieldEquals",
+                                    "field": field,
+                                    "value": value,
+                                    "reversed": true,
+                                })
+                            } else {
+                                json!({
+                                    "type": "fieldEquals",
+                                    "field": field,
+                                    "value": value,
+                                })
+                            }
+                        }
+                    })
+                    .collect(),
+            ),
+        );
+    }
+    if let Some(max) = parameter.max {
+        object.insert("max".to_string(), json!(max));
+    }
+    Value::Object(object)
+}
+
+fn encode_parameters(command: &Command, payload: &Value, buffer: &mut Vec<u8>) {
+    for parameter in command.parameters {
+        let include = if parameter.conditions.iter().any(|condition| {
+            matches!(
+                condition,
+                ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(_)
+            )
+        }) {
+            payload.get(parameter.name).is_some()
+        } else {
+            Frame::conditions_valid(parameter, payload, None)
+        };
+        if !include {
+            continue;
+        }
+        let Some(value) = payload.get(parameter.name) else {
+            panic!("Parameter '{}' is missing", parameter.name);
+        };
+        if parameter.name == "grouplist" {
+            for item in value.as_array().cloned().unwrap_or_default() {
+                push_u16(buffer, u16_value(&item));
+            }
+        } else {
+            write_data_type(buffer, parameter.r#type as u8, value);
+        }
+    }
+}
+
+fn decode_parameters(command: &Command, buffer: &[u8], header_length: usize) -> Value {
+    let mut position = header_length.min(buffer.len());
+    let mut payload = serde_json::Map::new();
+    for parameter in command.parameters {
+        let remaining = buffer.len().saturating_sub(position);
+        let current = Value::Object(payload.clone());
+        if !Frame::conditions_valid(parameter, &current, Some(remaining)) {
+            continue;
+        }
+        if position >= buffer.len() {
+            if parameter.name == "minimumBlockPeriod" {
+                break;
+            }
+            panic!("INVALID_FIELD");
+        }
+        let size = parameter_size(parameter, &payload);
+        if remaining < size {
+            if parameter.name == "minimumBlockPeriod" {
+                break;
+            }
+            panic!("INVALID_FIELD");
+        }
+        let value = if parameter.name == "grouplist" {
+            let count = payload
+                .get("groupcount")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+            let mut items = Vec::new();
+            for _ in 0..count {
+                let bytes = &buffer[position..position + 2];
+                position += 2;
+                items.push(json!(u16::from_le_bytes([bytes[0], bytes[1]])));
+            }
+            Value::Array(items)
+        } else {
+            read_data_type(buffer, &mut position, parameter.r#type as u8)
+        };
+        payload.insert(parameter.name.to_string(), value);
+    }
+    Value::Object(payload)
+}
+
+fn parameter_size(parameter: &Parameter, payload: &serde_json::Map<String, Value>) -> usize {
+    if parameter.name == "grouplist" {
+        return payload
+            .get("groupcount")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as usize
+            * 2;
+    }
+    match parameter.r#type as u8 {
+        0x00 => 0,
+        0x08 | 0x10 | 0x18 | 0x20 | 0x28 | 0x30 => 1,
+        0x09 | 0x19 | 0x21 | 0x29 | 0x31 | 0xe8 | 0xe9 => 2,
+        0x0a | 0x1a | 0x22 | 0x2a => 3,
+        0x0b | 0x1b | 0x23 | 0x2b | 0xe2 | 0xea => 4,
+        0x0c | 0x1c | 0x24 | 0x2c => 5,
+        0x0d | 0x1d | 0x25 | 0x2d => 6,
+        0x0e | 0x1e | 0x26 | 0x2e => 7,
+        0x0f | 0x1f | 0x27 | 0x2f | 0xf0 => 8,
+        _ => 0,
+    }
 }
