@@ -29,7 +29,6 @@ fn last(health: &Health) -> &Value {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_health_at_default_interval() {
     let mut health = Health::new(10, false);
 
@@ -104,7 +103,6 @@ fn checks_health_at_default_interval() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_health_at_given_interval() {
     let mut health = Health::new(20, false);
 
@@ -121,7 +119,6 @@ fn checks_health_at_given_interval() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn init_device_health_from_leave() {
     let mut health = Health::new(10, false);
 
@@ -148,7 +145,6 @@ fn init_device_health_from_leave() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn init_device_health_from_network_address_change() {
     let mut health = Health::new(10, false);
 
@@ -174,7 +170,6 @@ fn init_device_health_from_network_address_change() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_health_then_resets_possible_stats() {
     let mut health = Health::new(10, true);
 
