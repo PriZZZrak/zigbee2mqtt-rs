@@ -271,10 +271,136 @@ async fn static_server() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn websocket_interaction() {
-    todo!()
+async fn websocket_interaction() {
+    let mut frontend = frontend(json!({
+        "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
+        "homeassistant": {"enabled": true},
+    }));
+    frontend
+        .device_states
+        .insert("bulb_color".to_string(), json!({"brightness": 255}));
+    frontend
+        .device_states
+        .insert("remote".to_string(), json!({"brightness": 255}));
+    frontend.start().await;
+
+    let ws_client = frontend.add_client("open");
+    frontend.on_connection(ws_client);
+
+    let sent = &frontend.clients[ws_client].sent;
+    let all_topics: Vec<&str> = sent
+        .iter()
+        .filter_map(|message| message["topic"].as_str())
+        .collect();
+    assert!(all_topics.contains(&"bridge/devices"));
+    assert!(all_topics.contains(&"bridge/info"));
+    assert!(sent.contains(&json!({"topic": "bridge/state", "payload": {"state": "online"}})));
+    assert!(sent.contains(&json!({"topic": "remote", "payload": {"brightness": 255}})));
+
+    // Message
+    frontend.mqtt_published.clear();
+    frontend.clients[ws_client].sent.clear();
+    frontend.on_message(
+        ws_client,
+        Some(&json!({"topic": "bulb_color/set", "payload": {"state": "ON"}}).to_string()),
+        false,
+    );
+
+    assert_eq!(frontend.mqtt_published.len(), 1);
+    assert_eq!(frontend.mqtt_published[0].0, "zigbee2mqtt/bulb_color");
+    assert_eq!(
+        frontend.mqtt_published[0].1,
+        json!({
+            "state": "ON",
+            "effect": null,
+            "effect_color": null,
+            "effect_speed": null,
+            "identify": null,
+            "power_on_behavior": null,
+            "linkquality": 20,
+            "update": {"state": null, "installed_version": -1, "latest_version": -1},
+        })
+    );
+    assert_eq!(
+        (frontend.mqtt_published[0].2, frontend.mqtt_published[0].3),
+        (false, 0)
+    );
+
+    frontend.on_message(ws_client, None, false);
+    frontend.on_message(ws_client, Some(""), false);
+    frontend.on_message(ws_client, Some("null"), false);
+
+    // Error
+    frontend.on_error("This is an error");
+    assert_eq!(
+        frontend.logs.last(),
+        Some(&(
+            "error".to_string(),
+            "WebSocket error: This is an error".to_string()
+        ))
+    );
+
+    // Received message on socket
+    let sent = &frontend.clients[ws_client].sent;
+    assert_eq!(sent.len(), 1);
+    assert_eq!(
+        sent[0],
+        json!({
+            "topic": "bulb_color",
+            "payload": {
+                "state": "ON",
+                "power_on_behavior": null,
+                "effect": null,
+                "effect_color": null,
+                "effect_speed": null,
+                "identify": null,
+                "linkquality": 20,
+                "update": {"state": null, "installed_version": -1, "latest_version": -1},
+            },
+        })
+    );
+
+    // Should publish bridge messages
+    frontend.on_device_joined("0x000b57fffec6a5b2", "bulb");
+    assert!(frontend.clients[ws_client].sent.contains(&json!({
+        "payload": {
+            "data": {"friendly_name": "bulb", "ieee_address": "0x000b57fffec6a5b2"},
+            "type": "device_joined",
+        },
+        "topic": "bridge/event",
+    })));
+
+    // Should send JSON state event when `output: attribute`
+    frontend.clients[ws_client].sent.clear();
+    frontend.settings = json!({"advanced": {"output": "attribute"}});
+    frontend.on_mqtt_message("zigbee2mqtt/bulb_color/set", &json!({"brightness": 90}));
+    let sent = &frontend.clients[ws_client].sent;
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0]["topic"], json!("bulb_color"));
+    assert_eq!(sent[0]["payload"]["brightness"], json!(90));
+
+    // Shouldnt set when not ready
+    frontend.clients[ws_client].sent.clear();
+    frontend.clients[ws_client].ready_state = "close".to_string();
+    frontend.on_message(
+        ws_client,
+        Some(&json!({"topic": "bulb_color/set", "payload": {"state": "ON"}}).to_string()),
+        false,
+    );
+    assert!(frontend.clients[ws_client].sent.is_empty());
+
+    // Send last seen on connect
+    frontend.clients[ws_client].sent.clear();
+    frontend.clients[ws_client].ready_state = "open".to_string();
+    frontend.settings = json!({"advanced": {"last_seen": "ISO_8601"}});
+    let client2 = frontend.add_client("open");
+    frontend.on_connection(client2);
+    assert!(frontend.clients[client2].sent.contains(&json!({
+        "topic": "remote",
+        "payload": {"brightness": 255, "last_seen": "1970-01-01T00:00:01.000Z"},
+    })));
 }
 
 #[tokio::test]

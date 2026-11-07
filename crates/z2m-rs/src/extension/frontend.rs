@@ -4,6 +4,8 @@
 // The Rust port records the node:http/node-static/ws observables that the
 // upstream tests assert through mocks.
 
+use std::collections::BTreeMap;
+
 use serde_json::Value;
 
 pub const FRONTEND_PATH: &str = "frontend";
@@ -48,6 +50,11 @@ pub struct Frontend {
     pub send_not_found_calls: usize,
     pub auth_token: Option<String>,
     pub clients: Vec<WsClient>,
+    /// Per-device state replayed on connect and updated on MQTT messages.
+    pub device_states: BTreeMap<String, Value>,
+    /// `(topic, payload, retain, qos)` passed to `mqtt.publish`.
+    pub mqtt_published: Vec<(String, Value, bool, u8)>,
+    pub logs: Vec<(String, String)>,
 }
 
 impl Frontend {
@@ -78,18 +85,37 @@ impl Frontend {
         todo!()
     }
 
+    /// Adds a `WebSocket` client (test counterpart of `mockWSClient`).
+    pub fn add_client(&mut self, ready_state: &str) -> usize {
+        self.clients.push(WsClient {
+            ready_state: ready_state.to_string(),
+            ..Default::default()
+        });
+        self.clients.len() - 1
+    }
+
     /// Upstream `WebSocket.Server` `connection` event.
     pub fn on_connection(&mut self, client_id: usize) {
         todo!()
     }
 
     /// Upstream client `message` event.
-    pub fn on_message(&mut self, client_id: usize, message: &str, _is_binary: bool) {
+    pub fn on_message(&mut self, client_id: usize, message: Option<&str>, _is_binary: bool) {
         todo!()
     }
 
     /// Upstream client `error` event.
-    pub fn on_error(&mut self, _message: &str) {
+    pub fn on_error(&mut self, message: &str) {
+        todo!()
+    }
+
+    /// Upstream MQTT message handler updating device states.
+    pub fn on_mqtt_message(&mut self, topic: &str, payload: &Value) {
+        todo!()
+    }
+
+    /// Upstream `deviceJoined` event published on `bridge/event`.
+    pub fn on_device_joined(&mut self, ieee_address: &str, friendly_name: &str) {
         todo!()
     }
 }
