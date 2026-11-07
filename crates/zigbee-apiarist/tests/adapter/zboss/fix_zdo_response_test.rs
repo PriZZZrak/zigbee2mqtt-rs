@@ -20,7 +20,6 @@ fn hex_decode(value: &str) -> Vec<u8> {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn active_endpoints_response() {
     let frame = read_zboss_frame(&hex_decode("0001060211000002f2013412"));
     let expected = ZBOSSFrame {
@@ -38,7 +37,6 @@ fn active_endpoints_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn match_descriptors_response() {
     let frame = read_zboss_frame(&hex_decode("0001070211000002f2013412"));
     let expected = ZBOSSFrame {
@@ -56,7 +54,6 @@ fn match_descriptors_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn node_descriptor_response() {
     let frame = read_zboss_frame(&hex_decode("000104021100000000000000000000432c0000003412"));
     let expected = ZBOSSFrame {
@@ -108,7 +105,6 @@ fn node_descriptor_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn no_fix_needed_frame_type_indication() {
     let frame = read_zboss_frame(&hex_decode("00020c020cda603602602bd5b3708e"));
     let expected = ZBOSSFrame {
@@ -139,7 +135,6 @@ fn no_fix_needed_frame_type_indication() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn no_fix_needed_frame_type_response() {
     let frame = read_zboss_frame(&hex_decode("0001010211000088776655443322113412"));
     let expected = ZBOSSFrame {
@@ -162,7 +157,6 @@ fn no_fix_needed_frame_type_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn power_descriptor_response() {
     let frame = read_zboss_frame(&hex_decode("0001030211000001023412"));
     let expected = ZBOSSFrame {
@@ -186,7 +180,6 @@ fn power_descriptor_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn simple_descriptor_response() {
     let frame = read_zboss_frame(&hex_decode(
         "0001050211000001040100000301022c2ffefebcbc3412",
