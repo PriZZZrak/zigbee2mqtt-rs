@@ -146,16 +146,27 @@ fn opts() -> serde_json::Value {
     json!({})
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn adapter_disconnected() {
-    todo!()
+async fn adapter_disconnected() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_close();
+
+    assert_eq!(adapter.disconnected, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn adapter_disconnected_dont_emit_when_closing() {
-    todo!()
+async fn adapter_disconnected_dont_emit_when_closing() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.stop().await;
+
+    adapter.on_znp_close();
+
+    assert_eq!(adapter.disconnected, 0);
 }
 
 #[test]
@@ -214,40 +225,148 @@ async fn command_should_fail_when_in_interpan() {
     assert_eq!(adapter.send_zcl_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn concentrator_callback_indication() {
-    todo!()
+async fn concentrator_callback_indication() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_received(&json!({
+        "type": "AREQ",
+        "subsystem": "ZDO",
+        "command": "concentratorIndCb",
+        "payload": {"srcaddr": 124, "extaddr": "0x123"},
+    }));
+
+    assert_eq!(adapter.zdo_responses.len(), 1);
+    assert_eq!(
+        adapter.zdo_responses[0].0,
+        ClusterId::NETWORK_ADDRESS_RESPONSE
+    );
+    assert_eq!(adapter.zdo_responses[0].1[0], json!(0));
+    assert_eq!(
+        adapter.zdo_responses[0].1[1],
+        json!({"eui64": "0x123", "nwkAddress": 124, "assocDevList": [], "startIndex": 0})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn device_announce() {
-    todo!()
+async fn device_announce() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter.on_znp_received(&json!({
+        "type": "AREQ",
+        "subsystem": "ZDO",
+        "command": "endDeviceAnnceInd",
+        "payload": {
+            "status": 0,
+            "data": {
+                "capabilities": {"deviceType": 1},
+                "eui64": "0x123",
+                "nwkAddress": 123,
+            },
+        },
+    }));
+
+    assert_eq!(adapter.zdo_responses.len(), 1);
+    assert_eq!(adapter.zdo_responses[0].0, ClusterId::END_DEVICE_ANNOUNCE);
+    assert_eq!(adapter.zdo_responses[0].1[0], json!(0));
+    assert_eq!(
+        adapter.zdo_responses[0].1[1],
+        json!({"eui64": "0x123", "nwkAddress": 123, "capabilities": {"deviceType": 1}})
+    );
+    assert!(adapter.znp_calls.is_empty());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn device_announce_should_discover_route_to_end_devices() {
-    todo!()
+async fn device_announce_should_discover_route_to_end_devices() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let event = json!({
+        "type": "AREQ",
+        "subsystem": "ZDO",
+        "command": "endDeviceAnnceInd",
+        "payload": {
+            "status": 0,
+            "data": {
+                "capabilities": {"deviceType": 0},
+                "eui64": "0x123",
+                "nwkAddress": 123,
+            },
+        },
+    });
+    adapter.on_znp_received(&event);
+
+    assert_eq!(adapter.zdo_responses.len(), 1);
+    assert_eq!(adapter.zdo_responses[0].0, ClusterId::END_DEVICE_ANNOUNCE);
+    assert_eq!(
+        adapter.route_disc_calls,
+        vec![json!({"dstAddr": 123, "options": 0, "radius": 30})]
+    );
+
+    // Should debounce route discovery.
+    adapter.on_znp_received(&event);
+    assert_eq!(adapter.route_disc_calls.len(), 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn device_joined() {
-    todo!()
+async fn device_joined() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_received(&json!({
+        "type": "AREQ",
+        "subsystem": "ZDO",
+        "command": "tcDeviceInd",
+        "payload": {"nwkaddr": 123, "extaddr": "0x123"},
+    }));
+
+    assert_eq!(
+        adapter.device_joined_events,
+        vec![json!({"ieeeAddr": "0x123", "networkAddress": 123})]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn device_leave() {
-    todo!()
+async fn device_leave() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_received(&json!({
+        "type": "AREQ",
+        "subsystem": "ZDO",
+        "command": "leaveInd",
+        "payload": {"srcaddr": 123, "extaddr": "0x123"},
+    }));
+
+    assert_eq!(
+        adapter.device_leaves,
+        vec![json!({"ieeeAddr": "0x123", "networkAddress": 123})]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn do_nothing_wiht_non_areq_event() {
-    todo!()
+async fn do_nothing_wiht_non_areq_event() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_received(&json!({
+        "type": "SREQ",
+        "subsystem": "ZDO",
+        "command": "leaveInd",
+        "payload": {"srcaddr": 123, "extaddr": "0x123"},
+    }));
+
+    assert!(adapter.device_leaves.is_empty());
 }
 
 #[tokio::test]
@@ -310,16 +429,49 @@ async fn hard_reset() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn ignore_device_leave_with_rejoin() {
-    todo!()
+async fn ignore_device_leave_with_rejoin() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_received(&json!({
+        "type": "AREQ",
+        "subsystem": "ZDO",
+        "command": "leaveInd",
+        "payload": {"srcaddr": 123, "extaddr": "0x123", "rejoin": true},
+    }));
+
+    assert!(adapter.device_leaves.is_empty());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn incoming_message_raw_not_zcl() {
-    todo!()
+async fn incoming_message_raw_not_zcl() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_received(&json!({
+        "type": "AREQ",
+        "subsystem": "AF",
+        "command": "incomingMsg",
+        "payload": {
+            "clusterid": 1,
+            "srcendpoint": 20,
+            "srcaddr": 2,
+            "linkquality": 101,
+            "groupid": 12,
+            "data": [0x00, 0x01],
+        },
+    }));
+
+    let payload = &adapter.zcl_payloads[0];
+    assert_eq!(payload["clusterID"], json!(1));
+    assert_eq!(payload["endpoint"], json!(20));
+    assert_eq!(payload["groupID"], json!(12));
+    assert_eq!(payload["linkquality"], json!(101));
+    assert_eq!(payload["address"], json!(2));
+    assert_eq!(payload["data"], json!([0x00, 0x01]));
 }
 
 #[test]
@@ -346,10 +498,32 @@ fn led_behaviour_disable_led_true_firmware_not_handling_leds() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn network_address_response() {
-    todo!()
+async fn network_address_response() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.on_znp_received(&json!({
+        "type": "AREQ",
+        "subsystem": "ZDO",
+        "command": "nwkAddrRsp",
+        "payload": {
+            "status": 0,
+            "data": {"eui64": "0x123", "nwkAddress": 124, "assocDevList": [], "startIndex": 0},
+        },
+    }));
+
+    assert_eq!(adapter.zdo_responses.len(), 1);
+    assert_eq!(
+        adapter.zdo_responses[0].0,
+        ClusterId::NETWORK_ADDRESS_RESPONSE
+    );
+    assert_eq!(adapter.zdo_responses[0].1[0], json!(0));
+    assert_eq!(
+        adapter.zdo_responses[0].1[1],
+        json!({"eui64": "0x123", "nwkAddress": 124, "assocDevList": [], "startIndex": 0})
+    );
 }
 
 #[test]

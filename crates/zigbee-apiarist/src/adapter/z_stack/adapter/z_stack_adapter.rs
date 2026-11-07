@@ -135,6 +135,12 @@ pub struct ZStackAdapter {
     pub send_zcl_calls: usize,
     pub zdo_fail: bool,
     pub register_endpoints_fail: bool,
+    pub zcl_payloads: Vec<serde_json::Value>,
+    pub device_joined_events: Vec<serde_json::Value>,
+    pub zdo_responses: Vec<(u16, serde_json::Value)>,
+    pub device_leaves: Vec<serde_json::Value>,
+    pub disconnected: usize,
+    pub route_disc_calls: Vec<serde_json::Value>,
 }
 
 impl ZStackAdapter {
@@ -176,6 +182,12 @@ impl ZStackAdapter {
             send_zcl_calls: 0,
             zdo_fail: false,
             register_endpoints_fail: false,
+            zcl_payloads: Vec::new(),
+            device_joined_events: Vec::new(),
+            zdo_responses: Vec::new(),
+            device_leaves: Vec::new(),
+            disconnected: 0,
+            route_disc_calls: Vec::new(),
         }
     }
 
@@ -204,6 +216,16 @@ impl ZStackAdapter {
     }
 
     pub async fn reset(&mut self, _kind: &str) {
+        todo!()
+    }
+
+    /// Upstream `znp.on("received")` event handling.
+    pub fn on_znp_received(&mut self, _event: &serde_json::Value) {
+        todo!()
+    }
+
+    /// Upstream `znp.on("close")`.
+    pub fn on_znp_close(&mut self) {
         todo!()
     }
 
