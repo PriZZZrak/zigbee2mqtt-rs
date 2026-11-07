@@ -17,22 +17,68 @@
 //   - prevents mismatching setting/extension state
 
 use serde_json::json;
-use z2m_rs::extension::frontend::{enable_disable_extension, Frontend, ListenTarget};
+use z2m_rs::extension::frontend::{
+    enable_disable_extension, Frontend, ListenTarget, DEVICE_ICONS_PATH, FRONTEND_PATH,
+};
 
 fn frontend(settings: serde_json::Value) -> Frontend {
     Frontend::from_settings(&settings)
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn authentication() {
-    todo!()
+async fn authentication() {
+    let auth_token = "sample-secure-token";
+    let mut frontend = frontend(json!({
+        "frontend": {
+            "enabled": true,
+            "port": 8081,
+            "host": "127.0.0.1",
+            "auth_token": auth_token,
+        },
+    }));
+    frontend.start().await;
+
+    frontend.on_upgrade("/api", 1);
+    assert_eq!(frontend.handle_upgrade_calls.len(), 1);
+    assert_eq!(frontend.socket_destroy_calls, 0);
+    assert_eq!(
+        frontend.socket_closes,
+        vec![(4401, "Unauthorized".to_string())]
+    );
+
+    frontend.socket_closes.clear();
+    frontend.upgrade_emits.clear();
+
+    let url = format!("/api?token={auth_token}");
+    frontend.on_upgrade(&url, 3);
+    assert_eq!(frontend.handle_upgrade_calls.len(), 2);
+    assert_eq!(frontend.socket_destroy_calls, 0);
+    assert!(frontend.socket_closes.is_empty());
+    assert_eq!(frontend.upgrade_emits, vec![(url, 3)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_serve_device_icons() {
-    todo!()
+async fn should_serve_device_icons() {
+    let mut frontend = frontend(json!({
+        "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
+    }));
+    frontend.start().await;
+
+    frontend.on_request("/device_icons/my_device.png");
+    assert_eq!(
+        frontend
+            .static_served
+            .iter()
+            .filter(|(mount, _)| mount == FRONTEND_PATH)
+            .count(),
+        0
+    );
+    assert_eq!(
+        frontend.static_served.last(),
+        Some(&(DEVICE_ICONS_PATH.to_string(), "/my_device.png".to_string()))
+    );
 }
 
 #[tokio::test]
@@ -208,10 +254,21 @@ async fn start_stop_without_host() {
     assert_eq!(frontend.ws_close_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn static_server() {
-    todo!()
+async fn static_server() {
+    let mut frontend = frontend(json!({
+        "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
+    }));
+    frontend.start().await;
+
+    assert_eq!(
+        frontend.http_listen,
+        Some(ListenTarget::Tcp {
+            port: 8081,
+            host: Some("127.0.0.1".to_string()),
+        })
+    );
 }
 
 #[test]
@@ -220,10 +277,55 @@ fn websocket_interaction() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn works_with_non_default_complex_base_url() {
-    todo!()
+async fn works_with_non_default_complex_base_url() {
+    let base_url = "/z2m-more++/c0mplex.url/";
+    let mut frontend = frontend(json!({
+        "frontend": {
+            "enabled": true,
+            "port": 8081,
+            "host": "127.0.0.1",
+            "base_url": base_url,
+        },
+    }));
+    frontend.start().await;
+
+    assert_eq!(
+        frontend.ws_path,
+        Some("/z2m-more++/c0mplex.url/api".to_string())
+    );
+
+    frontend.on_request("/z2m-more++/c0mplex.url");
+    assert_eq!(
+        frontend.redirect,
+        Some((301, "/z2m-more++/c0mplex.url/".to_string()))
+    );
+    assert!(!frontend
+        .static_served
+        .iter()
+        .any(|(mount, _)| mount == FRONTEND_PATH));
+    assert_eq!(frontend.send_not_found_calls, 0);
+
+    frontend.on_request("/z2m-more++/c0mplex.url/");
+    assert_eq!(
+        frontend.static_served.last(),
+        Some(&(FRONTEND_PATH.to_string(), "/".to_string()))
+    );
+    assert_eq!(frontend.send_not_found_calls, 0);
+
+    frontend.static_served.clear();
+    frontend.on_request("/z2m-more++/c0mplex.url/file.txt");
+    assert_eq!(
+        frontend.static_served.last(),
+        Some(&(FRONTEND_PATH.to_string(), "/file.txt".to_string()))
+    );
+    assert_eq!(frontend.send_not_found_calls, 0);
+
+    frontend.static_served.clear();
+    frontend.on_request("/z/file.txt");
+    assert!(frontend.static_served.is_empty());
+    assert_eq!(frontend.send_not_found_calls, 1);
 }
 
 #[tokio::test]
@@ -244,10 +346,43 @@ async fn disables_serving() {
     assert_eq!(frontend.ws_close_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn on_request_on_upgrade() {
-    todo!()
+async fn on_request_on_upgrade() {
+    let mut frontend = frontend(json!({
+        "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
+    }));
+    frontend.start().await;
+
+    frontend.on_upgrade("http://localhost:8080/api", 3);
+    assert_eq!(frontend.handle_upgrade_calls.len(), 1);
+    assert_eq!(frontend.socket_destroy_calls, 0);
+    assert_eq!(
+        frontend.upgrade_emits,
+        vec![("http://localhost:8080/api".to_string(), 3)]
+    );
+
+    frontend.on_request("/file.txt");
+    assert_eq!(
+        frontend
+            .static_served
+            .iter()
+            .filter(|(mount, _)| mount == DEVICE_ICONS_PATH)
+            .count(),
+        0
+    );
+    assert_eq!(
+        frontend
+            .static_served
+            .iter()
+            .filter(|(mount, _)| mount == FRONTEND_PATH)
+            .count(),
+        1
+    );
+    assert_eq!(
+        frontend.static_served.last(),
+        Some(&(FRONTEND_PATH.to_string(), "/file.txt".to_string()))
+    );
 }
 
 #[tokio::test]
@@ -273,4 +408,60 @@ async fn prevents_mismatching_setting_extension_state() {
 
     settings_enabled = false;
     assert!(enable_disable_extension(settings_enabled, false).is_ok());
+}
+
+// Upstream: it.each(["/z2m/", "/z2m"])("Works with non-default base url %s", ...)
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn works_with_non_default_base_url() {
+    for base_url in ["/z2m/", "/z2m"] {
+        let mut frontend = frontend(json!({
+            "frontend": {
+                "enabled": true,
+                "port": 8081,
+                "host": "127.0.0.1",
+                "base_url": base_url,
+            },
+        }));
+        frontend.start().await;
+
+        assert_eq!(frontend.ws_path, Some("/z2m/api".to_string()));
+
+        // the base url without trailing slash points at a directory, redirect
+        // so relative asset paths resolve against it
+        frontend.on_request("/z2m");
+        assert_eq!(frontend.redirect, Some((301, "/z2m/".to_string())));
+        assert!(!frontend
+            .static_served
+            .iter()
+            .any(|(mount, _)| mount == FRONTEND_PATH));
+        assert_eq!(frontend.send_not_found_calls, 0);
+
+        frontend.on_request("/z2m/");
+        assert_eq!(
+            frontend.static_served.last(),
+            Some(&(FRONTEND_PATH.to_string(), "/".to_string()))
+        );
+        assert_eq!(frontend.send_not_found_calls, 0);
+
+        frontend.static_served.clear();
+        frontend.on_request("/z2m/file.txt");
+        assert_eq!(
+            frontend.static_served.last(),
+            Some(&(FRONTEND_PATH.to_string(), "/file.txt".to_string()))
+        );
+        assert_eq!(frontend.send_not_found_calls, 0);
+
+        frontend.static_served.clear();
+        frontend.on_request("/z/file.txt");
+        assert!(frontend.static_served.is_empty());
+        assert_eq!(frontend.send_not_found_calls, 1);
+
+        frontend.static_served.clear();
+        frontend.on_request("/z2m/device_icons/my-device.png");
+        assert_eq!(
+            frontend.static_served.last(),
+            Some(&(DEVICE_ICONS_PATH.to_string(), "/my-device.png".to_string()))
+        );
+    }
 }
