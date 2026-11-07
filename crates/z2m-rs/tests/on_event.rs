@@ -14,7 +14,6 @@ fn setup() -> OnEvent {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn starts_stops() {
     let mut on_event = setup();
     on_event.start().await;
@@ -48,7 +47,6 @@ async fn starts_stops() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn calls_on_device_events() {
     let mut on_event = setup();
     on_event.start().await;
@@ -120,7 +118,6 @@ async fn calls_on_device_events() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_block_startup_on_failure() {
     let mut on_event = setup();
     on_event.fail_device_start = true;
