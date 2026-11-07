@@ -70,10 +70,31 @@
 //   - readStartKeyNegotiationResponse
 //   - readSystemServerDiscoveryResponse
 
+use serde_json::json;
+use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+
+const IEEE_ADDRESS1: &str = "0xfe34ac2385ff8311";
+const IEEE_ADDRESS1_BYTES: [u8; 8] = [0x11, 0x83, 0xff, 0x85, 0x23, 0xac, 0x34, 0xfe];
+const IEEE_ADDRESS2: &str = "0x28373fecd834ba37";
+const IEEE_ADDRESS2_BYTES: [u8; 8] = [0x37, 0xba, 0x34, 0xd8, 0xec, 0x3f, 0x37, 0x28];
+const NODE_ID1: u16 = 0xfe32;
+const NODE_ID1_BYTES: [u8; 2] = [0x32, 0xfe];
+const CLUSTER_LIST1_BYTES: [u8; 6] = [0x09, 0x00, 0x02, 0x07, 0x03, 0x0b];
+const CLUSTER_LIST2_BYTES: [u8; 8] = [0x06, 0x00, 0x00, 0x00, 0x00, 0x05, 0x08, 0x00];
+const HA_PROFILE_ID: u16 = 0x0104;
+
 #[test]
 #[ignore = "not implemented yet"]
 fn checks_if_more_available_to_by_amount() {
-    todo!()
+    let mut buffalo = BuffaloZdo::new(vec![1, 2, 3, 255]);
+    buffalo.set_position(4);
+    assert!(buffalo.is_more_by(0));
+    assert!(!buffalo.is_more_by(1));
+    buffalo.set_position(1);
+    assert!(buffalo.is_more_by(0));
+    assert!(buffalo.is_more_by(3));
+    assert!(!buffalo.is_more_by(4));
 }
 
 #[test]
@@ -85,13 +106,29 @@ fn ignores_invalid_tlv_tag_and_reads_next_tlv() {
 #[test]
 #[ignore = "not implemented yet"]
 fn sets_gets_bytes_without_changing_internal_position() {
-    todo!()
+    let mut buffalo = BuffaloZdo::new(vec![1, 2, 3, 255]);
+    assert_eq!(buffalo.get_byte(0), 1);
+    assert_eq!(buffalo.get_byte(1), 2);
+    assert_eq!(buffalo.get_byte(2), 3);
+    assert_eq!(buffalo.get_byte(3), 255);
+    assert_eq!(buffalo.get_position(), 0);
+    buffalo.set_byte(3, 127);
+    assert_eq!(buffalo.get_byte(3), 127);
+    buffalo.set_byte(0, 7);
+    assert_eq!(buffalo.get_byte(0), 7);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn sets_gets_position() {
-    todo!()
+    let mut buffalo = BuffaloZdo::new(vec![0; 3]);
+    assert_eq!(buffalo.get_position(), 0);
+    buffalo.set_position(3);
+    assert_eq!(buffalo.get_position(), 3);
+    buffalo.set_position(1);
+    assert_eq!(buffalo.get_position(), 1);
+    buffalo.set_position(0);
+    assert_eq!(buffalo.get_position(), 0);
 }
 
 #[test]
@@ -103,7 +140,11 @@ fn throws_when_build_bind_request_build_unbind_request_invalid_type() {
 #[test]
 #[ignore = "not implemented yet"]
 fn throws_when_building_unknown_cluster_id() {
-    todo!()
+    let cluster_id = 0x8005u16;
+    let result = std::panic::catch_unwind(|| {
+        BuffaloZdo::build_request(true, cluster_id, &[json!([1, 123])]);
+    });
+    assert!(result.is_err());
 }
 
 #[test]
@@ -138,14 +179,17 @@ fn throws_when_writing_invalid_tlv_tag() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn zdo_buffalo() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
 fn build_active_endpoints_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&NODE_ID1_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::ACTIVE_ENDPOINTS_REQUEST,
+            &[json!(NODE_ID1)],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -217,7 +261,29 @@ fn build_get_configuration_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_ieee_address_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&NODE_ID1_BYTES);
+    expected.extend_from_slice(&[0, 1]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::IEEE_ADDRESS_REQUEST,
+            &[json!(NODE_ID1), json!(false), json!(1)],
+        ),
+        expected
+    );
+
+    let mut expected = vec![0];
+    expected.extend_from_slice(&NODE_ID1_BYTES);
+    expected.extend_from_slice(&[1, 3]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::IEEE_ADDRESS_REQUEST,
+            &[json!(NODE_ID1), json!(true), json!(3)],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -235,19 +301,100 @@ fn build_lqi_table_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_match_descriptor_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&NODE_ID1_BYTES);
+    expected.extend_from_slice(&HA_PROFILE_ID.to_le_bytes());
+    expected.push(3);
+    expected.extend_from_slice(&CLUSTER_LIST1_BYTES);
+    expected.push(4);
+    expected.extend_from_slice(&CLUSTER_LIST2_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::MATCH_DESCRIPTORS_REQUEST,
+            &[
+                json!(NODE_ID1),
+                json!(HA_PROFILE_ID),
+                json!([0x0009, 0x0702, 0x0b03]),
+                json!([0x0006, 0x0000, 0x0500, 0x0008]),
+            ],
+        ),
+        expected
+    );
+
+    let mut expected = vec![0];
+    expected.extend_from_slice(&NODE_ID1_BYTES);
+    expected.extend_from_slice(&HA_PROFILE_ID.to_le_bytes());
+    expected.push(3);
+    expected.extend_from_slice(&CLUSTER_LIST1_BYTES);
+    expected.push(0);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::MATCH_DESCRIPTORS_REQUEST,
+            &[
+                json!(NODE_ID1),
+                json!(HA_PROFILE_ID),
+                json!([0x0009, 0x0702, 0x0b03]),
+                json!([]),
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_network_address_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.extend_from_slice(&[0, 1]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            &[json!(IEEE_ADDRESS1), json!(false), json!(1)],
+        ),
+        expected
+    );
+
+    let mut expected = vec![0];
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    expected.extend_from_slice(&[1, 3]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            &[json!(IEEE_ADDRESS2), json!(true), json!(3)],
+        ),
+        expected
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_network_address_request_without_zdo_message_overhead() {
-    todo!()
+    let mut expected = IEEE_ADDRESS1_BYTES.to_vec();
+    expected.extend_from_slice(&[0, 1]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            false,
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            &[json!(IEEE_ADDRESS1), json!(false), json!(1)],
+        ),
+        expected
+    );
+
+    let mut expected = IEEE_ADDRESS2_BYTES.to_vec();
+    expected.extend_from_slice(&[1, 3]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            false,
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            &[json!(IEEE_ADDRESS2), json!(true), json!(3)],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -283,7 +430,16 @@ fn build_permit_joining() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_power_descriptor_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&NODE_ID1_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::POWER_DESCRIPTOR_REQUEST,
+            &[json!(NODE_ID1)],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -313,7 +469,17 @@ fn build_set_active_channels_and_nwk_manager_id_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_simple_descriptor_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&NODE_ID1_BYTES);
+    expected.push(3);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::SIMPLE_DESCRIPTOR_REQUEST,
+            &[json!(NODE_ID1), json!(3)],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -483,4 +649,3 @@ fn read_start_key_negotiation_response() {
 fn read_system_server_discovery_response() {
     todo!()
 }
-
