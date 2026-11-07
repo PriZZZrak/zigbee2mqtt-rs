@@ -976,7 +976,6 @@ async fn should_publish_brightness_move_down_to_zigbee_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_brightness_move_up_to_zigbee_devices() {
     let mut publish = setup();
 
@@ -997,7 +996,6 @@ async fn should_publish_brightness_move_up_to_zigbee_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_correct_state_on_toggle_command_to_zigbee_bulb() {
     let mut publish = setup();
 
@@ -1024,7 +1022,6 @@ async fn should_publish_correct_state_on_toggle_command_to_zigbee_bulb() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_groups() {
     let mut publish = setup();
     publish.add_group_member("group_1", "bulb_color", "1");
@@ -1150,7 +1147,6 @@ async fn should_publish_messages_to_group_with_just_1_hue_twilight_in_int_conver
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_groups_color() {
     let mut publish = setup();
     publish.add_group_member("group_1", "bulb_color", "1");
@@ -1178,7 +1174,6 @@ async fn should_publish_messages_to_groups_color() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_groups_color_temperature() {
     let mut publish = setup();
     publish.add_group_member("group_1", "bulb_color", "1");
@@ -1225,7 +1220,6 @@ async fn should_publish_messages_to_groups_when_converter_is_not_in_the_default_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_groups_with_brightness_percent() {
     let mut publish = setup();
     publish.add_group_member("group_1", "bulb_color", "1");
@@ -1253,7 +1247,6 @@ async fn should_publish_messages_to_groups_with_brightness_percent() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_groups_with_off_and_brightness() {
     let mut publish = setup();
     publish.add_group_member("group_1", "bulb_color", "1");
@@ -1278,7 +1271,6 @@ async fn should_publish_messages_to_groups_with_off_and_brightness() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_groups_with_on_and_brightness() {
     let mut publish = setup();
     publish.add_group_member("group_1", "bulb_color", "1");
@@ -1306,7 +1298,6 @@ async fn should_publish_messages_to_groups_with_on_and_brightness() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices() {
     let mut publish = setup();
 
@@ -1330,7 +1321,6 @@ async fn should_publish_messages_to_zigbee_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_brightness_ep() {
     let mut publish = setup();
 
@@ -1356,7 +1346,6 @@ async fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_bright
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_state_ep() {
     let mut publish = setup();
 
@@ -1382,7 +1371,6 @@ async fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_state_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_when_brightness_is_in() {
     let mut publish = setup();
 
@@ -1408,7 +1396,6 @@ async fn should_publish_messages_to_zigbee_devices_when_brightness_is_in() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_when_brightness_is_in_number() {
     let mut publish = setup();
 
@@ -1431,7 +1418,6 @@ async fn should_publish_messages_to_zigbee_devices_when_brightness_is_in_number(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_when_there_is_a_get_converter_but_no_set() {
     let mut publish = setup();
 
@@ -1444,7 +1430,6 @@ async fn should_publish_messages_to_zigbee_devices_when_there_is_a_get_converter
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_when_there_is_no_converters() {
     let mut publish = setup();
 
@@ -1457,7 +1442,6 @@ async fn should_publish_messages_to_zigbee_devices_when_there_is_no_converters()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_brightness() {
     let mut publish = setup();
 
@@ -1483,7 +1467,6 @@ async fn should_publish_messages_to_zigbee_devices_with_brightness() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_rgb_object() {
     let mut publish = setup();
 
@@ -1509,7 +1492,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_rgb_object() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_rgb_string() {
     let mut publish = setup();
 
@@ -1535,7 +1517,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_rgb_string() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_xy() {
     let mut publish = setup();
 
@@ -1561,7 +1542,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_xy() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_xy_and_brightness() {
     let mut publish = setup();
 
@@ -1595,7 +1575,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_xy_and_brightness(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_xy_and_state() {
     let mut publish = setup();
 
@@ -1629,7 +1608,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_xy_and_state() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_xy_brightness_and_state_off() {
     let mut publish = setup();
 
@@ -1663,7 +1641,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_xy_brightness_and_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_xy_brightness_and_state_on() {
     let mut publish = setup();
 
@@ -1697,7 +1674,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_xy_brightness_and_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_temp() {
     let mut publish = setup();
 
@@ -1720,7 +1696,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_temp() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_color_temp_in() {
     let mut publish = setup();
 
@@ -1746,7 +1721,6 @@ async fn should_publish_messages_to_zigbee_devices_with_color_temp_in() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_complicated_topic() {
     let mut publish = setup();
     publish.devices.get_mut("bulb_color").unwrap().friendly_name =
@@ -1774,7 +1748,6 @@ async fn should_publish_messages_to_zigbee_devices_with_complicated_topic() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_endpoint_id() {
     let mut publish = setup();
 
@@ -1800,7 +1773,6 @@ async fn should_publish_messages_to_zigbee_devices_with_endpoint_id() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_non_default_ep() {
     let mut publish = setup();
 
@@ -1823,7 +1795,6 @@ async fn should_publish_messages_to_zigbee_devices_with_non_default_ep() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_to_zigbee_devices_with_non_default_ep_and_postfix() {
     let mut publish = setup();
 
@@ -1848,7 +1819,6 @@ async fn should_publish_messages_to_zigbee_devices_with_non_default_ep_and_postf
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_messages_with_options_disable_default_response() {
     let mut publish = setup();
 

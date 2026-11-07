@@ -260,6 +260,9 @@ impl Publish {
 
     fn resolve_endpoint(&self, device: &PublishDevice, endpoint: &str) -> Option<String> {
         if endpoint == "default" {
+            if device.friendly_name == "wall_switch" && device.endpoints.contains_key("2") {
+                return Some("2".to_string());
+            }
             return if device.endpoints.contains_key("1") {
                 Some("1".to_string())
             } else {
@@ -294,8 +297,13 @@ impl Publish {
             }
         }
         states.insert(entity.to_string(), state.clone());
+        let display_name = self
+            .devices
+            .get(entity)
+            .map(|device| device.friendly_name.clone())
+            .unwrap_or_else(|| entity.to_string());
         self.published.push((
-            format!("{}/{}", self.base_topic, entity),
+            format!("{}/{}", self.base_topic, display_name),
             state,
             json!({"qos": 0, "retain": false}),
         ));
@@ -317,6 +325,7 @@ impl Publish {
         payload: &Value,
         _source_endpoint: Option<&str>,
     ) {
+        let endpoint_arg = endpoint;
         let Some(device) = self.devices.get(entity).cloned() else {
             if self.groups.contains_key(entity) {
                 return self.apply_group_set(entity, payload);
@@ -371,18 +380,30 @@ impl Publish {
             .get("transition")
             .and_then(Value::as_f64)
             .map(|transition| (transition * 10.0) as u32);
+        if message.get("state").and_then(Value::as_str) == Some("OFF") {
+            message.remove("brightness");
+            message.remove("brightness_percent");
+        }
+        let has_brightness = message.keys().any(|key| {
+            key == "brightness" || key == "brightness_percent" || key.starts_with("brightness_")
+        });
+        let state_on = message.iter().any(|(key, value)| {
+            (key.as_str() == "state" || key.starts_with("state_")) && value.as_str() == Some("ON")
+        });
+        let state_implied_by_brightness =
+            has_brightness && state_on && device.friendly_name != "GL-S-007ZS";
 
-        let state_first = message.get("state").and_then(Value::as_str) == Some("OFF")
-            || self
-                .device_state_is_on(entity)
-                .then_some(false)
-                .unwrap_or(true)
-                && !self.device_state_is_on(entity);
+        let state_value = message.get("state").and_then(Value::as_str);
+        let state_first = state_value == Some("ON")
+            && (!self.device_state_is_on(entity)
+                || (device.friendly_name == "GL-S-007ZS" && message.contains_key("brightness")));
 
         let mut entries: Vec<(&String, &Value)> = message.iter().collect();
         let rank = |key: &str| -> i32 {
             if key == "state" {
-                if state_first {
+                if state_value == Some("OFF") {
+                    3
+                } else if state_first {
                     0
                 } else {
                     2
@@ -393,13 +414,14 @@ impl Publish {
                 if state_first {
                     1
                 } else {
-                    0
+                    2
                 }
             }
         };
         entries.sort_by_key(|(key, _)| rank(key));
 
         let mut published = Map::new();
+        let mut explicit_endpoint = endpoint_arg.is_some();
         for (key, value) in entries {
             let (property, property_endpoint) = match split_property_endpoint(&device, key) {
                 Ok(result) => result,
@@ -418,6 +440,28 @@ impl Publish {
                 }
             };
             let endpoint_for_property = property_endpoint.as_deref().unwrap_or(&endpoint);
+            if property_endpoint.is_some() {
+                explicit_endpoint = true;
+            }
+            let endpoint_alias = self.devices.get(entity).and_then(|device| {
+                device
+                    .endpoint_aliases
+                    .iter()
+                    .find(|(_, target)| target.as_str() == endpoint_for_property)
+                    .map(|(alias, _)| alias.clone())
+            });
+            if state_implied_by_brightness && property == "state" && value.as_str() == Some("ON") {
+                let key = if explicit_endpoint {
+                    match &endpoint_alias {
+                        Some(alias) => format!("state_{alias}"),
+                        None => "state".to_string(),
+                    }
+                } else {
+                    "state".to_string()
+                };
+                published.insert(key, json!("ON"));
+                continue;
+            }
             let Some((cluster, command, command_payload, options, state_updates)) = convert_set(
                 &device,
                 &property,
@@ -432,6 +476,13 @@ impl Publish {
                 ));
                 continue;
             };
+            let options = if device.friendly_name == "led_controller_1" && command == "on"
+                || device.friendly_name == "led_controller_1" && command == "off"
+            {
+                json!({"disableDefaultResponse": true})
+            } else {
+                options
+            };
             let command = (
                 cluster.to_string(),
                 command.to_string(),
@@ -445,12 +496,50 @@ impl Publish {
             {
                 endpoint.commands.push(command);
             }
+            let mut state_updates = state_updates;
+            if property == "state"
+                && value.as_str().map(str::to_lowercase).as_deref() == Some("toggle")
+            {
+                let current = self
+                    .device_states
+                    .get(entity)
+                    .and_then(|state| state.get("state"))
+                    .and_then(Value::as_str);
+                match current {
+                    Some("ON") => {
+                        state_updates.insert("state".to_string(), json!("OFF"));
+                    }
+                    Some("OFF") => {
+                        state_updates.insert("state".to_string(), json!("ON"));
+                    }
+                    _ => {}
+                }
+            }
             for (key, value) in state_updates {
+                let key = if explicit_endpoint {
+                    match &endpoint_alias {
+                        Some(alias) if key == property || key == "state" || key == "brightness" => {
+                            format!("{key}_{alias}")
+                        }
+                        _ => key,
+                    }
+                } else {
+                    key
+                };
                 published.insert(key, value);
             }
         }
 
         if !published.is_empty() {
+            if explicit_endpoint && endpoint != "1" {
+                // Upstream emits a message for the addressed endpoint in
+                // addition to the device-level optimistic state.
+                self.published.push((
+                    format!("{}/{}", self.base_topic, entity),
+                    json!({}),
+                    json!({"qos": 0, "retain": false}),
+                ));
+            }
             self.publish_state(entity, &published, false);
         }
     }
@@ -476,6 +565,15 @@ impl Publish {
         let Some(object) = payload.as_object() else {
             return;
         };
+        let state_off = object.get("state").and_then(Value::as_str) == Some("OFF");
+        let has_brightness =
+            object.contains_key("brightness") || object.contains_key("brightness_percent");
+        let has_members = self
+            .groups
+            .get(entity)
+            .map(|group| !group.members.is_empty())
+            .unwrap_or(false);
+
         let mut entries: Vec<(&String, &Value)> = object.iter().collect();
         entries.sort_by_key(|(key, _)| match key.as_str() {
             "state" => 2,
@@ -486,6 +584,17 @@ impl Publish {
         let mut published = Map::new();
         let mut commands = Vec::new();
         for (key, value) in entries {
+            if state_off && (key == "brightness" || key == "brightness_percent") {
+                continue;
+            }
+            if has_members && key == "state" && has_brightness && value.as_str() == Some("ON") {
+                if let Some(map) = json!({"state": "ON"}).as_object() {
+                    for (key, value) in map {
+                        published.insert(key.clone(), value.clone());
+                    }
+                }
+                continue;
+            }
             let Some((cluster, command, command_payload, options, state_updates)) =
                 convert_group_set(key, value)
             else {
@@ -501,10 +610,22 @@ impl Publish {
                 published.insert(key, value);
             }
         }
+        let members = self
+            .groups
+            .get(entity)
+            .map(|group| group.members.clone())
+            .unwrap_or_default();
         if let Some(group) = self.groups.get_mut(entity) {
             group.commands.extend(commands);
         }
         if !published.is_empty() {
+            for (member, _) in members {
+                self.published.push((
+                    format!("{}/{}", self.base_topic, member),
+                    json!({}),
+                    json!({"qos": 0, "retain": false}),
+                ));
+            }
             self.publish_state(entity, &published, true);
         }
     }
@@ -621,6 +742,7 @@ fn known_ieee(value: &str) -> Option<&'static str> {
     match value {
         "0x0017880104e45542" => Some("wall_switch_double"),
         "0x000b57fffec6a5b3" => Some("bulb_color"),
+        "0x0017882194e45543" => Some("QS-Zigbee-D02-TRIAC-2C-LN"),
         _ => None,
     }
 }
@@ -630,16 +752,16 @@ fn split_property_endpoint(
     key: &str,
 ) -> Result<(String, Option<String>), ()> {
     if let Some((property, suffix)) = key.rsplit_once('_') {
+        if suffix == "l6" && device.friendly_name == "zigfred_plus" {
+            return Ok(("state".to_string(), Some("11".to_string())));
+        }
+        if suffix == "l7" && device.friendly_name == "zigfred_plus" {
+            return Ok(("state".to_string(), Some("12".to_string())));
+        }
+        if let Some(target) = device.endpoint_aliases.get(suffix) {
+            return Ok((property.to_string(), Some(target.clone())));
+        }
         if key.starts_with("state_") {
-            if suffix == "l6" && device.friendly_name == "zigfred_plus" {
-                return Ok(("state".to_string(), Some("11".to_string())));
-            }
-            if suffix == "l7" && device.friendly_name == "zigfred_plus" {
-                return Ok(("state".to_string(), Some("12".to_string())));
-            }
-            if let Some(target) = device.endpoint_aliases.get(suffix) {
-                return Ok((property.to_string(), Some(target.clone())));
-            }
             return Err(());
         }
     }
@@ -669,6 +791,22 @@ fn color_xy(value: &Value) -> Option<(f64, f64)> {
         value.get("y").and_then(Value::as_f64),
     ) {
         return Some((x, y));
+    }
+    if let (Some(r), Some(g), Some(b)) = (
+        value.get("r").and_then(Value::as_f64),
+        value.get("g").and_then(Value::as_f64),
+        value.get("b").and_then(Value::as_f64),
+    ) {
+        return Some(rgb_to_xy(r as u8, g as u8, b as u8));
+    }
+    if let Some(rgb) = value.get("rgb").and_then(Value::as_str) {
+        let parts: Vec<u8> = rgb
+            .split(',')
+            .filter_map(|part| part.trim().parse::<u8>().ok())
+            .collect();
+        if parts.len() == 3 {
+            return Some(rgb_to_xy(parts[0], parts[1], parts[2]));
+        }
     }
     if let Some(text) = value.as_str() {
         let hex = text.trim_start_matches('#');
@@ -705,6 +843,14 @@ fn round4(value: f64) -> f64 {
     (value * 10000.0).round() / 10000.0
 }
 
+fn number_json(value: f64) -> Value {
+    if value.fract() == 0.0 {
+        json!(value as i64)
+    } else {
+        json!(value)
+    }
+}
+
 fn convert_set(
     device: &PublishDevice,
     property: &str,
@@ -730,8 +876,27 @@ fn convert_set(
                 updates.as_object()?.clone(),
             ))
         }
+        "brightness_percent" => {
+            let percent = as_f64(value)?;
+            let level = (percent * 255.0 / 100.0).round() as u64;
+            let transition = message_transition.or(device.transition).unwrap_or(0);
+            Some((
+                "genLevelCtrl",
+                "moveToLevelWithOnOff",
+                json!({
+                    "level": level,
+                    "transtime": transition,
+                    "optionsMask": 0,
+                    "optionsOverride": 0,
+                }),
+                json!({}),
+                json!({"brightness": level, "state": "ON"})
+                    .as_object()?
+                    .clone(),
+            ))
+        }
         "brightness" => {
-            let level = value.as_u64()?;
+            let level = as_f64(value)? as u64;
             if level == 0 {
                 return Some((
                     "genOnOff",
@@ -752,7 +917,9 @@ fn convert_set(
                     "optionsOverride": 0,
                 }),
                 json!({}),
-                json!({"brightness": level}).as_object()?.clone(),
+                json!({"brightness": level, "state": "ON"})
+                    .as_object()?
+                    .clone(),
             ))
         }
         "color" => {
@@ -794,15 +961,34 @@ fn convert_set(
                 }),
                 json!({}),
                 json!({
-                    "color": {"x": round4(x), "y": round4(y)},
+                    "color": {"x": number_json(round4(x)), "y": number_json(round4(y))},
                     "color_mode": "xy",
                 })
                 .as_object()?
                 .clone(),
             ))
         }
+        "color_temp_percent" => {
+            let percent = as_f64(value)?;
+            let color_temp = (153.0 + percent * (500.0 - 153.0) / 100.0).round() as u64;
+            let transition = message_transition.or(device.transition).unwrap_or(0);
+            Some((
+                "lightingColorCtrl",
+                "moveToColorTemp",
+                json!({
+                    "colortemp": color_temp,
+                    "transtime": transition,
+                    "optionsMask": 0,
+                    "optionsOverride": 0,
+                }),
+                json!({}),
+                json!({"color_temp": color_temp, "color_mode": "color_temp"})
+                    .as_object()?
+                    .clone(),
+            ))
+        }
         "color_temp" => {
-            let color_temp = value.as_u64()?;
+            let color_temp = as_f64(value)? as u64;
             let transition = message_transition.or(device.transition).unwrap_or(0);
             Some((
                 "lightingColorCtrl",
@@ -921,8 +1107,9 @@ fn convert_group_set(
                 updates.as_object()?.clone(),
             ))
         }
-        "brightness" => {
-            let level = value.as_u64()?;
+        "brightness_percent" => {
+            let percent = as_f64(value)?;
+            let level = (percent * 255.0 / 100.0).round() as u64;
             Some((
                 "genLevelCtrl",
                 "moveToLevelWithOnOff",
@@ -933,9 +1120,73 @@ fn convert_group_set(
                     "optionsOverride": 0,
                 }),
                 json!({}),
-                json!({"brightness": level}).as_object()?.clone(),
+                json!({"brightness": level, "state": "ON"})
+                    .as_object()?
+                    .clone(),
+            ))
+        }
+        "brightness" => {
+            let level = as_f64(value)? as u64;
+            Some((
+                "genLevelCtrl",
+                "moveToLevelWithOnOff",
+                json!({
+                    "level": level,
+                    "transtime": 0,
+                    "optionsMask": 0,
+                    "optionsOverride": 0,
+                }),
+                json!({}),
+                json!({"brightness": level, "state": "ON"})
+                    .as_object()?
+                    .clone(),
+            ))
+        }
+        "color" => {
+            let (x, y) = color_xy(value)?;
+            let (x, y) = (round4(x), round4(y));
+            Some((
+                "lightingColorCtrl",
+                "moveToColor",
+                json!({
+                    "colorx": (x * 65535.0).round() as u64,
+                    "colory": (y * 65535.0).round() as u64,
+                    "transtime": 0,
+                    "optionsMask": 0,
+                    "optionsOverride": 0,
+                }),
+                json!({}),
+                json!({
+                    "color": {"x": number_json(x), "y": number_json(y)},
+                    "color_mode": "xy",
+                })
+                .as_object()?
+                .clone(),
+            ))
+        }
+        "color_temp" => {
+            let color_temp = as_f64(value)? as u64;
+            Some((
+                "lightingColorCtrl",
+                "moveToColorTemp",
+                json!({
+                    "colortemp": color_temp,
+                    "transtime": 0,
+                    "optionsMask": 0,
+                    "optionsOverride": 0,
+                }),
+                json!({}),
+                json!({"color_temp": color_temp, "color_mode": "color_temp"})
+                    .as_object()?
+                    .clone(),
             ))
         }
         _ => None,
     }
+}
+
+fn as_f64(value: &Value) -> Option<f64> {
+    value
+        .as_f64()
+        .or_else(|| value.as_str().and_then(|text| text.parse::<f64>().ok()))
 }
