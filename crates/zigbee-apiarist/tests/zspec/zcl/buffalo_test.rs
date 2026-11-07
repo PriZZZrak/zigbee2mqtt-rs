@@ -2,7 +2,9 @@
 
 use serde_json::json;
 use zigbee_apiarist::zspec::zcl::buffalo_zcl::BuffaloZcl;
-use zigbee_apiarist::zspec::zcl::definition::enums::{BuffaloZclDataType, DataType};
+use zigbee_apiarist::zspec::zcl::definition::enums::{
+    BuffaloZclDataType, DataType, StructuredIndicatorType,
+};
 // Upstream test titles (ported as #[test] #[ignore] stubs):
 //   - GPD Frame
 //   - Reads Mi Struct
@@ -52,80 +54,425 @@ use zigbee_apiarist::zspec::zcl::definition::enums::{BuffaloZclDataType, DataTyp
 
 #[test]
 #[ignore = "not implemented yet"]
-fn gpd_frame() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
 fn reads_mi_struct() {
-    todo!()
+    let buffer = vec![
+        34u8, 1, 33, 213, 12, 3, 40, 33, 4, 33, 168, 19, 5, 33, 43, 0, 6, 36, 0, 0, 5, 0, 0, 8, 33,
+        4, 2, 10, 33, 0, 0, 100, 16, 0,
+    ];
+    let mut buffalo = BuffaloZcl::new(buffer.clone());
+    assert_eq!(
+        buffalo.read(BuffaloZclDataType::MI_STRUCT as u32, &json!({})),
+        json!({
+            "1": 3285,
+            "3": 33,
+            "4": 5032,
+            "5": 43,
+            "6": 327680,
+            "8": 516,
+            "10": 0,
+            "100": 0,
+        })
+    );
+    assert_eq!(buffalo.get_position(), buffer.len());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_mi_struct_with_padding() {
-    todo!()
+    let buffer = vec![
+        68u8, 3, 40, 29, 5, 33, 190, 45, 8, 33, 47, 18, 9, 33, 2, 21, 100, 16, 1, 101, 16, 0, 110,
+        32, 255, 111, 32, 255, 148, 32, 4, 149, 57, 184, 30, 21, 62, 150, 57, 211, 249, 17, 69,
+        151, 57, 0, 48, 104, 59, 152, 57, 0, 0, 0, 0, 155, 33, 1, 0, 156, 32, 1, 10, 33, 56, 38,
+        12, 40, 0, 0,
+    ];
+    let mut buffalo = BuffaloZcl::new(buffer.clone());
+    assert_eq!(
+        buffalo.read(BuffaloZclDataType::MI_STRUCT as u32, &json!({})),
+        json!({
+            "3": 29,
+            "5": 11710,
+            "8": 4655,
+            "9": 5378,
+            "10": 9784,
+            "12": 0,
+            "100": 1,
+            "101": 0,
+            "110": 255,
+            "111": 255,
+            "148": 4,
+            "149": 0.14562499523162842,
+            "150": 2335.614013671875,
+            "151": 0.0035429000854492188,
+            "152": 0,
+            "155": 1,
+            "156": 1,
+        })
+    );
+    assert_eq!(buffalo.get_position(), buffer.len());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_attribute_report() {
-    todo!()
+    let value = vec![
+        0x00u8,
+        0x00,
+        0x01,
+        0x00,
+        DataType::UINT8 as u8,
+        0xff,
+        0x01,
+        0x10,
+        DataType::CHAR_STR as u8,
+        0x06,
+        0x5a,
+        0x49,
+        0x47,
+        0x42,
+        0x45,
+        0x45,
+        0x02,
+        0x10,
+        DataType::BOOLEAN as u8,
+        0x01,
+    ];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0xa0, "payloadSize": value.len()}}),
+        ),
+        json!({
+            "clusterID": 0x0000,
+            "clusterName": "genBasic",
+            "attributes": {"appVersion": 0xff, "4097": "ZIGBEE", "4098": 1},
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_attribute_request() {
-    todo!()
+    let value = vec![0x02u8, 0xfe, 0xef, 0xff, 0xff, 4, 0x00, 0x00, 0x00, 0x01];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0xa4, "payloadSize": value.len()}}),
+        ),
+        json!({
+            "options": 0x02,
+            "manufacturerID": 0xeffe,
+            "records": [{"clusterID": 0xffff, "attributes": [0x0000, 0x0100]}],
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_attribute_response() {
-    todo!()
+    let value = vec![
+        0x02u8,
+        0xfe,
+        0xef,
+        0x00,
+        0x00,
+        11,
+        0x00,
+        0x00,
+        0x00,
+        DataType::UINT8 as u8,
+        0x08,
+        0xfc,
+        0xff,
+        0x00,
+        DataType::UINT16 as u8,
+        0x00,
+        0x10,
+    ];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0xa5, "payloadSize": value.len()}}),
+        ),
+        json!({
+            "options": 0x02,
+            "manufacturerID": 0xeffe,
+            "records": [
+                {
+                    "clusterID": 0x0000,
+                    "clusterName": "genBasic",
+                    "attributes": {
+                        "zclVersion": {"status": 0x00, "attrData": 0x08},
+                        "65532": {"status": 0x00, "attrData": 0x1000},
+                    },
+                },
+            ],
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_channel_request() {
-    todo!()
+    let value = vec![0xfau8];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"payloadSize": value.len(), "commandID": 0xe3}}),
+        ),
+        json!({"nextChannel": 0xa, "nextNextChannel": 0xf})
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_commissioning() {
-    todo!()
+    let value = vec![0xffu8, 0x00];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"payloadSize": value.len(), "commandID": 0xe0}}),
+        ),
+        json!({
+            "deviceID": 0xff,
+            "options": 0x00,
+            "extendedOptions": 0x00,
+            "securityKey": vec![0u8; 16],
+            "keyMic": 0,
+            "outgoingCounter": 0,
+            "manufacturerID": 0,
+            "modelID": 0,
+            "numGpdCommands": 0,
+            "gpdCommandIdList": [],
+            "numServerClusters": 0,
+            "numClientClusters": 0,
+            "gpdServerClusters": [],
+            "gpdClientClusters": [],
+            "applicationInfo": 0x00,
+            "genericSwitchConfig": 0,
+            "currentContactStatus": 0,
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_commissioning_all_options() {
-    todo!()
+    let value = vec![
+        0xffu8,
+        0x80 | 0x04,
+        0x20 | 0x40 | 0x80,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0x01 | 0x02 | 0x04 | 0x08 | 0x10,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
+        5,
+        2,
+    ];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"payloadSize": value.len(), "commandID": 0xe0}}),
+        ),
+        json!({
+            "deviceID": 0xff,
+            "options": 0x80 | 0x04,
+            "extendedOptions": 0x20 | 0x40 | 0x80,
+            "securityKey": vec![0u8; 16],
+            "keyMic": 0,
+            "outgoingCounter": 0,
+            "manufacturerID": 0,
+            "modelID": 0,
+            "numGpdCommands": 0,
+            "gpdCommandIdList": [],
+            "numServerClusters": 0,
+            "numClientClusters": 0,
+            "gpdServerClusters": [],
+            "gpdClientClusters": [],
+            "applicationInfo": 0x01 | 0x02 | 0x04 | 0x08 | 0x10,
+            "genericSwitchConfig": 5,
+            "currentContactStatus": 2,
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_invalid_tuya_data_point_values_list_as_empty_array() {
-    todo!()
+    let mut buffalo = BuffaloZcl::new(vec![254, 125]);
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::LIST_TUYA_DATAPOINT_VALUES as u32,
+            &json!({}),
+        ),
+        json!([])
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_manufacturer_specific_attribute_report() {
-    todo!()
+    let value = vec![
+        0x12u8,
+        0x34,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        DataType::UINT8 as u8,
+        0x08,
+        0x01,
+        0x20,
+        DataType::CHAR_STR as u8,
+        0x06,
+        0x5a,
+        0x49,
+        0x47,
+        0x42,
+        0x45,
+        0x45,
+        0x02,
+        0x20,
+        DataType::BOOLEAN as u8,
+        0x01,
+    ];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0xa1, "payloadSize": value.len()}}),
+        ),
+        json!({
+            "manufacturerCode": 0x3412,
+            "clusterID": 0x0000,
+            "clusterName": "genBasic",
+            "attributes": {"zclVersion": 8, "8193": "ZIGBEE", "8194": 1},
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_manufacturer_specific_multi_cluster_attribute_report() {
-    todo!()
+    let value = vec![
+        0xefu8,
+        0xf3,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        DataType::UINT8 as u8,
+        0x08,
+        0xff,
+        0xfe,
+        0x00,
+        0x01,
+        DataType::UINT16 as u8,
+        0x10,
+        0x11,
+    ];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0xa3, "payloadSize": value.len()}}),
+        ),
+        json!({
+            "manufacturerCode": 0xf3ef,
+            "reports": [
+                {
+                    "clusterID": 0x0000,
+                    "clusterName": "genBasic",
+                    "attribute": "zclVersion",
+                    "attrData": 8,
+                },
+                {
+                    "clusterID": 0xfeff,
+                    "clusterName": "65279",
+                    "attribute": 0x0100,
+                    "attrData": 4368,
+                },
+            ],
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_multi_cluster_attribute_report() {
-    todo!()
+    let value = vec![
+        0xffu8,
+        0xff,
+        0x00,
+        0x00,
+        DataType::UINT32 as u8,
+        0x00,
+        0x01,
+        0x02,
+        0x03,
+        0x00,
+        0x00,
+        0x01,
+        0x00,
+        DataType::UINT8 as u8,
+        0x10,
+    ];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0xa2, "payloadSize": value.len()}}),
+        ),
+        json!({
+            "reports": [
+                {
+                    "clusterID": 0xffff,
+                    "clusterName": "65535",
+                    "attribute": 0,
+                    "attrData": 50462976u64,
+                },
+                {
+                    "clusterID": 0x0000,
+                    "clusterName": "genBasic",
+                    "attribute": "appVersion",
+                    "attrData": 0x10,
+                },
+            ],
+        })
+    );
 }
 
 #[test]
@@ -183,19 +530,54 @@ fn reads_partial_buffer_with_length_option() {
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_unhandled_command_as_empty_object_if_buffer_finished_reading() {
-    todo!()
+    let value = vec![0xff, 0x00];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    buffalo.set_position(value.len());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0x1ff, "payloadSize": value.len()}}),
+        ),
+        json!({"raw": []})
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_unhandled_command_as_object_raw_and_ignores_gpp_data_mic() {
-    todo!()
+    let value = vec![0xff, 0x00, 0x21, 0x43, 0xfe];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0x1ff, "payloadSize": 2}}),
+        ),
+        json!({"raw": &value[..value.len() - 3]})
+    );
+
+    let value = vec![0xff, 0x00, 0x21, 0x43, 0xfe, 0xf1, 0xf2, 0xf3, 0xf4];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0x1ff, "payloadSize": 2}}),
+        ),
+        json!({"raw": &value[..value.len() - 7]})
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_unhandled_command_as_object_raw_if_buffer_still_has_bytes_to_read() {
-    todo!()
+    let value = vec![0xff, 0x00];
+    let mut buffalo = BuffaloZcl::new(value.clone());
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0x1ff, "payloadSize": 2}}),
+        ),
+        json!({"raw": value})
+    );
 }
 
 #[test]
@@ -216,26 +598,65 @@ fn reads_whole_buffer_without_length_option() {
 #[test]
 #[ignore = "not implemented yet"]
 fn throws_when_read_strctured_select_indicator_is_outside_range() {
-    todo!()
+    let result = std::panic::catch_unwind(|| {
+        let mut buffalo = BuffaloZcl::new(vec![17]);
+        buffalo.read(BuffaloZclDataType::STRUCTURED_SELECTOR as u32, &json!({}));
+    });
+    assert!(result.is_err());
+
+    let result = std::panic::catch_unwind(|| {
+        let mut buffalo = BuffaloZcl::new(vec![17, 1, 2, 3]);
+        buffalo.read(BuffaloZclDataType::STRUCTURED_SELECTOR as u32, &json!({}));
+    });
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn throws_when_read_thermo_transitions_list_is_missing_required_payload_options() {
-    todo!()
+    let options = [
+        json!({}),
+        json!({"payload": {}}),
+        json!({"payload": {"mode": 1}}),
+        json!({"payload": {"numoftrans": 1}}),
+    ];
+
+    for options in options {
+        let result = std::panic::catch_unwind(|| {
+            let mut buffalo = BuffaloZcl::new(vec![0; 1]);
+            buffalo.read(BuffaloZclDataType::LIST_THERMO_TRANSITIONS as u32, &options);
+        });
+        assert!(result.is_err());
+    }
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn throws_when_read_is_missing_payload_payload_size_option() {
-    todo!()
+    let result = std::panic::catch_unwind(|| {
+        let mut buffalo = BuffaloZcl::new(vec![0; 1]);
+        buffalo.read(
+            BuffaloZclDataType::GPD_FRAME as u32,
+            &json!({"payload": {"commandID": 0xa1}}),
+        );
+    });
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn throws_when_write_use_data_type_is_missing_data_type_option_and_value_isnt_buffer_or_number_array(
 ) {
-    todo!()
+    let result = std::panic::catch_unwind(|| {
+        let payload = json!(1);
+        let mut buffalo = BuffaloZcl::new(vec![0; 2]);
+        buffalo.write(
+            BuffaloZclDataType::USE_DATA_TYPE as u32,
+            &payload,
+            &json!({}),
+        );
+    });
+    assert!(result.is_err());
 }
 
 #[test]
@@ -271,7 +692,37 @@ fn writes_reads_date() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_reads_mi_boxer_zones_list() {
-    todo!()
+    let value = json!([
+        {"zoneNum": 1, "groupId": 0x2b84},
+        {"zoneNum": 2, "groupId": 0x2b98},
+        {"zoneNum": 3, "groupId": 0x2bac},
+        {"zoneNum": 4, "groupId": 0x2bc0},
+        {"zoneNum": 5, "groupId": 0x2bd4},
+        {"zoneNum": 6, "groupId": 0x2be8},
+        {"zoneNum": 7, "groupId": 0x2bfc},
+        {"zoneNum": 8, "groupId": 0x2c10},
+    ]);
+    let expected_written = vec![
+        8, 0x84, 0x2b, 1, 0x98, 0x2b, 2, 0xac, 0x2b, 3, 0xc0, 0x2b, 4, 0xd4, 0x2b, 5, 0xe8, 0x2b,
+        6, 0xfc, 0x2b, 7, 0x10, 0x2c, 8,
+    ];
+    let mut buffalo = BuffaloZcl::new(vec![0; 50]);
+    buffalo.write(
+        BuffaloZclDataType::LIST_MIBOXER_ZONES as u32,
+        &value,
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_position(), expected_written.len());
+    assert_eq!(buffalo.get_written(), expected_written);
+
+    buffalo.set_position(0);
+    assert_eq!(
+        buffalo.read(
+            BuffaloZclDataType::LIST_MIBOXER_ZONES as u32,
+            &json!({"length": 8}),
+        ),
+        value
+    );
 }
 
 #[test]
@@ -320,7 +771,22 @@ fn writes_reads_use_data_type_as_buffer_when_missing_data_type_option() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_reads_big_endian_uint24() {
-    todo!()
+    let value = json!(16777200);
+    let expected_written = vec![0xff, 0xff, 0xf0];
+    let mut buffalo = BuffaloZcl::new(vec![0; 10]);
+    buffalo.write(
+        BuffaloZclDataType::BIG_ENDIAN_UINT24 as u32,
+        &value,
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_position(), expected_written.len());
+    assert_eq!(buffalo.get_written(), expected_written);
+
+    buffalo.set_position(0);
+    assert_eq!(
+        buffalo.read(BuffaloZclDataType::BIG_ENDIAN_UINT24 as u32, &json!({})),
+        value
+    );
 }
 
 #[test]
@@ -419,13 +885,27 @@ fn writes_reads_zone_info_list() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_channel_configuration() {
-    todo!()
+    let expected = vec![1u8, 0xf];
+    let mut buffalo = BuffaloZcl::new(vec![0; 2]);
+    buffalo.write(
+        BuffaloZclDataType::GPD_FRAME as u32,
+        &json!({"commandID": 0xf3, "operationalChannel": 0xf, "basic": false}),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_written(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_channel_configuration_basic() {
-    todo!()
+    let expected = vec![1u8, 0x1f];
+    let mut buffalo = BuffaloZcl::new(vec![0; 2]);
+    buffalo.write(
+        BuffaloZclDataType::GPD_FRAME as u32,
+        &json!({"commandID": 0xf3, "operationalChannel": 0xf, "basic": true}),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_written(), expected);
 }
 
 #[test]
@@ -442,19 +922,57 @@ fn writes_char_str_from_number_array() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_commissioning() {
-    todo!()
+    let expected = vec![1u8, 0];
+    let mut buffalo = BuffaloZcl::new(vec![0; 2]);
+    buffalo.write(
+        BuffaloZclDataType::GPD_FRAME as u32,
+        &json!({
+            "commandID": 0xf0,
+            "options": 0,
+            "panID": 0,
+            "securityKey": vec![0u8; 16],
+            "keyMic": 0,
+            "frameCounter": 0,
+        }),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_written(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_commissioning_all_options() {
-    todo!()
+    let expected = vec![
+        27, 0b11111, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
+    let mut buffalo = BuffaloZcl::new(vec![0; 28]);
+    buffalo.write(
+        BuffaloZclDataType::GPD_FRAME as u32,
+        &json!({
+            "commandID": 0xf0,
+            "options": 0b11111,
+            "panID": 0xffff,
+            "securityKey": vec![0u8; 16],
+            "keyMic": 0,
+            "frameCounter": 0,
+        }),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_written(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_custom_reply() {
-    todo!()
+    let expected = vec![6u8, 90, 73, 71, 66, 69, 69];
+    let mut buffalo = BuffaloZcl::new(vec![0; 7]);
+    buffalo.write(
+        BuffaloZclDataType::GPD_FRAME as u32,
+        &json!({"commandID": 0xf4, "buffer": b"ZIGBEE".to_vec()}),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_written(), expected);
 }
 
 #[test]
@@ -511,19 +1029,39 @@ fn writes_nothing() {
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_nothing_for_unhandled_command() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
-fn zcl_buffalo() {
-    todo!()
+    let mut buffalo = BuffaloZcl::new(vec![0; 7]);
+    buffalo.write(
+        BuffaloZclDataType::GPD_FRAME as u32,
+        &json!({"commandID": 0x1ff}),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_written(), Vec::<u8>::new());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn workaround_reads_char_str_as_mi_struct_for_xiaomi_attrid_id_65281() {
-    todo!()
+    let expected_value = json!({
+        "1": 3285,
+        "3": 33,
+        "4": 5032,
+        "5": 43,
+        "6": 327680,
+        "8": 516,
+        "10": 0,
+        "100": 0,
+    });
+    let buffer = vec![
+        34u8, 1, 0x21, 0xd5, 0x0c, 3, 0x28, 33, 4, 0x21, 0xa8, 0x13, 5, 0x21, 0x2b, 0x00, 6, 0x24,
+        0x00, 0x00, 0x05, 0x00, 0, 8, 0x21, 0x04, 0x02, 10, 0x21, 0x00, 0x00, 100, 0x10, 0,
+    ];
+    let mut buffalo = BuffaloZcl::new(buffer.clone());
+
+    assert_eq!(
+        buffalo.read(BuffaloZclDataType::MI_STRUCT as u32, &json!({})),
+        expected_value
+    );
+    assert_eq!(buffalo.get_position(), buffer.len());
 }
 
 // Upstream: it.each([...])("Writes & Reads using base class for %s", ...)
@@ -1390,6 +1928,107 @@ fn writes_reads_thermo_transitions_list() {
             buffalo.read(
                 BuffaloZclDataType::LIST_THERMO_TRANSITIONS as u32,
                 &read_options,
+            ),
+            value
+        );
+        assert_eq!(buffalo.get_position(), written.len());
+    }
+}
+
+// Upstream: it.each([...])("Writes & Reads Structured Selector for %s", ...)
+#[test]
+#[ignore = "not implemented yet"]
+fn writes_reads_structured_selector_for() {
+    let cases: [(&str, serde_json::Value, Vec<u8>); 2] = [
+        (
+            "whole",
+            json!({"indicatorType": StructuredIndicatorType::Whole as u8}),
+            vec![StructuredIndicatorType::Whole as u8],
+        ),
+        (
+            "indexes only",
+            json!({"indexes": [3, 4, 5, 256]}),
+            vec![4, 3, 0, 4, 0, 5, 0, 0, 1],
+        ),
+    ];
+
+    for (_name, value, written) in cases {
+        let mut buffalo = BuffaloZcl::new(vec![0; 50]);
+        buffalo.write(
+            BuffaloZclDataType::STRUCTURED_SELECTOR as u32,
+            &value,
+            &json!({}),
+        );
+        assert_eq!(buffalo.get_position(), written.len());
+        assert_eq!(buffalo.get_written(), written);
+
+        buffalo.set_position(0);
+        assert_eq!(
+            buffalo.read(BuffaloZclDataType::STRUCTURED_SELECTOR as u32, &json!({})),
+            value
+        );
+        assert_eq!(buffalo.get_position(), written.len());
+    }
+}
+
+// Upstream: it.each([...])("Writes Structured Selector for %s", ...)
+#[test]
+#[ignore = "not implemented yet"]
+fn writes_structured_selector_for() {
+    let cases: [(&str, u8); 2] = [
+        ("Add", StructuredIndicatorType::WriteAdd as u8),
+        ("Remove", StructuredIndicatorType::WriteRemove as u8),
+    ];
+
+    for (_name, indicator) in cases {
+        let value = json!({"indicatorType": indicator});
+        let written = vec![indicator];
+        let mut buffalo = BuffaloZcl::new(vec![0; 50]);
+        buffalo.write(
+            BuffaloZclDataType::STRUCTURED_SELECTOR as u32,
+            &value,
+            &json!({}),
+        );
+        assert_eq!(buffalo.get_position(), written.len());
+        assert_eq!(buffalo.get_written(), written);
+    }
+}
+
+// Upstream: it.each([...])("Writes & Reads Tuya Data Point Values List %s", ...)
+#[test]
+#[ignore = "not implemented yet"]
+fn writes_reads_tuya_data_point_values_list() {
+    let cases: [(&str, serde_json::Value, Vec<u8>); 2] = [
+        (
+            "single",
+            json!([{"dp": 254, "datatype": 125, "data": [1, 3, 5]}]),
+            vec![254, 125, 0, 3, 1, 3, 5],
+        ),
+        (
+            "multiple",
+            json!([
+                {"dp": 254, "datatype": 125, "data": [1, 3, 5]},
+                {"dp": 125, "datatype": 254, "data": [5, 0, 1, 5]},
+            ]),
+            vec![254, 125, 0, 3, 1, 3, 5, 125, 254, 0, 4, 5, 0, 1, 5],
+        ),
+    ];
+
+    for (_name, value, written) in cases {
+        let mut buffalo = BuffaloZcl::new(vec![0; written.len()]);
+        buffalo.write(
+            BuffaloZclDataType::LIST_TUYA_DATAPOINT_VALUES as u32,
+            &value,
+            &json!({}),
+        );
+        assert_eq!(buffalo.get_position(), written.len());
+        assert_eq!(buffalo.get_written(), written);
+
+        buffalo.set_position(0);
+        assert_eq!(
+            buffalo.read(
+                BuffaloZclDataType::LIST_TUYA_DATAPOINT_VALUES as u32,
+                &json!({}),
             ),
             value
         );

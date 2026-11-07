@@ -148,3 +148,14 @@ pub enum BuffaloZclDataType {
     BIG_ENDIAN_UINT24 = 1013,
     MI_STRUCT = 1014,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum StructuredIndicatorType {
+    // Read: only for attributes of type other than array or structure
+    Whole = 0x00,
+    // Add element to the set/bag
+    WriteAdd = 0x10,
+    // Remove element from the set/bag
+    WriteRemove = 0x20,
+}
