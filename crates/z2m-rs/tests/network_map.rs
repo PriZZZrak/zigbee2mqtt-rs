@@ -305,7 +305,6 @@ fn assert_published(network_map: &NetworkMap, expected: Value) {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn output_raw_networkmap() {
     let mut network_map = setup();
     mock_lqi(&mut network_map);
@@ -317,7 +316,6 @@ async fn output_raw_networkmap() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn output_graphviz_networkmap() {
     let mut network_map = setup();
     mock_lqi(&mut network_map);
@@ -371,7 +369,6 @@ async fn output_graphviz_networkmap() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn output_plantuml_networkmap() {
     let mut network_map = setup();
     mock_lqi(&mut network_map);
@@ -485,7 +482,6 @@ Coordinator
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_throw_error_when_requesting_invalid_type() {
     let mut network_map = setup();
     mock_lqi(&mut network_map);
@@ -508,7 +504,6 @@ async fn should_throw_error_when_requesting_invalid_type() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_exclude_disabled_devices_from_networkmap() {
     let mut network_map = setup();
     network_map.disable_device(BULB);
@@ -522,7 +517,6 @@ async fn should_exclude_disabled_devices_from_networkmap() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_retrying_request_when_first_attempt_fails() {
     let mut network_map = setup();
     network_map.disable_device(BULB);
