@@ -41,6 +41,8 @@ fn setup() -> Bind {
     bind.add_device("remote", "0x0017880104e45517", &["default", "1", "2"]);
     bind.add_device("bulb_color", "0x000b57fffec6a5b3", &["default", "1"]);
     bind.add_device("bulb", "0x000b57fffec6a5b2", &["default", "1"]);
+    bind.add_device("coordinator", "0x00124b00120144ae", &["default", "1"]);
+    bind.add_device("button", "0x00158d0001f4b5a2", &["default", "1"]);
     bind.add_group("group_1");
     bind
 }
@@ -150,10 +152,34 @@ fn filters_out_unsupported_clusters_for_reporting_setup() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_allow_to_bind_to_coordinator_by_ieee_addr() {
-    todo!()
+async fn should_allow_to_bind_to_coordinator_by_ieee_addr() {
+    let mut bind = setup();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "0x00124b00120144ae", "clusters": ["genOnOff"]}),
+    );
+
+    assert_eq!(
+        bind.endpoint("remote", "default").bind_calls,
+        vec![("genOnOff".to_string(), "0x00124b00120144ae".to_string())]
+    );
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {
+                "from": "remote",
+                "from_endpoint": "default",
+                "to": "0x00124b00120144ae",
+                "clusters": ["genOnOff"],
+                "failed": [],
+            },
+            "status": "ok",
+        })
+    ));
 }
 
 #[test]
@@ -168,10 +194,34 @@ fn should_bind_from_non_default_endpoint_names() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_bind_only_specified_clusters() {
-    todo!()
+async fn should_bind_only_specified_clusters() {
+    let mut bind = setup();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "bulb_color", "clusters": ["genOnOff"]}),
+    );
+
+    assert_eq!(
+        bind.endpoint("remote", "default").bind_calls,
+        vec![("genOnOff".to_string(), "bulb_color".to_string())]
+    );
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {
+                "from": "remote",
+                "from_endpoint": "default",
+                "to": "bulb_color",
+                "clusters": ["genOnOff"],
+                "failed": [],
+            },
+            "status": "ok",
+        })
+    ));
 }
 
 #[test]
@@ -192,28 +242,127 @@ fn should_bind_to_device_and_configure_reporting() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_bind_to_group_by_number() {
-    todo!()
+async fn should_bind_to_group_by_number() {
+    let mut bind = setup();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "1"}),
+    );
+
+    let endpoint = bind.endpoint("remote", "default");
+    assert_eq!(endpoint.bind_calls.len(), 3);
+    assert!(endpoint
+        .bind_calls
+        .contains(&("genOnOff".to_string(), "1".to_string())));
+    assert!(endpoint
+        .bind_calls
+        .contains(&("genLevelCtrl".to_string(), "1".to_string())));
+    assert!(endpoint
+        .bind_calls
+        .contains(&("genScenes".to_string(), "1".to_string())));
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {
+                "from": "remote",
+                "from_endpoint": "default",
+                "to": "1",
+                "clusters": ["genScenes", "genOnOff", "genLevelCtrl"],
+                "failed": [],
+            },
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_bind_to_groups() {
-    todo!()
+async fn should_bind_to_groups() {
+    let mut bind = setup();
+    bind.add_group_member("group_1", "bulb", "1");
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "group_1"}),
+    );
+
+    let endpoint = bind.endpoint("remote", "default");
+    assert_eq!(endpoint.bind_calls.len(), 3);
+    assert!(endpoint
+        .bind_calls
+        .contains(&("genOnOff".to_string(), "group_1".to_string())));
+    assert!(endpoint
+        .bind_calls
+        .contains(&("genLevelCtrl".to_string(), "group_1".to_string())));
+    assert!(endpoint
+        .bind_calls
+        .contains(&("genScenes".to_string(), "group_1".to_string())));
+
+    let member = bind.endpoint("bulb", "1");
+    assert_eq!(member.configure_reporting.len(), 2);
+    assert!(member.configure_reporting.contains(&(
+            "genOnOff".to_string(),
+            json!([{"attribute": "onOff", "maximumReportInterval": 3600, "minimumReportInterval": 0, "reportableChange": 0}])
+        )));
+    assert!(member.configure_reporting.contains(&(
+            "genLevelCtrl".to_string(),
+            json!([{"attribute": "currentLevel", "maximumReportInterval": 3600, "minimumReportInterval": 5, "reportableChange": 1}])
+        )));
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({
+            "data": {
+                "from": "remote",
+                "from_endpoint": "default",
+                "to": "group_1",
+                "clusters": ["genScenes", "genOnOff", "genLevelCtrl"],
+                "failed": [],
+            },
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_log_error_when_there_is_nothing_to_bind() {
-    todo!()
+async fn should_log_error_when_there_is_nothing_to_bind() {
+    let mut bind = setup();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "button"}),
+    );
+
+    assert!(bind.endpoint("remote", "default").bind_calls.is_empty());
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({"data": {}, "status": "error", "error": "Nothing to bind"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_log_when_bind_fails() {
-    todo!()
+async fn should_log_when_bind_fails() {
+    let mut bind = setup();
+    bind.bind_error = true;
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/bind",
+        &json!({"from": "remote", "to": "bulb_color"}),
+    );
+
+    assert_eq!(bind.endpoint("remote", "default").bind_calls.len(), 3);
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/bind",
+        json!({"data": {}, "status": "error", "error": "Failed to bind"})
+    ));
 }
 
 #[test]
@@ -252,16 +401,106 @@ async fn should_throw_error_on_invalid_payload() {
     ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_unbind() {
-    todo!()
+async fn should_unbind() {
+    let mut bind = setup();
+    bind.endpoint("bulb_color", "1").binds = vec![
+        ("genOnOff".to_string(), "coordinator".to_string()),
+        ("genLevelCtrl".to_string(), "coordinator".to_string()),
+        ("lightingColorCtrl".to_string(), "coordinator".to_string()),
+    ];
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/unbind",
+        &json!({"from": "remote", "to": "bulb_color"}),
+    );
+
+    let endpoint = bind.endpoint("remote", "default");
+    assert_eq!(endpoint.unbind_calls.len(), 3);
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genOnOff".to_string(), "bulb_color".to_string())));
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genLevelCtrl".to_string(), "bulb_color".to_string())));
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genScenes".to_string(), "bulb_color".to_string())));
+
+    let target = bind.endpoint("bulb_color", "default");
+    assert_eq!(target.configure_reporting.len(), 3);
+    assert!(target.configure_reporting.contains(&(
+            "genOnOff".to_string(),
+            json!([{"attribute": "onOff", "maximumReportInterval": 0xffff, "minimumReportInterval": 0, "reportableChange": 0}])
+        )));
+    assert!(target.configure_reporting.contains(&(
+            "genLevelCtrl".to_string(),
+            json!([{"attribute": "currentLevel", "maximumReportInterval": 0xffff, "minimumReportInterval": 5, "reportableChange": 1}])
+        )));
+    assert!(target.configure_reporting.contains(&(
+            "lightingColorCtrl".to_string(),
+            json!([
+                {"attribute": "colorTemperature", "minimumReportInterval": 5, "maximumReportInterval": 0xffff, "reportableChange": 1},
+                {"attribute": "currentX", "minimumReportInterval": 5, "maximumReportInterval": 0xffff, "reportableChange": 1},
+                {"attribute": "currentY", "minimumReportInterval": 5, "maximumReportInterval": 0xffff, "reportableChange": 1},
+            ])
+        )));
+    assert_eq!(
+        bind.devices["bulb_color"].ieee_address,
+        "0x000b57fffec6a5b3"
+    );
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/unbind",
+        json!({
+            "data": {
+                "from": "remote",
+                "from_endpoint": "default",
+                "to": "bulb_color",
+                "clusters": ["genScenes", "genOnOff", "genLevelCtrl"],
+                "failed": [],
+            },
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_unbind_coordinator() {
-    todo!()
+async fn should_unbind_coordinator() {
+    let mut bind = setup();
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/unbind",
+        &json!({"from": "remote", "to": "Coordinator"}),
+    );
+
+    let endpoint = bind.endpoint("remote", "default");
+    assert_eq!(endpoint.unbind_calls.len(), 3);
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genOnOff".to_string(), "Coordinator".to_string())));
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genLevelCtrl".to_string(), "Coordinator".to_string())));
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genScenes".to_string(), "Coordinator".to_string())));
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/unbind",
+        json!({
+            "data": {
+                "from": "remote",
+                "from_endpoint": "default",
+                "to": "Coordinator",
+                "clusters": ["genScenes", "genOnOff", "genLevelCtrl"],
+                "failed": [],
+            },
+            "status": "ok",
+        })
+    ));
 }
 
 #[test]
@@ -270,22 +509,81 @@ fn should_unbind_from_default_bind_group() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_unbind_from_group() {
-    todo!()
+async fn should_unbind_from_group() {
+    let mut bind = setup();
+    bind.add_group_member("group_1", "bulb", "1");
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/unbind",
+        &json!({"from": "remote", "to": "group_1"}),
+    );
+
+    let endpoint = bind.endpoint("remote", "default");
+    assert_eq!(endpoint.unbind_calls.len(), 3);
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genOnOff".to_string(), "group_1".to_string())));
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genLevelCtrl".to_string(), "group_1".to_string())));
+    assert!(endpoint
+        .unbind_calls
+        .contains(&("genScenes".to_string(), "group_1".to_string())));
+    assert!(has(
+        &bind,
+        "zigbee2mqtt/bridge/response/device/unbind",
+        json!({
+            "data": {
+                "from": "remote",
+                "from_endpoint": "default",
+                "to": "group_1",
+                "clusters": ["genScenes", "genOnOff", "genLevelCtrl"],
+                "failed": [],
+            },
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_unbind_from_group_with_skip_disable_reporting_false() {
-    todo!()
+async fn should_unbind_from_group_with_skip_disable_reporting_false() {
+    let mut bind = setup();
+    bind.add_group_member("group_1", "bulb_2", "1");
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/unbind",
+        &json!({"from": "remote", "to": "group_1", "skip_disable_reporting": false}),
+    );
+
+    assert_eq!(bind.endpoint("remote", "default").unbind_calls.len(), 3);
+    let member = bind.endpoint("bulb_2", "1");
+    assert_eq!(member.configure_reporting.len(), 2);
+    assert!(member.configure_reporting.contains(&(
+            "genLevelCtrl".to_string(),
+            json!([{"attribute": "currentLevel", "maximumReportInterval": 65535, "minimumReportInterval": 5, "reportableChange": 1}])
+        )));
+    assert!(member.configure_reporting.contains(&(
+            "genOnOff".to_string(),
+            json!([{"attribute": "onOff", "maximumReportInterval": 65535, "minimumReportInterval": 0, "reportableChange": 0}])
+        )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_unbind_from_group_with_skip_disable_reporting_true() {
-    todo!()
+async fn should_unbind_from_group_with_skip_disable_reporting_true() {
+    let mut bind = setup();
+    bind.add_group_member("group_1", "bulb_2", "1");
+
+    bind.on_message(
+        "zigbee2mqtt/bridge/request/device/unbind",
+        &json!({"from": "remote", "to": "group_1", "skip_disable_reporting": true}),
+    );
+
+    assert_eq!(bind.endpoint("remote", "default").unbind_calls.len(), 3);
+    assert!(bind.endpoint("bulb_2", "1").configure_reporting.is_empty());
 }
 
 #[tokio::test]
