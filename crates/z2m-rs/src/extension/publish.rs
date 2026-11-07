@@ -25,6 +25,9 @@ pub struct PublishDevice {
     pub has_definition: bool,
     /// endpoint alias (left/right) -> endpoint id.
     pub endpoint_aliases: BTreeMap<String, String>,
+    /// transition in deciseconds.
+    pub transition: Option<u32>,
+    pub invert_cover: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -33,6 +36,7 @@ pub struct PublishGroup {
     pub members: Vec<(String, String)>,
     pub commands: Vec<(String, String, Value, Value)>,
     pub optimistic: bool,
+    pub transition: Option<u32>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -70,6 +74,8 @@ impl Publish {
                 filtered_optimistic: Vec::new(),
                 has_definition: true,
                 endpoint_aliases: BTreeMap::new(),
+                transition: None,
+                invert_cover: false,
             },
         );
     }
