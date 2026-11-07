@@ -20,6 +20,7 @@ pub struct DeviceAvailability {
     pub ping_calls: Vec<bool>,
     pub fail_first_ping: bool,
     pub removed: bool,
+    pub backoff_enabled: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -35,6 +36,13 @@ pub struct Availability {
     pub ping_queue: Vec<String>,
     pub stopped: bool,
     pub endpoint_reads: usize,
+    pub max_jitter_ms: u64,
+    pub backoff_enabled: bool,
+    pub pause_on_backoff_gt: Option<f64>,
+    /// Per-device jitter and backoff overrides/multiplication state.
+    pub jitter_ms: BTreeMap<String, u64>,
+    pub backoff_multiplier: BTreeMap<String, f64>,
+    pub paused: std::collections::BTreeSet<String>,
 }
 
 impl Availability {
@@ -43,6 +51,8 @@ impl Availability {
             enabled: true,
             active_timeout_minutes: 10,
             passive_timeout_minutes: 25 * 60,
+            max_jitter_ms: 1000,
+            backoff_enabled: true,
             ..Default::default()
         }
     }
@@ -63,6 +73,7 @@ impl Availability {
                 ping_calls: Vec::new(),
                 fail_first_ping: false,
                 removed: false,
+                backoff_enabled: true,
             },
         );
     }
@@ -96,6 +107,35 @@ impl Availability {
 
     pub fn set_last_seen_minutes_ago(&mut self, device: &str, minutes: u64) {
         self.devices.get_mut(device).unwrap().last_seen_minutes_ago = minutes;
+    }
+
+    pub fn set_max_jitter(&mut self, milliseconds: u64) {
+        self.max_jitter_ms = milliseconds;
+    }
+
+    pub fn set_backoff_enabled(&mut self, enabled: bool) {
+        self.backoff_enabled = enabled;
+    }
+
+    pub fn set_pause_on_backoff_gt(&mut self, value: f64) {
+        self.pause_on_backoff_gt = Some(value);
+    }
+
+    pub fn set_device_max_jitter(&mut self, device: &str, milliseconds: u64) {
+        self.jitter_ms.insert(device.to_string(), milliseconds);
+    }
+
+    pub fn set_device_backoff_enabled(&mut self, device: &str, enabled: bool) {
+        self.devices.get_mut(device).unwrap().backoff_enabled = enabled;
+    }
+
+    pub fn set_device_pause_on_backoff_gt(&mut self, _device: &str, value: f64) {
+        self.pause_on_backoff_gt = Some(value);
+    }
+
+    /// Upstream `extension.start()` rejecting a second start.
+    pub async fn start_checked(&mut self) -> Result<(), String> {
+        todo!()
     }
 
     pub fn set_fail_first_ping(&mut self, device: &str) {

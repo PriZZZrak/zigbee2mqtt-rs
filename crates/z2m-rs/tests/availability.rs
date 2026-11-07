@@ -59,6 +59,28 @@ fn pings(availability: &Availability, device: &str) -> Vec<bool> {
     availability.devices[device].ping_calls.clone()
 }
 
+fn setup_with_jitter_devices() -> Availability {
+    let mut availability = setup();
+    for device in [
+        "TS0601_thermostat",
+        "bulb_2",
+        "ZNCZ02LM",
+        "GLEDOPTO_2ID",
+        "QBKG03LM",
+        "hue_twilight",
+    ] {
+        availability.add_device(device, false);
+    }
+    availability
+}
+
+fn total_pings(availability: &Availability, devices: &[&str]) -> usize {
+    devices
+        .iter()
+        .map(|device| pings(availability, device).len())
+        .sum()
+}
+
 #[tokio::test]
 #[ignore = "not implemented yet"]
 async fn should_allow_to_be_disabled() {
@@ -237,10 +259,15 @@ async fn should_ping_on_startup_for_enabled_and_unavailable_devices() {
     assert!(pings(&availability, "bulb_color_2").is_empty()); // enabled/available
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_prevent_instance_restart() {
-    todo!()
+async fn should_prevent_instance_restart() {
+    let mut availability = setup();
+    availability.start();
+    availability.stop();
+
+    let result = availability.start_checked().await;
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -500,44 +527,220 @@ async fn shouldnt_do_anything_for_a_device_when_availability_false_is_set_for_de
     assert!(pings(&availability, "bulb_color_2").is_empty());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn allows_to_disable_backoff() {
-    todo!()
+async fn allows_to_disable_backoff() {
+    let mut availability = setup();
+    availability.set_max_jitter(0);
+    availability.set_backoff_enabled(false);
+    availability.start();
+    availability.on_last_seen_changed("bulb_color");
+    availability.set_fail_first_ping("bulb_color");
+
+    availability.advance_seconds(10 * 60 + 30); // 10:30
+    assert_eq!(pings(&availability, "bulb_color"), vec![true, false]);
+
+    availability.advance_seconds(9 * 60 + 30); // 20:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 2);
+
+    availability.advance_seconds(30); // 20:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 3);
+
+    availability.advance_seconds(9 * 60 + 30); // 30:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 3);
+
+    availability.advance_seconds(30); // 30:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 4);
+
+    availability.advance_seconds(9 * 60 + 30); // 40:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 4);
+
+    availability.advance_seconds(30); // 40:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 5);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn clamps_the_ping_delay_to_the_maximum_supported_timeout() {
-    todo!()
+async fn clamps_the_ping_delay_to_the_maximum_supported_timeout() {
+    let mut availability = setup();
+    // ~27.8 days
+    availability.set_timeout("bulb_color", 40000);
+    availability.set_device_max_jitter("bulb_color", 0);
+    availability.start();
+
+    // unclamped, the delay collapses to 1ms, so pings would already be looping by now
+    availability.advance_seconds(1);
+
+    assert!(pings(&availability, "bulb_color").is_empty());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn does_not_trigger_backoff_on_ping_success() {
-    todo!()
+async fn does_not_trigger_backoff_on_ping_success() {
+    let mut availability = setup();
+    availability.set_max_jitter(0);
+    availability.start();
+    availability.on_last_seen_changed("bulb_color");
+
+    availability.advance_seconds(10 * 60 + 30); // 10:30
+    assert_eq!(pings(&availability, "bulb_color"), vec![true]);
+
+    availability.advance_seconds(10 * 60 + 30); // 21:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 2);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn jitters_pings() {
-    todo!()
+async fn jitters_pings() {
+    let mut availability = setup_with_jitter_devices();
+    availability.set_device_max_jitter("hue_twilight", 1000);
+    availability.set_device_backoff_enabled("GLEDOPTO_2ID", false);
+    availability.set_device_pause_on_backoff_gt("QBKG03LM", 1.5);
+    availability.start();
+
+    let devices = [
+        "bulb_color",
+        "TS0601_thermostat",
+        "bulb_2",
+        "ZNCZ02LM",
+        "GLEDOPTO_2ID",
+        "QBKG03LM",
+        "hue_twilight",
+    ];
+
+    availability.advance_minutes(10);
+    assert_eq!(total_pings(&availability, &devices), 0);
+
+    availability.advance_seconds(2); // 10:02
+    assert_eq!(pings(&availability, "hue_twilight").len(), 1); // max_jitter: 1000
+
+    availability.advance_seconds(8); // 10:10
+    let called = total_pings(&availability, &devices);
+    assert!(called < 7);
+
+    availability.advance_seconds(20); // 10:20
+    let called = total_pings(&availability, &devices);
+
+    availability.advance_seconds(35); // 10:35
+    assert_eq!(total_pings(&availability, &devices), 7);
+    let _ = called;
+
+    for device in devices {
+        assert_eq!(pings(&availability, device).len(), 1);
+    }
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn pauses_when_backoff_reaches_configured_value_and_unpauses_on_last_seen() {
-    todo!()
+async fn pauses_when_backoff_reaches_configured_value_and_unpauses_on_last_seen() {
+    let mut availability = setup_with_jitter_devices();
+    availability.set_max_jitter(0);
+    availability.set_pause_on_backoff_gt(3.0);
+    availability.set_device_pause_on_backoff_gt("QBKG03LM", 1.5);
+    availability.start();
+    availability.on_last_seen_changed("bulb_color");
+    availability.on_last_seen_changed("QBKG03LM");
+
+    availability.set_fail_first_ping("bulb_color");
+    availability.set_fail_first_ping("QBKG03LM");
+
+    availability.advance_seconds(10 * 60 + 30); // 10:30
+    assert_eq!(pings(&availability, "bulb_color"), vec![true, false]);
+    assert_eq!(pings(&availability, "QBKG03LM"), vec![true, false]);
+
+    availability.advance_seconds(14 * 60 + 30); // 25:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 2);
+    assert_eq!(pings(&availability, "QBKG03LM").len(), 2);
+
+    availability.advance_seconds(30); // 25:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 3);
+    assert_eq!(pings(&availability, "QBKG03LM").len(), 3);
+
+    availability.advance_seconds(29 * 60 + 30); // 55:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 3);
+    assert_eq!(pings(&availability, "QBKG03LM").len(), 3);
+
+    availability.advance_seconds(30); // 55:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 4);
+    assert_eq!(pings(&availability, "QBKG03LM").len(), 3);
+
+    availability.advance_seconds(100 * 60);
+    assert_eq!(pings(&availability, "bulb_color").len(), 4);
+    assert_eq!(pings(&availability, "QBKG03LM").len(), 3);
+
+    availability.advance_seconds(100 * 60);
+    assert_eq!(pings(&availability, "bulb_color").len(), 4);
+    assert_eq!(pings(&availability, "QBKG03LM").len(), 3);
+
+    availability.on_last_seen_changed("bulb_color");
+    availability.on_last_seen_changed("QBKG03LM");
+
+    availability.advance_seconds(10 * 60 + 30);
+    assert_eq!(pings(&availability, "bulb_color").len(), 5);
+    assert_eq!(pings(&availability, "QBKG03LM").len(), 4);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn resets_backoff_on_last_seen() {
-    todo!()
+async fn resets_backoff_on_last_seen() {
+    let mut availability = setup();
+    availability.set_max_jitter(0);
+    availability.start();
+    availability.on_last_seen_changed("bulb_color");
+
+    availability.set_fail_first_ping("bulb_color");
+
+    availability.advance_seconds(10 * 60 + 30); // 10:30
+    assert_eq!(pings(&availability, "bulb_color"), vec![true, false]);
+
+    availability.on_last_seen_changed("bulb_color");
+
+    availability.advance_seconds(10 * 60 + 30); // 21:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 3);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn triggers_backoff_on_successive_ping_failures() {
-    todo!()
+async fn triggers_backoff_on_successive_ping_failures() {
+    let mut availability = setup_with_jitter_devices();
+    availability.set_max_jitter(0);
+    availability.set_device_backoff_enabled("GLEDOPTO_2ID", false);
+    availability.start();
+    availability.on_last_seen_changed("bulb_color");
+    availability.on_last_seen_changed("GLEDOPTO_2ID");
+
+    availability.set_fail_first_ping("bulb_color");
+    availability.set_fail_first_ping("GLEDOPTO_2ID");
+
+    availability.advance_seconds(10 * 60 + 30); // 10:30
+    assert_eq!(pings(&availability, "bulb_color"), vec![true, false]);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID"), vec![true, false]);
+
+    availability.advance_seconds(14 * 60 + 30); // 25:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 2);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID").len(), 3);
+
+    availability.advance_seconds(30); // 25:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 3);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID").len(), 3);
+
+    availability.advance_seconds(29 * 60 + 30); // 55:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 3);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID").len(), 6);
+
+    availability.advance_seconds(30); // 55:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 4);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID").len(), 6);
+
+    availability.advance_seconds(59 * 60 + 30); // 115:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 4);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID").len(), 12);
+
+    availability.advance_seconds(30); // 115:30
+    assert_eq!(pings(&availability, "bulb_color").len(), 5);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID").len(), 12);
+
+    availability.advance_seconds(10 * 60 + 30); // 126:00
+    assert_eq!(pings(&availability, "bulb_color").len(), 6);
+    assert_eq!(pings(&availability, "GLEDOPTO_2ID").len(), 13);
 }
