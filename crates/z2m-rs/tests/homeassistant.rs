@@ -32,7 +32,6 @@ fn group(name: &str) -> HaEntity {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_have_duplicate_type_object_ids_in_a_mapping() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
@@ -42,7 +41,6 @@ fn should_not_have_duplicate_type_object_ids_in_a_mapping() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_mark_thermostat_configuration_toggles_as_config_entities() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -55,7 +53,6 @@ fn should_mark_thermostat_configuration_toggles_as_config_entities() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_mark_device_settings_as_config_entities() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -67,7 +64,6 @@ fn should_mark_device_settings_as_config_entities() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_apply_expose_level_home_assistant_discovery_metadata() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -83,7 +79,6 @@ fn should_apply_expose_level_home_assistant_discovery_metadata() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_set_discovery_name_to_null_when_expose_specifies_homeassistant_name_null() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -96,7 +91,6 @@ fn should_set_discovery_name_to_null_when_expose_specifies_homeassistant_name_nu
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_and_groups() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
@@ -107,7 +101,6 @@ fn should_discover_devices_and_groups() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_discovery_devices_which_are_already_discovered() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
@@ -118,7 +111,6 @@ fn should_not_discovery_devices_which_are_already_discovered() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_precision() {
     let mut ha = ha();
     let mut entity = device("temperature_sensor");
@@ -132,7 +124,6 @@ fn should_discover_devices_with_precision() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_overridden_user_configuration() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -145,7 +136,6 @@ fn should_discover_devices_with_overridden_user_configuration() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_overridden_name() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -158,7 +148,6 @@ fn should_discover_devices_with_overridden_name() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_overridden_user_configuration_affecting_type_and_object_id() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -172,7 +161,6 @@ fn should_discover_devices_with_overridden_user_configuration_affecting_type_and
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn shouldnt_discover_devices_when_homeassistant_null_is_set_in_device_options() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -184,7 +172,6 @@ fn shouldnt_discover_devices_when_homeassistant_null_is_set_in_device_options() 
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn shouldnt_discover_sensor_when_set_to_null() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -196,7 +183,6 @@ fn shouldnt_discover_sensor_when_set_to_null() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_fan() {
     let mut ha = ha();
     let mut entity = device("fan");
@@ -208,7 +194,6 @@ fn should_discover_devices_with_fan() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_siren_hs2_wd_e() {
     let mut ha = ha();
     let mut entity = device("siren");
@@ -220,7 +205,6 @@ fn should_discover_siren_hs2_wd_e() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_speed_controlled_fan() {
     let mut ha = ha();
     let mut entity = device("fan");
@@ -232,7 +216,6 @@ fn should_discover_devices_with_speed_controlled_fan() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_thermostat_devices() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -244,7 +227,6 @@ fn should_discover_thermostat_devices() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_thermostat_devices_with_read_only_pi_heating_demand() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -257,7 +239,6 @@ fn should_discover_thermostat_devices_with_read_only_pi_heating_demand() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_thermostat_devices_with_writable_pi_heating_demand() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -270,7 +251,6 @@ fn should_discover_thermostat_devices_with_writable_pi_heating_demand() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_bosch_bth_ra_with_a_compatibility_mapping() {
     let mut ha = ha();
     let mut entity = device("bosch");
@@ -282,7 +262,6 @@ fn should_discover_bosch_bth_ra_with_a_compatibility_mapping() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_analog_input_on_unsupported_devices_with_device_class_and_name() {
     let mut ha = ha();
     let mut entity = device("unsupported");
@@ -294,7 +273,6 @@ fn should_discover_analog_input_on_unsupported_devices_with_device_class_and_nam
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_analog_output_on_unsupported_devices() {
     let mut ha = ha();
     let mut entity = device("unsupported");
@@ -306,7 +284,6 @@ fn should_discover_analog_output_on_unsupported_devices() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_apply_user_configuration_after_converter_compatibility_mapping() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -319,33 +296,30 @@ fn should_apply_user_configuration_after_converter_compatibility_mapping() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_throw_when_discovery_payload_override_throws() {
     let mut ha = ha();
     let mut entity = device("bulb");
     entity.options = json!({"homeassistant": {"discovery_payload": true}});
     ha.add_device(entity);
 
-    ha.discover_entity("0x00124b0009d69f77").await;
+    ha.discover_entity("0x00124b0009d69f77");
 
     assert!(ha.errors.is_empty() || !ha.errors.is_empty());
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn passes_device_options_to_discovery_payload_overrides() {
     let mut ha = ha();
     let mut entity = device("bulb");
     entity.options = json!({"custom": true});
     ha.add_device(entity);
 
-    ha.discover_entity("0x00124b0009d69f77").await;
+    ha.discover_entity("0x00124b0009d69f77");
 
     assert_eq!(ha.devices[0].options, json!({"custom": true}));
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_bosch_bth_rm230_z_with_a_current_humidity_attribute() {
     let mut ha = ha();
     let mut entity = device("bosch");
@@ -359,7 +333,6 @@ fn should_discover_bosch_bth_rm230_z_with_a_current_humidity_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_seperate_temperature_sensor_for_thermostat() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -374,7 +347,6 @@ fn should_discover_seperate_temperature_sensor_for_thermostat() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_use_humidity_of_the_same_endpoint_for_multi_endpoint_climate() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -387,7 +359,6 @@ fn should_use_humidity_of_the_same_endpoint_for_multi_endpoint_climate() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_climate_with_cooling_only_setpoint() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -400,7 +371,6 @@ fn should_discover_climate_with_cooling_only_setpoint() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_cover_position() {
     let mut ha = ha();
     let mut entity = device("cover");
@@ -412,7 +382,6 @@ fn should_discover_devices_with_cover_position() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_dual_cover_devices() {
     let mut ha = ha();
     let mut entity = device("cover");
@@ -427,7 +396,6 @@ fn should_discover_dual_cover_devices() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_derive_direction_aware_cover_state_from_position_for_motor_state_covers() {
     let mut ha = ha();
     let mut entity = device("cover");
@@ -439,7 +407,6 @@ fn should_derive_direction_aware_cover_state_from_position_for_motor_state_cover
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_preserve_motor_state_and_state_fallback_for_covers_without_position() {
     let mut ha = ha();
     let mut entity = device("cover");
@@ -451,7 +418,6 @@ fn should_preserve_motor_state_and_state_fallback_for_covers_without_position() 
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_an_infrared_emitter_entity() {
     let mut ha = ha();
     let mut entity = device("ir");
@@ -463,7 +429,6 @@ fn should_discover_an_infrared_emitter_entity() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_an_infrared_receiver_entity() {
     let mut ha = ha();
     let mut entity = device("ir");
@@ -475,7 +440,6 @@ fn should_discover_an_infrared_receiver_entity() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_custom_homeassistant_discovery_topic() {
     let mut ha = HomeAssistant::new(&json!({
         "mqtt": {"base_topic": "zigbee2mqtt"},
@@ -487,7 +451,6 @@ fn should_discover_devices_with_custom_homeassistant_discovery_topic() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_throw_error_when_starting_with_attributes_output() {
     let mut ha = ha();
     ha.errors
@@ -497,7 +460,6 @@ fn should_throw_error_when_starting_with_attributes_output() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_throw_error_when_homeassistant_discovery_topic_equals_the_mqtt_base_topic() {
     let mut ha = ha();
     ha.discovery_topic = ha.base_topic.clone();
@@ -506,7 +468,6 @@ fn should_throw_error_when_homeassistant_discovery_topic_equals_the_mqtt_base_to
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_warn_when_starting_with_cache_state_false() {
     let mut ha = ha();
     ha.cache_state = false;
@@ -519,7 +480,6 @@ fn should_warn_when_starting_with_cache_state_false() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_set_missing_values_to_null() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -531,7 +491,6 @@ fn should_set_missing_values_to_null() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_copy_hue_saturtion_to_h_s_if_present() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -544,7 +503,6 @@ fn should_copy_hue_saturtion_to_h_s_if_present() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_copy_hue_saturtion_if_properties_are_missing() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -557,7 +515,6 @@ fn should_not_copy_hue_saturtion_if_properties_are_missing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_copy_hue_saturtion_if_color_is_missing() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -570,7 +527,6 @@ fn should_not_copy_hue_saturtion_if_color_is_missing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn shouldt_discover_when_already_discovered() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
@@ -583,7 +539,6 @@ fn shouldt_discover_when_already_discovered() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_when_not_discovered_yet() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
@@ -594,78 +549,65 @@ fn should_discover_when_not_discovered_yet() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_discover_when_device_leaves() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
-    ha.discover_entity("0x00124b0009d69f77").await;
+    ha.discover_entity("0x00124b0009d69f77");
 
-    ha.handle_message("zigbee2mqtt/bridge/event", json!({"type": "device_leave"}))
-        .await;
+    ha.handle_message("zigbee2mqtt/bridge/event", json!({"type": "device_leave"}));
 
     assert!(ha.discovery.is_empty() || !ha.has_discovery_containing("bulb"));
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_discover_when_options_change() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
 
-    ha.on_options_change("0x00124b0009d69f77", json!({"homeassistant": {}}))
-        .await;
+    ha.on_options_change("0x00124b0009d69f77", json!({"homeassistant": {}}));
 
     assert!(!ha.published.is_empty() || ha.published.is_empty());
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_send_all_status_when_home_assistant_comes_online_default_topic() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
 
-    ha.handle_message("homeassistant/status", json!("online"))
-        .await;
+    ha.handle_message("homeassistant/status", json!("online"));
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_send_all_status_when_home_assistant_comes_online() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
 
-    ha.handle_message("homeassistant/status", json!("online"))
-        .await;
+    ha.handle_message("homeassistant/status", json!("online"));
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_send_all_status_when_home_assistant_comes_offline() {
     let mut ha = ha();
 
-    ha.handle_message("homeassistant/status", json!("offline"))
-        .await;
+    ha.handle_message("homeassistant/status", json!("offline"));
 
     assert!(ha.published.is_empty());
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_send_all_status_when_home_assistant_comes_online_with_different_topic() {
     let mut ha = ha();
 
-    ha.handle_message("homeassistant/other", json!("online"))
-        .await;
+    ha.handle_message("homeassistant/other", json!("online"));
 
     assert!(ha.published.is_empty());
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_devices_with_availability() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -677,68 +619,62 @@ fn should_discover_devices_with_availability() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_clear_discovery_when_device_is_removed() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
-    ha.discover_entity("0x00124b0009d69f77").await;
+    ha.discover_entity("0x00124b0009d69f77");
 
-    ha.remove_entity("0x00124b0009d69f77").await;
+    ha.remove_entity("0x00124b0009d69f77");
 
     assert!(ha.discovery.is_empty());
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_clear_discovery_when_group_is_removed() {
     let mut ha = ha();
     ha.add_group(group("group_1"));
-    ha.discover_entity("1").await;
+    ha.discover_entity("1");
 
-    ha.remove_entity("1").await;
+    ha.remove_entity("1");
 
     assert!(ha.discovery.is_empty());
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_refresh_discovery_when_device_is_renamed() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
-    ha.discover_entity("0x00124b0009d69f77").await;
+    ha.discover_entity("0x00124b0009d69f77");
 
-    ha.rename_entity("0x00124b0009d69f77", "bulb_new").await;
+    ha.rename_entity("0x00124b0009d69f77", "bulb_new");
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_refresh_discovery_when_group_is_renamed() {
     let mut ha = ha();
     ha.add_group(group("group_1"));
-    ha.discover_entity("1").await;
+    ha.discover_entity("1");
 
-    ha.rename_entity("1", "group_new").await;
+    ha.rename_entity("1", "group_new");
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_refresh_discovery_when_device_is_renamed_and_homeassistant_rename_is_false() {
     let mut ha = ha();
     let mut entity = device("bulb");
     entity.options = json!({"homeassistant": {"rename": false}});
     ha.add_device(entity);
 
-    ha.rename_entity("0x00124b0009d69f77", "bulb_new").await;
+    ha.rename_entity("0x00124b0009d69f77", "bulb_new");
 
     assert!(ha.published.is_empty());
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_update_when_device_supports_it() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -750,7 +686,6 @@ fn should_discover_update_when_device_supports_it() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_trigger_when_action_is_published() {
     let mut ha = ha();
     let mut entity = device("remote");
@@ -762,7 +697,6 @@ fn should_discover_trigger_when_action_is_published() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_discover_device_automation_when_disabled() {
     let mut ha = ha();
     ha.experimental_event_entities = false;
@@ -775,7 +709,6 @@ fn should_not_discover_device_automation_when_disabled() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_enable_experimental_event_entities() {
     let mut ha = ha();
     ha.experimental_event_entities = true;
@@ -788,31 +721,26 @@ fn should_enable_experimental_event_entities() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_republish_payload_to_postfix_topic_with_light_with_postfix_config() {
     let mut ha = ha();
     let mut entity = device("bulb");
     entity.options = json!({"homeassistant": {"light": {"postfix": "custom"}}});
     ha.add_device(entity);
 
-    ha.on_publish_entity_state("0x00124b0009d69f77", json!({"state": "ON"}))
-        .await;
+    ha.on_publish_entity_state("0x00124b0009d69f77", json!({"state": "ON"}));
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_crash_in_on_publish_entity_state_on_group_publish() {
     let mut ha = ha();
     ha.add_group(group("group_1"));
 
-    ha.on_publish_entity_state("1", json!({"state": "ON"}))
-        .await;
+    ha.on_publish_entity_state("1", json!({"state": "ON"}));
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_clear_outdated_configs() {
     let mut ha = ha();
     ha.discovery.insert(
@@ -820,24 +748,21 @@ async fn should_clear_outdated_configs() {
         json!({"unique_id": "old"}),
     );
 
-    ha.clear_outdated_configs().await;
+    ha.clear_outdated_configs();
 
     assert!(ha.discovery.is_empty());
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_rediscover_group_when_device_is_added_to_it() {
     let mut ha = ha();
     ha.add_group(group("group_1"));
-    ha.on_options_change("1", json!({"devices": ["0x00124b0009d69f77"]}))
-        .await;
+    ha.on_options_change("1", json!({"devices": ["0x00124b0009d69f77"]}));
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_with_json_availability_payload_value_template() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -849,7 +774,6 @@ fn should_discover_with_json_availability_payload_value_template() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_with_availability_offline_when_device_is_disabled() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -861,7 +785,6 @@ fn should_discover_with_availability_offline_when_device_is_disabled() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_last_seen_when_enabled() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -873,20 +796,18 @@ fn should_discover_last_seen_when_enabled() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_rediscover_scenes_when_a_scene_is_changed() {
     let mut ha = ha();
     let mut entity = device("bulb");
     entity.exposes = vec![json!({"type": "enum", "name": "scene"})];
     ha.add_device(entity);
 
-    ha.on_scene_change("0x00124b0009d69f77").await;
+    ha.on_scene_change("0x00124b0009d69f77");
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_clear_bridge_entities_unnecessarily() {
     let mut ha = ha();
     ha.discovery.insert(
@@ -894,13 +815,12 @@ async fn should_not_clear_bridge_entities_unnecessarily() {
         json!({"unique_id": "bridge"}),
     );
 
-    ha.clear_outdated_configs().await;
+    ha.clear_outdated_configs();
 
     assert!(ha.has_discovery_containing("bridge"));
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_discover_bridge_entities() {
     let mut ha = ha();
     ha.discover_entity("bridge");
@@ -909,30 +829,27 @@ fn should_discover_bridge_entities() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_remove_discovery_entries_for_removed_exposes_when_device_options_change() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
-    ha.discover_entity("0x00124b0009d69f77").await;
+    ha.discover_entity("0x00124b0009d69f77");
 
-    ha.on_options_change("0x00124b0009d69f77", json!({})).await;
+    ha.on_options_change("0x00124b0009d69f77", json!({}));
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_discovery_message_when_a_converter_announces_changed_exposes() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
 
-    ha.on_exposes_changed("0x00124b0009d69f77").await;
+    ha.on_exposes_changed("0x00124b0009d69f77");
 
     assert!(ha.published.len() <= usize::MAX);
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn legacy_action_sensor() {
     let mut ha = ha();
     let mut entity = device("remote");
@@ -944,7 +861,6 @@ fn legacy_action_sensor() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn prevents_mismatching_setting_extension_state() {
     let mut ha = ha();
     ha.enabled = false;
@@ -953,7 +869,6 @@ fn prevents_mismatching_setting_extension_state() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_have_duplicate_type_object_ids_in_mapping_2() {
     let mut ha = ha();
     ha.add_device(device("bulb"));
@@ -963,7 +878,6 @@ fn should_not_have_duplicate_type_object_ids_in_mapping_2() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_mark_thermostat_configuration_toggles_as_config_entities_2() {
     let mut ha = ha();
     let mut entity = device("thermostat");
@@ -975,7 +889,6 @@ fn should_mark_thermostat_configuration_toggles_as_config_entities_2() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_mark_device_settings_as_config_entities_2() {
     let mut ha = ha();
     let mut entity = device("bulb");
@@ -987,13 +900,11 @@ fn should_mark_device_settings_as_config_entities_2() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn test_case() {
     // Upstream placeholder title "%".
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn extension_home_assistant() {
     // Upstream describe block.
 }
