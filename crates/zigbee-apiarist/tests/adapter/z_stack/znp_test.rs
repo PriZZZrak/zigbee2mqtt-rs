@@ -86,6 +86,8 @@ use zigbee_apiarist::adapter::z_stack::znp::buffalo_znp::BuffaloZnp;
 use zigbee_apiarist::adapter::z_stack::znp::parameter_type::ParameterType;
 use zigbee_apiarist::adapter::z_stack::znp::znp::Znp;
 use zigbee_apiarist::adapter::z_stack::znp::zpi_object::{ParameterDef, ZpiObject};
+use zigbee_apiarist::utils::logger::console_logger;
+use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
 
 const IEEE_ADDR1: &str = "0xae440112004b1200";
 const IEEE_ADDR1_HEX: [u8; 8] = [0x00, 0x12, 0x4b, 0x00, 0x12, 0x01, 0x44, 0xae];
@@ -100,6 +102,9 @@ fn duplicate_array<T: Clone>(times: usize, item: &[T]) -> Vec<T> {
     out
 }
 
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer_read() {
@@ -319,7 +324,9 @@ async fn close_without_initialization() {
 #[test]
 #[ignore = "not implemented yet"]
 fn coverage_logger() {
-    todo!()
+    let logger = console_logger();
+    logger.warning("Test warning", "TestNS");
+    logger.error("Test error", "TestNS");
 }
 
 #[test]
@@ -689,12 +696,6 @@ fn uint8_write() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn znp() {
-    todo!()
-}
-
-#[test]
-#[ignore = "not implemented yet"]
 fn zpi_object_parse_payload_for_end_device_annce_ind() {
     let buffer = vec![0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 8, 5];
     let frame = Frame::new(Type::AREQ, Subsystem::ZDO, 193, buffer, 0, 0);
@@ -854,147 +855,537 @@ async fn znp_receive_malformed() {
     assert_eq!(znp.received.len(), 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_areq() {
-    todo!()
+async fn znp_request_areq() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let result = znp
+        .request(
+            Subsystem::SAPI as u16,
+            "startConfirm",
+            json!({"status": 1}),
+            None,
+        )
+        .await
+        .unwrap();
+
+    let frame = &znp.written_frames[0];
+    assert_eq!(znp.written_frames.len(), 1);
+    assert_eq!(frame.commandID, 128);
+    assert_eq!(frame.subsystem, Subsystem::SAPI);
+    assert_eq!(frame.r#type, Type::AREQ);
+    assert_eq!(frame.data, vec![1]);
+
+    assert!(result.is_none());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_areq_reset() {
-    todo!()
+async fn znp_request_areq_reset() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let result = znp
+        .request(Subsystem::SYS as u16, "resetReq", json!({"type": 1}), None)
+        .await
+        .unwrap()
+        .expect("reset indication");
+
+    let frame = &znp.written_frames[0];
+    assert_eq!(znp.written_frames.len(), 1);
+    assert_eq!(frame.commandID, 0);
+    assert_eq!(frame.subsystem, Subsystem::SYS);
+    assert_eq!(frame.r#type, Type::AREQ);
+    assert_eq!(frame.data, vec![1]);
+
+    assert_eq!(result.command.name, "resetInd");
+    assert_eq!(result.command.id, 0x80);
+    assert_eq!(
+        result.payload,
+        json!({"reason": 1, "transportrev": 2, "productid": 3, "majorrel": 4, "minorrel": 5, "hwrev": 6})
+    );
+    assert_eq!(result.subsystem, Subsystem::SYS);
+    assert_eq!(result.r#type, Type::AREQ);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_sreq() {
-    todo!()
+async fn znp_request_sreq() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let result = znp
+        .request_with_reply(
+            Subsystem::SYS as u16,
+            "osalNvRead",
+            json!({"id": 1, "offset": 2}),
+        )
+        .await
+        .unwrap();
+
+    let frame = &znp.written_frames[0];
+    assert_eq!(znp.written_frames.len(), 1);
+    assert_eq!(frame.commandID, 8);
+    assert_eq!(frame.subsystem, Subsystem::SYS);
+    assert_eq!(frame.r#type, Type::SREQ);
+    assert_eq!(frame.data, vec![0x01, 0x00, 0x02]);
+
+    assert_eq!(result.command.name, "osalNvRead");
+    assert_eq!(result.command.id, 0x08);
+    assert_eq!(
+        result.payload,
+        json!({"status": 0, "len": 2, "value": [0x01, 0x02]})
+    );
+    assert_eq!(result.subsystem, Subsystem::SYS);
+    assert_eq!(result.r#type, Type::SRSP);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_sreq_failed() {
-    todo!()
+async fn znp_request_sreq_failed() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    assert_eq!(znp.waiters_size(), 0);
+
+    let error = znp
+        .request(
+            Subsystem::SYS as u16,
+            "osalNvRead",
+            json!({"id": 1, "offset": 2}),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(znp.waiters_size(), 0);
+    assert_eq!(
+            error,
+            "--> 'SREQ: SYS - osalNvRead - {\"id\":1,\"offset\":2}' failed with status '(0x01: FAILURE)' (expected '(0x00: SUCCESS)')"
+        );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_sreq_failed_should_cancel_waiter_when_provided() {
-    todo!()
+async fn znp_request_sreq_failed_should_cancel_waiter_when_provided() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    assert_eq!(znp.waiters_size(), 0);
+    let waiter = znp.wait_for(Type::SRSP, Subsystem::SYS, "osalNvRead", None, None, None);
+    assert_eq!(znp.waiters_size(), 1);
+
+    let error = znp
+        .request(
+            Subsystem::SYS as u16,
+            "osalNvRead",
+            json!({"id": 1, "offset": 2}),
+            Some(waiter.id),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(znp.waiters_size(), 0);
+    assert_eq!(
+            error,
+            "--> 'SREQ: SYS - osalNvRead - {\"id\":1,\"offset\":2}' failed with status '(0x01: FAILURE)' (expected '(0x00: SUCCESS)')"
+        );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_sreq_with_parsed_in_between() {
-    todo!()
+async fn znp_request_sreq_with_parsed_in_between() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let result = znp
+        .request(
+            Subsystem::SYS as u16,
+            "osalNvRead",
+            json!({"id": 1, "offset": 2}),
+            None,
+        )
+        .await
+        .unwrap()
+        .expect("SREQ reply");
+
+    let frame = &znp.written_frames[0];
+    assert_eq!(znp.written_frames.len(), 1);
+    assert_eq!(frame.commandID, 8);
+    assert_eq!(frame.subsystem, Subsystem::SYS);
+    assert_eq!(frame.r#type, Type::SREQ);
+    assert_eq!(frame.data, vec![0x01, 0x00, 0x02]);
+
+    assert_eq!(result.command.name, "osalNvRead");
+    assert_eq!(result.command.id, 0x08);
+    assert_eq!(
+        result.payload,
+        json!({"status": 0, "len": 2, "value": [0x01, 0x02]})
+    );
+    assert_eq!(result.subsystem, Subsystem::SYS);
+    assert_eq!(result.r#type, Type::SRSP);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_zdo() {
-    todo!()
+async fn znp_request_zdo() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let zdo_payload = vec![0x02, 0x00, 0x02, 0x00];
+    znp.request_zdo(
+        ClusterId::NODE_DESCRIPTOR_REQUEST,
+        zdo_payload.clone(),
+        Some(1),
+    )
+    .await
+    .unwrap();
+
+    let frame = &znp.written_frames[0];
+    assert_eq!(znp.written_frames.len(), 1);
+    assert_eq!(frame.commandID, 2);
+    assert_eq!(frame.subsystem, Subsystem::ZDO);
+    assert_eq!(frame.r#type, Type::SREQ);
+    assert_eq!(frame.data, zdo_payload);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_zdo_failure() {
-    todo!()
+async fn znp_request_zdo_failure() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let zdo_payload = vec![0x02, 0x00, 0x02, 0x00];
+    let error = znp
+        .request_zdo(
+            ClusterId::NODE_DESCRIPTOR_REQUEST,
+            zdo_payload.clone(),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        format!(
+            "--> 'SREQ: ZDO - NODE_DESCRIPTOR_REQUEST - {}' failed with status '(0x01: FAILURE)'",
+            hex_encode(&zdo_payload)
+        )
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_zdo_success() {
-    todo!()
+async fn znp_request_zdo_success() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(Type::SRSP, Subsystem::ZDO, "nodeDescReq", None, None, None);
+    let zdo_payload = vec![0x02, 0x00, 0x02, 0x00];
+    znp.request_zdo(ClusterId::NODE_DESCRIPTOR_REQUEST, zdo_payload, Some(1))
+        .await
+        .unwrap();
+
+    let object = waiter.start().promise.await.unwrap();
+    assert_eq!(object.payload, json!({"status": 0x00}));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_zdo_failed_should_cancel_waiter_when_provided() {
-    todo!()
+async fn znp_request_zdo_failed_should_cancel_waiter_when_provided() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    assert_eq!(znp.waiters_size(), 0);
+    let waiter = znp.wait_for(Type::AREQ, Subsystem::ZDO, "nodeDescRsp", None, None, None);
+    assert_eq!(znp.waiters_size(), 1);
+
+    let zdo_payload = vec![0x02, 0x00, 0x02, 0x00];
+    let error = znp
+        .request_zdo(
+            ClusterId::NODE_DESCRIPTOR_REQUEST,
+            zdo_payload.clone(),
+            Some(waiter.id),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(znp.waiters_size(), 0);
+    assert_eq!(
+        error,
+        format!(
+            "--> 'SREQ: ZDO - NODE_DESCRIPTOR_REQUEST - {}' failed with status '(0x01: FAILURE)'",
+            hex_encode(&zdo_payload)
+        )
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_timeout() {
-    todo!()
+async fn znp_request_timeout() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let error = znp
+        .request(
+            Subsystem::SYS as u16,
+            "osalNvRead",
+            json!({"id": 1, "offset": 2}),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "SRSP - SYS - osalNvRead after 6000ms");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_timeout_for_startup_from_app_is_longer() {
-    todo!()
+async fn znp_request_timeout_for_startup_from_app_is_longer() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let error = znp
+        .request(
+            Subsystem::ZDO as u16,
+            "startupFromApp",
+            json!({"startdelay": 100}),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "SRSP - ZDO - startupFromApp after 40000ms");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_with_non_existing_cmd() {
-    todo!()
+async fn znp_request_with_non_existing_cmd() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let error = znp
+        .request(
+            Subsystem::SAPI as u16,
+            "nonExisting",
+            json!({"status": 1}),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Command request 'nonExisting' from subsystem '6' not found"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_with_non_existing_subsystem() {
-    todo!()
+async fn znp_request_with_non_existing_subsystem() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let error = znp
+        .request(999, "startConfirm", json!({"status": 1}), None)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Subsystem '999' does not exist");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_without_init() {
-    todo!()
+async fn znp_request_without_init() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+
+    let error = znp
+        .request(
+            Subsystem::SAPI as u16,
+            "startConfirm",
+            json!({"status": 1}),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Cannot request when znp has not been initialized yet"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_responses_comes_after_timeout() {
-    todo!()
+async fn znp_request_responses_comes_after_timeout() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let error = znp
+        .request(
+            Subsystem::SYS as u16,
+            "osalNvRead",
+            json!({"id": 1, "offset": 2}),
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "SRSP - SYS - osalNvRead after 6000ms");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_wait_for() {
-    todo!()
+async fn znp_request_wait_for() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(Type::SRSP, Subsystem::SYS, "osalNvRead", None, None, None);
+    let object = waiter.start().promise.await.unwrap();
+    assert_eq!(
+        object.payload,
+        json!({"len": 2, "status": 0, "value": [1, 2]})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_request_with_reply_should_throw_error_when_request_as_no_reply() {
-    todo!()
+async fn znp_request_with_reply_should_throw_error_when_request_as_no_reply() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let error = znp
+        .request_with_reply(Subsystem::ZDO as u16, "autoFindDestination", json!({}))
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Command autoFindDestination has no reply");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_wait_for_with_payload_mismatch() {
-    todo!()
+async fn znp_wait_for_with_payload_mismatch() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(
+        Type::SRSP,
+        Subsystem::SYS,
+        "osalNvRead",
+        Some(json!("abcd")),
+        None,
+        None,
+    );
+    let error = waiter.start().promise.await.unwrap_err();
+    assert_eq!(error, "SRSP - SYS - osalNvRead after 10000ms");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_wait_for_with_state() {
-    todo!()
+async fn znp_wait_for_with_state() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(
+        Type::AREQ,
+        Subsystem::ZDO,
+        "stateChangeInd",
+        None,
+        None,
+        Some(9),
+    );
+    let object = waiter.start().promise.await.unwrap();
+    assert_eq!(object.payload, json!({"state": 9}));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_wait_for_with_target_as_ieee() {
-    todo!()
+async fn znp_wait_for_with_target_as_ieee() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(
+        Type::AREQ,
+        Subsystem::ZDO,
+        "nwkAddrRsp",
+        Some(json!("0x0807060504030201")),
+        None,
+        None,
+    );
+    let object = waiter.start().promise.await.unwrap();
+    assert_eq!(
+        object.payload["zdo"],
+        json!([
+            0,
+            {
+                "assocDevList": [4112, 4369],
+                "eui64": "0x0807060504030201",
+                "nwkAddress": 257,
+                "startIndex": 0,
+            },
+        ])
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_wait_for_with_target_as_ieee_forced_to_timeout_because_invalid_zdo_status_no_payload_to_match_against(
+async fn znp_wait_for_with_target_as_ieee_forced_to_timeout_because_invalid_zdo_status_no_payload_to_match_against(
 ) {
-    todo!()
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(
+        Type::AREQ,
+        Subsystem::ZDO,
+        "nwkAddrRsp",
+        Some(json!("0x0807060504030201")),
+        None,
+        None,
+    );
+    let error = waiter.start().promise.await.unwrap_err();
+    assert_eq!(error, "AREQ - ZDO - nwkAddrRsp after 10000ms");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_wait_for_with_target_as_network_address() {
-    todo!()
+async fn znp_wait_for_with_target_as_network_address() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(
+        Type::AREQ,
+        Subsystem::ZDO,
+        "activeEpRsp",
+        Some(json!(0x1234)),
+        None,
+        None,
+    );
+    let object = waiter.start().promise.await.unwrap();
+    assert_eq!(
+        object.payload["zdo"],
+        json!([0, {"nwkAddress": 0x1234, "endpointList": []}])
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_wait_for_with_transid() {
-    todo!()
+async fn znp_wait_for_with_transid() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let waiter = znp.wait_for(
+        Type::AREQ,
+        Subsystem::AF,
+        "dataConfirm",
+        None,
+        Some(123),
+        None,
+    );
+    let object = waiter.start().promise.await.unwrap();
+    assert_eq!(
+        object.payload,
+        json!({"status": 0, "endpoint": 1, "transid": 123})
+    );
 }

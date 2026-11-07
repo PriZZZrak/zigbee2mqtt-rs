@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 
+use super::super::unpi::constants::{Subsystem, Type};
 use super::super::unpi::frame::Frame;
 use super::zpi_object::ZpiObject;
 
@@ -41,6 +42,31 @@ pub struct Znp {
 
     pub received: Vec<ZpiObject>,
     pub tcp_params: BTreeMap<String, String>,
+    /// Frames passed to the UNPI writer.
+    pub written_frames: Vec<Frame>,
+}
+
+/// Upstream `waitress.waitFor(...)` result.
+pub struct Waiter {
+    pub id: u64,
+    pub r#type: Type,
+    pub subsystem: Subsystem,
+    pub command: String,
+    pub target: Option<serde_json::Value>,
+    pub transid: Option<u8>,
+    pub state: Option<u8>,
+}
+
+pub struct WaiterStart {
+    pub promise:
+        std::pin::Pin<Box<dyn std::future::Future<Output = Result<ZpiObject, String>> + Send>>,
+}
+
+impl Waiter {
+    /// Upstream: `waiter.start().promise`.
+    pub fn start(&self) -> WaiterStart {
+        todo!()
+    }
 }
 
 impl Znp {
@@ -58,6 +84,7 @@ impl Znp {
             request_error: None,
             received: Vec::new(),
             tcp_params: BTreeMap::new(),
+            written_frames: Vec::new(),
         }
     }
 
@@ -93,18 +120,52 @@ impl Znp {
         todo!()
     }
 
-    /// Upstream: `znp.request(...)`.
-    pub async fn request(&mut self, subsystem: u8, command: &str, payload: serde_json::Value) {
+    /// Upstream: `znp.waitFor(type, subsystem, command, target?, transid?, state?)`.
+    pub fn wait_for(
+        &mut self,
+        r#type: Type,
+        subsystem: Subsystem,
+        command: &str,
+        target: Option<serde_json::Value>,
+        transid: Option<u8>,
+        state: Option<u8>,
+    ) -> Waiter {
+        todo!()
+    }
+
+    /// Upstream `waitress.waiters.size`.
+    pub fn waiters_size(&self) -> usize {
+        todo!()
+    }
+
+    /// Upstream: `znp.request(...)`. SREQ returns the reply, AREQ returns `None`.
+    pub async fn request(
+        &mut self,
+        subsystem: u16,
+        command: &str,
+        payload: serde_json::Value,
+        waiter_id: Option<u64>,
+    ) -> Result<Option<ZpiObject>, String> {
         todo!()
     }
 
     /// Upstream: `znp.requestWithReply(...)`.
     pub async fn request_with_reply(
         &mut self,
-        subsystem: u8,
+        subsystem: u16,
         command: &str,
         payload: serde_json::Value,
-    ) -> ZpiObject {
+    ) -> Result<ZpiObject, String> {
+        todo!()
+    }
+
+    /// Upstream: `znp.requestZdo(clusterId, payload, waiterId)`.
+    pub async fn request_zdo(
+        &mut self,
+        cluster_id: u16,
+        payload: Vec<u8>,
+        waiter_id: Option<u64>,
+    ) -> Result<(), String> {
         todo!()
     }
 }
