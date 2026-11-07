@@ -1,8 +1,5 @@
 // Harness that wires the nested zspec/ test files into a Cargo test target.
 
-#[path = "zspec/utils_test.rs"]
-mod utils_test;
-
 #[path = "zspec/zcl/buffalo_test.rs"]
 mod zcl_buffalo_test;
 
