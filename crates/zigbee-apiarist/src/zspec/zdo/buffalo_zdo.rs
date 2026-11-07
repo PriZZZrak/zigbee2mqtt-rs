@@ -53,9 +53,9 @@ impl BuffaloZdo {
     }
 
     pub fn read_response(
-        &mut self,
-        cluster_id: u16,
         has_zdo_message_overhead: bool,
+        cluster_id: u16,
+        buffer: &[u8],
     ) -> serde_json::Value {
         todo!()
     }
