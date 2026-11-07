@@ -50,6 +50,22 @@ impl Parameter {
     }
 }
 
+/// Upstream `AttributeDefinition` (subset used by the ported tests).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Attribute {
+    pub name: &'static str,
+    /// Upstream camelCase: `ID`.
+    pub ID: u16,
+    /// Upstream camelCase: `type`.
+    pub r#type: DataType,
+}
+
+impl Attribute {
+    pub const fn new(name: &'static str, ID: u16, r#type: DataType) -> Self {
+        Self { name, ID, r#type }
+    }
+}
+
 /// Upstream `CommandDefinition`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Command {
@@ -94,8 +110,28 @@ pub struct Cluster {
 
 #[allow(non_snake_case)]
 pub mod genBasic {
+    use super::{Attribute, Command, DataType};
+
     pub const ID: u16 = 0x0000;
     pub const name: &str = "genBasic";
+
+    pub mod attributes {
+        use super::*;
+
+        pub const zclVersion: Attribute = Attribute::new("zclVersion", 0x0000, DataType::UINT8);
+        pub const manufacturerName: Attribute =
+            Attribute::new("manufacturerName", 0x0004, DataType::CHAR_STR);
+        pub const modelId: Attribute = Attribute::new("modelId", 0x0005, DataType::CHAR_STR);
+        pub const powerSource: Attribute = Attribute::new("powerSource", 0x0007, DataType::ENUM8);
+        pub const physicalEnv: Attribute = Attribute::new("physicalEnv", 0x0011, DataType::ENUM8);
+        pub const alarmMask: Attribute = Attribute::new("alarmMask", 0x0013, DataType::BITMAP8);
+    }
+
+    pub mod commands {
+        use super::*;
+
+        pub const resetFactDefault: Command = Command::new("resetFactDefault", 0x00);
+    }
 }
 
 #[allow(non_snake_case)]
@@ -106,8 +142,28 @@ pub mod genPowerCfg {
 
 #[allow(non_snake_case)]
 pub mod genOnOff {
+    use super::{Attribute, Command, DataType};
+
     pub const ID: u16 = 0x0006;
     pub const name: &str = "genOnOff";
+
+    pub mod attributes {
+        use super::*;
+
+        pub const onOff: Attribute = Attribute::new("onOff", 0x0000, DataType::BOOLEAN);
+        pub const globalSceneCtrl: Attribute =
+            Attribute::new("globalSceneCtrl", 0x4000, DataType::BOOLEAN);
+        pub const onTime: Attribute = Attribute::new("onTime", 0x4001, DataType::UINT16);
+        pub const offWaitTime: Attribute = Attribute::new("offWaitTime", 0x4002, DataType::UINT16);
+        pub const startUpOnOff: Attribute = Attribute::new("startUpOnOff", 0x4003, DataType::ENUM8);
+    }
+
+    pub mod commands {
+        use super::*;
+
+        pub const off: Command = Command::new("off", 0x00);
+        pub const on: Command = Command::new("on", 0x01);
+    }
 }
 
 #[allow(non_snake_case)]

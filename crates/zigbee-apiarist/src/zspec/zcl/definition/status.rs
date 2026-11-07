@@ -5,7 +5,10 @@
 #[repr(u8)]
 pub enum Status {
     SUCCESS = 0x00,
+    NOT_AUTHORIZED = 0x7e,
+    MALFORMED_COMMAND = 0x80,
     INVALID_FIELD = 0x85,
+    UNSUPPORTED_ATTRIBUTE = 0x86,
     ABORT = 0x95,
 }
 
@@ -13,7 +16,10 @@ impl Status {
     pub fn name(self) -> &'static str {
         match self {
             Status::SUCCESS => "SUCCESS",
+            Status::NOT_AUTHORIZED => "NOT_AUTHORIZED",
+            Status::MALFORMED_COMMAND => "MALFORMED_COMMAND",
             Status::INVALID_FIELD => "INVALID_FIELD",
+            Status::UNSUPPORTED_ATTRIBUTE => "UNSUPPORTED_ATTRIBUTE",
             Status::ABORT => "ABORT",
         }
     }

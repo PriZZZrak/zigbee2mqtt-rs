@@ -25,6 +25,25 @@ impl From<&'static str> for CommandRef {
     }
 }
 
+/// Upstream cluster argument: a cluster name or a numeric cluster identifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusterRef {
+    Id(u16),
+    Name(&'static str),
+}
+
+impl From<u16> for ClusterRef {
+    fn from(value: u16) -> Self {
+        Self::Id(value)
+    }
+}
+
+impl From<&'static str> for ClusterRef {
+    fn from(value: &'static str) -> Self {
+        Self::Name(value)
+    }
+}
+
 /// Upstream `ZclFrame`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Frame {
@@ -44,7 +63,7 @@ impl Frame {
         _manufacturer_code: Option<u16>,
         _transaction_sequence_number: u8,
         _command: impl Into<CommandRef>,
-        _cluster_id: u16,
+        _cluster: impl Into<ClusterRef>,
         _payload: Value,
         _custom_clusters: Value,
         _reserved_bits: u8,
