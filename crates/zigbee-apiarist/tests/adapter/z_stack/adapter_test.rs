@@ -1057,16 +1057,58 @@ async fn send_zcl_frame_network_address() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_data_confirm_fails_with_default_response() {
-    todo!()
+async fn send_zcl_frame_network_address_data_confirm_fails_with_default_response() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 201;
+    adapter.start().await;
+
+    let error = adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 1, 0, 0],
+            0,
+            1,
+            0x0104,
+            true,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Data request failed with error: 'NWK_UNSUPPORTED_ATTRIBUTE' (0xc9)"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_data_confirm_fails_without_default_response() {
-    todo!()
+async fn send_zcl_frame_network_address_data_confirm_fails_without_default_response() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 201;
+    adapter.start().await;
+
+    let error = adapter
+        .send_zcl_frame_to_endpoint_checked(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 1, 0, 0],
+            0,
+            1,
+            0x0104,
+            false,
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Data request failed with error: 'NWK_UNSUPPORTED_ATTRIBUTE' (0xc9)"
+    );
 }
 
 #[tokio::test]
@@ -1097,37 +1139,217 @@ async fn send_zcl_frame_network_address_data_confirm_fails() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_should_retry(
+async fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_should_retry(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 233;
+    adapter.start().await;
+    adapter.retry_calls.clear();
+
+    let data = vec![0x18, 100, 0x05, 0x00, 0x00, 0x00];
+    let error = adapter
+        .send_zcl_frame_retry("0x03", 2, 20, data.clone(), 10000, false, false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Data request failed with error: 'MAC_NO_ACK' (0xe9)");
+    assert_eq!(
+        adapter.retry_calls,
+        vec![
+            data_request(2, 20, &data, 1),
+            data_request(2, 20, &data, 2),
+            sys_call(
+                "extRouteDisc",
+                json!({"dstAddr": 2, "options": 0, "radius": 30})
+            ),
+            data_request(2, 20, &data, 3),
+            sys_call(
+                "extRouteDisc",
+                json!({"dstAddr": 3, "options": 0, "radius": 30})
+            ),
+            data_request(3, 20, &data, 4),
+            data_request(3, 20, &data, 5),
+        ]
+    );
+    assert_eq!(
+        adapter.retry_zdo_calls,
+        vec![(
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            BuffaloZdo::build_request(
+                false,
+                ClusterId::NETWORK_ADDRESS_REQUEST,
+                &[json!("0x03"), json!(false), json!(0)],
+            ),
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_without_recovery(
+async fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_without_recovery(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 233;
+    adapter.start().await;
+    adapter.retry_calls.clear();
+
+    let data = vec![0x18, 100, 0x05, 0x00, 0x00, 0x00];
+    let error = adapter
+        .send_zcl_frame_retry("0x03", 2, 20, data.clone(), 10000, false, true)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Data request failed with error: 'MAC_NO_ACK' (0xe9)");
+    assert_eq!(adapter.retry_calls.len(), 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_no_ack_should_retry() {
-    todo!()
+async fn send_zcl_frame_network_address_fails_because_mac_no_ack_should_retry() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 233;
+    adapter.start().await;
+    adapter.retry_calls.clear();
+
+    let data = vec![0x18, 100, 0x05, 0x00, 0x00, 0x00];
+    let error = adapter
+        .send_zcl_frame_retry("0x02", 2, 20, data.clone(), 10000, false, false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Data request failed with error: 'MAC_NO_ACK' (0xe9)");
+    assert_eq!(
+        adapter.retry_calls,
+        vec![
+            data_request(2, 20, &data, 1),
+            data_request(2, 20, &data, 2),
+            sys_call(
+                "extRouteDisc",
+                json!({"dstAddr": 2, "options": 0, "radius": 30})
+            ),
+            data_request(2, 20, &data, 3),
+            data_request(2, 20, &data, 4),
+            data_request(2, 20, &data, 5),
+        ]
+    );
+    assert_eq!(
+        adapter.retry_zdo_calls,
+        vec![(
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            BuffaloZdo::build_request(
+                false,
+                ClusterId::NETWORK_ADDRESS_REQUEST,
+                &[json!("0x02"), json!(false), json!(0)],
+            ),
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_when_not_being_a_parent_should_retry(
+async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_when_not_being_a_parent_should_retry(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 240;
+    adapter.assoc_get_with_address_node_relation = 255;
+    adapter.start().await;
+    adapter.retry_calls.clear();
+
+    let data = vec![0x18, 100, 0x05, 0x00, 0x00, 0x00];
+    let error = adapter
+        .send_zcl_frame_retry("0x02", 2, 20, data.clone(), 10000, false, false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Data request failed with error: 'MAC_TRANSACTION_EXPIRED' (0xf0)"
+    );
+    assert_eq!(
+        adapter.retry_calls,
+        vec![
+            data_request(2, 20, &data, 1),
+            data_request(2, 20, &data, 2),
+            sys_call(
+                "assocGetWithAddress",
+                json!({"extaddr": "0x02", "nwkaddr": 2})
+            ),
+            sys_call(
+                "extRouteDisc",
+                json!({"dstAddr": 2, "options": 0, "radius": 30})
+            ),
+            data_request(2, 20, &data, 3),
+            data_request(2, 20, &data, 4),
+            data_request(2, 20, &data, 5),
+        ]
+    );
+    assert_eq!(
+        adapter.retry_zdo_calls,
+        vec![(
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            BuffaloZdo::build_request(
+                false,
+                ClusterId::NETWORK_ADDRESS_REQUEST,
+                &[json!("0x02"), json!(false), json!(0)],
+            ),
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_should_retry() {
-    todo!()
+async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_should_retry() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 240;
+    adapter.start().await;
+    adapter.retry_calls.clear();
+
+    let data = vec![0x18, 100, 0x05, 0x00, 0x00, 0x00];
+    let error = adapter
+        .send_zcl_frame_retry("0x02", 2, 20, data.clone(), 10000, false, false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Data request failed with error: 'MAC_TRANSACTION_EXPIRED' (0xf0)"
+    );
+    assert_eq!(
+        adapter.retry_calls,
+        vec![
+            data_request(2, 20, &data, 1),
+            data_request(2, 20, &data, 2),
+            sys_call(
+                "assocGetWithAddress",
+                json!({"extaddr": "0x02", "nwkaddr": 2})
+            ),
+            sys_call("assocRemove", json!({"ieeeadr": "0x02"})),
+            data_request(2, 20, &data, 3),
+            sys_call(
+                "assocAdd",
+                json!({"ieeeadr": "0x02", "noderelation": 1, "nwkaddr": 2})
+            ),
+            sys_call(
+                "extRouteDisc",
+                json!({"dstAddr": 2, "options": 0, "radius": 30})
+            ),
+            data_request(2, 20, &data, 4),
+            data_request(2, 20, &data, 5),
+        ]
+    );
+    assert_eq!(
+        adapter.retry_zdo_calls,
+        vec![(
+            ClusterId::NETWORK_ADDRESS_REQUEST,
+            BuffaloZdo::build_request(
+                false,
+                ClusterId::NETWORK_ADDRESS_REQUEST,
+                &[json!("0x02"), json!(false), json!(0)],
+            ),
+        )]
+    );
 }
 
 #[tokio::test]
@@ -1211,10 +1433,27 @@ async fn send_zcl_frame_network_address_matches_on_default_response() {
     assert_eq!(result.data, vec![24, 100, 11, 0, 126]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_retry_on_mac_channel_access_failure() {
-    todo!()
+async fn send_zcl_frame_network_address_retry_on_mac_channel_access_failure() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 225;
+    adapter.data_confirm_reset = true;
+    adapter.start().await;
+    adapter.retry_calls.clear();
+    adapter.queue_execute_send_policy.clear();
+
+    let data = vec![0x18, 100, 0x05, 0x00, 0x00, 0x00];
+    adapter
+        .send_zcl_frame_retry("0x02", 2, 20, data.clone(), 10000, false, false)
+        .await
+        .unwrap();
+
+    assert_eq!(adapter.queue_execute_send_policy[0], 2);
+    assert_eq!(
+        adapter.retry_calls,
+        vec![data_request(2, 20, &data, 1), data_request(2, 20, &data, 2),]
+    );
 }
 
 #[tokio::test]
@@ -1243,23 +1482,126 @@ async fn send_zcl_frame_network_address_should_retry_on_dataconfirm_timeout() {
     assert_eq!(adapter.znp_calls.len(), 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_timeout_should_discover_route_and_retry() {
-    todo!()
+async fn send_zcl_frame_network_address_timeout_should_discover_route_and_retry() {
+    let mut adapter = adapter();
+    adapter.assoc_get_with_address_node_relation = 2;
+    adapter.start().await;
+    adapter.retry_calls.clear();
+
+    let data = vec![0x00, 100, 0x00, 0x00, 0x00];
+    let error = adapter
+        .send_zcl_frame_retry("0x02", 2, 20, data.clone(), 1, false, false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(adapter.queue_execute_send_policy[0], 2);
+    assert_eq!(
+        adapter.retry_calls,
+        vec![
+            data_request(2, 20, &data, 1),
+            sys_call(
+                "assocGetWithAddress",
+                json!({"extaddr": "0x02", "nwkaddr": 2})
+            ),
+            sys_call(
+                "extRouteDisc",
+                json!({"dstAddr": 2, "options": 0, "radius": 30})
+            ),
+            data_request(2, 20, &data, 2),
+        ]
+    );
+    assert_eq!(
+        error,
+        "Timeout after 1ms [address=2 endpoint=20 clusterId=0 cmdId=1 tsn=100]"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_timeout_should_discover_route_rewrite_child_entry_and_retry_for_sleepy_end_device(
+async fn send_zcl_frame_network_address_timeout_should_discover_route_rewrite_child_entry_and_retry_for_sleepy_end_device(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.retry_calls.clear();
+
+    let data = vec![0x00, 100, 0x00, 0x00, 0x00];
+    let error = adapter
+        .send_zcl_frame_retry("0x02", 2, 20, data.clone(), 1, false, false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(adapter.queue_execute_send_policy[0], 2);
+    assert_eq!(
+        adapter.retry_calls,
+        vec![
+            data_request(2, 20, &data, 1),
+            sys_call(
+                "assocGetWithAddress",
+                json!({"extaddr": "0x02", "nwkaddr": 2})
+            ),
+            sys_call("assocRemove", json!({"ieeeadr": "0x02"})),
+            sys_call(
+                "assocAdd",
+                json!({"ieeeadr": "0x02", "nwkaddr": 2, "noderelation": 1})
+            ),
+            sys_call(
+                "extRouteDisc",
+                json!({"dstAddr": 2, "options": 0, "radius": 30})
+            ),
+            data_request(2, 20, &data, 2),
+        ]
+    );
+    assert_eq!(
+        error,
+        "Timeout after 1ms [address=2 endpoint=20 clusterId=0 cmdId=1 tsn=100]"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_transaction_number_shouldnt_go_higher_than_255() {
-    todo!()
+async fn send_zcl_frame_network_address_transaction_number_shouldnt_go_higher_than_255() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.transaction_ids.clear();
+
+    for _ in 0..300 {
+        adapter
+            .send_zcl_frame_to_endpoint_checked(
+                "0x02",
+                2,
+                20,
+                vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+                0,
+                1,
+                0x0104,
+                false,
+            )
+            .await
+            .unwrap();
+    }
+
+    assert_eq!(adapter.transaction_ids[0], 1);
+    assert!(!adapter.transaction_ids.contains(&0));
+    assert!(!adapter.transaction_ids.iter().any(|id| *id > 255));
+    assert_eq!(
+        adapter
+            .transaction_ids
+            .iter()
+            .filter(|id| **id == 1)
+            .count(),
+        2
+    );
+    assert_eq!(
+        adapter
+            .transaction_ids
+            .iter()
+            .filter(|id| **id == 255)
+            .count(),
+        1
+    );
+    assert_eq!(adapter.transaction_ids.len(), 300);
 }
 
 #[tokio::test]
@@ -1902,10 +2244,18 @@ async fn wait_for_resolves_on_specified_default_response() {
     assert_eq!(result.data, vec![24, 99, 11, 5, 0x80]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_recommission_restore_unified_backup_with_1_2_adapter_and_create_backup_empty() {
-    todo!()
+async fn should_recommission_restore_unified_backup_with_1_2_adapter_and_create_backup_empty() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+    adapter.backup_frame_counter = 0;
+
+    let result = adapter.start_checked().await.unwrap();
+    assert_eq!(result, "restored");
+
+    let backup = adapter.backup(Vec::new()).await.unwrap();
+    assert_eq!(backup.network_key_info["frameCounter"], json!(0));
 }
 
 #[tokio::test]
@@ -2407,22 +2757,40 @@ async fn should_restore_unified_backup_with_3_0_x_adapter_commissioned_mismatche
     assert_eq!(result, "restored");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_empty() {
-    todo!()
+async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_empty() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+    assert_eq!(result, "restored");
+
+    adapter.backup(Vec::new()).await.unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_no_tclk_seed() {
-    todo!()
+async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_no_tclk_seed() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+    assert_eq!(result, "restored");
+
+    adapter.backup(Vec::new()).await.unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_restore_unified_backup_with_3_x_0_adapter_and_create_backup_empty() {
-    todo!()
+async fn should_restore_unified_backup_with_3_x_0_adapter_and_create_backup_empty() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+    assert_eq!(result, "restored");
+
+    adapter.backup(Vec::new()).await.unwrap();
 }
 
 #[tokio::test]
@@ -2553,8 +2921,30 @@ async fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commission
         );
 }
 
-#[test]
-#[ignore = "not implemented yet"]
-fn zstack_adapter() {
-    todo!()
+/// Upstream `mockZnpRequest` AF `dataRequest` call for a retried ZCL frame.
+fn data_request(network_address: u16, endpoint: u8, data: &[u8], transaction_id: u8) -> ZnpCall {
+    ZnpCall {
+        subsystem: "AF".to_string(),
+        command: "dataRequest".to_string(),
+        payload: json!({
+            "clusterid": 0,
+            "data": data,
+            "destendpoint": endpoint,
+            "dstaddr": network_address,
+            "len": data.len(),
+            "options": 0,
+            "radius": 30,
+            "srcendpoint": 1,
+            "transid": transaction_id,
+        }),
+    }
+}
+
+/// Upstream `mockZnpRequest` call against the SYS subsystem (assoc/route).
+fn sys_call(command: &str, payload: serde_json::Value) -> ZnpCall {
+    ZnpCall {
+        subsystem: "SYS".to_string(),
+        command: command.to_string(),
+        payload,
+    }
 }

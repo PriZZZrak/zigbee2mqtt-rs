@@ -158,6 +158,19 @@ pub struct ZStackAdapter {
     pub backup_frame_counter: u64,
     pub backup_devices: Vec<serde_json::Value>,
     pub backup_error: Option<String>,
+    /// Transaction IDs assigned by successive sends.
+    pub transaction_ids: Vec<u8>,
+    /// `Znp` calls performed while retrying a ZCL send (AF/SYS subsystems).
+    pub retry_calls: Vec<ZnpCall>,
+    /// ZDO requests issued while retrying a ZCL send.
+    pub retry_zdo_calls: Vec<(u16, Vec<u8>)>,
+    /// Second argument (`sendPolicy`) passed to `queue.execute` per attempt.
+    pub queue_execute_send_policy: Vec<u64>,
+    /// Upstream `assocGetWithAddressNodeRelation`.
+    pub assoc_get_with_address_node_relation: u8,
+    /// Upstream `dataConfirmCodeReset`: reset the confirm code after the first
+    /// failure (only fail once, then succeed).
+    pub data_confirm_reset: bool,
 }
 
 impl ZStackAdapter {
@@ -215,6 +228,12 @@ impl ZStackAdapter {
             backup_frame_counter: 0,
             backup_devices: Vec::new(),
             backup_error: None,
+            transaction_ids: Vec::new(),
+            retry_calls: Vec::new(),
+            retry_zdo_calls: Vec::new(),
+            queue_execute_send_policy: Vec::new(),
+            assoc_get_with_address_node_relation: 1,
+            data_confirm_reset: false,
         }
     }
 
@@ -262,6 +281,22 @@ impl ZStackAdapter {
 
     /// Upstream: `adapter.addInstallCode(ieee, key, hashed)`.
     pub async fn add_install_code(&mut self, _ieee_address: &str, _key: &[u8], _hashed: bool) {
+        todo!()
+    }
+
+    /// Upstream `sendZclFrameToEndpoint` including the MAC/recovery retry
+    /// sequences (transaction expire, no-ack, route discovery, address change).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn send_zcl_frame_retry(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _endpoint: u8,
+        _data: Vec<u8>,
+        _timeout: u64,
+        _disable_response: bool,
+        _disable_recovery: bool,
+    ) -> Result<(), String> {
         todo!()
     }
 
