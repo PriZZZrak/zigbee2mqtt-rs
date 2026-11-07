@@ -119,6 +119,20 @@ fn setup() -> Publish {
         .has_set_converter = false;
     publish.add_device("wall_switch", &["1", "2"]);
     publish.add_device("wall_switch_double", &["1", "2", "3"]);
+    publish.add_endpoint_alias("wall_switch_double", "left", "2");
+    publish.add_endpoint_alias("wall_switch_double", "right", "3");
+    publish
+        .devices
+        .get_mut("wall_switch_double")
+        .unwrap()
+        .friendly_name = "wall_switch_double".to_string();
+    publish.add_device("zigfred_plus", &["11", "12"]);
+    publish.add_device("button_double_key_interviewing", &["1"]);
+    publish
+        .devices
+        .get_mut("button_double_key_interviewing")
+        .unwrap()
+        .has_definition = false;
     publish.add_group("group_1");
     publish.add_group("group_2");
     publish.add_group("thermostat_group");
@@ -257,22 +271,71 @@ async fn should_create_and_publish_to_group_which_is_in_configuration_yaml_but_n
     assert!(publish.group("group_12312").commands.is_empty());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_get() {
-    todo!()
+async fn should_handle_get() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/get",
+        &json!({"state": "", "brightness": ""}),
+    );
+
+    assert_eq!(publish.endpoint("bulb_color", "1").reads.len(), 2);
+    assert!(publish
+        .endpoint("bulb_color", "1")
+        .reads
+        .contains(&("genOnOff".to_string(), vec!["onOff".to_string()])));
+    assert!(publish
+        .endpoint("bulb_color", "1")
+        .reads
+        .contains(&("genLevelCtrl".to_string(), vec!["currentLevel".to_string()])));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_get_with_multiple_cover_endpoints() {
-    todo!()
+async fn should_handle_get_with_multiple_cover_endpoints() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/zigfred_plus/get",
+        &json!({"state_l6": "", "state_l7": ""}),
+    );
+
+    assert_eq!(
+        publish.endpoint("zigfred_plus", "11").reads,
+        vec![(
+            "closuresWindowCovering".to_string(),
+            vec!["currentPositionLiftPercentage".to_string()]
+        )]
+    );
+    assert_eq!(
+        publish.endpoint("zigfred_plus", "12").reads,
+        vec![(
+            "closuresWindowCovering".to_string(),
+            vec!["currentPositionLiftPercentage".to_string()]
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_get_with_multiple_endpoints() {
-    todo!()
+async fn should_handle_get_with_multiple_endpoints() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/0x0017880104e45542/get",
+        &json!({"state_left": "", "state_right": ""}),
+    );
+
+    assert_eq!(
+        publish.endpoint("wall_switch_double", "2").reads,
+        vec![("genOnOff".to_string(), vec!["onOff".to_string()])]
+    );
+    assert_eq!(
+        publish.endpoint("wall_switch_double", "3").reads,
+        vec![("genOnOff".to_string(), vec!["onOff".to_string()])]
+    );
 }
 
 #[tokio::test]
@@ -291,28 +354,76 @@ fn should_log_as_error_when_setting_property_with_no_defined_converter() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_log_error_when_device_has_no_definition() {
-    todo!()
+async fn should_log_error_when_device_has_no_definition() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/button_double_key_interviewing/set",
+        &json!({"state": "OFF"}),
+    );
+
+    assert!(publish.logs.contains(&(
+        "error".to_string(),
+        "Cannot publish to unsupported device 'button_double_key_interviewing'".to_string(),
+        "z2m".to_string()
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_log_error_when_device_has_no_such_endpoint_via_property() {
-    todo!()
+async fn should_log_error_when_device_has_no_such_endpoint_via_property() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/0x0017880104e45542/get",
+        &json!({"state_center": "", "state_right": ""}),
+    );
+
+    assert!(publish.logs.iter().any(|(level, message, _)| {
+        level == "error"
+            && message
+                == "No converter available for 'state_center' on 'wall_switch_double': (\"\")"
+    }));
+    assert!(publish.endpoint("wall_switch_double", "2").reads.is_empty());
+    assert_eq!(
+        publish.endpoint("wall_switch_double", "3").reads,
+        vec![("genOnOff".to_string(), vec!["onOff".to_string()])]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_log_error_when_device_has_no_such_endpoint_via_topic() {
-    todo!()
+async fn should_log_error_when_device_has_no_such_endpoint_via_topic() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/0x0017880104e45542/center/get",
+        &json!({"state": ""}),
+    );
+
+    assert!(publish.logs.iter().any(|(level, message, _)| {
+        level == "error" && message == "Device 'wall_switch_double' has no endpoint 'center'"
+    }));
+    assert!(publish.endpoint("wall_switch_double", "2").reads.is_empty());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_not_publish_messages_to_zigbee_devices_when_payload_is_invalid() {
-    todo!()
+async fn should_not_publish_messages_to_zigbee_devices_when_payload_is_invalid() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/wall_switch_double/left/set",
+        &json!({"state": true}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/wall_switch_double/left/set",
+        &json!({"state": 1}),
+    );
+
+    assert!(nothing_published(&publish));
 }
 
 #[test]
@@ -321,64 +432,204 @@ fn should_not_use_state_converter_on_non_json_message_when_value_is_not_on_off_t
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_set_with_and_slashes_in_base_and_device_id_postfix_topic() {
-    todo!()
+async fn should_parse_set_with_and_slashes_in_base_and_device_id_postfix_topic() {
+    let mut publish = setup();
+    publish.base_topic = "zigbee2mqtt/at/my/home".to_string();
+    publish
+        .devices
+        .get_mut("wall_switch_double")
+        .unwrap()
+        .friendly_name = "in/basement/wall_switch_double".to_string();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/at/my/home/in/basement/wall_switch_double/left/set",
+        &json!({"state": "ON"}),
+    );
+
+    assert_eq!(
+        publish.endpoint("wall_switch_double", "2").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "on".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_set_with_attribute_topic() {
-    todo!()
+async fn should_parse_set_with_attribute_topic() {
+    let mut publish = setup();
+
+    publish.on_mqtt_raw("zigbee2mqtt/bulb_color/set/state", "ON");
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "on".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_set_with_color_attribute_topic() {
-    todo!()
+async fn should_parse_set_with_color_attribute_topic() {
+    let mut publish = setup();
+
+    publish.on_mqtt_raw("zigbee2mqtt/bulb_color/set/color", "#64C80A");
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "lightingColorCtrl".to_string(),
+            "moveToColor".to_string(),
+            json!({"colorx": 17806, "colory": 43155, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/bulb_color",
+        json!({"color": {"x": 0.2717, "y": 0.6585}, "color_mode": "xy"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_set_with_ieee_addr_topic() {
-    todo!()
+async fn should_parse_set_with_ieee_addr_topic() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/0x000b57fffec6a5b3/set",
+        &json!({"state": "ON"}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "on".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_set_with_non_existing_postfix() {
-    todo!()
+async fn should_parse_set_with_non_existing_postfix() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/wall_switch_double/invalid/set",
+        &json!({"state": "ON"}),
+    );
+
+    assert!(nothing_published(&publish));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_set_with_number_at_the_end_of_friendly_name_and_postfix() {
-    todo!()
+async fn should_parse_set_with_number_at_the_end_of_friendly_name_and_postfix() {
+    let mut publish = setup();
+    publish
+        .devices
+        .get_mut("wall_switch_double")
+        .unwrap()
+        .friendly_name = "ground_floor/kitchen/wall_switch/2".to_string();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/ground_floor/kitchen/wall_switch/2/left/set",
+        &json!({"state": "ON"}),
+    );
+
+    assert_eq!(
+        publish.endpoint("wall_switch_double", "2").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "on".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_set_with_postfix_topic_and_attribute() {
-    todo!()
+async fn should_parse_set_with_postfix_topic_and_attribute() {
+    let mut publish = setup();
+
+    publish.on_mqtt_raw("zigbee2mqtt/wall_switch_double/left/set", "ON");
+
+    assert_eq!(
+        publish.endpoint("wall_switch_double", "2").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "on".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_topic_with_when_base_and_device_id_have_multiple_slashes() {
-    todo!()
+async fn should_parse_topic_with_when_base_and_device_id_have_multiple_slashes() {
+    let mut publish = setup();
+    publish.base_topic = "zigbee2mqtt/at/my/basement".to_string();
+    publish.devices.get_mut("bulb_color").unwrap().friendly_name =
+        "floor0/basement/my_device_id2".to_string();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/at/my/basement/floor0/basement/my_device_id2/get",
+        &json!({"state": ""}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").reads,
+        vec![("genOnOff".to_string(), vec!["onOff".to_string()])]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_topic_with_when_base_topic_has_multiple_slashes() {
-    todo!()
+async fn should_parse_topic_with_when_base_topic_has_multiple_slashes() {
+    let mut publish = setup();
+    publish.base_topic = "zigbee2mqtt/at/my/home".to_string();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/at/my/home/bulb_color/get",
+        &json!({"state": ""}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").reads,
+        vec![("genOnOff".to_string(), vec!["onOff".to_string()])]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_parse_topic_with_when_device_id_has_multiple_slashes() {
-    todo!()
+async fn should_parse_topic_with_when_device_id_has_multiple_slashes() {
+    let mut publish = setup();
+    publish.devices.get_mut("bulb_color").unwrap().friendly_name =
+        "floor0/basement/my_device_id2".to_string();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/floor0/basement/my_device_id2/get",
+        &json!({"state": ""}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").reads,
+        vec![("genOnOff".to_string(), vec!["onOff".to_string()])]
+    );
 }
 
 #[test]
@@ -1165,4 +1416,37 @@ fn zncldj11_lm_open() {
 #[ignore = "not implemented yet"]
 fn zncldj11_lm_position() {
     todo!()
+}
+
+// Upstream has several additional tests with the same title `Should handle non-valid topics`.
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_handle_non_valid_topics_2() {
+    let mut publish = setup();
+    publish.on_mqtt("zigbee2mqtt1/bulb_color/sett", &json!({"state": "ON"}));
+    assert!(nothing_published(&publish));
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_handle_non_valid_topics_3() {
+    let mut publish = setup();
+    publish.on_mqtt("zigbee2mqtt/bulb_color/write", &json!({"state": "ON"}));
+    assert!(nothing_published(&publish));
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_handle_non_valid_topics_4() {
+    let mut publish = setup();
+    publish.on_mqtt("zigbee2mqtt/set", &json!({"state": "ON"}));
+    assert!(nothing_published(&publish));
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_handle_non_valid_topics_5() {
+    let mut publish = setup();
+    publish.on_mqtt("set", &json!({"state": "ON"}));
+    assert!(nothing_published(&publish));
 }

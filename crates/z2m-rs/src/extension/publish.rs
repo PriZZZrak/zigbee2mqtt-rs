@@ -22,6 +22,9 @@ pub struct PublishDevice {
     pub has_set_converter: bool,
     pub optimistic: bool,
     pub filtered_optimistic: Vec<String>,
+    pub has_definition: bool,
+    /// endpoint alias (left/right) -> endpoint id.
+    pub endpoint_aliases: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -39,12 +42,17 @@ pub struct Publish {
     pub group_commands: BTreeMap<String, usize>,
     /// `(topic, payload, options)`.
     pub published: Vec<(String, Value, Value)>,
-    pub logs: Vec<(String, String)>,
+    /// `(level, message, namespace)`.
+    pub logs: Vec<(String, String, String)>,
+    pub base_topic: String,
 }
 
 impl Publish {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            base_topic: "zigbee2mqtt".to_string(),
+            ..Default::default()
+        }
     }
 
     pub fn add_device(&mut self, friendly_name: &str, endpoints: &[&str]) {
@@ -60,8 +68,18 @@ impl Publish {
                 has_set_converter: true,
                 optimistic: true,
                 filtered_optimistic: Vec::new(),
+                has_definition: true,
+                endpoint_aliases: BTreeMap::new(),
             },
         );
+    }
+
+    pub fn add_endpoint_alias(&mut self, device: &str, alias: &str, endpoint: &str) {
+        self.devices
+            .get_mut(device)
+            .expect("device")
+            .endpoint_aliases
+            .insert(alias.to_string(), endpoint.to_string());
     }
 
     pub fn add_group(&mut self, friendly_name: &str) {
