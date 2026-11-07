@@ -67,7 +67,6 @@ fn minimal_config() -> serde_json::Value {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn combine_everything_groups_and_devices_from_separate_file() {
     let mut settings = Settings::with_files(BTreeMap::from([
         (
@@ -111,7 +110,6 @@ fn combine_everything_groups_and_devices_from_separate_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configuration_friendly_name_cannot_be_empty() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -125,7 +123,6 @@ fn configuration_friendly_name_cannot_be_empty() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configuration_friendly_name_cannot_contain_control_char() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -139,7 +136,6 @@ fn configuration_friendly_name_cannot_contain_control_char() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configuration_friendly_name_cannot_end_with() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -153,7 +149,6 @@ fn configuration_friendly_name_cannot_end_with() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configuration_shouldnt_be_valid_when_duplicate_friendly_name_are_used() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -168,7 +163,6 @@ fn configuration_shouldnt_be_valid_when_duplicate_friendly_name_are_used() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configuration_shouldnt_be_valid_when_friendly_name_contains_a_mqtt_wildcard() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -182,7 +176,6 @@ fn configuration_shouldnt_be_valid_when_friendly_name_contains_a_mqtt_wildcard()
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configuration_shouldnt_be_valid_when_friendly_name_ends_with_digit() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -196,7 +189,6 @@ fn configuration_shouldnt_be_valid_when_friendly_name_ends_with_digit() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configuration_shouldnt_be_valid_when_invalid_qos_value_is_used() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -210,7 +202,6 @@ fn configuration_shouldnt_be_valid_when_invalid_qos_value_is_used() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ensures_configuration_example_yaml_is_never_out_of_sync_with_settings() {
     let example = json!({
         "version": 5,
@@ -232,7 +223,6 @@ fn ensures_configuration_example_yaml_is_never_out_of_sync_with_settings() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn frontend_config() {
     let mut settings = Settings::with_config(json!({"frontend": {"enabled": true}}));
     settings.re_read();
@@ -249,7 +239,6 @@ fn frontend_config() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn settings() {
     let mut settings = Settings::new(json!({
         "devices": {
@@ -266,7 +255,6 @@ fn settings() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_and_remove_devices_to_a_separate_file_if_devices_yaml_doesnt_exist() {
     let mut settings = Settings::with_files(BTreeMap::from([(
         CONFIGURATION_FILE.to_string(),
@@ -288,7 +276,6 @@ fn should_add_and_remove_devices_to_a_separate_file_if_devices_yaml_doesnt_exist
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_devices() {
     let mut settings = Settings::from_config(json!({}));
     settings.add_device("0x12345678");
@@ -304,7 +291,6 @@ fn should_add_devices() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_devices_even_when_devices_exist_empty() {
     let mut settings = Settings::from_config(json!({"devices": []}));
     settings.add_device("0x12345678");
@@ -320,7 +306,6 @@ fn should_add_devices_even_when_devices_exist_empty() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_devices_for_first_file_when_using_2_separates_file() {
     let mut settings = Settings::with_files(BTreeMap::from([
         (
@@ -357,7 +342,6 @@ fn should_add_devices_for_first_file_when_using_2_separates_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_devices_for_first_file_when_using_2_separates_file_and_the_second_file_is_empty() {
     let mut settings = Settings::with_files(BTreeMap::from([
         (
@@ -388,7 +372,6 @@ fn should_add_devices_for_first_file_when_using_2_separates_file_and_the_second_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_devices_to_a_separate_file() {
     let mut settings = Settings::with_files(BTreeMap::from([
         (
@@ -417,7 +400,6 @@ fn should_add_devices_to_a_separate_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_devices_to_a_separate_file_if_devices_yaml_doesnt_exist() {
     let mut settings = Settings::with_files(BTreeMap::from([(
         CONFIGURATION_FILE.to_string(),
@@ -437,7 +419,6 @@ fn should_add_devices_to_a_separate_file_if_devices_yaml_doesnt_exist() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_devices_to_blocklist() {
     let mut settings = Settings::new(json!({}));
 
@@ -449,7 +430,6 @@ fn should_add_devices_to_blocklist() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_groups() {
     let mut settings = Settings::from_config(json!({}));
 
@@ -470,7 +450,6 @@ fn should_add_groups() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_add_groups_with_specific_id() {
     let mut settings = Settings::from_config(json!({}));
 
@@ -482,7 +461,6 @@ fn should_add_groups_with_specific_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_retention_configuration_with_mqtt_v5() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -495,7 +473,6 @@ fn should_allow_retention_configuration_with_mqtt_v5() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_username_without_password() {
     let settings = Settings::with_config(json!({
         "mqtt": {"server": "my.mqtt.server", "user": "myusername"},
@@ -518,7 +495,6 @@ fn should_allow_username_without_password() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_apply_home_assistant_environment_variables() {
     let mut settings = Settings::with_config(json!({}));
     settings.env = BTreeMap::from([
@@ -563,7 +539,6 @@ fn should_apply_home_assistant_environment_variables() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_apply_environment_variables_as_overrides() {
     let mut settings = Settings::with_files(BTreeMap::from([
         (
@@ -664,7 +639,6 @@ fn should_apply_environment_variables_as_overrides() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_keep_homeassistant_null_properties_on_apply() {
     let mut settings = Settings::from_config(json!({
         "device_options": {
@@ -691,7 +665,6 @@ fn should_keep_homeassistant_null_properties_on_apply() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_keep_homeassistant_null_property_on_device_setting_change() {
     let mut settings = Settings::from_config(json!({
         "devices": {
@@ -725,7 +698,6 @@ fn should_keep_homeassistant_null_property_on_device_setting_change() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_add_duplicate_groups() {
     let mut settings = Settings::from_config(json!({}));
 
@@ -741,7 +713,6 @@ fn should_not_add_duplicate_groups() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_add_duplicate_groups_with_specific_id() {
     let mut settings = Settings::from_config(json!({}));
 
@@ -757,7 +728,6 @@ fn should_not_add_duplicate_groups_with_specific_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_allow_any_string_values_for_ext_pan_id() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -771,7 +741,6 @@ fn should_not_allow_any_string_values_for_ext_pan_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_allow_any_string_values_for_network_key() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -785,7 +754,6 @@ fn should_not_allow_any_string_values_for_network_key() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_allow_any_string_values_for_pan_id() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -799,7 +767,6 @@ fn should_not_allow_any_string_values_for_pan_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_allow_retention_configuration_without_mqtt_v5() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -813,7 +780,6 @@ fn should_not_allow_retention_configuration_without_mqtt_v5() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_throw_error_when_devices_is_null() {
     let settings = Settings::from_config(json!({"devices": null}));
     // Upstream only checks that this does not throw.
@@ -821,7 +787,6 @@ fn should_not_throw_error_when_devices_is_null() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_read_all_secrets_form_a_separate_file() {
     let configuration = json!({
         "mqtt": {
@@ -868,7 +833,6 @@ fn should_read_all_secrets_form_a_separate_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_read_mqtt_username_and_password_form_a_separate_file() {
     let configuration = json!({
         "mqtt": {
@@ -914,7 +878,6 @@ fn should_read_mqtt_username_and_password_form_a_separate_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_read_devices() {
     let settings = Settings::from_config(json!({
         "devices": {
@@ -936,7 +899,6 @@ fn should_read_devices() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_read_devices_form_2_separate_files() {
     let settings = Settings::with_files(BTreeMap::from([
         (
@@ -964,7 +926,6 @@ fn should_read_devices_form_2_separate_files() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_read_devices_form_a_separate_file() {
     let settings = Settings::with_files(BTreeMap::from([
         (
@@ -988,7 +949,6 @@ fn should_read_devices_form_a_separate_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_read_groups() {
     let settings = Settings::with_config(json!({
         "groups": {"1": {"friendly_name": "123"}},
@@ -1001,7 +961,6 @@ fn should_read_groups() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_read_groups_from_a_separate_file() {
     let settings = Settings::with_files(BTreeMap::from([
         (
@@ -1021,7 +980,6 @@ fn should_read_groups_from_a_separate_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_return_default_settings() {
     let settings = Settings::with_config(json!({}));
 
@@ -1031,7 +989,6 @@ fn should_return_default_settings() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_return_settings() {
     let settings = Settings::with_config(json!({"serial": {"disable_led": true}}));
 
@@ -1041,7 +998,6 @@ fn should_return_settings() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_throw_error_when_changing_entity_friendly_name_of_non_existing_device() {
     let mut settings = Settings::from_config(json!({}));
 
@@ -1052,7 +1008,6 @@ fn should_throw_error_when_changing_entity_friendly_name_of_non_existing_device(
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_throw_error_when_changing_entity_options_of_non_existing_device() {
     let mut settings = Settings::from_config(json!({}));
 
@@ -1063,7 +1018,6 @@ fn should_throw_error_when_changing_entity_options_of_non_existing_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_throw_when_adding_device_which_already_exists() {
     let mut settings = Settings::from_config(json!({
         "devices": {
@@ -1078,7 +1032,6 @@ fn should_throw_when_adding_device_which_already_exists() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_throw_when_removing_device_which_doesnt_exist() {
     let mut settings = Settings::from_config(json!({
         "devices": {
@@ -1093,7 +1046,6 @@ fn should_throw_when_removing_device_which_doesnt_exist() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_validate_if_settings_do_not_conform_to_scheme() {
     let mut settings = Settings::new(json!({
         "homeassistant": {"enabled": true},
@@ -1107,7 +1059,6 @@ fn should_validate_if_settings_do_not_conform_to_scheme() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_write_environment_variables_as_overrides_to_configuration_yaml_not_in_the_ref_file() {
     let mut settings = Settings::with_files(BTreeMap::from([
         (
@@ -1151,7 +1102,6 @@ fn should_write_environment_variables_as_overrides_to_configuration_yaml_not_in_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn shouldnt_write_to_configuration_yaml_when_there_are_no_changes_in_it() {
     let mut settings = Settings::with_files(BTreeMap::from([
         (
@@ -1167,7 +1117,6 @@ fn shouldnt_write_to_configuration_yaml_when_there_are_no_changes_in_it() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throw_if_removing_non_existing_group() {
     let mut settings = Settings::with_config(json!({
         "groups": {"1": {"friendly_name": "123"}},
@@ -1179,7 +1128,6 @@ fn throw_if_removing_non_existing_group() {
 
 // Upstream: it.each([...])("Device icons should be in `device_icons` directory or a url", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn device_icons_should_be_in_device_icons_directory_or_a_url() {
     let cases: [(&str, Option<&str>); 4] = [
         (
