@@ -130,6 +130,7 @@
 
 use serde_json::json;
 use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::{ZStackAdapter, ZnpCall};
+use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
 use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
 
 fn adapter() -> ZStackAdapter {
@@ -615,52 +616,247 @@ fn send_zcl_frame_with_aps_encryption() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_multicast() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_multicast() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::BIND_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request_be(
+        false,
+        cluster_id,
+        &[
+            json!("0x1122334455667788"),
+            json!(3),
+            json!(0x0103),
+            json!(1),
+            json!("0x0000000000000000"),
+            json!(32),
+            json!(0),
+        ],
+    );
+    adapter
+        .send_zdo(
+            "0x0000000000000000",
+            1234,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    let mut expected = vec![0x23, 0x01];
+    expected.extend_from_slice(&zdo_payload);
+    expected.extend_from_slice(&[0; 7]);
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_unicast() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_unicast() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::BIND_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request_be(
+        false,
+        cluster_id,
+        &[
+            json!("0x1122334455667788"),
+            json!(3),
+            json!(0x0103),
+            json!(3),
+            json!("0x5544332211667788"),
+            json!(0),
+            json!(5),
+        ],
+    );
+    adapter
+        .send_zdo(
+            "0x0000000000000000",
+            1234,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    let mut expected = vec![0x23, 0x01];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_network_address_request() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_network_address_request() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::NETWORK_ADDRESS_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request_be(
+        false,
+        cluster_id,
+        &[json!("0x1122334455667788"), json!(false), json!(0)],
+    );
+    adapter
+        .send_zdo(
+            "0x0000000000000000",
+            1234,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, zdo_payload, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_nwk_update_request_broadcast() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_nwk_update_request_broadcast() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::NWK_UPDATE_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request(
+        false,
+        cluster_id,
+        &[
+            json!([15]),
+            json!(0xfe),
+            json!(0),
+            serde_json::Value::Null,
+            json!(0),
+        ],
+    );
+    adapter
+        .send_zdo(
+            "0x0000000000000000",
+            0xffff,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    let mut expected = vec![0xff, 0xff, 0x0f];
+    expected.extend_from_slice(&zdo_payload);
+    expected.extend_from_slice(&[0, 0, 0]);
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_nwk_update_request_unicast() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_nwk_update_request_unicast() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::NWK_UPDATE_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request(
+        false,
+        cluster_id,
+        &[
+            json!([15]),
+            json!(0xfe),
+            json!(0),
+            serde_json::Value::Null,
+            json!(0),
+        ],
+    );
+    adapter
+        .send_zdo(
+            "0x0000000000000000",
+            0x123,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    let mut expected = vec![0x23, 0x01, 0x02];
+    expected.extend_from_slice(&zdo_payload);
+    expected.extend_from_slice(&[0, 0, 0]);
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_permit_joining_request_broadcast() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_permit_joining_request_broadcast() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::PERMIT_JOINING_REQUEST;
+    let zdo_payload =
+        BuffaloZdo::build_request(false, cluster_id, &[json!(250), json!(1), json!([])]);
+    adapter
+        .send_zdo(
+            "0x0000000000000000",
+            0xfffc,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    let mut expected = vec![0x0f, 0xfc, 0xff];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_permit_joining_request_to_target() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_permit_joining_request_to_target() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::PERMIT_JOINING_REQUEST;
+    let zdo_payload =
+        BuffaloZdo::build_request(false, cluster_id, &[json!(250), json!(1), json!([])]);
+    adapter
+        .send_zdo(
+            "0x1122334455667788",
+            1234,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    let mut expected = vec![0x02, (1234u32 & 0xff) as u8, ((1234u32 >> 8) & 0xff) as u8];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn sends_proper_zdo_request_payload_for_generic_logic_request() {
-    todo!()
+async fn sends_proper_zdo_request_payload_for_generic_logic_request() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    let cluster_id = ClusterId::NODE_DESCRIPTOR_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request(false, cluster_id, &[json!(1234)]);
+    adapter
+        .send_zdo(
+            "0x0000000000000000",
+            1234,
+            cluster_id,
+            zdo_payload.clone(),
+            true,
+        )
+        .await;
+
+    let mut expected = vec![0x23, 0x01];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
 #[test]

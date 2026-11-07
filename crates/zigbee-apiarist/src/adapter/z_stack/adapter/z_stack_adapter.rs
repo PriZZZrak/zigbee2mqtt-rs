@@ -181,4 +181,16 @@ impl ZStackAdapter {
     pub async fn reset(&mut self, _kind: &str) {
         todo!()
     }
+
+    /// Upstream: `adapter.sendZdo(ieeeAddr, networkAddress, clusterId, payload, disableResponse)`.
+    pub async fn send_zdo(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _cluster_id: u16,
+        _payload: Vec<u8>,
+        _disable_response: bool,
+    ) {
+        todo!()
+    }
 }
