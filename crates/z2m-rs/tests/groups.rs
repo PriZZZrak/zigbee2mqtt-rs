@@ -41,7 +41,7 @@
 //   - Shouldnt publish group state change when a group is not optimistic
 
 use serde_json::json;
-use z2m_rs::extension::groups::Groups;
+use z2m_rs::extension::groups::{GroupConfig, GroupState, Groups};
 
 fn setup() -> Groups {
     let mut groups = Groups::new();
@@ -484,10 +484,22 @@ fn should_not_publish_state_change_off_if_any_lights_within_with_non_default_ep_
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_not_publish_state_change_when_group_changes_state_and_device_is_disabled() {
-    todo!()
+async fn should_not_publish_state_change_when_group_changes_state_and_device_is_disabled() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+    state.disable("bulb_color");
+
+    state.on_group_set("group_1", &json!({"state": "ON"}));
+
+    assert_eq!(state.published.len(), 1);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
 #[test]
@@ -502,53 +514,250 @@ fn should_only_include_relevant_properties_when_publishing_member_states() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_only_update_group_state_with_changed_properties() {
-    todo!()
+async fn should_only_update_group_state_with_changed_properties() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+    state.add_member("group_1", "bulb", "1");
+    state.set_retain("bulb", true);
+
+    state.on_device_set("bulb_color", &json!({"state": "OFF", "color_temp": 200}));
+    state.on_device_set("bulb", &json!({"state": "ON", "color_temp": 250}));
+    state.published.clear();
+
+    state.on_group_set("group_1", &json!({"color_temp": 300}));
+
+    assert_eq!(state.published.len(), 3);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"color_mode": "color_temp", "color_temp": 300, "state": "OFF"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb".to_string(),
+        json!({"color_mode": "color_temp", "color_temp": 300, "state": "ON"}),
+        json!({"retain": true, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"color_mode": "color_temp", "color_temp": 300, "state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_group_state_change_when_a_device_in_it_changes_state() {
-    todo!()
+async fn should_publish_group_state_change_when_a_device_in_it_changes_state() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+
+    state.on_attribute_report("bulb_color", "1", &json!({"onOff": 1}));
+
+    assert_eq!(state.published.len(), 2);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_state_change_for_group_when_members_state_change() {
-    todo!()
+async fn should_publish_state_change_for_group_when_members_state_change() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+
+    state.on_device_set("bulb_color", &json!({"state": "ON"}));
+    assert_eq!(state.published.len(), 2);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
+
+    state.published.clear();
+    state.on_group_set("group_1", &json!({"state": "OFF"}));
+    assert_eq!(state.published.len(), 2);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "OFF"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "OFF"}),
+        json!({"retain": false, "qos": 0})
+    )));
+
+    state.published.clear();
+    state.on_device_set("bulb_color", &json!({"state": "ON"}));
+    assert_eq!(state.published.len(), 2);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_state_change_of_all_members_when_a_group_changes_its_state() {
-    todo!()
+async fn should_publish_state_change_of_all_members_when_a_group_changes_its_state() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+
+    state.on_group_set("group_1", &json!({"state": "ON"}));
+
+    assert_eq!(state.published.len(), 2);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_state_change_of_all_members_when_a_group_changes_its_state_filtered() {
-    todo!()
+async fn should_publish_state_change_of_all_members_when_a_group_changes_its_state_filtered() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+    state.set_group_config(
+        "group_1",
+        GroupConfig {
+            optimistic: true,
+            filtered_attributes: vec!["brightness".to_string()],
+            off_state: None,
+        },
+    );
+
+    state.on_group_set("group_1", &json!({"state": "ON", "brightness": 100}));
+
+    assert_eq!(state.published.len(), 2);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "ON", "brightness": 100}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_state_change_of_another_group_with_shared_device_when_a_group_changes_its_state()
-{
-    todo!()
+async fn should_publish_state_change_of_another_group_with_shared_device_when_a_group_changes_its_state(
+) {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_group("group_2");
+    state.add_member("group_1", "bulb_color", "1");
+    state.add_member("group_2", "bulb_color", "1");
+
+    state.on_group_set("group_1", &json!({"state": "ON"}));
+
+    assert_eq!(state.published.len(), 3);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_2".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_state_change_off_even_when_missing_current_state() {
-    todo!()
+async fn should_publish_state_change_off_even_when_missing_current_state() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+    state.add_member("group_1", "bulb", "1");
+
+    state.on_group_set("group_1", &json!({"state": "ON"}));
+    state.published.clear();
+    state.group_states.clear();
+
+    state.on_device_set("bulb_color", &json!({"state": "OFF"}));
+
+    assert_eq!(state.published.len(), 2);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "OFF"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "OFF"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_state_change_off_if_all_lights_within_turn_off() {
-    todo!()
+async fn should_publish_state_change_off_if_all_lights_within_turn_off() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+    state.add_member("group_1", "bulb", "1");
+    state.set_retain("bulb", true);
+
+    state.on_group_set("group_1", &json!({"state": "ON"}));
+
+    state.published.clear();
+    state.on_device_set("bulb_color", &json!({"state": "OFF"}));
+    state.on_device_set("bulb", &json!({"state": "OFF"}));
+
+    assert_eq!(state.published.len(), 3);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "OFF"}),
+        json!({"retain": false, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb".to_string(),
+        json!({"state": "OFF"}),
+        json!({"retain": true, "qos": 0})
+    )));
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/group_1".to_string(),
+        json!({"state": "OFF"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
 
 #[test]
@@ -583,8 +792,27 @@ fn should_publish_state_of_group_when_specific_state_of_specific_endpoint_is_cha
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn shouldnt_publish_group_state_change_when_a_group_is_not_optimistic() {
-    todo!()
+async fn shouldnt_publish_group_state_change_when_a_group_is_not_optimistic() {
+    let mut state = GroupState::new();
+    state.add_group("group_1");
+    state.add_member("group_1", "bulb_color", "1");
+    state.set_group_config(
+        "group_1",
+        GroupConfig {
+            optimistic: false,
+            filtered_attributes: Vec::new(),
+            off_state: None,
+        },
+    );
+
+    state.on_attribute_report("bulb_color", "1", &json!({"onOff": 1}));
+
+    assert_eq!(state.published.len(), 1);
+    assert!(state.published.contains(&(
+        "zigbee2mqtt/bulb_color".to_string(),
+        json!({"state": "ON"}),
+        json!({"retain": false, "qos": 0})
+    )));
 }
