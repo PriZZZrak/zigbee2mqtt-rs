@@ -30,7 +30,6 @@ fn attempts(notify: &SdNotify) -> Vec<String> {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn no_socket() {
     let res = init_sd_notify_with(options()).await;
 
@@ -38,7 +37,6 @@ async fn no_socket() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_on_unsupported_platform() {
     let (warnings, log_warning) = logs();
     let res = init_sd_notify_with(SdNotifyOptions {
@@ -57,7 +55,6 @@ async fn error_on_unsupported_platform() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_on_supported_platform() {
     let (errors, log_error) = logs();
     let res = init_sd_notify_with(SdNotifyOptions {
@@ -76,7 +73,6 @@ async fn error_on_supported_platform() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn socket_only() {
     let res = init_sd_notify_with(SdNotifyOptions {
         notify_socket: Some("mocked".to_string()),
@@ -97,7 +93,6 @@ async fn socket_only() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn invalid_watchdog_timeout_socket_only() {
     let res = init_sd_notify_with(SdNotifyOptions {
         notify_socket: Some("mocked".to_string()),
@@ -119,7 +114,6 @@ async fn invalid_watchdog_timeout_socket_only() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn socket_and_watchdog() {
     let res = init_sd_notify_with(SdNotifyOptions {
         notify_socket: Some("mocked".to_string()),
@@ -157,7 +151,6 @@ async fn socket_and_watchdog() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fails_to_send() {
     let (warnings, log_warning) = logs();
     let res = init_sd_notify_with(SdNotifyOptions {

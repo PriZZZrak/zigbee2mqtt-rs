@@ -32,6 +32,7 @@ fn setup() -> (PathBuf, StaticFileServer) {
     ));
     let dir = root.join("public");
 
+    std::fs::create_dir_all(&root).unwrap();
     // outside the served directory: only a working traversal could reach it
     std::fs::write(root.join("secret.txt"), SECRET).unwrap();
     std::fs::create_dir_all(dir.join("sub")).unwrap();
@@ -63,7 +64,6 @@ fn header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str> {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn serves_a_file_with_its_content_type() {
     let (_dir, server) = setup();
     let response = server.handle(&request("/sub/icon.png", &[]));
@@ -74,7 +74,6 @@ fn serves_a_file_with_its_content_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn serves_index_html_for_the_root_never_cached() {
     let (_dir, server) = setup();
     let response = server.handle(&request("/", &[]));
@@ -89,7 +88,6 @@ fn serves_index_html_for_the_root_never_cached() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn serves_the_precompressed_brotli_variant() {
     let (_dir, server) = setup();
     let response = server.handle(&request("/app.js", &[("Accept-Encoding", "br")]));
@@ -106,7 +104,6 @@ fn serves_the_precompressed_brotli_variant() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn serves_the_precompressed_gzip_variant() {
     let (_dir, server) = setup();
     let response = server.handle(&request("/app.js", &[("Accept-Encoding", "gzip")]));
@@ -117,7 +114,6 @@ fn serves_the_precompressed_gzip_variant() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn serves_the_identity_file_when_no_encoding_is_accepted() {
     let (_dir, server) = setup();
     let value = app_js();
@@ -133,7 +129,6 @@ fn serves_the_identity_file_when_no_encoding_is_accepted() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn revalidates_with_an_etag() {
     let (_dir, server) = setup();
     let response = server.handle(&request("/app.js", &[("Accept-Encoding", "identity")]));
@@ -150,7 +145,6 @@ fn revalidates_with_an_etag() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_404_for_an_unknown_file() {
     let (_dir, server) = setup();
     let response = server.handle(&request("/nope.js", &[]));
@@ -170,7 +164,6 @@ fn returns_404_for_an_unknown_file() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn escapes_the_url_in_the_404_body() {
     let (_dir, server) = setup();
     let response = server.handle(&request("/%3Cscript%3E", &[]));
@@ -181,7 +174,6 @@ fn escapes_the_url_in_the_404_body() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_serve_files_outside_of_the_served_directory() {
     let (_dir, server) = setup();
 
@@ -200,7 +192,6 @@ fn does_not_serve_files_outside_of_the_served_directory() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reports_a_failure_to_serve_with_a_500() {
     let (dir, _server) = setup();
     let logs = Arc::new(Mutex::new(Vec::<String>::new()));
