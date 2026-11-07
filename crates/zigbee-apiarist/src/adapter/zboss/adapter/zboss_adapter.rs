@@ -82,3 +82,63 @@ pub fn supports_backup() {
 pub fn wait_for() {
     todo!()
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetworkParameters {
+    pub pan_id: u16,
+    pub extended_pan_id: String,
+    pub channel: u8,
+    pub nwk_update_id: u8,
+}
+
+#[derive(Debug, Clone)]
+pub struct ZBOSSAdapterOptions {
+    pub pan_id: u16,
+    pub extended_pan_id: [u8; 8],
+    pub channel_list: Vec<u8>,
+    pub network_key: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ZBOSSAdapterConfig {
+    pub path: String,
+    pub adapter: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ZBOSSAdapterStartupOptions {
+    pub disable_led: bool,
+}
+
+pub struct ZBOSSAdapter {
+    pub options: ZBOSSAdapterOptions,
+    pub config: ZBOSSAdapterConfig,
+    pub backup_path: String,
+    pub startup_options: ZBOSSAdapterStartupOptions,
+}
+
+impl ZBOSSAdapter {
+    pub fn new(
+        options: ZBOSSAdapterOptions,
+        config: ZBOSSAdapterConfig,
+        backup_path: &str,
+        startup_options: ZBOSSAdapterStartupOptions,
+    ) -> Self {
+        Self {
+            options,
+            config,
+            backup_path: backup_path.to_string(),
+            startup_options,
+        }
+    }
+
+    /// Upstream: `start()`.
+    pub async fn start(&mut self) -> String {
+        todo!()
+    }
+
+    /// Upstream: `getNetworkParameters()`.
+    pub async fn get_network_parameters(&self) -> NetworkParameters {
+        todo!()
+    }
+}
