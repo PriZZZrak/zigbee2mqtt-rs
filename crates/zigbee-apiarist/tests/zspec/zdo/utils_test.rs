@@ -7,7 +7,6 @@ use zigbee_apiarist::zspec::zdo::utils::{MacCapabilities, ServerMask};
 use zigbee_apiarist::zspec::zdo::zdo_status_error::ZdoStatusError;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn creates_status_error() {
     let zdo_error = ZdoStatusError::new(Status::INVALID_INDEX);
 
@@ -16,7 +15,6 @@ fn creates_status_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_response_cluster_id_for_request() {
     let cases = [
         (
@@ -74,7 +72,6 @@ fn capabilities(
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_mac_capabilities_flags() {
     let cases: [(u8, MacCapabilities); 11] = [
         (0, capabilities(0, 0, 0, 0, 0, 0, 0, 0)),
@@ -122,7 +119,6 @@ fn server_mask(
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_and_creates_server_mask() {
     let cases: [(u16, ServerMask); 4] = [
         (0, server_mask(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),

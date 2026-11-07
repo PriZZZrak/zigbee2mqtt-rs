@@ -47,18 +47,52 @@ pub struct ServerMask {
     pub stack_compliance_revision: u16,
 }
 
-pub fn create_server_mask(_mask: ServerMask) -> u16 {
-    todo!()
+pub fn create_server_mask(mask: ServerMask) -> u16 {
+    (mask.primary_trust_center & 0x01)
+        | ((mask.backup_trust_center << 1) & 0x02)
+        | ((mask.deprecated1 << 2) & 0x04)
+        | ((mask.deprecated2 << 3) & 0x08)
+        | ((mask.deprecated3 << 4) & 0x10)
+        | ((mask.deprecated4 << 5) & 0x20)
+        | ((mask.network_manager << 6) & 0x40)
+        | ((mask.reserved1 << 7) & 0x80)
+        | ((mask.reserved2 << 8) & 0x100)
+        | ((mask.stack_compliance_revision << 9) & 0xfe00)
 }
 
-pub fn get_mac_cap_flags(_value: u8) -> MacCapabilities {
-    todo!()
+pub fn get_mac_cap_flags(value: u8) -> MacCapabilities {
+    MacCapabilities {
+        alternate_pan_coordinator: value & 0x01,
+        device_type: (value & 0x02) >> 1,
+        power_source: (value & 0x04) >> 2,
+        rx_on_when_idle: (value & 0x08) >> 3,
+        reserved1: (value & 0x10) >> 4,
+        reserved2: (value & 0x20) >> 5,
+        security_capability: (value & 0x40) >> 6,
+        allocate_address: (value & 0x80) >> 7,
+    }
 }
 
 pub fn get_response_cluster_id(request: u16) -> Option<u16> {
-    todo!()
+    const RESPONSES: [u16; 6] = [0x8000, 0x8002, 0x8005, 0x8011, 0x8033, 0x8047];
+    if request > 0x8000 || request == 0x0013 {
+        return None;
+    }
+    let response = request + 0x8000;
+    RESPONSES.contains(&response).then_some(response)
 }
 
-pub fn get_server_mask(_value: u16) -> ServerMask {
-    todo!()
+pub fn get_server_mask(value: u16) -> ServerMask {
+    ServerMask {
+        primary_trust_center: value & 0x01,
+        backup_trust_center: (value & 0x02) >> 1,
+        deprecated1: (value & 0x04) >> 2,
+        deprecated2: (value & 0x08) >> 3,
+        deprecated3: (value & 0x10) >> 4,
+        deprecated4: (value & 0x20) >> 5,
+        network_manager: (value & 0x40) >> 6,
+        reserved1: (value & 0x80) >> 7,
+        reserved2: (value & 0x100) >> 8,
+        stack_compliance_revision: (value & 0xfe00) >> 9,
+    }
 }
