@@ -199,7 +199,6 @@ async fn assert_detect(
 // -------------------------------------------------------------------------
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn adapter() {
     let cases = [
         ("deconz", AdapterKind::Deconz),
@@ -224,7 +223,6 @@ async fn adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn tcp_discovery() {
     for path in ["tcp://192168.1.321", "tcp://192168.1.321:INVALID"] {
         let result = create_with(
@@ -241,7 +239,6 @@ async fn tcp_discovery() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn usb_discovery() {
     let mut discovery = context_with(vec![
         deconz_conbee_ii(),
@@ -262,7 +259,6 @@ async fn usb_discovery() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_sky_connect_zbt_1_when_zwa_2_present() {
     let context = context_with(vec![zwa_2_conflict(), zbt_1_pnpid()]);
 
@@ -281,7 +277,6 @@ async fn detects_sky_connect_zbt_1_when_zwa_2_present() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_sky_connect_zbt_2_when_zwa_2_present() {
     let context = context_with(vec![zwa_2_conflict(), zbt_2()]);
 
@@ -300,7 +295,6 @@ async fn detects_sky_connect_zbt_2_when_zwa_2_present() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_each_adapter() {
     let cases = [
         (
@@ -341,7 +335,6 @@ async fn detects_each_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_on_windows_with_manufacturer_present() {
     let mut context = context_with(vec![SerialPortInfo {
         path: "COM3".to_string(),
@@ -382,7 +375,6 @@ async fn detects_on_windows_with_manufacturer_present() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_on_windows_without_manufacturer_present() {
     let mut context = context_with(vec![SerialPortInfo {
         path: "COM3".to_string(),
@@ -405,7 +397,6 @@ async fn detects_on_windows_without_manufacturer_present() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_with_conflict_vendor_product_ids() {
     let mut context = context_with(vec![SerialPortInfo {
         manufacturer: None,
@@ -480,7 +471,6 @@ async fn detects_with_conflict_vendor_product_ids() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_with_multiple_adapters_connected() {
     let context = context_with(vec![
         deconz_conbee_ii(),
@@ -498,7 +488,6 @@ async fn detects_with_multiple_adapters_connected() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn detects_with_pnp_id_instead_of_path() {
     let context = context_with(vec![SerialPortInfo {
         path: "/dev/ttyUSB0".to_string(),
@@ -516,7 +505,6 @@ async fn detects_with_pnp_id_instead_of_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn errors_inside_mdns() {
     let context = DiscoveryContext {
         mdns_start_error: Some("failed".to_string()),
@@ -532,7 +520,6 @@ async fn errors_inside_mdns() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn falls_back_to_host_if_no_addresses() {
     let context = DiscoveryContext {
         mdns_services: vec![MdnsService {
@@ -555,7 +542,6 @@ async fn falls_back_to_host_if_no_addresses() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn finds_all_devices() {
     let mut context = context_with(vec![
         SerialPortInfo {
@@ -668,7 +654,6 @@ async fn finds_all_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn finds_all_devices_with_quirks() {
     let mut context = context_with(vec![SerialPortInfo {
         friendly_name: Some("silicon labs cp210x".to_string()),
@@ -729,7 +714,6 @@ async fn finds_all_devices_with_quirks() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn for_zstack_as_znp() {
     assert_detect(
         &DiscoveryContext::default(),
@@ -741,7 +725,6 @@ async fn for_zstack_as_znp() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn given_invalid_path() {
     let result = create_with(&DiscoveryContext::default(), json!({"path": "mdns://"})).await;
 
@@ -752,7 +735,6 @@ async fn given_invalid_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_ipv4() {
     assert_detect(
         &DiscoveryContext::default(),
@@ -768,7 +750,6 @@ async fn handles_ipv4() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_ipv6() {
     assert_detect(
         &DiscoveryContext::default(),
@@ -784,7 +765,6 @@ async fn handles_ipv6() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_domain_name() {
     assert_detect(
         &DiscoveryContext::default(),
@@ -800,7 +780,6 @@ async fn handles_domain_name() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_invalid_ipv6() {
     let result = create_with(
         &DiscoveryContext::default(),
@@ -815,7 +794,6 @@ async fn handles_invalid_ipv6() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_mdns_error_during_find_all_devices() {
     let mut context = context_with(Vec::new());
     context.mdns_services = Vec::new();
@@ -825,7 +803,6 @@ async fn handles_mdns_error_during_find_all_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_nested_mdns_error_during_find_all_devices() {
     let mut context = context_with(Vec::new());
     context.mdns_start_error = Some("failed".to_string());
@@ -835,7 +812,6 @@ async fn handles_nested_mdns_error_during_find_all_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_serial_error_during_find_all_devices() {
     let mut context = context(Err("fail"));
 
@@ -868,7 +844,6 @@ async fn handles_serial_error_during_find_all_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn invalid_adapter() {
     let result = create_with(
         &DiscoveryContext::default(),
@@ -883,7 +858,6 @@ async fn invalid_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn m_dns_discovery() {
     let cases = [
         ("deconz", AdapterKind::Deconz),
@@ -914,7 +888,6 @@ async fn m_dns_discovery() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_config_with_hostname_path() {
     assert_detect(
         &DiscoveryContext::default(),
@@ -926,7 +899,6 @@ async fn returns_config_with_hostname_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_config_with_socket_path() {
     assert_detect(
         &DiscoveryContext::default(),
@@ -938,7 +910,6 @@ async fn returns_config_with_socket_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_config_with_tcp_path() {
     assert_detect(
         &DiscoveryContext::default(),
@@ -950,7 +921,6 @@ async fn returns_config_with_tcp_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_first_from_list_with_multiple_adapters_nothing_to_match_against() {
     let context = context_with(vec![
         deconz_conbee_ii(),
@@ -968,7 +938,6 @@ async fn returns_first_from_list_with_multiple_adapters_nothing_to_match_against
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_instance_anyway_on_failure_to_get_serial_port_list() {
     let context = context(Err("spawn udevadm ENOENT"));
 
@@ -982,7 +951,6 @@ async fn returns_instance_anyway_on_failure_to_get_serial_port_list() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_instance_anyway_on_failure_to_match() {
     let context = context_with(Vec::new());
 
@@ -996,7 +964,6 @@ async fn returns_instance_anyway_on_failure_to_match() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_instance_anyway_on_failure_to_match_with_different_path() {
     let context = context_with(vec![deconz_conbee_ii()]);
 
@@ -1010,7 +977,6 @@ async fn returns_instance_anyway_on_failure_to_match_with_different_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_invalid_format() {
     let context = DiscoveryContext {
         mdns_services: vec![MdnsService {
@@ -1032,7 +998,6 @@ async fn returns_invalid_format() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn throws_on_failure_to_detect_with_conflict_vendor_product_ids() {
     let context = context_with(vec![SerialPortInfo {
         path: "/dev/ttyACM0".to_string(),
@@ -1047,7 +1012,6 @@ async fn throws_on_failure_to_detect_with_conflict_vendor_product_ids() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn throws_on_failure_to_get_serial_port_list() {
     let context = context(Err("spawn udevadm ENOENT"));
 
@@ -1058,7 +1022,6 @@ async fn throws_on_failure_to_get_serial_port_list() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn throws_on_failure_to_match_invalid_adapter() {
     let context = context_with(Vec::new());
 
@@ -1071,7 +1034,6 @@ async fn throws_on_failure_to_match_invalid_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn throws_on_failure_to_match_when_port_info_too_limited() {
     let context = context_with(vec![SerialPortInfo {
         vendor_id: None,
@@ -1093,7 +1055,6 @@ async fn throws_on_failure_to_match_when_port_info_too_limited() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn throws_on_failure_to_match_with_different_path() {
     let context = context_with(vec![deconz_conbee_ii()]);
 
@@ -1106,7 +1067,6 @@ async fn throws_on_failure_to_match_with_different_path() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn times_out() {
     let context = DiscoveryContext {
         mdns_services: Vec::new(),
@@ -1122,7 +1082,6 @@ async fn times_out() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn uses_default_serial_port_options_of_adapter() {
     let context = context_with(vec![zbt_2()]);
 
@@ -1141,7 +1100,6 @@ async fn uses_default_serial_port_options_of_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn uses_provided_options_instead_of_default_serial_port_options_of_adapter() {
     let context = context_with(vec![zbt_2()]);
 
@@ -1160,7 +1118,6 @@ async fn uses_provided_options_instead_of_default_serial_port_options_of_adapter
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn with_adapter_only_config() {
     let cases = [
         (
@@ -1207,7 +1164,6 @@ async fn with_adapter_only_config() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn with_adapter_path_config() {
     let cases = [
         (
@@ -1254,7 +1210,6 @@ async fn with_adapter_path_config() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn with_path_only_config() {
     let cases = [
         (
@@ -1295,7 +1250,6 @@ async fn with_path_only_config() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn without_config() {
     // multiple adapters connected: first sorted by path is Ember
     let context = context_with(vec![
