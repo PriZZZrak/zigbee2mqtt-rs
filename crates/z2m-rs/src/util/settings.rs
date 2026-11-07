@@ -95,12 +95,22 @@ pub fn write_minimal_defaults() {
 }
 
 /// Minimal settings document used by the ported tests.
+pub const CONFIGURATION_FILE: &str = "configuration.yaml";
+pub const DEVICES_FILE: &str = "devices.yaml";
+pub const DEVICES_FILE2: &str = "devices2.yaml";
+pub const GROUPS_FILE: &str = "groups.yaml";
+pub const SECRET_FILE: &str = "secret.yaml";
+
 #[derive(Debug, Clone, Default)]
 pub struct Settings {
     /// Effective settings document (`settings.get()`).
     pub data: serde_json::Value,
     /// Persisted `configuration.yaml` document.
     pub configuration: serde_json::Value,
+    /// In-memory stand-in for the data directory files.
+    pub files: std::collections::BTreeMap<String, serde_json::Value>,
+    /// `ZIGBEE2MQTT_CONFIG_*` environment overrides.
+    pub env: std::collections::BTreeMap<String, String>,
 }
 
 impl Settings {
@@ -108,7 +118,64 @@ impl Settings {
         Self {
             configuration: data.clone(),
             data,
+            ..Default::default()
         }
+    }
+
+    pub fn with_files(files: std::collections::BTreeMap<String, serde_json::Value>) -> Self {
+        let configuration = files
+            .get(CONFIGURATION_FILE)
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        Self {
+            data: configuration.clone(),
+            configuration,
+            files,
+            env: Default::default(),
+        }
+    }
+
+    pub fn with_config(configuration: serde_json::Value) -> Self {
+        let mut files = std::collections::BTreeMap::new();
+        files.insert(CONFIGURATION_FILE.to_string(), configuration.clone());
+        Self::with_files(files)
+    }
+
+    pub fn read_file(&self, name: &str) -> serde_json::Value {
+        self.files
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}))
+    }
+
+    /// Upstream: `settings.set(path, value)`.
+    pub fn set(&mut self, _path: &[&str], _value: serde_json::Value) {
+        todo!()
+    }
+
+    /// Upstream: `settings.getGroup(id)`.
+    pub fn get_group(&self, _id: &str) -> Option<serde_json::Value> {
+        todo!()
+    }
+
+    /// Upstream: `settings.removeGroup(id)`.
+    pub fn remove_group(&mut self, _id: &str) -> Result<(), String> {
+        todo!()
+    }
+
+    /// Upstream: `settings.write()`, returns whether anything was written.
+    pub fn write(&mut self) -> bool {
+        todo!()
+    }
+
+    /// Upstream: `settings.testing.write()` (forces writing ENV overrides).
+    pub fn testing_write(&mut self) {
+        todo!()
+    }
+
+    /// Applies `ZIGBEE2MQTT_CONFIG_*` overrides.
+    pub fn apply_env_overrides(&mut self) {
+        todo!()
     }
 
     pub fn from_config(configuration: serde_json::Value) -> Self {

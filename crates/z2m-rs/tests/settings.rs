@@ -53,7 +53,11 @@
 //   - Throw if removing non-existing group
 
 use serde_json::json;
-use z2m_rs::util::settings::Settings;
+use std::collections::BTreeMap;
+
+use z2m_rs::util::settings::{
+    Settings, CONFIGURATION_FILE, DEVICES_FILE, DEVICES_FILE2, GROUPS_FILE, SECRET_FILE,
+};
 
 fn minimal_config() -> serde_json::Value {
     json!({
@@ -65,7 +69,45 @@ fn minimal_config() -> serde_json::Value {
 #[test]
 #[ignore = "not implemented yet"]
 fn combine_everything_groups_and_devices_from_separate_file() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"devices": "devices.yaml", "groups": "groups.yaml"}),
+        ),
+        (
+            GROUPS_FILE.to_string(),
+            json!({"1": {"friendly_name": "123"}}),
+        ),
+    ]));
+    let expected_configuration = json!({"devices": "devices.yaml", "groups": "groups.yaml"});
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        expected_configuration
+    );
+
+    settings.add_device("0x1234");
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        expected_configuration
+    );
+    assert_eq!(
+        settings.read_file(DEVICES_FILE),
+        json!({"0x1234": {"friendly_name": "0x1234"}})
+    );
+    assert_eq!(
+        settings.get_group("1"),
+        Some(json!({"ID": 1, "friendly_name": "123"}))
+    );
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        expected_configuration
+    );
+    assert_eq!(
+        settings.get_device("0x1234"),
+        Some(json!({"ID": "0x1234", "friendly_name": "0x1234"}))
+    );
 }
 
 #[test]
@@ -170,13 +212,40 @@ fn configuration_shouldnt_be_valid_when_invalid_qos_value_is_used() {
 #[test]
 #[ignore = "not implemented yet"]
 fn ensures_configuration_example_yaml_is_never_out_of_sync_with_settings() {
-    todo!()
+    let example = json!({
+        "version": 5,
+        "homeassistant": {"enabled": false},
+        "frontend": {"enabled": true},
+        "mqtt": {"base_topic": "zigbee2mqtt", "server": "mqtt://localhost"},
+        "advanced": {
+            "network_key": "GENERATE",
+            "pan_id": "GENERATE",
+            "ext_pan_id": "GENERATE",
+        },
+    });
+    let settings = Settings::with_files(BTreeMap::from([(
+        "configuration.example.yaml".to_string(),
+        example.clone(),
+    )]));
+
+    assert_eq!(settings.read_file("configuration.example.yaml"), example);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn frontend_config() {
-    todo!()
+    let mut settings = Settings::with_config(json!({"frontend": {"enabled": true}}));
+    settings.re_read();
+
+    assert_eq!(
+        settings.get()["frontend"],
+        json!({
+            "enabled": true,
+            "package": "zigbee2mqtt-windfront",
+            "port": 8080,
+            "base_url": "/",
+        })
+    );
 }
 
 #[test]
@@ -199,7 +268,23 @@ fn settings() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_and_remove_devices_to_a_separate_file_if_devices_yaml_doesnt_exist() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([(
+        CONFIGURATION_FILE.to_string(),
+        json!({"devices": "devices.yaml"}),
+    )]));
+
+    settings.add_device("0x1234");
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        json!({"devices": "devices.yaml"})
+    );
+
+    settings.remove_device("0x1234").unwrap();
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        json!({"devices": "devices.yaml"})
+    );
+    assert_eq!(settings.read_file(DEVICES_FILE), json!({}));
 }
 
 #[test]
@@ -237,25 +322,118 @@ fn should_add_devices_even_when_devices_exist_empty() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_devices_for_first_file_when_using_2_separates_file() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"devices": ["devices.yaml", "devices2.yaml"]}),
+        ),
+        (
+            DEVICES_FILE.to_string(),
+            json!({"0x12345678": {"friendly_name": "0x12345678", "retain": false}}),
+        ),
+        (
+            DEVICES_FILE2.to_string(),
+            json!({"0x87654321": {"friendly_name": "0x87654321", "retain": false}}),
+        ),
+    ]));
+
+    settings.add_device("0x1234");
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        json!({"devices": ["devices.yaml", "devices2.yaml"]})
+    );
+    assert_eq!(
+        settings.read_file(DEVICES_FILE),
+        json!({
+            "0x12345678": {"friendly_name": "0x12345678", "retain": false},
+            "0x1234": {"friendly_name": "0x1234"},
+        })
+    );
+    assert_eq!(
+        settings.read_file(DEVICES_FILE2),
+        json!({"0x87654321": {"friendly_name": "0x87654321", "retain": false}})
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_devices_for_first_file_when_using_2_separates_file_and_the_second_file_is_empty() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"devices": ["devices.yaml", "devices2.yaml"]}),
+        ),
+        (
+            DEVICES_FILE.to_string(),
+            json!({"0x12345678": {"friendly_name": "0x12345678", "retain": false}}),
+        ),
+        (DEVICES_FILE2.to_string(), json!({})),
+    ]));
+
+    settings.add_device("0x1234");
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        json!({"devices": ["devices.yaml", "devices2.yaml"]})
+    );
+    assert_eq!(
+        settings.read_file(DEVICES_FILE),
+        json!({
+            "0x12345678": {"friendly_name": "0x12345678", "retain": false},
+            "0x1234": {"friendly_name": "0x1234"},
+        })
+    );
+    assert_eq!(settings.read_file(DEVICES_FILE2), json!({}));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_devices_to_a_separate_file() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"devices": "devices.yaml"}),
+        ),
+        (
+            DEVICES_FILE.to_string(),
+            json!({"0x12345678": {"friendly_name": "0x12345678", "retain": false}}),
+        ),
+    ]));
+
+    settings.add_device("0x1234");
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        json!({"devices": "devices.yaml"})
+    );
+    assert_eq!(
+        settings.read_file(DEVICES_FILE),
+        json!({
+            "0x12345678": {"friendly_name": "0x12345678", "retain": false},
+            "0x1234": {"friendly_name": "0x1234"},
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_devices_to_a_separate_file_if_devices_yaml_doesnt_exist() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([(
+        CONFIGURATION_FILE.to_string(),
+        json!({"devices": "devices.yaml"}),
+    )]));
+
+    settings.add_device("0x1234");
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        json!({"devices": "devices.yaml"})
+    );
+    assert_eq!(
+        settings.read_file(DEVICES_FILE),
+        json!({"0x1234": {"friendly_name": "0x1234"}})
+    );
 }
 
 #[test]
@@ -319,19 +497,170 @@ fn should_allow_retention_configuration_with_mqtt_v5() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_allow_username_without_password() {
-    todo!()
+    let settings = Settings::with_config(json!({
+        "mqtt": {"server": "my.mqtt.server", "user": "myusername"},
+    }));
+
+    assert_eq!(
+        settings.get()["mqtt"],
+        json!({
+            "base_topic": "zigbee2mqtt",
+            "include_device_information": false,
+            "maximum_packet_size": 1048576,
+            "keepalive": 60,
+            "reject_unauthorized": true,
+            "version": 4,
+            "force_disable_retain": false,
+            "server": "my.mqtt.server",
+            "user": "myusername",
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_apply_home_assistant_environment_variables() {
-    todo!()
+    let mut settings = Settings::with_config(json!({}));
+    settings.env = BTreeMap::from([
+            ("ZIGBEE2MQTT_CONFIG_FRONTEND_ENABLED".to_string(), "true".to_string()),
+            ("ZIGBEE2MQTT_CONFIG_FRONTEND_PORT".to_string(), "8099".to_string()),
+            ("ZIGBEE2MQTT_CONFIG_HOMEASSISTANT_ENABLED".to_string(), "true".to_string()),
+            (
+                "ZIGBEE2MQTT_CONFIG_SERIAL_PORT".to_string(),
+                "/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_48be7a7468d8ed11bfea786ff2c613ac-if00-port0".to_string(),
+            ),
+            ("ZIGBEE2MQTT_CONFIG_MQTT_SERVER".to_string(), "mqtt://core-mosquitto:1883".to_string()),
+            ("ZIGBEE2MQTT_CONFIG_MQTT_USER".to_string(), "addons".to_string()),
+            (
+                "ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD".to_string(),
+                "7RbR4NBSskS8TKG4ugzdRilXw6TPQ4NKFs259j2DxeultOFtl5JwciNZFd6feT5o".to_string(),
+            ),
+        ]);
+
+    for _ in 0..3 {
+        assert!(settings.write());
+        assert_eq!(settings.validate(), Vec::<String>::new());
+
+        assert_eq!(settings.get()["frontend"]["enabled"], json!(true));
+        assert_eq!(settings.get()["frontend"]["port"], json!(8099));
+        assert_eq!(settings.get()["homeassistant"]["enabled"], json!(true));
+        assert_eq!(
+                settings.get()["serial"]["port"],
+                json!("/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_48be7a7468d8ed11bfea786ff2c613ac-if00-port0")
+            );
+        assert_eq!(
+            settings.get()["mqtt"]["server"],
+            json!("mqtt://core-mosquitto:1883")
+        );
+        assert_eq!(settings.get()["mqtt"]["user"], json!("addons"));
+        assert_eq!(
+            settings.get()["mqtt"]["password"],
+            json!("7RbR4NBSskS8TKG4ugzdRilXw6TPQ4NKFs259j2DxeultOFtl5JwciNZFd6feT5o")
+        );
+        assert_eq!(settings.get()["devices"], json!({}));
+        assert_eq!(settings.get()["groups"], json!({}));
+    }
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_apply_environment_variables_as_overrides() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"mqtt": {"password": "config-password"}}),
+        ),
+        (SECRET_FILE.to_string(), json!({"password": "the-password"})),
+        (
+            DEVICES_FILE.to_string(),
+            json!({"0x00158d00018255df": {"friendly_name": "0x00158d00018255df", "retain": false}}),
+        ),
+    ]));
+    settings.env = BTreeMap::from([
+        (
+            "ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD".to_string(),
+            "!secret.yaml password".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_SERIAL_DISABLE_LED".to_string(),
+            "true".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_ADVANCED_CHANNEL".to_string(),
+            "15".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_ADVANCED_OUTPUT".to_string(),
+            "attribute_and_json".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_ADVANCED_LOG_OUTPUT".to_string(),
+            "[\"console\"]".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_MAP_OPTIONS_GRAPHVIZ_COLORS_FILL".to_string(),
+            "{\"enddevice\": \"#ff0000\", \"coordinator\": \"#00ff00\", \"router\": \"#0000ff\"}"
+                .to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_MQTT_BASE_TOPIC".to_string(),
+            "testtopic".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_MQTT_SERVER".to_string(),
+            "testserver".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_ADVANCED_NETWORK_KEY".to_string(),
+            "GENERATE".to_string(),
+        ),
+        (
+            "ZIGBEE2MQTT_CONFIG_DEVICES".to_string(),
+            "devices.yaml".to_string(),
+        ),
+    ]);
+
+    // Write trice to ensure there are no side effects.
+    for _ in 0..3 {
+        assert!(settings.write());
+        assert_eq!(settings.validate(), Vec::<String>::new());
+
+        assert_eq!(settings.get()["serial"]["disable_led"], json!(true));
+        assert_eq!(settings.get()["advanced"]["channel"], json!(15));
+        assert_eq!(settings.get()["advanced"]["log_output"], json!(["console"]));
+        assert_eq!(
+            settings.get()["advanced"]["output"],
+            json!("attribute_and_json")
+        );
+        assert_eq!(
+            settings.get()["map_options"]["graphviz"]["colors"]["fill"],
+            json!({"enddevice": "#ff0000", "coordinator": "#00ff00", "router": "#0000ff"})
+        );
+        assert_eq!(settings.get()["mqtt"]["base_topic"], json!("testtopic"));
+        assert_eq!(settings.get()["mqtt"]["server"], json!("testserver"));
+        assert_eq!(settings.get()["mqtt"]["password"], json!("the-password"));
+        assert_eq!(settings.get()["advanced"]["network_key"], json!("GENERATE"));
+        assert_eq!(
+            settings.get()["devices"]["0x00158d00018255df"]["retain"],
+            json!(false)
+        );
+
+        settings.set(&["advanced", "channel"], json!(25));
+        assert_eq!(settings.get()["advanced"]["channel"], json!(15));
+        assert_eq!(
+            settings.read_file(CONFIGURATION_FILE)["advanced"]["channel"],
+            json!(15)
+        );
+
+        assert_eq!(
+            settings.read_file(SECRET_FILE)["password"],
+            json!("the-password")
+        );
+        assert_eq!(
+            settings.read_file(CONFIGURATION_FILE)["mqtt"]["password"],
+            json!("!secret.yaml password")
+        );
+    }
 }
 
 #[test]
@@ -494,13 +823,94 @@ fn should_not_throw_error_when_devices_is_null() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_read_all_secrets_form_a_separate_file() {
-    todo!()
+    let configuration = json!({
+        "mqtt": {
+            "server": "!secret server",
+            "user": "!secret username",
+            "password": "!secret.yaml password",
+        },
+        "advanced": {"network_key": "!secret network_key"},
+    });
+    let secret = json!({
+        "server": "my.mqtt.server",
+        "username": "mysecretusername",
+        "password": "mysecretpassword",
+        "network_key": [1, 2, 3],
+    });
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (SECRET_FILE.to_string(), secret.clone()),
+        (CONFIGURATION_FILE.to_string(), configuration.clone()),
+    ]));
+
+    assert_eq!(
+        settings.get()["mqtt"]["password"],
+        json!("mysecretpassword")
+    );
+    assert_eq!(settings.get()["mqtt"]["server"], json!("my.mqtt.server"));
+    assert_eq!(settings.get()["mqtt"]["user"], json!("mysecretusername"));
+    assert_eq!(settings.get()["advanced"]["network_key"], json!([1, 2, 3]));
+
+    settings.testing_write();
+    assert_eq!(settings.read_file(CONFIGURATION_FILE), configuration);
+    assert_eq!(settings.read_file(SECRET_FILE), secret);
+
+    settings.set(&["mqtt", "server"], json!("not.secret.server"));
+    assert_eq!(settings.read_file(CONFIGURATION_FILE), configuration);
+    assert_eq!(
+        settings.read_file(SECRET_FILE),
+        json!({
+            "server": "not.secret.server",
+            "username": "mysecretusername",
+            "password": "mysecretpassword",
+            "network_key": [1, 2, 3],
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_read_mqtt_username_and_password_form_a_separate_file() {
-    todo!()
+    let configuration = json!({
+        "mqtt": {
+            "server": "my.mqtt.server",
+            "user": "!secret username",
+            "password": "!secret password",
+        },
+        "advanced": {"network_key": "!secret network_key"},
+    });
+    let secret = json!({
+        "username": "mysecretusername",
+        "password": "mysecretpassword",
+        "network_key": [1, 2, 3],
+    });
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (SECRET_FILE.to_string(), secret.clone()),
+        (CONFIGURATION_FILE.to_string(), configuration.clone()),
+    ]));
+
+    assert_eq!(
+        settings.get()["mqtt"]["password"],
+        json!("mysecretpassword")
+    );
+    assert_eq!(settings.get()["mqtt"]["user"], json!("mysecretusername"));
+    assert_eq!(settings.get()["mqtt"]["server"], json!("my.mqtt.server"));
+    assert_eq!(settings.get()["advanced"]["network_key"], json!([1, 2, 3]));
+
+    settings.testing_write();
+    assert_eq!(settings.read_file(CONFIGURATION_FILE), configuration);
+    assert_eq!(settings.read_file(SECRET_FILE), secret);
+
+    settings.set(&["mqtt", "user"], json!("test123"));
+    settings.set(&["advanced", "network_key"], json!([1, 2, 3, 4]));
+    assert_eq!(settings.read_file(CONFIGURATION_FILE), configuration);
+    assert_eq!(
+        settings.read_file(SECRET_FILE),
+        json!({
+            "username": "test123",
+            "password": "mysecretpassword",
+            "network_key": [1, 2, 3, 4],
+        })
+    );
 }
 
 #[test]
@@ -528,37 +938,106 @@ fn should_read_devices() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_read_devices_form_2_separate_files() {
-    todo!()
+    let settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"devices": ["devices.yaml", "devices2.yaml"]}),
+        ),
+        (
+            DEVICES_FILE.to_string(),
+            json!({"0x12345678": {"friendly_name": "0x12345678", "retain": false}}),
+        ),
+        (
+            DEVICES_FILE2.to_string(),
+            json!({"0x87654321": {"friendly_name": "0x87654321", "retain": false}}),
+        ),
+    ]));
+
+    assert_eq!(
+        settings.get_device("0x12345678").unwrap()["friendly_name"],
+        json!("0x12345678")
+    );
+    assert_eq!(
+        settings.get_device("0x87654321").unwrap()["friendly_name"],
+        json!("0x87654321")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_read_devices_form_a_separate_file() {
-    todo!()
+    let settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"devices": "devices.yaml"}),
+        ),
+        (
+            DEVICES_FILE.to_string(),
+            json!({"0x12345678": {"friendly_name": "0x12345678", "retain": false}}),
+        ),
+    ]));
+
+    assert_eq!(
+        settings.get_device("0x12345678"),
+        Some(json!({
+            "ID": "0x12345678",
+            "friendly_name": "0x12345678",
+            "retain": false,
+        }))
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_read_groups() {
-    todo!()
+    let settings = Settings::with_config(json!({
+        "groups": {"1": {"friendly_name": "123"}},
+    }));
+
+    assert_eq!(
+        settings.get_group("1"),
+        Some(json!({"ID": 1, "friendly_name": "123"}))
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_read_groups_from_a_separate_file() {
-    todo!()
+    let settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"groups": "groups.yaml"}),
+        ),
+        (
+            GROUPS_FILE.to_string(),
+            json!({"1": {"friendly_name": "123"}}),
+        ),
+    ]));
+
+    assert_eq!(
+        settings.get_group("1"),
+        Some(json!({"ID": 1, "friendly_name": "123"}))
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_return_default_settings() {
-    todo!()
+    let settings = Settings::with_config(json!({}));
+
+    assert_eq!(settings.get()["devices"], json!({}));
+    assert_eq!(settings.get()["groups"], json!({}));
+    assert_eq!(settings.get()["mqtt"]["base_topic"], json!("zigbee2mqtt"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_return_settings() {
-    todo!()
+    let settings = Settings::with_config(json!({"serial": {"disable_led": true}}));
+
+    assert_eq!(settings.get()["devices"], json!({}));
+    assert_eq!(settings.get()["groups"], json!({}));
+    assert_eq!(settings.get()["serial"], json!({"disable_led": true}));
 }
 
 #[test]
@@ -630,19 +1109,72 @@ fn should_validate_if_settings_do_not_conform_to_scheme() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_write_environment_variables_as_overrides_to_configuration_yaml_not_in_the_ref_file() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            SECRET_FILE.to_string(),
+            json!({"password": "password-in-secret-file"}),
+        ),
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"mqtt": {"password": "!secret password", "server": "server"}}),
+        ),
+    ]));
+    settings.env = BTreeMap::from([(
+        "ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD".to_string(),
+        "password-in-env-var".to_string(),
+    )]);
+
+    for _ in 0..3 {
+        assert!(settings.write());
+        assert_eq!(settings.validate(), Vec::<String>::new());
+
+        assert_eq!(
+            settings.get()["mqtt"]["password"],
+            json!("password-in-env-var")
+        );
+        assert_eq!(settings.get()["mqtt"]["server"], json!("server"));
+        assert_eq!(settings.get()["groups"], json!({}));
+        assert_eq!(settings.get()["devices"], json!({}));
+        assert_eq!(
+            settings.read_file(SECRET_FILE)["password"],
+            json!("password-in-secret-file")
+        );
+        assert_eq!(
+            settings.read_file(CONFIGURATION_FILE)["mqtt"]["password"],
+            json!("password-in-env-var")
+        );
+        assert_eq!(
+            settings.read_file(CONFIGURATION_FILE)["mqtt"]["server"],
+            json!("server")
+        );
+    }
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shouldnt_write_to_configuration_yaml_when_there_are_no_changes_in_it() {
-    todo!()
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"devices": "devices.yaml"}),
+        ),
+        (DEVICES_FILE.to_string(), json!({})),
+    ]));
+
+    settings.add_device("0x1234");
+
+    assert!(!settings.write());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn throw_if_removing_non_existing_group() {
-    todo!()
+    let mut settings = Settings::with_config(json!({
+        "groups": {"1": {"friendly_name": "123"}},
+    }));
+
+    let error = settings.remove_group("2").unwrap_err();
+    assert_eq!(error, "Group '2' does not exist");
 }
 
 // Upstream: it.each([...])("Device icons should be in `device_icons` directory or a url", ...)
