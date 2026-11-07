@@ -49,7 +49,6 @@ fn response_payload<'a>(external_extensions: &'a ExternalExtensions, topic: &str
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn loads_nothing() {
     let mut external_extensions = ExternalExtensions::new();
 
@@ -63,7 +62,6 @@ async fn loads_nothing() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn cjs_loads_extensions() {
     let mut external_extensions = ExternalExtensions::new();
     external_extensions.folder = cjs_assets();
@@ -93,7 +91,6 @@ async fn cjs_loads_extensions() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn mjs_loads_extensions() {
     let mut external_extensions = ExternalExtensions::new();
     external_extensions.folder = mjs_assets();
@@ -123,7 +120,6 @@ async fn mjs_loads_extensions() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn starts_extensions_only_once() {
     let mut external_extensions = ExternalExtensions::new();
     external_extensions.folder = mjs_assets();
@@ -146,7 +142,6 @@ async fn starts_extensions_only_once() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn loads_all_valid_extensions_relocates_skips_ones_with_errors() {
     let mut external_extensions = ExternalExtensions::new();
     external_extensions.folder = mjs_assets();
@@ -174,7 +169,6 @@ async fn loads_all_valid_extensions_relocates_skips_ones_with_errors() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn updates_after_edit_from_mqtt() {
     let extension_name = "exampleExtension.js";
     let mut external_extensions = ExternalExtensions::new();
@@ -230,7 +224,6 @@ async fn updates_after_edit_from_mqtt() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn cjs_saves_and_removes() {
     let extension_name = "foo.js";
     let extension_code = CJS_EXAMPLE;
@@ -286,7 +279,6 @@ async fn cjs_saves_and_removes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn mjs_saves_and_removes() {
     let extension_name = "foo.mjs";
     let extension_code = MJS_EXAMPLE;
@@ -342,7 +334,6 @@ async fn mjs_saves_and_removes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_invalid_name() {
     let extension_name = "foo1";
     let mut external_extensions = ExternalExtensions::new();
@@ -366,7 +357,6 @@ async fn returns_error_on_invalid_name() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_invalid_code() {
     let extension_name = "foo1.js";
     let extension_code = "definetly not a correct javascript code";
@@ -396,7 +386,6 @@ async fn returns_error_on_invalid_code() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_invalid_removal() {
     let extension_name = "foo2.js";
     let mut external_extensions = ExternalExtensions::new();
@@ -423,7 +412,6 @@ async fn returns_error_on_invalid_removal() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_invalid_payloads() {
     let mut external_extensions = ExternalExtensions::new();
     external_extensions.start().await;
@@ -460,7 +448,6 @@ async fn handles_invalid_payloads() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn doesnt_add_extension_when_external_js_disabled() {
     let mut external_extensions = ExternalExtensions::new();
     external_extensions.enabled = false;
