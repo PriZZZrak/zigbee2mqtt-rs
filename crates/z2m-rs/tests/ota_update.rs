@@ -35,10 +35,10 @@ fn idle(installed: u64, latest: u64, source: Option<&str>) -> Value {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn updates_a_device_with_topic() {
     for (api, downgrade) in [("update", false), ("update/downgrade", true)] {
         let mut ota = ota();
+        ota.versions = (1, 90);
         message(&mut ota, api, json!({"id": "bulb"})).await;
 
         assert_eq!(
@@ -59,7 +59,6 @@ async fn updates_a_device_with_topic() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn re_interviews_and_re_configures_after_successful_update() {
     let mut ota = ota();
     message(&mut ota, "update", json!({"id": "bulb"})).await;
@@ -71,9 +70,9 @@ async fn re_interviews_and_re_configures_after_successful_update() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_re_interview_failure_post_update() {
     let mut ota = ota();
+    ota.reint_error = Some("dragons".to_string());
     message(&mut ota, "update", json!({"id": "bulb"})).await;
 
     assert!(ota
@@ -83,7 +82,6 @@ async fn handles_re_interview_failure_post_update() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn updates_with_url_payload() {
     let mut ota = ota();
     message(
@@ -101,7 +99,6 @@ async fn updates_with_url_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn updates_with_hex_payload() {
     let mut ota = ota();
     message(
@@ -122,7 +119,6 @@ async fn updates_with_hex_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn updates_with_hex_and_file_name_payload() {
     let mut ota = ota();
     message(
@@ -138,7 +134,6 @@ async fn updates_with_hex_and_file_name_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn updates_with_override_data_settings() {
     let mut ota = ota();
     message(
@@ -164,7 +159,6 @@ async fn updates_with_override_data_settings() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn schedules_with_hex_payload() {
     let mut ota = ota();
     message(
@@ -189,7 +183,6 @@ async fn schedules_with_hex_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn schedules_with_hex_and_file_name_payload() {
     let mut ota = ota();
     message(
@@ -207,9 +200,9 @@ async fn schedules_with_hex_and_file_name_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn aborts_running_ota() {
     let mut ota = ota();
+    ota.keep_in_progress = true;
     message(&mut ota, "update", json!({"id": "bulb"})).await;
     message(&mut ota, "update/abort", json!({"id": "bulb"})).await;
 
@@ -224,7 +217,6 @@ async fn aborts_running_ota() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_abort_when_no_running_ota() {
     let mut ota = ota();
     message(&mut ota, "update/abort", json!({"id": "bulb"})).await;
@@ -236,9 +228,9 @@ async fn handles_abort_when_no_running_ota() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_when_ota_update_fails() {
     let mut ota = ota();
+    ota.update_result = "fail".to_string();
     message(&mut ota, "update", json!({"id": "bulb"})).await;
 
     assert!(ota.has_publish(
@@ -252,9 +244,9 @@ async fn handles_when_ota_update_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_when_ota_update_returns_no_image_available() {
     let mut ota = ota();
+    ota.update_result = "no_image".to_string();
     message(&mut ota, "update", json!({"id": "bulb"})).await;
 
     assert!(ota.has_publish("zigbee2mqtt/bulb", idle(1, 1, None)));
@@ -265,9 +257,9 @@ async fn handles_when_ota_update_returns_no_image_available() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn is_able_to_check_if_ota_update_is_available() {
     let mut ota = ota();
+    ota.check_results = vec!["none".to_string(), "source".to_string()];
 
     message(&mut ota, "check", json!({"id": "bulb"})).await;
     assert_eq!(ota.check_calls.len(), 1);
@@ -293,9 +285,9 @@ async fn is_able_to_check_if_ota_update_is_available() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_if_ota_update_check_fails() {
     let mut ota = ota();
+    ota.check_results = vec!["fail".to_string()];
     message(&mut ota, "check", json!({"id": "bulb"})).await;
 
     assert_eq!(
@@ -309,7 +301,6 @@ async fn handles_if_ota_update_check_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fails_when_device_does_not_exist() {
     let mut ota = ota();
     message(&mut ota, "check", json!({"id": "not_existing_deviceooo"})).await;
@@ -321,7 +312,6 @@ async fn fails_when_device_does_not_exist() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_ota_when_device_does_not_support_it() {
     for api in ["check", "update", "schedule"] {
         let mut ota = ota();
@@ -335,7 +325,6 @@ async fn does_not_ota_when_device_does_not_support_it() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn allows_check_ota_with_custom_url_even_when_device_does_not_support_it() {
     let mut ota = ota();
     message(
@@ -358,7 +347,6 @@ async fn allows_check_ota_with_custom_url_even_when_device_does_not_support_it()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn refuses_to_operate_when_already_in_progress() {
     for api in [
         "check",
@@ -370,6 +358,7 @@ async fn refuses_to_operate_when_already_in_progress() {
         "unschedule",
     ] {
         let mut ota = ota();
+        ota.keep_in_progress = true;
         message(&mut ota, "update", json!({"id": "bulb"})).await;
         message(&mut ota, api, json!({"id": "bulb"})).await;
 
@@ -382,7 +371,6 @@ async fn refuses_to_operate_when_already_in_progress() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_crash_when_read_model_id_before_after_ota_update_fails() {
     let mut ota = ota();
     message(&mut ota, "update", json!({"id": "bulb"})).await;
@@ -397,14 +385,19 @@ async fn does_not_crash_when_read_model_id_before_after_ota_update_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn checks_for_update_when_device_requests_it() {
     let mut ota = ota();
+    ota.device_request_result = "available".to_string();
     ota.command_responses.push((
         "queryNextImageResponse".to_string(),
         json!({"status": 0x98}),
         Some(10),
     ));
+    ota.handle_message(
+        "zigbee2mqtt/event",
+        json!({"type": "commandQueryNextImageRequest", "device": "bulb"}),
+    )
+    .await;
 
     assert!(ota.info_logs.is_empty());
     assert_eq!(ota.command_responses[0].1, json!({"status": 152}));
@@ -423,28 +416,38 @@ async fn checks_for_update_when_device_requests_it() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn responds_with_no_image_available_when_update_available_request_fails() {
     let mut ota = ota();
+    ota.device_request_result = "idle".to_string();
     ota.command_responses.push((
         "queryNextImageResponse".to_string(),
         json!({"status": 0x98}),
         Some(10),
     ));
+    ota.handle_message(
+        "zigbee2mqtt/event",
+        json!({"type": "commandQueryNextImageRequest", "device": "bulb"}),
+    )
+    .await;
 
     assert_eq!(ota.command_responses[0].1, json!({"status": 152}));
     assert!(ota.has_publish("zigbee2mqtt/bulb", json!({"update": {"state": "idle"}})));
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn checks_for_update_when_device_requests_it_and_it_is_not_available() {
     let mut ota = ota();
+    ota.device_request_result = "idle_same".to_string();
     ota.command_responses.push((
         "queryNextImageResponse".to_string(),
         json!({"status": 0x98}),
         Some(10),
     ));
+    ota.handle_message(
+        "zigbee2mqtt/event",
+        json!({"type": "commandQueryNextImageRequest", "device": "bulb"}),
+    )
+    .await;
 
     assert_eq!(ota.command_responses.len(), 1);
     assert!(ota.has_publish(
@@ -454,9 +457,9 @@ async fn checks_for_update_when_device_requests_it_and_it_is_not_available() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_check_for_update_when_disable_automatic_update_check_is_set_to_true() {
     let mut ota = ota();
+    ota.disable_auto_check = true;
     ota.handle_message(
         "zigbee2mqtt/bridge/request/device/ota_update/check",
         json!({"id": "bulb"}),
@@ -468,9 +471,9 @@ async fn does_not_check_for_update_when_disable_automatic_update_check_is_set_to
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_check_for_update_when_device_disable_automatic_update_check_is_set_to_true() {
     let mut ota = ota();
+    ota.disable_auto_check = true;
     ota.handle_message(
         "zigbee2mqtt/bridge/request/device/ota_update/check",
         json!({"id": "bulb"}),
@@ -481,7 +484,6 @@ async fn does_not_check_for_update_when_device_disable_automatic_update_check_is
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn schedules_and_performs_an_update() {
     for (api, downgrade) in [("schedule", false), ("schedule/downgrade", true)] {
         let mut ota = ota();
@@ -509,9 +511,9 @@ async fn schedules_and_performs_an_update() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn schedules_and_cancels_an_update_when_no_image_available() {
     let mut ota = ota();
+    ota.schedule_result = "no_image".to_string();
     message(
         &mut ota,
         "schedule",
@@ -524,9 +526,9 @@ async fn schedules_and_cancels_an_update_when_no_image_available() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn schedules_and_re_schedules_an_update_when_failed() {
     let mut ota = ota();
+    ota.schedule_result = "rescheduled".to_string();
     message(
         &mut ota,
         "schedule",
@@ -543,7 +545,6 @@ async fn schedules_and_re_schedules_an_update_when_failed() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn overwrites_current_schedule_on_re_schedule() {
     for (first, second, expected) in [
         ("schedule", "schedule/downgrade", true),
@@ -561,7 +562,6 @@ async fn overwrites_current_schedule_on_re_schedule() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn unschedules() {
     for api in ["schedule", "schedule/downgrade"] {
         let mut ota = ota();
@@ -575,7 +575,6 @@ async fn unschedules() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn responds_with_no_image_available_when_not_supporting_ota() {
     let mut ota = ota();
     ota.command_responses.push((
@@ -589,7 +588,6 @@ async fn responds_with_no_image_available_when_not_supporting_ota() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn responds_with_no_image_available_when_not_supporting_ota_and_device_has_no_ota_endpoint_to_standard_endpoint(
 ) {
     let mut ota = ota();
@@ -603,7 +601,6 @@ async fn responds_with_no_image_available_when_not_supporting_ota_and_device_has
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sets_given_configuration() {
     let local = OtaUpdate::new(Some("local.index.json".to_string()));
     assert_eq!(local.index_location, Some("local.index.json".to_string()));
@@ -616,7 +613,6 @@ async fn sets_given_configuration() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn uses_given_configuration_when_updating() {
     let mut ota = ota();
     ota.data_settings = OtaDataSettings {
@@ -654,7 +650,6 @@ async fn uses_given_configuration_when_updating() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn clear_update_state_on_startup() {
     let mut ota = ota();
     ota.state.insert(
@@ -671,7 +666,6 @@ async fn clear_update_state_on_startup() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn deprecated_handles_message_as_device_id_string() {
     let mut ota = ota();
     message(&mut ota, "schedule", json!("bulb")).await;
@@ -684,7 +678,6 @@ async fn deprecated_handles_message_as_device_id_string() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn deprecated_does_not_ota_when_device_does_not_support_it() {
     for api in ["check", "update", "schedule"] {
         let mut ota = ota();
