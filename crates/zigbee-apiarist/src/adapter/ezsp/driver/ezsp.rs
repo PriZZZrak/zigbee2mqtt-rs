@@ -58,3 +58,30 @@ pub fn set_source_routing() {
 pub fn wait_for() {
     todo!()
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EzspFrame {
+    pub cls: &'static str,
+    pub id: u16,
+    pub fields: serde_json::Value,
+}
+
+pub struct EZSPFrameData;
+
+impl EZSPFrameData {
+    /// Upstream: `EZSPFrameData.createFrame(version, frameId, isRequest, buffer)`.
+    pub fn create_frame(
+        version: u8,
+        frame_id: u16,
+        is_request: bool,
+        buffer: &[u8],
+    ) -> Option<EzspFrame> {
+        todo!()
+    }
+}
+
+impl Default for EZSPFrameData {
+    fn default() -> Self {
+        Self
+    }
+}
