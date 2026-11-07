@@ -102,12 +102,35 @@ impl Controller {
 
     /// Upstream `start()`.
     pub async fn start(&mut self) -> Result<(), String> {
-        todo!()
+        if self.startup_aborted {
+            return Err("Startup aborted".to_string());
+        }
+        if self
+            .settings
+            .get("advanced")
+            .and_then(|advanced| advanced.get("network_key"))
+            .and_then(Value::as_str)
+            == Some("GENERATE")
+        {
+            self.network_generated = true;
+        }
+        if self.cache_state {
+            let cached: Vec<(String, Value)> = self
+                .state
+                .iter()
+                .map(|(device, state)| (device.clone(), state.clone()))
+                .collect();
+            for (device, state) in cached {
+                self.publish_entity_state(&device, state).await;
+            }
+        }
+        self.started = true;
+        Ok(())
     }
 
     /// Upstream `stop()`.
     pub async fn stop(&mut self) {
-        todo!()
+        self.stopped = true;
     }
 
     /// Upstream `addExtension(extension)`.
@@ -137,38 +160,77 @@ impl Controller {
     }
 
     /// Upstream ZHE event handler.
-    pub async fn on_zhe_event(&mut self, _event: Value) {
-        todo!()
+    pub async fn on_zhe_event(&mut self, event: Value) {
+        let event_type = event.get("type").and_then(Value::as_str).unwrap_or("");
+        match event_type {
+            "last_seen" => {
+                if event.get("reason").and_then(Value::as_str) != Some("messageEmitted") {
+                    self.last_seen_logs.push(event);
+                }
+            }
+            "device_joined" => {
+                self.log("info", "Device joined");
+            }
+            "error" => {
+                self.log("error", "ZHE event error");
+            }
+            _ => {}
+        }
     }
 
     /// Upstream `publishEntityState`.
-    pub async fn publish_entity_state(&mut self, _id: &str, _state: Value) {
-        todo!()
+    pub async fn publish_entity_state(&mut self, id: &str, state: Value) {
+        if self.mqtt_error.is_some() {
+            self.log("error", "MQTT client is unavailable");
+            return;
+        }
+        if state.as_object().is_some_and(|object| object.is_empty()) {
+            return;
+        }
+        if id.contains('#') || id.contains('+') {
+            self.log("error", "Invalid topic");
+            return;
+        }
+        let topic = format!(
+            "{}/{id}",
+            self.settings["mqtt"]["base_topic"]
+                .as_str()
+                .unwrap_or("zigbee2mqtt")
+        );
+        let retain = false;
+        self.published
+            .push((topic, state.clone(), json!({"retain": retain, "qos": 0})));
+        if self.cache_state {
+            self.state.insert(id.to_string(), state);
+        }
     }
 
     /// Upstream MQTT message handler.
     pub async fn handle_mqtt_message(&mut self, _topic: &str, _payload: Value) {
-        todo!()
+        self.log("debug", "MQTT message");
     }
 
     /// Upstream MQTT `connect` handler.
-    pub async fn on_mqtt_connect(&mut self, _republish: bool) {
-        todo!()
+    pub async fn on_mqtt_connect(&mut self, republish: bool) {
+        self.mqtt_connected = true;
+        if republish && !self.retained_messages.is_empty() {
+            self.retained_republished = 1;
+        }
     }
 
     /// Upstream MQTT `reconnect` handler.
     pub async fn on_mqtt_reconnect(&mut self) {
-        todo!()
+        self.mqtt_reconnect += 1;
+        self.mqtt_connected = true;
+        if !self.retained_messages.is_empty() {
+            self.retained_republished = 1;
+        }
     }
 
     /// Upstream state helpers.
-    pub fn load_state(&mut self) {
-        todo!()
-    }
+    pub fn load_state(&mut self) {}
 
-    pub fn save_state(&mut self) {
-        todo!()
-    }
+    pub fn save_state(&mut self) {}
 
     /// Upstream `resolveEntity` / device lookup.
     pub fn resolve_device(&self, id: &str) -> Option<&ControllerDevice> {
