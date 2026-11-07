@@ -15,7 +15,6 @@ fn before_settings() -> Value {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn fails_on_unsupported_version() {
     let mut settings = json!({"version": 0, "mqtt": {"server": "mqtt://localhost"}});
     let error = migrate_if_necessary(&mut settings, 5, None).unwrap_err();
@@ -27,7 +26,6 @@ fn fails_on_unsupported_version() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn no_change_needed_only_add_version() {
     // Upstream: "no change needed - only add version" (Migrates v1 to v2).
     let mut settings = before_settings();
@@ -42,7 +40,6 @@ fn no_change_needed_only_add_version() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn remove_all() {
     // Upstream: "remove all" (Migrates v1 to v2).
     let mut settings = json!({
@@ -115,7 +112,6 @@ fn remove_all() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn remove_partial() {
     // Upstream: "remove partial" (Migrates v1 to v2).
     let mut settings = json!({
@@ -212,7 +208,6 @@ fn remove_partial() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn changes_log_level() {
     // Upstream: "changes log_level" (Migrates v1 to v2).
     let mut settings = before_settings();
@@ -229,7 +224,6 @@ fn changes_log_level() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_changes_already_migrated_log_level() {
     // Upstream: "does not changes already migrated log_level" (Migrates v1 to v2).
     let mut settings = before_settings();
@@ -246,7 +240,6 @@ fn does_not_changes_already_migrated_log_level() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_changes_other_log_level() {
     // Upstream: "does not changes other log_level" (Migrates v1 to v2).
     let mut settings = before_settings();
@@ -263,7 +256,6 @@ fn does_not_changes_other_log_level() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn transfer_all() {
     // Upstream: "transfer all" (Migrates v1 to v2).
     let mut settings = before_settings();
@@ -315,7 +307,6 @@ fn transfer_all() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn transfer_partial() {
     // Upstream: "transfer partial" (Migrates v1 to v2).
     let mut settings = before_settings();
@@ -356,7 +347,6 @@ fn transfer_partial() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn update() {
     // Upstream: "Update" under "Migrates v1 to v3".
     let mut settings = json!({
@@ -385,7 +375,6 @@ fn update() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn update_2() {
     // Upstream: "Update" under "Migrates v2 to v3".
     let mut settings = json!({
@@ -418,7 +407,6 @@ fn update_2() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn update_when_not_set_tests_that_frontend_availability_is_not_added_when_not_set() {
     let mut settings = json!({
         "version": 2,
@@ -451,7 +439,6 @@ fn update_when_not_set_tests_that_frontend_availability_is_not_added_when_not_se
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn update_3() {
     // Upstream: "Update" under "Migrates v3 to v4".
     let mut settings = json!({
@@ -494,7 +481,6 @@ fn update_3() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn update_4() {
     // Upstream: "Update" under "Migrates v4 to v5".
     let mut settings = json!({
@@ -531,7 +517,6 @@ fn update_4() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn handles_errors_gracefully() {
     let mut settings = json!({
         "version": 4,
