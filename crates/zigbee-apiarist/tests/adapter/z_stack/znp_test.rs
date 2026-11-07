@@ -106,7 +106,6 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer_read() {
     let buffer = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
     let mut buffalo = BuffaloZnp::new(buffer.clone(), 2);
@@ -116,7 +115,6 @@ fn buffer_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 9], 1);
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
@@ -129,7 +127,6 @@ fn buffer_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer100_read() {
     let payload = duplicate_array(20, &[0x00, 0x01, 0x02, 0x03, 0x04]);
     let mut buffer = vec![0x00];
@@ -141,7 +138,6 @@ fn buffer100_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer100_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 100], 0);
     let payload = duplicate_array(20, &[0x00, 0x01, 0x02, 0x03, 0x04]);
@@ -151,7 +147,6 @@ fn buffer100_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer16_read() {
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
     let mut buffer = vec![0x00];
@@ -166,7 +161,6 @@ fn buffer16_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer16_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 20], 1);
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
@@ -181,7 +175,6 @@ fn buffer16_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer18_read() {
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
     let mut buffer = vec![0x00];
@@ -196,7 +189,6 @@ fn buffer18_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer18_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 20], 1);
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
@@ -211,7 +203,6 @@ fn buffer18_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer32_read() {
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
     let full = duplicate_array(4, &payload);
@@ -224,7 +215,6 @@ fn buffer32_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer32_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 34], 1);
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
@@ -238,7 +228,6 @@ fn buffer32_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer42_read() {
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
     let mut full = duplicate_array(5, &payload);
@@ -252,7 +241,6 @@ fn buffer42_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer42_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 44], 1);
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
@@ -267,7 +255,6 @@ fn buffer42_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer8_read() {
     let buffer = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
     let mut buffalo = BuffaloZnp::new(buffer.clone(), 2);
@@ -277,7 +264,6 @@ fn buffer8_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer8_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 9], 1);
     let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
@@ -289,7 +275,6 @@ fn buffer8_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn buffer8_write_length_consistent() {
     let result = std::panic::catch_unwind(|| {
         let mut buffalo = BuffaloZnp::new(vec![0; 9], 0);
@@ -300,7 +285,6 @@ fn buffer8_write_length_consistent() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn cant_read_unsupported_type() {
     let result = std::panic::catch_unwind(|| {
         let mut buffalo = BuffaloZnp::new(vec![0; 0], 0);
@@ -310,7 +294,6 @@ fn cant_read_unsupported_type() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn close_without_initialization() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.on_close();
@@ -322,7 +305,6 @@ async fn close_without_initialization() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn coverage_logger() {
     let logger = console_logger();
     logger.warning("Test warning", "TestNS");
@@ -330,7 +312,6 @@ fn coverage_logger() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieeeaddr_read() {
     let mut buffalo = BuffaloZnp::new(IEEE_ADDR2_HEX.to_vec(), 0);
     let value = buffalo.read(ParameterType::IEEEADDR as u32, &json!({}));
@@ -339,7 +320,6 @@ fn ieeeaddr_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieeeaddr_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 8], 0);
     buffalo.write(
@@ -352,7 +332,6 @@ fn ieeeaddr_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int8_read() {
     let mut buffalo = BuffaloZnp::new(vec![0x00, 0xf0, 0x00, 0x00], 1);
     let value = buffalo.read(ParameterType::INT8 as u32, &json!({}));
@@ -361,7 +340,6 @@ fn int8_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn int8_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 3], 1);
     buffalo.write(ParameterType::INT8 as u32, &json!(127), &json!({}));
@@ -370,7 +348,6 @@ fn int8_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_network_read() {
     let buffer = vec![
         0x05, 0x10, 0x10, 0x09, 0x31, 0x13, 0x01, 0x10, 0x10, 0x09, 0x31, 0x13, 0x00, 0x01,
@@ -404,7 +381,6 @@ fn list_network_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_network_write() {
     let result = std::panic::catch_unwind(|| {
         let mut buffalo = BuffaloZnp::new(vec![0; 10], 0);
@@ -414,7 +390,6 @@ fn list_network_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint16_read() {
     let mut buffalo = BuffaloZnp::new(vec![0x00, 0x00, 0x04, 0x00, 0x08], 1);
     let value = buffalo.read(ParameterType::LIST_UINT16 as u32, &json!({"length": 2}));
@@ -423,7 +398,6 @@ fn list_uint16_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint16_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 5], 1);
     let payload = vec![1024, 2048];
@@ -437,7 +411,6 @@ fn list_uint16_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint8_read() {
     let mut buffalo = BuffaloZnp::new(vec![0x00, 0x00, 0x04, 0x08], 2);
     let value = buffalo.read(ParameterType::LIST_UINT8 as u32, &json!({"length": 2}));
@@ -446,7 +419,6 @@ fn list_uint8_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn list_uint8_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 4], 1);
     let payload = vec![200, 100];
@@ -460,7 +432,6 @@ fn list_uint8_write() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -477,7 +448,6 @@ async fn open() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_first_ping_fails_should_send_reset_bootloader() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.request_error = Some("failed".to_string());
@@ -495,7 +465,6 @@ async fn open_first_ping_fails_should_send_reset_bootloader() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_and_close() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.on_close();
@@ -510,7 +479,6 @@ async fn open_and_close() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_and_close_by_serialport_event() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.on_close();
@@ -522,7 +490,6 @@ async fn open_and_close_by_serialport_event() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_and_close_error() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.on_close();
@@ -537,7 +504,6 @@ async fn open_and_close_error() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_and_close_tcp_port() {
     let mut znp = Znp::new("tcp://localhost:8080", Some(100), Some(false));
     znp.open().await.unwrap();
@@ -555,7 +521,6 @@ async fn open_and_close_tcp_port() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_tcp_port_with_socket_error() {
     let mut znp = Znp::new("tcp://localhost:666", Some(100), Some(false));
     znp.socket_connect_error = true;
@@ -567,7 +532,6 @@ async fn open_tcp_port_with_socket_error() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_with_defaults() {
     let mut znp = Znp::new("/dev/ttyACM0", None, None);
     znp.open().await.unwrap();
@@ -583,7 +547,6 @@ async fn open_with_defaults() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_with_error() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.async_open_error = Some("failed!".to_string());
@@ -605,7 +568,6 @@ async fn open_with_error() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn open_with_error_when_serialport_is_not_open() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.async_open_error = Some("failed!".to_string());
@@ -627,7 +589,6 @@ async fn open_with_error_when_serialport_is_not_open() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn serialport_error_do_nothing() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -638,7 +599,6 @@ async fn serialport_error_do_nothing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint16_read() {
     let mut buffalo = BuffaloZnp::new(vec![0x00, 0x03, 0xff, 0x00], 1);
     let value = buffalo.read(ParameterType::UINT16 as u32, &json!({}));
@@ -647,7 +607,6 @@ fn uint16_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint16_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 3], 1);
     buffalo.write(ParameterType::UINT16 as u32, &json!(1020), &json!({}));
@@ -656,7 +615,6 @@ fn uint16_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint32_read() {
     let mut buffalo = BuffaloZnp::new(vec![0x01, 0x03, 0xff, 0xff], 0);
     let value = buffalo.read(ParameterType::UINT32 as u32, &json!({}));
@@ -665,7 +623,6 @@ fn uint32_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint32_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 6], 2);
     buffalo.write(ParameterType::UINT32 as u32, &json!(1065283), &json!({}));
@@ -677,7 +634,6 @@ fn uint32_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint8_read() {
     let mut buffalo = BuffaloZnp::new(vec![0x00, 0x03, 0x00, 0x00], 1);
     let value = buffalo.read(ParameterType::UINT8 as u32, &json!({}));
@@ -686,7 +642,6 @@ fn uint8_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uint8_write() {
     let mut buffalo = BuffaloZnp::new(vec![0; 3], 1);
     buffalo.write(ParameterType::UINT8 as u32, &json!(240), &json!({}));
@@ -695,7 +650,6 @@ fn uint8_write() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zpi_object_parse_payload_for_end_device_annce_ind() {
     let buffer = vec![0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 8, 5];
     let frame = Frame::new(Type::AREQ, Subsystem::ZDO, 193, buffer, 0, 0);
@@ -723,7 +677,6 @@ fn zpi_object_parse_payload_for_end_device_annce_ind() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zpi_object_parse_payload_for_nwk_addr_rsp() {
     let buffer = vec![
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x01, 0x01, 0x00, 0x02, 0x10, 0x10,
@@ -746,7 +699,6 @@ fn zpi_object_parse_payload_for_nwk_addr_rsp() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zpi_object_throw_error_on_missing_write_parser() {
     // Upstream passes parameterType 9999999.
     let obj = ZpiObject::new(
@@ -767,7 +719,6 @@ fn zpi_object_throw_error_on_missing_write_parser() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zpi_object_throw_error_on_unknown_command() {
     // Upstream uses command ID 99999, which does not fit the 1-byte UNPI field.
     let frame = Frame::new(Type::SREQ, Subsystem::AF, 99, Vec::new(), 0, 0);
@@ -778,7 +729,6 @@ fn zpi_object_throw_error_on_unknown_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zpi_object_throw_error_on_unknown_parameters() {
     let frame = Frame::new(Type::SRSP, Subsystem::AF, 128, Vec::new(), 0, 0);
     let result = std::panic::catch_unwind(|| {
@@ -788,7 +738,6 @@ fn zpi_object_throw_error_on_unknown_parameters() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zpi_object_with_cmd_and_non_sapi_is_not_reset_command() {
     let obj = ZpiObject::new(
         Type::SREQ,
@@ -802,7 +751,6 @@ fn zpi_object_with_cmd_and_non_sapi_is_not_reset_command() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_receive() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -837,7 +785,6 @@ async fn znp_receive() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_receive_malformed() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -856,7 +803,6 @@ async fn znp_receive_malformed() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_areq() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -882,7 +828,6 @@ async fn znp_request_areq() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_areq_reset() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -911,10 +856,17 @@ async fn znp_request_areq_reset() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_sreq() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_reply(Frame::new(
+        Type::SRSP,
+        Subsystem::SYS,
+        8,
+        vec![0x00, 0x02, 0x01, 0x02],
+        0,
+        0,
+    ));
 
     let result = znp
         .request_with_reply(
@@ -943,10 +895,17 @@ async fn znp_request_sreq() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_sreq_failed() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_reply(Frame::new(
+        Type::SRSP,
+        Subsystem::SYS,
+        8,
+        vec![0x01, 0x02, 0x01, 0x02],
+        0,
+        0,
+    ));
 
     assert_eq!(znp.waiters_size(), 0);
 
@@ -968,10 +927,17 @@ async fn znp_request_sreq_failed() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_sreq_failed_should_cancel_waiter_when_provided() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_reply(Frame::new(
+        Type::SRSP,
+        Subsystem::SYS,
+        8,
+        vec![0x01, 0x02, 0x01, 0x02],
+        0,
+        0,
+    ));
 
     assert_eq!(znp.waiters_size(), 0);
     let waiter = znp.wait_for(Type::SRSP, Subsystem::SYS, "osalNvRead", None, None, None);
@@ -995,10 +961,18 @@ async fn znp_request_sreq_failed_should_cancel_waiter_when_provided() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_sreq_with_parsed_in_between() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_reply(Frame::new(Type::SRSP, Subsystem::AF, 0, vec![0x00], 0, 0));
+    znp.mock_reply(Frame::new(
+        Type::SRSP,
+        Subsystem::SYS,
+        8,
+        vec![0x00, 0x02, 0x01, 0x02],
+        0,
+        0,
+    ));
 
     let result = znp
         .request(
@@ -1029,7 +1003,6 @@ async fn znp_request_sreq_with_parsed_in_between() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_zdo() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1052,10 +1025,10 @@ async fn znp_request_zdo() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_zdo_failure() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_reply(Frame::new(Type::SRSP, Subsystem::ZDO, 2, vec![0x01], 0, 0));
 
     let zdo_payload = vec![0x02, 0x00, 0x02, 0x00];
     let error = znp
@@ -1077,10 +1050,10 @@ async fn znp_request_zdo_failure() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_zdo_success() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_reply(Frame::new(Type::SRSP, Subsystem::ZDO, 2, vec![0x00], 0, 0));
 
     let waiter = znp.wait_for(Type::SRSP, Subsystem::ZDO, "nodeDescReq", None, None, None);
     let zdo_payload = vec![0x02, 0x00, 0x02, 0x00];
@@ -1093,10 +1066,10 @@ async fn znp_request_zdo_success() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_zdo_failed_should_cancel_waiter_when_provided() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_reply(Frame::new(Type::SRSP, Subsystem::ZDO, 2, vec![0x01], 0, 0));
 
     assert_eq!(znp.waiters_size(), 0);
     let waiter = znp.wait_for(Type::AREQ, Subsystem::ZDO, "nodeDescRsp", None, None, None);
@@ -1123,10 +1096,10 @@ async fn znp_request_zdo_failed_should_cancel_waiter_when_provided() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_timeout() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_no_reply();
 
     let error = znp
         .request(
@@ -1142,10 +1115,10 @@ async fn znp_request_timeout() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_timeout_for_startup_from_app_is_longer() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_no_reply();
 
     let error = znp
         .request(
@@ -1161,7 +1134,6 @@ async fn znp_request_timeout_for_startup_from_app_is_longer() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_with_non_existing_cmd() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1183,7 +1155,6 @@ async fn znp_request_with_non_existing_cmd() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_with_non_existing_subsystem() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1197,7 +1168,6 @@ async fn znp_request_with_non_existing_subsystem() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_without_init() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
 
@@ -1218,10 +1188,10 @@ async fn znp_request_without_init() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_responses_comes_after_timeout() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
+    znp.mock_no_reply();
 
     let error = znp
         .request(
@@ -1237,7 +1207,6 @@ async fn znp_request_responses_comes_after_timeout() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_wait_for() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1251,7 +1220,6 @@ async fn znp_request_wait_for() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_request_with_reply_should_throw_error_when_request_as_no_reply() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1265,7 +1233,6 @@ async fn znp_request_with_reply_should_throw_error_when_request_as_no_reply() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_wait_for_with_payload_mismatch() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1283,7 +1250,6 @@ async fn znp_wait_for_with_payload_mismatch() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_wait_for_with_state() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1301,7 +1267,6 @@ async fn znp_wait_for_with_state() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_wait_for_with_target_as_ieee() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1330,12 +1295,12 @@ async fn znp_wait_for_with_target_as_ieee() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_wait_for_with_target_as_ieee_forced_to_timeout_because_invalid_zdo_status_no_payload_to_match_against(
 ) {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
 
+    znp.next_zdo_status = Some(1);
     let waiter = znp.wait_for(
         Type::AREQ,
         Subsystem::ZDO,
@@ -1349,7 +1314,6 @@ async fn znp_wait_for_with_target_as_ieee_forced_to_timeout_because_invalid_zdo_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_wait_for_with_target_as_network_address() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();
@@ -1370,7 +1334,6 @@ async fn znp_wait_for_with_target_as_network_address() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn znp_wait_for_with_transid() {
     let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
     znp.open().await.unwrap();

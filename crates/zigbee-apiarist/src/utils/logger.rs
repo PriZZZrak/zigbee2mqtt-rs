@@ -13,11 +13,11 @@ pub struct ConsoleLogger;
 
 impl ConsoleLogger {
     pub fn warning(&self, message: &str, namespace: &str) {
-        todo!()
+        eprintln!("[WARNING] ({namespace}) {message}");
     }
 
     pub fn error(&self, message: &str, namespace: &str) {
-        todo!()
+        eprintln!("[ERROR] ({namespace}) {message}");
     }
 }
 

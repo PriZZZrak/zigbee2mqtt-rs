@@ -18,6 +18,15 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::POLL => "POLL",
+            Self::SREQ => "SREQ",
+            Self::AREQ => "AREQ",
+            Self::SRSP => "SRSP",
+        }
+    }
+
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0 => Some(Self::POLL),
@@ -47,6 +56,23 @@ pub enum Subsystem {
 }
 
 impl Subsystem {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::RESERVED => "RESERVED",
+            Self::SYS => "SYS",
+            Self::MAC => "MAC",
+            Self::NWK => "NWK",
+            Self::AF => "AF",
+            Self::ZDO => "ZDO",
+            Self::SAPI => "SAPI",
+            Self::UTIL => "UTIL",
+            Self::DEBUG => "DEBUG",
+            Self::APP => "APP",
+            Self::APP_CNF => "APP_CNF",
+            Self::GREENPOWER => "GREENPOWER",
+        }
+    }
+
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0 => Some(Self::RESERVED),
