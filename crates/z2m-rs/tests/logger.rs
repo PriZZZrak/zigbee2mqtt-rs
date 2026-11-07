@@ -76,7 +76,6 @@ fn clear_dir(dir: &Path) {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn create_log_directory() {
     let (dir, _logger) = setup();
     let dirs: Vec<String> = std::fs::read_dir(&dir)
@@ -89,7 +88,6 @@ fn create_log_directory() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_cleanup_default_setting() {
     let (dir, mut logger) = setup();
     clear_dir(&dir);
@@ -101,7 +99,6 @@ fn should_cleanup_default_setting() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_cleanup_error() {
     let (dir, mut logger) = setup();
     clear_dir(&dir);
@@ -122,7 +119,6 @@ fn should_handle_cleanup_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_cleanup_15_folders_setting() {
     let (dir, mut logger) = setup();
     clear_dir(&dir);
@@ -138,7 +134,6 @@ fn should_cleanup_15_folders_setting() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_cleanup_when_there_is_no_timestamp_set() {
     let (dir, mut logger) = setup();
     clear_dir(&dir);
@@ -151,7 +146,6 @@ fn should_not_cleanup_when_there_is_no_timestamp_set() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn set_and_get_log_level() {
     let mut logger = Logger::new();
 
@@ -172,7 +166,6 @@ fn set_and_get_log_level() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_remove_transport() {
     let (_dir, mut logger) = setup();
 
@@ -187,7 +180,6 @@ fn add_remove_transport() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logger_should_be_console_and_file_by_default() {
     let (dir, logger) = setup();
     let pipes = &logger.transports;
@@ -203,7 +195,6 @@ fn logger_should_be_console_and_file_by_default() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logger_can_be_file_only() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({
@@ -224,7 +215,6 @@ fn logger_can_be_file_only() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logger_can_be_console_only() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({
@@ -239,7 +229,6 @@ fn logger_can_be_console_only() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logger_can_be_nothing() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({
@@ -254,7 +243,6 @@ fn logger_can_be_nothing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_to_disable_log_rotation() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({
@@ -271,7 +259,6 @@ fn should_allow_to_disable_log_rotation() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_to_symlink_logs_to_current_directory() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({
@@ -289,7 +276,6 @@ fn should_allow_to_symlink_logs_to_current_directory() {
 
 // Upstream: it.each([...])("Logs relevant levels for %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn logs_relevant_levels_for() {
     let cases: [(&str, &[&str], &[&str]); 4] = [
         ("debug", &["info", "warning", "error"], &[]),
@@ -365,7 +351,6 @@ fn logs_relevant_levels_for() {
 
 // Upstream: it.each([...])("Sets namespace ignore for debug level %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn sets_namespace_ignore_for_debug_level() {
     let cases: [(&str, &[(&str, bool)]); 3] = [
         (
@@ -438,7 +423,6 @@ fn sets_namespace_ignore_for_debug_level() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logs_with_namespaced_levels_or_default_higher() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({
@@ -473,7 +457,6 @@ fn logs_with_namespaced_levels_or_default_higher() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logs_with_namespaced_levels_or_default_lower() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({"log_directory": format!("{}/%TIMESTAMP%", dir.display())}));
@@ -513,7 +496,6 @@ fn logs_with_namespaced_levels_or_default_lower() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logs_with_namespaced_levels_hierarchy() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({"log_directory": format!("{}/%TIMESTAMP%", dir.display())}));
@@ -665,7 +647,6 @@ fn logs_with_namespaced_levels_hierarchy() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ignores_splat_chars() {
     let (_dir, mut logger) = setup();
     logger.set_level("debug");
@@ -690,7 +671,6 @@ fn ignores_splat_chars() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn logs_to_console_in_json_when_configured() {
     let (dir, mut logger) = setup();
     logger.advanced = settings(json!({
