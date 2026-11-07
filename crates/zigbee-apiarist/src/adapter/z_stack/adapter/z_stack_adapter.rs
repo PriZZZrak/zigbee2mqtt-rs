@@ -91,6 +91,19 @@ pub fn wait_for() {
     todo!()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZStackWaitResult {
+    pub endpoint: u8,
+    pub group_id: u16,
+    pub linkquality: u8,
+    pub address: u16,
+    pub data: Vec<u8>,
+}
+
+pub struct ZStackWait {
+    pub promise: std::pin::Pin<Box<dyn std::future::Future<Output = ZStackWaitResult> + Send>>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ZnpCall {
     pub subsystem: String,
@@ -116,6 +129,12 @@ pub struct ZStackAdapter {
     pub network: serde_json::Value,
     pub led_supported: bool,
     pub start_result: String,
+    pub backup_supported: bool,
+    pub in_inter_pan: bool,
+    pub interpan_calls: Vec<(u8, Vec<u8>)>,
+    pub send_zcl_calls: usize,
+    pub zdo_fail: bool,
+    pub register_endpoints_fail: bool,
 }
 
 impl ZStackAdapter {
@@ -151,6 +170,12 @@ impl ZStackAdapter {
             network: serde_json::json!({"channel": 21, "extendedPanID": "0x00124b0009d69f77", "panID": 123, "nwkUpdateID": 0}),
             led_supported: true,
             start_result: "resumed".to_string(),
+            backup_supported: true,
+            in_inter_pan: false,
+            interpan_calls: Vec::new(),
+            send_zcl_calls: 0,
+            zdo_fail: false,
+            register_endpoints_fail: false,
         }
     }
 
@@ -182,6 +207,48 @@ impl ZStackAdapter {
         todo!()
     }
 
+    pub async fn supports_backup(&self) -> bool {
+        todo!()
+    }
+
+    pub async fn set_channel_inter_pan(&mut self, _channel: u8) {
+        todo!()
+    }
+
+    pub async fn restore_channel_inter_pan(&mut self) {
+        todo!()
+    }
+
+    pub async fn send_zcl_frame_to_endpoint(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _endpoint: u8,
+        _frame: &serde_json::Value,
+    ) -> Result<(), String> {
+        todo!()
+    }
+
+    /// Upstream: `adapter.start()` rejecting on failed initialization.
+    pub async fn start_checked(&mut self) -> Result<String, String> {
+        todo!()
+    }
+
+    pub fn wait_for(
+        &mut self,
+        _address: u16,
+        _endpoint: u8,
+        _frame_type: u8,
+        _direction: u8,
+        _transaction_sequence: Option<u8>,
+        _cluster_id: u16,
+        _command_id: Option<u8>,
+        _default_response_command_id: Option<u8>,
+        _timeout: u64,
+    ) -> ZStackWait {
+        todo!()
+    }
+
     /// Upstream: `adapter.sendZdo(ieeeAddr, networkAddress, clusterId, payload, disableResponse)`.
     pub async fn send_zdo(
         &mut self,
@@ -191,6 +258,18 @@ impl ZStackAdapter {
         _payload: Vec<u8>,
         _disable_response: bool,
     ) {
+        todo!()
+    }
+
+    /// Upstream: `sendZdo` surfacing the underlying ZNP rejection.
+    pub async fn send_zdo_checked(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _cluster_id: u16,
+        _payload: Vec<u8>,
+        _disable_response: bool,
+    ) -> Result<(), String> {
         todo!()
     }
 }

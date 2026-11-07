@@ -188,10 +188,30 @@ async fn close_adapter() {
     assert_eq!(adapter.close_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn command_should_fail_when_in_interpan() {
-    todo!()
+async fn command_should_fail_when_in_interpan() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    adapter.set_channel_inter_pan(14).await;
+    adapter.in_inter_pan = true;
+    adapter.send_zcl_calls = 0;
+
+    let error = adapter
+        .send_zcl_frame_to_endpoint("0x02", 2, 20, &json!({}))
+        .await
+        .unwrap_err();
+    assert_eq!(error, "Cannot execute command, in Inter-PAN mode");
+    assert_eq!(adapter.send_zcl_calls, 0);
+
+    adapter.restore_channel_inter_pan().await;
+    adapter.in_inter_pan = false;
+    adapter
+        .send_zcl_frame_to_endpoint("0x02", 2, 20, &json!({}))
+        .await
+        .unwrap();
+    assert_eq!(adapter.send_zcl_calls, 1);
 }
 
 #[test]
@@ -425,10 +445,16 @@ fn refuse_to_start_when_ping_fails() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn restore_interpan_channel() {
-    todo!()
+async fn restore_interpan_channel() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.interpan_calls.clear();
+
+    adapter.restore_channel_inter_pan().await;
+
+    assert_eq!(adapter.interpan_calls, vec![(0u8, Vec::<u8>::new())]);
 }
 
 #[test]
@@ -859,22 +885,51 @@ async fn sends_proper_zdo_request_payload_for_generic_logic_request() {
     assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn set_interpan_channel() {
-    todo!()
+async fn set_interpan_channel() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.interpan_calls.clear();
+
+    adapter.set_channel_inter_pan(14).await;
+    assert_eq!(
+        adapter.interpan_calls,
+        vec![(1u8, vec![14u8]), (2u8, vec![12u8])]
+    );
+
+    adapter.interpan_calls.clear();
+    adapter.set_channel_inter_pan(15).await;
+    assert_eq!(adapter.interpan_calls, vec![(1u8, vec![15u8])]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_throw_error_when_zdo_call_fails() {
-    todo!()
+async fn should_throw_error_when_zdo_call_fails() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+    adapter.zdo_fail = true;
+
+    let cluster_id = ClusterId::SIMPLE_DESCRIPTOR_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request(false, cluster_id, &[json!(123), json!(0)]);
+    let error = adapter
+        .send_zdo_checked("0x0000000000000000", 1234, cluster_id, zdo_payload, true)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Failed");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_throw_error_when_register_endpoints_fails() {
-    todo!()
+async fn should_throw_error_when_register_endpoints_fails() {
+    let mut adapter = adapter();
+    adapter.register_endpoints_fail = true;
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(error, "Status 'NOT_ACTIVE'");
 }
 
 #[tokio::test]
@@ -943,22 +998,48 @@ async fn support_led_should_go_to_false_when_led_request_fails() {
     }));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn supports_backup() {
-    todo!()
+async fn supports_backup() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    assert!(adapter.supports_backup().await);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn wait_for_resolves_on_cmd() {
-    todo!()
+async fn wait_for_resolves_on_cmd() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    for _ in 0..0 {
+        // no-op
+    }
+
+    let wait = adapter.wait_for(2, 20, 0, 1, Some(100), 0, Some(1), None, 10);
+    let result = wait.promise.await;
+
+    assert_eq!(result.endpoint, 20);
+    assert_eq!(result.group_id, 12);
+    assert_eq!(result.linkquality, 101);
+    assert_eq!(result.address, 2);
+    assert_eq!(result.data, vec![24, 100, 1, 0, 0, 0, 32, 2]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn wait_for_resolves_on_specified_default_response() {
-    todo!()
+async fn wait_for_resolves_on_specified_default_response() {
+    let mut adapter = adapter();
+    adapter.start().await;
+
+    let wait = adapter.wait_for(1234, 1, 1, 0, None, 0x0019, Some(3), Some(5), 15000);
+    let result = wait.promise.await;
+
+    assert_eq!(result.endpoint, 1);
+    assert_eq!(result.group_id, 0);
+    assert_eq!(result.linkquality, 101);
+    assert_eq!(result.address, 1234);
+    assert_eq!(result.data, vec![24, 99, 11, 5, 0x80]);
 }
 
 #[test]
