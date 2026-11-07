@@ -93,3 +93,37 @@ pub fn write() {
 pub fn write_minimal_defaults() {
     todo!()
 }
+
+/// Minimal settings document used by the ported tests.
+#[derive(Debug, Clone, Default)]
+pub struct Settings {
+    pub data: serde_json::Value,
+}
+
+impl Settings {
+    pub fn new(data: serde_json::Value) -> Self {
+        Self { data }
+    }
+
+    /// Upstream: `settings.reRead()`.
+    pub fn re_read(&mut self) {}
+
+    pub fn get(&self) -> &serde_json::Value {
+        &self.data
+    }
+
+    /// Upstream: `settings.validate()`.
+    pub fn validate(&self) -> Vec<String> {
+        todo!()
+    }
+
+    /// Upstream: `settings.blockDevice(ieeeAddr)`.
+    pub fn block_device(&mut self, _ieee_address: &str) {
+        todo!()
+    }
+
+    /// Upstream: `settings.changeFriendlyName(from, to)`.
+    pub fn change_friendly_name(&mut self, _from: &str, _to: &str) -> Result<(), String> {
+        todo!()
+    }
+}
