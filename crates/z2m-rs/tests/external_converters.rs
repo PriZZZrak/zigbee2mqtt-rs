@@ -67,7 +67,6 @@ fn response_payload<'a>(external_converters: &'a ExternalConverters, topic: &str
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn loads_nothing() {
     let mut external_converters = ExternalConverters::new();
 
@@ -81,7 +80,6 @@ async fn loads_nothing() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn cjs_loads_converters() {
     let mut external_converters = ExternalConverters::new();
     external_converters.folder = cjs_assets();
@@ -130,7 +128,6 @@ async fn cjs_loads_converters() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn mjs_loads_converters() {
     let mut external_converters = ExternalConverters::new();
     external_converters.folder = mjs_assets();
@@ -159,7 +156,6 @@ async fn mjs_loads_converters() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn updates_after_edit_from_mqtt() {
     let converter_name = "mock-external-converter.js";
     let mut external_converters = ExternalConverters::new();
@@ -216,7 +212,6 @@ async fn updates_after_edit_from_mqtt() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn loads_all_valid_converters_relocates_skips_ones_with_errors() {
     let mut external_converters = ExternalConverters::new();
     external_converters.folder = mjs_assets();
@@ -244,7 +239,6 @@ async fn loads_all_valid_converters_relocates_skips_ones_with_errors() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn cjs_saves_and_removes() {
     let converter_name = "foo.js";
     let converter_code = CJS_MAIN;
@@ -305,7 +299,6 @@ async fn cjs_saves_and_removes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn mjs_saves_and_removes() {
     let converter_name = "foo.mjs";
     let converter_code = MJS_MAIN;
@@ -358,7 +351,6 @@ async fn mjs_saves_and_removes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_invalid_name() {
     let converter_name = "foo1";
     let mut external_converters = ExternalConverters::new();
@@ -382,7 +374,6 @@ async fn returns_error_on_invalid_name() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_invalid_code() {
     let converter_name = "foo1.js";
     let converter_code = "definetly not a correct javascript code";
@@ -412,7 +403,6 @@ async fn returns_error_on_invalid_code() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_invalid_removal() {
     let converter_name = "foo2.js";
     let mut external_converters = ExternalConverters::new();
@@ -439,7 +429,6 @@ async fn returns_error_on_invalid_removal() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_invalid_definition() {
     let converter_name = "foo3.js";
     let converter_code = CJS_MAIN;
@@ -468,7 +457,6 @@ async fn returns_error_on_invalid_definition() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn returns_error_on_failed_removal() {
     let converter_name = "foo4.js";
     let converter_code = CJS_MAIN;
@@ -507,7 +495,6 @@ async fn returns_error_on_failed_removal() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_invalid_payloads() {
     let mut external_converters = ExternalConverters::new();
     external_converters.start().await;
@@ -544,7 +531,6 @@ async fn handles_invalid_payloads() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn doesnt_add_extension_when_external_js_disabled() {
     let mut external_converters = ExternalConverters::new();
     external_converters.enabled = false;
