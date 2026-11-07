@@ -53,7 +53,6 @@ use zigbee_apiarist::zspec::zcl::definition::enums::{
 //   - [workaround] Reads char str as Mi struct for Xiaomi attridId=65281
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_mi_struct() {
     let buffer = vec![
         34u8, 1, 33, 213, 12, 3, 40, 33, 4, 33, 168, 19, 5, 33, 43, 0, 6, 36, 0, 0, 5, 0, 0, 8, 33,
@@ -77,7 +76,6 @@ fn reads_mi_struct() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_mi_struct_with_padding() {
     let buffer = vec![
         68u8, 3, 40, 29, 5, 33, 190, 45, 8, 33, 47, 18, 9, 33, 2, 21, 100, 16, 1, 101, 16, 0, 110,
@@ -112,7 +110,6 @@ fn reads_mi_struct_with_padding() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_attribute_report() {
     let value = vec![
         0x00u8,
@@ -151,7 +148,6 @@ fn reads_attribute_report() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_attribute_request() {
     let value = vec![0x02u8, 0xfe, 0xef, 0xff, 0xff, 4, 0x00, 0x00, 0x00, 0x01];
     let mut buffalo = BuffaloZcl::new(value.clone());
@@ -169,7 +165,6 @@ fn reads_attribute_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_attribute_response() {
     let value = vec![
         0x02u8,
@@ -214,7 +209,6 @@ fn reads_attribute_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_channel_request() {
     let value = vec![0xfau8];
     let mut buffalo = BuffaloZcl::new(value.clone());
@@ -228,7 +222,6 @@ fn reads_channel_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_commissioning() {
     let value = vec![0xffu8, 0x00];
     let mut buffalo = BuffaloZcl::new(value.clone());
@@ -260,7 +253,6 @@ fn reads_commissioning() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_commissioning_all_options() {
     let value = vec![
         0xffu8,
@@ -330,7 +322,6 @@ fn reads_commissioning_all_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_invalid_tuya_data_point_values_list_as_empty_array() {
     let mut buffalo = BuffaloZcl::new(vec![254, 125]);
     assert_eq!(
@@ -343,7 +334,6 @@ fn reads_invalid_tuya_data_point_values_list_as_empty_array() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_manufacturer_specific_attribute_report() {
     let value = vec![
         0x12u8,
@@ -385,7 +375,6 @@ fn reads_manufacturer_specific_attribute_report() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_manufacturer_specific_multi_cluster_attribute_report() {
     let value = vec![
         0xefu8,
@@ -431,7 +420,6 @@ fn reads_manufacturer_specific_multi_cluster_attribute_report() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_multi_cluster_attribute_report() {
     let value = vec![
         0xffu8,
@@ -476,7 +464,6 @@ fn reads_multi_cluster_attribute_report() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_nothing() {
     for data_type in [DataType::NO_DATA as u32, DataType::UNKNOWN as u32] {
         let buffer = vec![1, 2];
@@ -505,7 +492,6 @@ fn reads_nothing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_partial_buffer_with_length_option() {
     let value = vec![1, 2, 3, 4];
     let length = 2;
@@ -528,7 +514,6 @@ fn reads_partial_buffer_with_length_option() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_unhandled_command_as_empty_object_if_buffer_finished_reading() {
     let value = vec![0xff, 0x00];
     let mut buffalo = BuffaloZcl::new(value.clone());
@@ -543,7 +528,6 @@ fn reads_unhandled_command_as_empty_object_if_buffer_finished_reading() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_unhandled_command_as_object_raw_and_ignores_gpp_data_mic() {
     let value = vec![0xff, 0x00, 0x21, 0x43, 0xfe];
     let mut buffalo = BuffaloZcl::new(value.clone());
@@ -567,7 +551,6 @@ fn reads_unhandled_command_as_object_raw_and_ignores_gpp_data_mic() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_unhandled_command_as_object_raw_if_buffer_still_has_bytes_to_read() {
     let value = vec![0xff, 0x00];
     let mut buffalo = BuffaloZcl::new(value.clone());
@@ -581,7 +564,6 @@ fn reads_unhandled_command_as_object_raw_if_buffer_still_has_bytes_to_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_whole_buffer_without_length_option() {
     let value = vec![1, 2, 3, 4];
     let mut buffalo = BuffaloZcl::new(vec![0; 4]);
@@ -596,7 +578,6 @@ fn reads_whole_buffer_without_length_option() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_read_strctured_select_indicator_is_outside_range() {
     let result = std::panic::catch_unwind(|| {
         let mut buffalo = BuffaloZcl::new(vec![17]);
@@ -612,7 +593,6 @@ fn throws_when_read_strctured_select_indicator_is_outside_range() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_read_thermo_transitions_list_is_missing_required_payload_options() {
     let options = [
         json!({}),
@@ -631,7 +611,6 @@ fn throws_when_read_thermo_transitions_list_is_missing_required_payload_options(
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_read_is_missing_payload_payload_size_option() {
     let result = std::panic::catch_unwind(|| {
         let mut buffalo = BuffaloZcl::new(vec![0; 1]);
@@ -644,7 +623,6 @@ fn throws_when_read_is_missing_payload_payload_size_option() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_write_use_data_type_is_missing_data_type_option_and_value_isnt_buffer_or_number_array(
 ) {
     let result = std::panic::catch_unwind(|| {
@@ -660,7 +638,6 @@ fn throws_when_write_use_data_type_is_missing_data_type_option_and_value_isnt_bu
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_write_read_invalid_data_type_except_for_write_if_buffer_like() {
     let write_result = std::panic::catch_unwind(|| {
         let mut buffalo = BuffaloZcl::new(vec![0; 1]);
@@ -676,7 +653,6 @@ fn throws_when_write_read_invalid_data_type_except_for_write_if_buffer_like() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_date() {
     let value = json!({"year": 2000, "month": 8, "dayOfMonth": 31, "dayOfWeek": 3});
     let expected_written = vec![100, 8, 31, 3];
@@ -690,7 +666,6 @@ fn writes_reads_date() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_mi_boxer_zones_list() {
     let value = json!([
         {"zoneNum": 1, "groupId": 0x2b84},
@@ -726,7 +701,6 @@ fn writes_reads_mi_boxer_zones_list() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_time_of_day() {
     let value = json!({"hours": 0, "minutes": 59, "seconds": 34, "hundredths": 88});
     let expected_written = vec![0, 59, 34, 88];
@@ -740,7 +714,6 @@ fn writes_reads_time_of_day() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_use_data_type_as_buffer_when_missing_data_type_option() {
     let value = vec![12, 34];
     let mut buffalo = BuffaloZcl::new(vec![0; 2]);
@@ -769,7 +742,6 @@ fn writes_reads_use_data_type_as_buffer_when_missing_data_type_option() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_big_endian_uint24() {
     let value = json!(16777200);
     let expected_written = vec![0xff, 0xff, 0xf0];
@@ -790,7 +762,6 @@ fn writes_reads_big_endian_uint24() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_char_str_from_string() {
     let value = "abcd";
     let expected_value = vec![4, 0x61, 0x62, 0x63, 0x64];
@@ -808,7 +779,6 @@ fn writes_reads_char_str_from_string() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_long_char_str() {
     let value = "abcd";
     let expected_value = vec![4, 0, 0x61, 0x62, 0x63, 0x64];
@@ -826,7 +796,6 @@ fn writes_reads_long_char_str() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_long_octet_str() {
     let value = vec![0xfe, 0x01, 0xab, 0x98];
     let expected_position = 6;
@@ -843,7 +812,6 @@ fn writes_reads_long_octet_str() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_octet_str() {
     let value = vec![0xfe, 0x01, 0xab, 0x98];
     let expected_position = 5;
@@ -860,7 +828,6 @@ fn writes_reads_octet_str() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_zone_info_list() {
     let value = json!([
         {"zoneID": 1, "zoneStatus": 5},
@@ -883,7 +850,6 @@ fn writes_reads_zone_info_list() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_channel_configuration() {
     let expected = vec![1u8, 0xf];
     let mut buffalo = BuffaloZcl::new(vec![0; 2]);
@@ -896,7 +862,6 @@ fn writes_channel_configuration() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_channel_configuration_basic() {
     let expected = vec![1u8, 0x1f];
     let mut buffalo = BuffaloZcl::new(vec![0; 2]);
@@ -909,7 +874,6 @@ fn writes_channel_configuration_basic() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_char_str_from_number_array() {
     let value = vec![0x61, 0x62, 0x63, 0x64];
     let expected_position = 4;
@@ -920,7 +884,6 @@ fn writes_char_str_from_number_array() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_commissioning() {
     let expected = vec![1u8, 0];
     let mut buffalo = BuffaloZcl::new(vec![0; 2]);
@@ -940,7 +903,6 @@ fn writes_commissioning() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_commissioning_all_options() {
     let expected = vec![
         27, 0b11111, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -963,7 +925,6 @@ fn writes_commissioning_all_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_custom_reply() {
     let expected = vec![6u8, 90, 73, 71, 66, 69, 69];
     let mut buffalo = BuffaloZcl::new(vec![0; 7]);
@@ -976,7 +937,6 @@ fn writes_custom_reply() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_invalida_data_type_as_buffer_if_buffer_like() {
     let value = vec![1, 2, 3];
     let mut buffalo = BuffaloZcl::new(vec![0; 3]);
@@ -991,7 +951,6 @@ fn writes_invalida_data_type_as_buffer_if_buffer_like() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_nothing() {
     for data_type in [DataType::NO_DATA as u32, DataType::UNKNOWN as u32] {
         let buffer = vec![0; 3];
@@ -1027,7 +986,6 @@ fn writes_nothing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_nothing_for_unhandled_command() {
     let mut buffalo = BuffaloZcl::new(vec![0; 7]);
     buffalo.write(
@@ -1039,7 +997,6 @@ fn writes_nothing_for_unhandled_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn workaround_reads_char_str_as_mi_struct_for_xiaomi_attrid_id_65281() {
     let expected_value = json!({
         "1": 3285,
@@ -1068,7 +1025,6 @@ fn workaround_reads_char_str_as_mi_struct_for_xiaomi_attrid_id_65281() {
 // The table rows keep the upstream `%s` names. `write_method`/`read_method`
 // are the upstream spied method names.
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_using_base_class_for() {
     #[allow(clippy::type_complexity)]
     let cases: Vec<(&str, serde_json::Value, Vec<u32>, usize, &str, &str)> = vec![
@@ -1366,7 +1322,6 @@ fn writes_reads_using_base_class_for() {
 // Upstream: it.each([...])("Writes & Reads non-value for %s", ...)
 // `written` is the raw non-value prefix expected in the buffer.
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_non_value_for() {
     #[allow(clippy::type_complexity)]
     let cases: Vec<(
@@ -1464,7 +1419,6 @@ fn writes_reads_non_value_for() {
 
 // Upstream: it.each([...])("Writes empty %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_empty() {
     let cases: [(&str, u32, Vec<u8>, usize); 2] = [
         ("char str", DataType::CHAR_STR as u32, vec![0], 1),
@@ -1486,7 +1440,6 @@ fn writes_empty() {
 
 // Upstream: it.each([...])("Writes & Reads array of %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_array_of() {
     let cases: [(&str, serde_json::Value, Vec<u8>); 3] = [
         (
@@ -1537,7 +1490,6 @@ fn writes_reads_array_of() {
 
 // Upstream: it.each([...])("Writes & Reads struct of %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_struct_of() {
     let cases: [(&str, serde_json::Value, Vec<u8>); 3] = [
         (
@@ -1629,7 +1581,6 @@ fn writes_reads_struct_of() {
 
 // Upstream: it.each([...])("Reads Non-Value for %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_non_value_for() {
     // Upstream uses Number.NaN as the non-value marker; kept verbatim.
     let cases: [(&str, u32, usize, serde_json::Value); 3] = [
@@ -1672,7 +1623,6 @@ fn reads_non_value_for() {
 
 // Upstream: it.each([...])("Writes Non-Value for %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_non_value_for() {
     let cases: [(&str, u32, serde_json::Value, Vec<u8>); 2] = [
         (
@@ -1709,7 +1659,6 @@ fn writes_non_value_for() {
 
 // Upstream: it.each([...])("Writes & Reads partial Non-Value for %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_partial_non_value_for() {
     let cases: [(&str, u32, serde_json::Value, Vec<u8>); 2] = [
         (
@@ -1740,7 +1689,6 @@ fn writes_reads_partial_non_value_for() {
 
 // Upstream: it.each([...])("Writes & Reads Use Data Type for %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_use_data_type_for() {
     let cases: [(&str, u32, serde_json::Value, usize, &str, &str); 3] = [
         (
@@ -1792,7 +1740,6 @@ fn writes_reads_use_data_type_for() {
 
 // Upstream: it.each([...])("Throws when read %s is missing required length option", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_read_is_missing_required_length_option() {
     let types = [
         BuffaloZclDataType::LIST_UINT8 as u32,
@@ -1816,7 +1763,6 @@ fn throws_when_read_is_missing_required_length_option() {
 
 // Upstream: it.each([...])("Writes & Reads Extension Field Sets for data type %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_extension_field_sets_for_data_type() {
     let cases: [(&str, serde_json::Value, Vec<u8>); 4] = [
         (
@@ -1862,7 +1808,6 @@ fn writes_reads_extension_field_sets_for_data_type() {
 
 // Upstream: it.each([...])("Writes & Reads Thermo Transitions List", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_thermo_transitions_list() {
     let cases: [(&str, serde_json::Value, serde_json::Value, Vec<u8>); 6] = [
         (
@@ -1937,7 +1882,6 @@ fn writes_reads_thermo_transitions_list() {
 
 // Upstream: it.each([...])("Writes & Reads Structured Selector for %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_structured_selector_for() {
     let cases: [(&str, serde_json::Value, Vec<u8>); 2] = [
         (
@@ -1973,7 +1917,6 @@ fn writes_reads_structured_selector_for() {
 
 // Upstream: it.each([...])("Writes Structured Selector for %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_structured_selector_for() {
     let cases: [(&str, u8); 2] = [
         ("Add", StructuredIndicatorType::WriteAdd as u8),
@@ -1996,7 +1939,6 @@ fn writes_structured_selector_for() {
 
 // Upstream: it.each([...])("Writes & Reads Tuya Data Point Values List %s", ...)
 #[test]
-#[ignore = "not implemented yet"]
 fn writes_reads_tuya_data_point_values_list() {
     let cases: [(&str, serde_json::Value, Vec<u8>); 2] = [
         (

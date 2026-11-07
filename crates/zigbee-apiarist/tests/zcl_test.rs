@@ -1190,28 +1190,37 @@ fn int8() {
 #[test]
 fn list_uint16() {
     let mut buffalo = BuffaloZcl::new(vec![0; 16]);
-    let value = buffalo.read(BuffaloZclDataType::LIST_UINT16 as u32 as u32, &json!({}));
+    let value = buffalo.read(
+        BuffaloZclDataType::LIST_UINT16 as u32,
+        &json!({"length": 0}),
+    );
     assert!(value.is_null() || !value.is_null());
 }
 
 #[test]
 fn list_uint24() {
     let mut buffalo = BuffaloZcl::new(vec![0; 16]);
-    let value = buffalo.read(BuffaloZclDataType::LIST_UINT24 as u32 as u32, &json!({}));
+    let value = buffalo.read(
+        BuffaloZclDataType::LIST_UINT24 as u32,
+        &json!({"length": 0}),
+    );
     assert!(value.is_null() || !value.is_null());
 }
 
 #[test]
 fn list_uint32() {
     let mut buffalo = BuffaloZcl::new(vec![0; 16]);
-    let value = buffalo.read(BuffaloZclDataType::LIST_UINT32 as u32 as u32, &json!({}));
+    let value = buffalo.read(
+        BuffaloZclDataType::LIST_UINT32 as u32,
+        &json!({"length": 0}),
+    );
     assert!(value.is_null() || !value.is_null());
 }
 
 #[test]
 fn list_uint8() {
     let mut buffalo = BuffaloZcl::new(vec![0; 16]);
-    let value = buffalo.read(BuffaloZclDataType::LIST_UINT8 as u32 as u32, &json!({}));
+    let value = buffalo.read(BuffaloZclDataType::LIST_UINT8 as u32, &json!({"length": 0}));
     assert!(value.is_null() || !value.is_null());
 }
 
