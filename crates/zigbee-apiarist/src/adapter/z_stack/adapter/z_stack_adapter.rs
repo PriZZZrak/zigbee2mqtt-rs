@@ -143,6 +143,9 @@ pub struct ZStackAdapter {
     pub route_disc_calls: Vec<serde_json::Value>,
     pub led_firmware: bool,
     pub data_confirm_code: u8,
+    pub data_request_ext_code: u8,
+    pub interpan_response: Option<serde_json::Value>,
+    pub ping_error: Option<String>,
 }
 
 impl ZStackAdapter {
@@ -192,6 +195,9 @@ impl ZStackAdapter {
             route_disc_calls: Vec::new(),
             led_firmware: false,
             data_confirm_code: 0,
+            data_request_ext_code: 0,
+            interpan_response: None,
+            ping_error: None,
         }
     }
 
@@ -252,6 +258,26 @@ impl ZStackAdapter {
         _options: u8,
         _transaction_id: u8,
     ) {
+        todo!()
+    }
+
+    /// Upstream: `adapter.sendZclFrameInterPANToIeeeAddr(frame, ieeeAddress)`.
+    pub async fn send_zcl_frame_inter_pan_to_ieee_addr(
+        &mut self,
+        _cluster_id: u16,
+        _data: Vec<u8>,
+        _ieee_address: &str,
+    ) {
+        todo!()
+    }
+
+    /// Upstream: `adapter.sendZclFrameInterPANBroadcast(frame, timeout)`.
+    pub async fn send_zcl_frame_inter_pan_broadcast(
+        &mut self,
+        _cluster_id: u16,
+        _data: Vec<u8>,
+        _has_response: bool,
+    ) -> Result<serde_json::Value, String> {
         todo!()
     }
 

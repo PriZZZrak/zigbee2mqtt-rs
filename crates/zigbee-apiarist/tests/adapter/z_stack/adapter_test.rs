@@ -754,10 +754,18 @@ async fn permit_join_specific_network_address() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn refuse_to_start_when_ping_fails() {
-    todo!()
+async fn refuse_to_start_when_ping_fails() {
+    let mut adapter = adapter();
+    adapter.ping_error = Some("Couldnt lock port".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "Failed to connect to the adapter (Error: Couldnt lock port)"
+    );
 }
 
 #[tokio::test]
@@ -846,28 +854,111 @@ async fn send_zcl_frame_group_retry_on_mac_channel_access_failure() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_interpan() {
-    todo!()
+async fn send_zcl_frame_interpan() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_inter_pan_to_ieee_addr(
+            4096,
+            vec![9, 12, 1, 0, 0, 0, 10, 5, 6],
+            "0x0017880104c9cd33",
+        )
+        .await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 4096,
+                "data": [9, 12, 1, 0, 0, 0, 10, 5, 6],
+                "destendpoint": 254,
+                "dstaddr": "0x0017880104c9cd33",
+                "len": 9,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 12,
+                "transid": 1,
+                "dstaddrmode": 3,
+                "dstpanid": 65535,
+            }),
+        }]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_interpan_throw_exception_data_request_fails() {
-    todo!()
+async fn send_zcl_frame_interpan_throw_exception_data_request_fails() {
+    let mut adapter = adapter();
+    adapter.data_request_ext_code = 99;
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let error = adapter
+        .send_zcl_frame_inter_pan_broadcast(4096, vec![9, 12, 1, 1, 0, 0, 0, 10, 5], true)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error, "Data request failed with code '99'");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_interpan_throw_exception_when_command_has_no_response() {
-    todo!()
+async fn send_zcl_frame_interpan_throw_exception_when_command_has_no_response() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let error = adapter
+        .send_zcl_frame_inter_pan_broadcast(4096, vec![9, 12, 1, 0, 0, 0, 10, 5, 6], false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        "Command 'identifyRequest' has no response, cannot wait for response"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_interpan_with_response() {
-    todo!()
+async fn send_zcl_frame_interpan_with_response() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+    adapter.interpan_response = Some(json!({"clusterID": 4096, "address": 12394}));
+
+    let result = adapter
+        .send_zcl_frame_inter_pan_broadcast(4096, vec![9, 12, 1, 1, 0, 0, 0, 10, 5], true)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 4096,
+                "data": [9, 12, 1, 1, 0, 0, 0, 10, 5],
+                "destendpoint": 254,
+                "dstaddr": "0x000000000000ffff",
+                "len": 9,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 12,
+                "transid": 1,
+                "dstaddrmode": 2,
+                "dstpanid": 65535,
+            }),
+        }]
+    );
+    assert_eq!(result, json!({"clusterID": 4096, "address": 12394}));
 }
 
 #[tokio::test]
