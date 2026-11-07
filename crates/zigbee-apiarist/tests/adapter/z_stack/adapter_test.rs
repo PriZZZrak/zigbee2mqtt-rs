@@ -667,10 +667,33 @@ async fn network_address_response() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn node_descriptor_request_should_discover_route_to_fix_potential_fails() {
-    todo!()
+async fn node_descriptor_request_should_discover_route_to_fix_potential_fails() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+    adapter.zdo_calls.clear();
+    adapter.route_disc_calls.clear();
+    adapter.zdo_fail = true;
+
+    let cluster_id = ClusterId::NODE_DESCRIPTOR_REQUEST;
+    let zdo_payload = BuffaloZdo::build_request(false, cluster_id, &[json!(1234)]);
+    adapter
+        .send_zdo_route_discovery("0x0000000000000000", 1234, cluster_id, zdo_payload.clone())
+        .await
+        .unwrap();
+
+    let mut expected = vec![0x23, 0x01];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(adapter.zdo_calls.len(), 2);
+    assert_eq!(adapter.zdo_calls[0].0, cluster_id);
+    assert_eq!(adapter.zdo_calls[0].1, expected);
+    assert_eq!(adapter.zdo_calls[1].1, expected);
+    assert_eq!(
+        adapter.route_disc_calls,
+        vec![json!({"dstAddr": 1234, "options": 0, "radius": 30})]
+    );
 }
 
 #[tokio::test]
@@ -813,10 +836,44 @@ async fn send_zcl_frame_group() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_group_data_confirm_fails() {
-    todo!()
+async fn send_zcl_frame_group_data_confirm_fails() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 184;
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let error = adapter
+        .send_zcl_frame_to_group(25, vec![0x18, 100, 0, 0, 0], 1, 0, 1)
+        .await
+        .unwrap_err();
+
+    assert_eq!(adapter.znp_calls.len(), 1);
+    assert_eq!(
+        adapter.znp_calls[0],
+        ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0, 0, 0],
+                "destendpoint": 255,
+                "dstaddr": "0x0000000000000019",
+                "len": 5,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+                "dstaddrmode": 1,
+                "dstpanid": 0,
+            }),
+        }
+    );
+    assert_eq!(
+        error,
+        "Data request failed with error: 'APS_DUPLICATE_ENTRY' (0xb8)"
+    );
 }
 
 #[tokio::test]
@@ -1096,16 +1153,62 @@ async fn send_zcl_frame_network_address_fails_because_requested_profile_id_is_no
     assert_eq!(error, "Profile ID 9999 is not supported by this adapter.");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_matches_by_tsn() {
-    todo!()
+async fn send_zcl_frame_network_address_matches_by_tsn() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let result = adapter
+        .send_zcl_frame_to_endpoint_result("0x02", 2, 20, vec![0x18, 100, 1, 0, 0], 0, 1)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequest".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 1, 0, 0],
+                "destendpoint": 20,
+                "dstaddr": 2,
+                "len": 5,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+            }),
+        }]
+    );
+    assert_eq!(adapter.znp_calls.len(), 1);
+    assert_eq!(result.endpoint, 20);
+    assert_eq!(result.group_id, 12);
+    assert_eq!(result.linkquality, 101);
+    assert_eq!(result.address, 2);
+    assert_eq!(result.data, vec![24, 100, 1, 0, 0, 0, 32, 2]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_matches_on_default_response() {
-    todo!()
+async fn send_zcl_frame_network_address_matches_on_default_response() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    let result = adapter
+        .send_zcl_frame_to_endpoint_result("0x02", 2, 20, vec![0x18, 100, 1, 0, 0], 0, 1)
+        .await
+        .unwrap();
+
+    assert_eq!(adapter.znp_calls.len(), 1);
+    assert_eq!(result.endpoint, 20);
+    assert_eq!(result.group_id, 12);
+    assert_eq!(result.linkquality, 101);
+    assert_eq!(result.address, 2);
+    assert_eq!(result.data, vec![24, 100, 11, 0, 126]);
 }
 
 #[test]

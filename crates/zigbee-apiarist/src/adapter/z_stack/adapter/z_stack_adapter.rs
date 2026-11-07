@@ -261,6 +261,30 @@ impl ZStackAdapter {
         todo!()
     }
 
+    /// Upstream `sendZclFrameToEndpoint` returning the matched incoming payload.
+    pub async fn send_zcl_frame_to_endpoint_result(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _endpoint: u8,
+        _data: Vec<u8>,
+        _options: u8,
+        _transaction_id: u8,
+    ) -> Result<ZStackWaitResult, String> {
+        todo!()
+    }
+
+    /// Upstream `sendZdo` with the NODE_DESCRIPTOR route-discovery retry.
+    pub async fn send_zdo_route_discovery(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _cluster_id: u16,
+        _payload: Vec<u8>,
+    ) -> Result<(), String> {
+        todo!()
+    }
+
     /// Upstream `sendZclFrameToEndpoint` surfacing data-confirm/profile errors.
     pub async fn send_zcl_frame_to_endpoint_checked(
         &mut self,
@@ -304,7 +328,7 @@ impl ZStackAdapter {
         _source_endpoint: u8,
         _options: u8,
         _transaction_id: u8,
-    ) {
+    ) -> Result<(), String> {
         todo!()
     }
 
