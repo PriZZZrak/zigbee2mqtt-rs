@@ -56,4 +56,3 @@ fn simple_descriptor_response() {
 fn zboss_fix_non_standard_zdo_response_payloads() {
     todo!()
 }
-

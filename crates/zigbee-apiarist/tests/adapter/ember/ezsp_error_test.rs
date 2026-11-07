@@ -14,4 +14,3 @@ fn creates_error() {
 fn ezsp_error() {
     todo!()
 }
-

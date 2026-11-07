@@ -175,4 +175,3 @@ fn workaround_reads_gen_ota_image_block_request_even_if_minimum_block_period_is_
 fn throws_when_payload_too_short_to_continue_reading() {
     todo!()
 }
-

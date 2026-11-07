@@ -370,13 +370,15 @@ fn adapter_impl_throws_when_send_zcl_frame_to_all_fails_request() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn adapter_impl_throws_when_send_zcl_frame_to_endpoint_get_busy_status_from_ncp_and_exceeded_max_attempts() {
+fn adapter_impl_throws_when_send_zcl_frame_to_endpoint_get_busy_status_from_ncp_and_exceeded_max_attempts(
+) {
     todo!()
 }
 
 #[test]
 #[ignore = "not implemented yet"]
-fn adapter_impl_throws_when_send_zcl_frame_to_endpoint_get_busy_status_from_ncp_and_recovery_disabled() {
+fn adapter_impl_throws_when_send_zcl_frame_to_endpoint_get_busy_status_from_ncp_and_recovery_disabled(
+) {
     todo!()
 }
 
@@ -388,7 +390,8 @@ fn adapter_impl_throws_when_send_zcl_frame_to_endpoint_request_fails() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn adapter_impl_throws_when_send_zcl_frame_to_endpoint_throws_no_tx_space_status_and_recovery_disabled() {
+fn adapter_impl_throws_when_send_zcl_frame_to_endpoint_throws_no_tx_space_status_and_recovery_disabled(
+) {
     todo!()
 }
 
@@ -847,4 +850,3 @@ fn trust_center_join() {
 fn zdo_response() {
     todo!()
 }
-

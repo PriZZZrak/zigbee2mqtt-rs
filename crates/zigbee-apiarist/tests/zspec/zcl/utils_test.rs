@@ -270,7 +270,8 @@ fn rssi_location_attributes_coordinate1_and_path_loss_exponent() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn rssi_location_cmd_rsp_location_data_notification_parameters_coordinate1_and_path_loss_exponent() {
+fn rssi_location_cmd_rsp_location_data_notification_parameters_coordinate1_and_path_loss_exponent()
+{
     todo!()
 }
 
@@ -357,4 +358,3 @@ fn throws_when_attribute_not_writable() {
 fn throws_when_trying_to_write_non_value_on_unsupported_datatype() {
     todo!()
 }
-

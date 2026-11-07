@@ -376,13 +376,15 @@ fn send_zcl_frame_network_address_data_confirm_fails() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_should_retry() {
+fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_should_retry(
+) {
     todo!()
 }
 
 #[test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_without_recovery() {
+fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_without_recovery(
+) {
     todo!()
 }
 
@@ -394,7 +396,8 @@ fn send_zcl_frame_network_address_fails_because_mac_no_ack_should_retry() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_when_not_being_a_parent_should_retry() {
+fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_when_not_being_a_parent_should_retry(
+) {
     todo!()
 }
 
@@ -442,7 +445,8 @@ fn send_zcl_frame_network_address_timeout_should_discover_route_and_retry() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_timeout_should_discover_route_rewrite_child_entry_and_retry_for_sleepy_end_device() {
+fn send_zcl_frame_network_address_timeout_should_discover_route_rewrite_child_entry_and_retry_for_sleepy_end_device(
+) {
     todo!()
 }
 
@@ -460,7 +464,8 @@ fn send_zcl_frame_network_address_with_default_response() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_care_because_command_has_response() {
+fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_care_because_command_has_response(
+) {
     todo!()
 }
 
@@ -772,13 +777,15 @@ fn should_fail_to_restore_unified_backup_with_1_2_adapter_backup_from_newer_adap
 
 #[test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_aps_link_key_data_table_size() {
+fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_aps_link_key_data_table_size(
+) {
     todo!()
 }
 
 #[test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_security_manager_table_size() {
+fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_security_manager_table_size(
+) {
     todo!()
 }
 
@@ -790,7 +797,8 @@ fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_tclk_ta
 
 #[test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_invalid_open_coordinator_backup_version() {
+fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_invalid_open_coordinator_backup_version(
+) {
     todo!()
 }
 
@@ -826,7 +834,8 @@ fn should_restore_legacy_backup_with_3_0_x_adapter_empty() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn should_restore_unified_backup_with_3_0_x_adapter_commissioned_mismatched_adapter_config_matching_config_backup() {
+fn should_restore_unified_backup_with_3_0_x_adapter_commissioned_mismatched_adapter_config_matching_config_backup(
+) {
     todo!()
 }
 
@@ -880,7 +889,8 @@ fn should_start_with_3_x_0_adapter_warn_when_preconfigured_key_doesn() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commissioned_config_adapter_mismatch() {
+fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commissioned_config_adapter_mismatch(
+) {
     todo!()
 }
 
@@ -889,4 +899,3 @@ fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commissioned_con
 fn zstack_adapter() {
     todo!()
 }
-

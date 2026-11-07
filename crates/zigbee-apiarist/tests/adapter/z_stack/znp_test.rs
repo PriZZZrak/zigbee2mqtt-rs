@@ -531,7 +531,8 @@ fn znp_wait_for_with_target_as_ieee() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn znp_wait_for_with_target_as_ieee_forced_to_timeout_because_invalid_zdo_status_no_payload_to_match_against() {
+fn znp_wait_for_with_target_as_ieee_forced_to_timeout_because_invalid_zdo_status_no_payload_to_match_against(
+) {
     todo!()
 }
 
@@ -546,4 +547,3 @@ fn znp_wait_for_with_target_as_network_address() {
 fn znp_wait_for_with_transid() {
     todo!()
 }
-

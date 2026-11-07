@@ -14,4 +14,3 @@ fn creates_status_error() {
 fn zdo_utils() {
     todo!()
 }
-

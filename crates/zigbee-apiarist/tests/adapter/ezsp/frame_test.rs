@@ -21,4 +21,3 @@ fn change_source_route_handler() {
 fn incoming_network_status_handler() {
     todo!()
 }
-

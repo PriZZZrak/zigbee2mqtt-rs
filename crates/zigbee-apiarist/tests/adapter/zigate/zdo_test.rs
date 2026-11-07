@@ -77,4 +77,3 @@ fn zi_gate_command_code_un_bind_multicast() {
 fn zi_gate_command_code_un_bind_unicast() {
     todo!()
 }
-

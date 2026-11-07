@@ -161,4 +161,3 @@ fn uses_defaults_when_custom_stack_config_invalid() {
 fn uses_defaults_when_custom_stack_config_partial() {
     todo!()
 }
-

@@ -21,4 +21,3 @@ fn reports_the_formed_network_after_forming_on_a_blank_ncp() {
 fn reports_the_new_network_after_a_factory_reset_and_reform() {
     todo!()
 }
-

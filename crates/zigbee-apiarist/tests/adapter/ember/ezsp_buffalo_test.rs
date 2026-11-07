@@ -28,4 +28,3 @@ fn maps_ember_status_ezsp_status_to_slstatus() {
 fn writes_read_at_position_without_altering_internal_position_tracker() {
     todo!()
 }
-

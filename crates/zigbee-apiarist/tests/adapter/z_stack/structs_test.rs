@@ -91,4 +91,3 @@ fn should_properly_serialize_unaligned_and_aligned_table_without_inline_occupanc
 fn should_throw_error_on_invalid_uint8_array_length() {
     todo!()
 }
-

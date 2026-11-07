@@ -98,4 +98,3 @@ fn throws_on_send_command_with_ash_connection_problem() {
 fn when_connected() {
     todo!()
 }
-

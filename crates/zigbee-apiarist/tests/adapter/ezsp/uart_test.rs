@@ -42,4 +42,3 @@ fn two_messages_in_one_chunk() {
 fn uart() {
     todo!()
 }
-

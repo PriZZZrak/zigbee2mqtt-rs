@@ -322,4 +322,3 @@ fn with_path_only_config() {
 fn without_config() {
     todo!()
 }
-

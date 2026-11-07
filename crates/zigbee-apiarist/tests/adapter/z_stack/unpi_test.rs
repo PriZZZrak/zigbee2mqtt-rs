@@ -47,7 +47,8 @@ fn message_in_two_chunks_fcs_as_separate() {
 
 #[test]
 #[ignore = "not implemented yet"]
-fn parse_message_when_it_doenst_start_with_sof_and_buffer_is_empty_throw_away_everything_until_sof() {
+fn parse_message_when_it_doenst_start_with_sof_and_buffer_is_empty_throw_away_everything_until_sof()
+{
     todo!()
 }
 
@@ -98,4 +99,3 @@ fn write_frame() {
 fn writer() {
     todo!()
 }
-

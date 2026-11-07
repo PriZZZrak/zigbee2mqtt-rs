@@ -189,4 +189,3 @@ fn write_structured_rsp() {
 fn write_undiv() {
     todo!()
 }
-

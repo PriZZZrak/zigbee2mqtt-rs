@@ -42,4 +42,3 @@ fn write_uint16() {
 fn write_uint32() {
     todo!()
 }
-
