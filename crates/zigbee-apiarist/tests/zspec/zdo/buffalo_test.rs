@@ -71,6 +71,10 @@
 //   - readSystemServerDiscoveryResponse
 
 use serde_json::json;
+use zigbee_apiarist::zspec::consts::{
+    ALL_802_15_4_CHANNELS, ALL_802_15_4_CHANNELS_MASK, PREFERRED_802_15_4_CHANNELS,
+    PREFERRED_802_15_4_CHANNELS_MASK,
+};
 use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
 use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
 
@@ -302,7 +306,23 @@ fn build_challenge_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_channel_change_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&(1u32 << 15).to_le_bytes());
+    expected.extend_from_slice(&[0xfe, 1]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_UPDATE_REQUEST,
+            &[
+                json!([15]),
+                json!(0xfe),
+                serde_json::Value::Null,
+                json!(1),
+                serde_json::Value::Null,
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -345,19 +365,102 @@ fn build_decommission_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_enhanced_channel_change_request() {
-    todo!()
+    let channel_page = 54394u32;
+    let mut expected = vec![0, 1];
+    expected.extend_from_slice(&channel_page.to_le_bytes());
+    expected.extend_from_slice(&[0xfe, 3, 1]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_ENHANCED_UPDATE_REQUEST,
+            &[
+                json!([channel_page]),
+                json!(0xfe),
+                serde_json::Value::Null,
+                json!(3),
+                serde_json::Value::Null,
+                json!(1),
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_enhanced_scan_channels_request() {
-    todo!()
+    let channel_pages = [123u32, 54394, 29344];
+    let mut expected = vec![0, channel_pages.len() as u8];
+    for page in channel_pages {
+        expected.extend_from_slice(&page.to_le_bytes());
+    }
+    expected.extend_from_slice(&[5, 3, 1]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_ENHANCED_UPDATE_REQUEST,
+            &[
+                json!(channel_pages.to_vec()),
+                json!(5),
+                json!(3),
+                serde_json::Value::Null,
+                serde_json::Value::Null,
+                json!(1),
+            ],
+        ),
+        expected
+    );
+
+    let mut expected = vec![0, channel_pages.len() as u8];
+    for page in channel_pages {
+        expected.extend_from_slice(&page.to_le_bytes());
+    }
+    expected.extend_from_slice(&[6, 1]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_ENHANCED_UPDATE_REQUEST,
+            &[
+                json!(channel_pages.to_vec()),
+                json!(6),
+                json!(3),
+                serde_json::Value::Null,
+                serde_json::Value::Null,
+                json!(1),
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_enhanced_set_active_channels_and_nwk_manager_id_request() {
-    todo!()
+    let channel_pages = [123u32, 54394, 29344];
+    let nwk_manager_addr = 0xfe01u16;
+    let mut expected = vec![0, channel_pages.len() as u8];
+    for page in channel_pages {
+        expected.extend_from_slice(&page.to_le_bytes());
+    }
+    expected.push(0xff);
+    expected.push(2);
+    expected.extend_from_slice(&nwk_manager_addr.to_le_bytes());
+    expected.push(1);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_ENHANCED_UPDATE_REQUEST,
+            &[
+                json!(channel_pages.to_vec()),
+                json!(0xff),
+                serde_json::Value::Null,
+                json!(2),
+                json!(nwk_manager_addr),
+                json!(1),
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -555,7 +658,30 @@ fn build_node_descriptor_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_nwk_beacon_survey_request() {
-    todo!()
+    let tlv = json!({"scanChannelList": [], "configurationBitmask": 0});
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::NWK_BEACON_SURVEY_REQUEST, &[tlv]),
+        vec![0, 0, 1, 0, 0]
+    );
+
+    let tlv2 = json!({"scanChannelList": [34252], "configurationBitmask": 1});
+    let mut expected = vec![0, 0, 5, 1];
+    expected.extend_from_slice(&34252u32.to_le_bytes());
+    expected.push(1);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::NWK_BEACON_SURVEY_REQUEST, &[tlv2]),
+        expected
+    );
+
+    let tlv3 = json!({"scanChannelList": [34252, 123], "configurationBitmask": 1});
+    let mut expected = vec![0, 0, 9, 2];
+    expected.extend_from_slice(&34252u32.to_le_bytes());
+    expected.extend_from_slice(&123u32.to_le_bytes());
+    expected.push(1);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::NWK_BEACON_SURVEY_REQUEST, &[tlv3]),
+        expected
+    );
 }
 
 #[test]
@@ -570,7 +696,14 @@ fn build_nwk_ieeejoining_list_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_parent_announce() {
-    todo!()
+    let children = [IEEE_ADDRESS1, IEEE_ADDRESS2];
+    let mut expected = vec![0, children.len() as u8];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::PARENT_ANNOUNCE, &[json!(children)]),
+        expected
+    );
 }
 
 #[test]
@@ -616,13 +749,64 @@ fn build_routing_table_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_scan_channels_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&ALL_802_15_4_CHANNELS_MASK.to_le_bytes());
+    expected.extend_from_slice(&[3, 3]);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_UPDATE_REQUEST,
+            &[
+                json!(ALL_802_15_4_CHANNELS.to_vec()),
+                json!(3),
+                json!(3),
+                serde_json::Value::Null,
+                serde_json::Value::Null,
+            ],
+        ),
+        expected
+    );
+
+    let mut expected = vec![0];
+    expected.extend_from_slice(&ALL_802_15_4_CHANNELS_MASK.to_le_bytes());
+    expected.push(64);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_UPDATE_REQUEST,
+            &[
+                json!(ALL_802_15_4_CHANNELS.to_vec()),
+                json!(64),
+                json!(3),
+                serde_json::Value::Null,
+                serde_json::Value::Null,
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_set_active_channels_and_nwk_manager_id_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&PREFERRED_802_15_4_CHANNELS_MASK.to_le_bytes());
+    expected.extend_from_slice(&[0xff, 3]);
+    expected.extend_from_slice(&123u16.to_le_bytes());
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::NWK_UPDATE_REQUEST,
+            &[
+                json!(PREFERRED_802_15_4_CHANNELS.to_vec()),
+                json!(0xff),
+                serde_json::Value::Null,
+                json!(3),
+                json!(123),
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
@@ -644,7 +828,23 @@ fn build_simple_descriptor_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_start_key_negotiation_request() {
-    todo!()
+    let tlv = json!({"eui64": IEEE_ADDRESS1, "publicPoint": vec![0xcdu8; 32]});
+    let mut expected = vec![0, 0, 8 + 32 - 1];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.extend_from_slice(&[0xcdu8; 32]);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::START_KEY_NEGOTIATION_REQUEST, &[tlv],),
+        expected
+    );
+
+    let tlv2 = json!({"eui64": IEEE_ADDRESS2, "publicPoint": vec![0x3cu8; 32]});
+    let mut expected = vec![0, 0, 8 + 32 - 1];
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    expected.extend_from_slice(&[0x3cu8; 32]);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::START_KEY_NEGOTIATION_REQUEST, &[tlv2],),
+        expected
+    );
 }
 
 #[test]
