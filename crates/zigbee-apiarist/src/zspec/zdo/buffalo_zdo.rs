@@ -60,6 +60,25 @@ impl BuffaloZdo {
         todo!()
     }
 
+    /// ZiGate-patched variant: same as `build_request` but with big-endian
+    /// integer/address writes (upstream `patchZdoBuffaloBE`).
+    pub fn build_request_be(
+        has_zdo_message_overhead: bool,
+        cluster_id: u16,
+        args: &[serde_json::Value],
+    ) -> Vec<u8> {
+        todo!()
+    }
+
+    /// ZiGate-patched variant: reads stay little-endian.
+    pub fn read_response_be(
+        has_zdo_message_overhead: bool,
+        cluster_id: u16,
+        buffer: &[u8],
+    ) -> serde_json::Value {
+        todo!()
+    }
+
     pub fn read_network_address_response(&mut self) -> serde_json::Value {
         todo!()
     }
