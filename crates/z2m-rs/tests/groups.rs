@@ -40,112 +40,421 @@
 //   - Should publish state of group when specific state of specific endpoint is changed
 //   - Shouldnt publish group state change when a group is not optimistic
 
-#[test]
-#[ignore = "not implemented yet"]
-fn add_to_group_via_mqtt() {
-    todo!()
+use serde_json::json;
+use z2m_rs::extension::groups::Groups;
+
+fn setup() -> Groups {
+    let mut groups = Groups::new();
+    groups.add_group("group_1");
+    groups.add_device("bulb_color", &[("default", "1")]);
+    groups.add_device(
+        "wall_switch_double",
+        &[("left", "1"), ("right", "3"), ("1", "1"), ("3", "3")],
+    );
+    groups.add_device(
+        "0x0017880104e45542",
+        &[("left", "1"), ("right", "3"), ("1", "1"), ("3", "3")],
+    );
+    groups
 }
 
-#[test]
-#[ignore = "not implemented yet"]
-fn add_to_group_via_mqtt_fails() {
-    todo!()
+const ADD: &str = "zigbee2mqtt/bridge/request/group/members/add";
+const REMOVE: &str = "zigbee2mqtt/bridge/request/group/members/remove";
+const REMOVE_ALL: &str = "zigbee2mqtt/bridge/request/group/members/remove_all";
+const GROUPS_TOPIC: &str = "zigbee2mqtt/bridge/groups";
+
+fn response(topic: &str) -> String {
+    format!(
+        "zigbee2mqtt/bridge/response/group/members/{}",
+        topic.rsplit('/').next().unwrap()
+    )
 }
 
-#[test]
-#[ignore = "not implemented yet"]
-fn add_to_group_via_mqtt_with_postfix() {
-    todo!()
+fn has_response(groups: &Groups, topic: &str, payload: serde_json::Value) -> bool {
+    groups
+        .published
+        .contains(&(response(topic), payload, json!({})))
 }
 
-#[test]
-#[ignore = "not implemented yet"]
-fn add_to_group_via_mqtt_with_postfix_shouldnt_add_it_twice() {
-    todo!()
+fn has_groups_publish(groups: &Groups) -> bool {
+    groups
+        .published
+        .iter()
+        .any(|(topic, _, _)| topic == GROUPS_TOPIC)
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn add_to_group_with_slashes_via_mqtt() {
-    todo!()
+async fn add_to_group_via_mqtt() {
+    let mut groups = setup();
+    groups.published.clear();
+
+    groups.on_message(
+        ADD,
+        &json!({"transaction": "123", "group": "group_1", "device": "bulb_color"}),
+    );
+
+    assert_eq!(
+        groups.groups["group_1"].members,
+        vec!["bulb_color:1".to_string()]
+    );
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({
+            "data": {"device": "bulb_color", "endpoint": "default", "group": "group_1"},
+            "transaction": "123",
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn error_when_add_remove_with_invalid_payload() {
-    todo!()
+async fn add_to_group_via_mqtt_fails() {
+    let mut groups = setup();
+    groups.fail_add = Some("timeout".to_string());
+    groups.published.clear();
+
+    groups.on_message(ADD, &json!({"group": "group_1", "device": "bulb_color"}));
+
+    assert!(groups.groups["group_1"].members.is_empty());
+    assert!(!has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({"data": {}, "status": "error", "error": "Failed to add to group (timeout)"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn error_when_adding_a_non_existing_device() {
-    todo!()
+async fn add_to_group_via_mqtt_with_postfix() {
+    let mut groups = setup();
+    groups.published.clear();
+
+    groups.on_message(
+        ADD,
+        &json!({"group": "group_1", "device": "wall_switch_double", "endpoint": "right"}),
+    );
+
+    assert_eq!(
+        groups.groups["group_1"].members,
+        vec!["wall_switch_double:3".to_string()]
+    );
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({
+            "data": {"device": "wall_switch_double", "endpoint": "right", "group": "group_1"},
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn error_when_adding_a_non_existing_endpoint() {
-    todo!()
+async fn add_to_group_via_mqtt_with_postfix_shouldnt_add_it_twice() {
+    let mut groups = setup();
+    groups.published.clear();
+
+    groups.on_message(
+        ADD,
+        &json!({"group": "group_1", "device": "wall_switch_double", "endpoint": "right"}),
+    );
+    groups.on_message(
+        ADD,
+        &json!({"group": "group_1", "device": "wall_switch_double", "endpoint": "right"}),
+    );
+
+    assert_eq!(
+        groups.groups["group_1"].members,
+        vec!["wall_switch_double:3".to_string()]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn error_when_adding_to_non_existing_group() {
-    todo!()
+async fn add_to_group_with_slashes_via_mqtt() {
+    let mut groups = setup();
+    groups.add_group("group/with/slashes");
+    groups.published.clear();
+
+    groups.on_message(
+        ADD,
+        &json!({"group": "group/with/slashes", "device": "bulb_color"}),
+    );
+
+    assert_eq!(
+        groups.groups["group/with/slashes"].members,
+        vec!["bulb_color:1".to_string()]
+    );
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({
+            "data": {"device": "bulb_color", "endpoint": "default", "group": "group/with/slashes"},
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn error_when_invalid_payload() {
-    todo!()
+async fn error_when_add_remove_with_invalid_payload() {
+    let mut groups = setup();
+    groups.published.clear();
+
+    groups.on_message(ADD, &json!({"groupz": "group_1", "device": "bulb_color"}));
+
+    assert!(!has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({"data": {}, "status": "error", "error": "Invalid payload"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn extension_groups() {
-    todo!()
+async fn error_when_adding_a_non_existing_device() {
+    let mut groups = setup();
+    groups.published.clear();
+
+    groups.on_message(
+        ADD,
+        &json!({"group": "group_1", "device": "bulb_color_not_existing"}),
+    );
+
+    assert!(!has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({"data": {}, "status": "error", "error": "Device 'bulb_color_not_existing' does not exist"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn remove_from_group_all() {
-    todo!()
+async fn error_when_adding_a_non_existing_endpoint() {
+    let mut groups = setup();
+    groups.published.clear();
+
+    groups.on_message(
+        ADD,
+        &json!({"group": "group_1", "device": "bulb_color", "endpoint": "not_existing_endpoint"}),
+    );
+
+    assert!(!has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({"data": {}, "status": "error", "error": "Device 'bulb_color' does not have endpoint 'not_existing_endpoint'"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn remove_from_group_via_mqtt() {
-    todo!()
+async fn error_when_adding_to_non_existing_group() {
+    let mut groups = Groups::new();
+    groups.add_device("bulb_color", &[("default", "1")]);
+    groups.published.clear();
+
+    groups.on_message(
+        REMOVE,
+        &json!({"group": "group_1_not_existing", "device": "bulb_color"}),
+    );
+
+    assert!(!has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE,
+        json!({"data": {}, "status": "error", "error": "Group 'group_1_not_existing' does not exist"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn remove_from_group_via_mqtt_fails() {
-    todo!()
+async fn error_when_invalid_payload() {
+    let mut groups = setup();
+    groups.published.clear();
+
+    groups.on_message(ADD, &json!({"group": "group_1", "devicez": "bulb_color"}));
+
+    assert!(!has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        ADD,
+        json!({"data": {}, "status": "error", "error": "Invalid payload"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn remove_from_group_via_mqtt_keeping_device_reporting() {
-    todo!()
+async fn remove_from_group_all() {
+    let mut groups = setup();
+    groups
+        .member("group_1")
+        .push("0x0017880104e45542:3".to_string());
+    groups.published.clear();
+
+    groups.on_message(
+        REMOVE_ALL,
+        &json!({"device": "0x0017880104e45542", "endpoint": "right"}),
+    );
+
+    assert!(groups.groups["group_1"].members.is_empty());
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE_ALL,
+        json!({"data": {"device": "0x0017880104e45542", "endpoint": "right"}, "status": "ok"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn remove_from_group_via_mqtt_with_postfix_variant_1() {
-    todo!()
+async fn remove_from_group_via_mqtt() {
+    let mut groups = setup();
+    groups.member("group_1").push("bulb_color:1".to_string());
+    groups.published.clear();
+
+    groups.on_message(REMOVE, &json!({"group": "group_1", "device": "bulb_color"}));
+
+    assert!(groups.groups["group_1"].members.is_empty());
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE,
+        json!({
+            "data": {"device": "bulb_color", "endpoint": "default", "group": "group_1"},
+            "status": "ok",
+        })
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn remove_from_group_via_mqtt_with_postfix_variant_2() {
-    todo!()
+async fn remove_from_group_via_mqtt_fails() {
+    let mut groups = setup();
+    groups.member("group_1").push("bulb_color:1".to_string());
+    groups.fail_remove = Some("timeout".to_string());
+    groups.published.clear();
+
+    groups.on_message(REMOVE, &json!({"group": "group_1", "device": "bulb_color"}));
+
+    assert_eq!(groups.groups["group_1"].members.len(), 1);
+    assert!(!has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE,
+        json!({"data": {}, "status": "error", "error": "Failed to remove from group (timeout)"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn remove_from_group_via_mqtt_with_postfix_variant_3() {
-    todo!()
+async fn remove_from_group_via_mqtt_keeping_device_reporting() {
+    let mut groups = setup();
+    groups.member("group_1").push("bulb_color:1".to_string());
+    groups.published.clear();
+
+    groups.on_message(
+        REMOVE,
+        &json!({"group": "group_1", "device": "bulb_color", "skip_disable_reporting": true}),
+    );
+
+    assert!(groups.groups["group_1"].members.is_empty());
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE,
+        json!({
+            "data": {"device": "bulb_color", "endpoint": "default", "group": "group_1"},
+            "status": "ok",
+        })
+    ));
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn remove_from_group_via_mqtt_with_postfix_variant_1() {
+    let mut groups = setup();
+    groups
+        .member("group_1")
+        .push("0x0017880104e45542:3".to_string());
+    groups.published.clear();
+
+    groups.on_message(
+        REMOVE,
+        &json!({"group": "group_1", "device": "0x0017880104e45542", "endpoint": "3"}),
+    );
+
+    assert!(groups.groups["group_1"].members.is_empty());
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE,
+        json!({
+            "data": {"device": "0x0017880104e45542", "endpoint": "3", "group": "group_1"},
+            "status": "ok",
+        })
+    ));
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn remove_from_group_via_mqtt_with_postfix_variant_2() {
+    let mut groups = setup();
+    groups
+        .member("group_1")
+        .push("0x0017880104e45542:3".to_string());
+    groups.published.clear();
+
+    groups.on_message(
+        REMOVE,
+        &json!({"group": "group_1", "device": "wall_switch_double", "endpoint": "3"}),
+    );
+
+    assert!(groups.groups["group_1"].members.is_empty());
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE,
+        json!({
+            "data": {"device": "wall_switch_double", "endpoint": "3", "group": "group_1"},
+            "status": "ok",
+        })
+    ));
+}
+
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn remove_from_group_via_mqtt_with_postfix_variant_3() {
+    let mut groups = setup();
+    groups
+        .member("group_1")
+        .push("0x0017880104e45542:3".to_string());
+    groups.published.clear();
+
+    groups.on_message(
+        REMOVE,
+        &json!({"group": "group_1", "device": "0x0017880104e45542", "endpoint": "right"}),
+    );
+
+    assert!(groups.groups["group_1"].members.is_empty());
+    assert!(has_groups_publish(&groups));
+    assert!(has_response(
+        &groups,
+        REMOVE,
+        json!({
+            "data": {"device": "0x0017880104e45542", "endpoint": "right", "group": "group_1"},
+            "status": "ok",
+        })
+    ));
 }
 
 #[test]
