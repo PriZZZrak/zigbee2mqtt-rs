@@ -86,3 +86,43 @@ pub fn supports_backup() {
 pub fn wait_for() {
     todo!()
 }
+
+use std::cell::RefCell;
+
+pub struct ZiGateAdapter {
+    pub options: serde_json::Value,
+    pub config: serde_json::Value,
+    pub backup_path: String,
+    pub startup: serde_json::Value,
+    /// Records `driver.requestZdo(clusterId, payload)` calls.
+    pub driver_calls: RefCell<Vec<(u16, Vec<u8>)>>,
+}
+
+impl ZiGateAdapter {
+    pub fn new(
+        options: serde_json::Value,
+        config: serde_json::Value,
+        backup_path: &str,
+        startup: serde_json::Value,
+    ) -> Self {
+        Self {
+            options,
+            config,
+            backup_path: backup_path.to_string(),
+            startup,
+            driver_calls: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Upstream: `adapter.sendZdo(ieee, networkAddress, clusterId, payload, disableResponse)`.
+    pub async fn send_zdo(
+        &self,
+        ieee_address: &str,
+        network_address: u16,
+        cluster_id: u16,
+        payload: Vec<u8>,
+        disable_response: bool,
+    ) {
+        todo!()
+    }
+}
