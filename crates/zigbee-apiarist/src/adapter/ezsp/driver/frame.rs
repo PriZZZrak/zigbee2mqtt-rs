@@ -1,10 +1,21 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ezsp/driver/frame.ts
 // TODO: port public API from the original file.
 
-// pub fn Frame() { todo!() }
-// pub fn checkCRC() { todo!() }
-// pub fn constructor() { todo!() }
-// pub fn toString() { todo!() }
+/// Upstream `FrameType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameType {
+    RSTACK,
+    DATA,
+    NAK,
+}
+
+/// A parsed EZSP frame (upstream `Frame`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Frame {
+    pub frame_type: FrameType,
+    pub sequence: i32,
+    pub payload: Vec<u8>,
+}
 
 pub fn frame() {
     todo!()
