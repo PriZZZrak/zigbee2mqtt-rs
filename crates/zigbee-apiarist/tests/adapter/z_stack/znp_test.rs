@@ -80,8 +80,12 @@
 //   - znp waitFor with transid
 
 use serde_json::json;
+use zigbee_apiarist::adapter::z_stack::unpi::constants::{Subsystem, Type};
+use zigbee_apiarist::adapter::z_stack::unpi::frame::Frame;
 use zigbee_apiarist::adapter::z_stack::znp::buffalo_znp::BuffaloZnp;
 use zigbee_apiarist::adapter::z_stack::znp::parameter_type::ParameterType;
+use zigbee_apiarist::adapter::z_stack::znp::znp::Znp;
+use zigbee_apiarist::adapter::z_stack::znp::zpi_object::{ParameterDef, ZpiObject};
 
 const IEEE_ADDR1: &str = "0xae440112004b1200";
 const IEEE_ADDR1_HEX: [u8; 8] = [0x00, 0x12, 0x4b, 0x00, 0x12, 0x01, 0x44, 0xae];
@@ -300,10 +304,16 @@ fn cant_read_unsupported_type() {
     assert!(result.is_err());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn close_without_initialization() {
-    todo!()
+async fn close_without_initialization() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.on_close();
+    znp.flush_and_close_error = Some("failed!".to_string());
+    znp.close().await.unwrap();
+
+    assert_eq!(znp.serial.flush_and_close_calls, 0);
+    assert_eq!(znp.close_calls, 1);
 }
 
 #[test]
@@ -442,70 +452,182 @@ fn list_uint8_write() {
     assert_eq!(buffalo.get_buffer(), vec![0x00, 0xc8, 0x64, 0x00]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open() {
-    todo!()
+async fn open() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    assert_eq!(znp.serial.constructor_calls.len(), 1);
+    assert_eq!(
+        znp.serial.constructor_calls[0],
+        ("/dev/ttyACM0".to_string(), 100, true)
+    );
+    assert_eq!(znp.serial.pipe_calls, 1);
+    assert_eq!(znp.serial.async_open_calls, 1);
+    assert_eq!(znp.serial.once_calls, 2);
+    assert_eq!(znp.serial.write_buffer_calls, 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_first_ping_fails_should_send_reset_bootloader() {
-    todo!()
+async fn open_first_ping_fails_should_send_reset_bootloader() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.request_error = Some("failed".to_string());
+    znp.open().await.unwrap();
+
+    assert_eq!(znp.serial.constructor_calls.len(), 1);
+    assert_eq!(
+        znp.serial.constructor_calls[0],
+        ("/dev/ttyACM0".to_string(), 100, true)
+    );
+    assert_eq!(znp.serial.pipe_calls, 1);
+    assert_eq!(znp.serial.async_open_calls, 1);
+    assert_eq!(znp.serial.write_buffer_calls, 1);
+    assert_eq!(znp.serial.once_calls, 2);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_and_close() {
-    todo!()
+async fn open_and_close() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.on_close();
+    assert!(!znp.is_initialized());
+    znp.open().await.unwrap();
+    assert!(znp.is_initialized());
+    znp.close().await.unwrap();
+    assert!(!znp.is_initialized());
+
+    assert_eq!(znp.serial.flush_and_close_calls, 1);
+    assert_eq!(znp.close_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_and_close_by_serialport_event() {
-    todo!()
+async fn open_and_close_by_serialport_event() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.on_close();
+    znp.open().await.unwrap();
+
+    znp.emit_serial_close();
+
+    assert_eq!(znp.close_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_and_close_error() {
-    todo!()
+async fn open_and_close_error() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.on_close();
+    znp.flush_and_close_error = Some("failed!".to_string());
+    znp.open().await.unwrap();
+
+    let error = znp.close().await.unwrap_err();
+
+    assert_eq!(znp.serial.flush_and_close_calls, 1);
+    assert_eq!(error, "failed!");
+    assert_eq!(znp.close_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_and_close_tcp_port() {
-    todo!()
+async fn open_and_close_tcp_port() {
+    let mut znp = Znp::new("tcp://localhost:8080", Some(100), Some(false));
+    znp.open().await.unwrap();
+
+    assert_eq!(znp.serial.socket_connect_calls, 1);
+    assert_eq!(
+        znp.serial.socket_connect,
+        Some((8080, "localhost".to_string()))
+    );
+    assert!(znp.is_initialized());
+    assert_eq!(znp.serial.write_buffer_calls, 1);
+
+    znp.close().await.unwrap();
+    assert_eq!(znp.serial.socket_destroy_calls, 1);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_tcp_port_with_socket_error() {
-    todo!()
+async fn open_tcp_port_with_socket_error() {
+    let mut znp = Znp::new("tcp://localhost:666", Some(100), Some(false));
+    znp.socket_connect_error = true;
+
+    let error = znp.open().await.unwrap_err();
+
+    assert_eq!(error, "Error while opening socket");
+    assert!(!znp.is_initialized());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_with_defaults() {
-    todo!()
+async fn open_with_defaults() {
+    let mut znp = Znp::new("/dev/ttyACM0", None, None);
+    znp.open().await.unwrap();
+
+    assert_eq!(znp.serial.constructor_calls.len(), 1);
+    assert_eq!(
+        znp.serial.constructor_calls[0],
+        ("/dev/ttyACM0".to_string(), 115200, false)
+    );
+    assert_eq!(znp.serial.pipe_calls, 1);
+    assert_eq!(znp.serial.async_open_calls, 1);
+    assert_eq!(znp.serial.once_calls, 2);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_with_error() {
-    todo!()
+async fn open_with_error() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.async_open_error = Some("failed!".to_string());
+    znp.serial.is_open = true;
+
+    let error = znp.open().await.unwrap_err();
+
+    assert_eq!(znp.serial.constructor_calls.len(), 1);
+    assert_eq!(
+        znp.serial.constructor_calls[0],
+        ("/dev/ttyACM0".to_string(), 100, true)
+    );
+    assert_eq!(error, "failed!");
+    assert_eq!(znp.serial.pipe_calls, 1);
+    assert_eq!(znp.serial.async_open_calls, 1);
+    assert_eq!(znp.serial.close_calls, 1);
+    assert_eq!(znp.serial.write_buffer_calls, 0);
+    assert_eq!(znp.serial.once_calls, 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn open_with_error_when_serialport_is_not_open() {
-    todo!()
+async fn open_with_error_when_serialport_is_not_open() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.async_open_error = Some("failed!".to_string());
+    znp.serial.is_open = false;
+
+    let error = znp.open().await.unwrap_err();
+
+    assert_eq!(znp.serial.constructor_calls.len(), 1);
+    assert_eq!(
+        znp.serial.constructor_calls[0],
+        ("/dev/ttyACM0".to_string(), 100, true)
+    );
+    assert_eq!(error, "failed!");
+    assert_eq!(znp.serial.pipe_calls, 1);
+    assert_eq!(znp.serial.async_open_calls, 1);
+    assert_eq!(znp.serial.close_calls, 0);
+    assert_eq!(znp.serial.write_buffer_calls, 0);
+    assert_eq!(znp.serial.once_calls, 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn serialport_error_do_nothing() {
-    todo!()
+async fn serialport_error_do_nothing() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    znp.emit_serial_error();
+    // Upstream asserts nothing; the handler must not panic or close.
+    assert!(znp.is_initialized());
 }
 
 #[test]
@@ -574,49 +696,162 @@ fn znp() {
 #[test]
 #[ignore = "not implemented yet"]
 fn zpi_object_parse_payload_for_end_device_annce_ind() {
-    todo!()
+    let buffer = vec![0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 8, 5];
+    let frame = Frame::new(Type::AREQ, Subsystem::ZDO, 193, buffer, 0, 0);
+    let obj = ZpiObject::from_unpi_frame(&frame);
+    assert_eq!(
+        obj.payload["zdo"],
+        json!([
+            0,
+            {
+                "capabilities": {
+                    "allocateAddress": 0,
+                    "alternatePANCoordinator": 1,
+                    "deviceType": 0,
+                    "powerSource": 1,
+                    "reserved1": 0,
+                    "reserved2": 0,
+                    "rxOnWhenIdle": 0,
+                    "securityCapability": 0,
+                },
+                "eui64": "0x0807060504030201",
+                "nwkAddress": 256,
+            },
+        ])
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn zpi_object_parse_payload_for_nwk_addr_rsp() {
-    todo!()
+    let buffer = vec![
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x01, 0x01, 0x00, 0x02, 0x10, 0x10,
+        0x11, 0x11,
+    ];
+    let frame = Frame::new(Type::AREQ, Subsystem::ZDO, 128, buffer, 0, 0);
+    let obj = ZpiObject::from_unpi_frame(&frame);
+    assert_eq!(
+        obj.payload["zdo"],
+        json!([
+            0,
+            {
+                "assocDevList": [4112, 4369],
+                "eui64": "0x0807060504030201",
+                "nwkAddress": 257,
+                "startIndex": 0,
+            },
+        ])
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn zpi_object_throw_error_on_missing_write_parser() {
-    todo!()
+    // Upstream passes parameterType 9999999.
+    let obj = ZpiObject::new(
+        Type::POLL,
+        Subsystem::RESERVED,
+        "dummy",
+        0,
+        json!({}),
+        vec![ParameterDef {
+            name: "nonExisting".to_string(),
+            parameter_type: 9999999,
+        }],
+    );
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        obj.create_payload_buffer();
+    }));
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn zpi_object_throw_error_on_unknown_command() {
-    todo!()
+    // Upstream uses command ID 99999, which does not fit the 1-byte UNPI field.
+    let frame = Frame::new(Type::SREQ, Subsystem::AF, 99, Vec::new(), 0, 0);
+    let result = std::panic::catch_unwind(|| {
+        ZpiObject::from_unpi_frame(&frame);
+    });
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn zpi_object_throw_error_on_unknown_parameters() {
-    todo!()
+    let frame = Frame::new(Type::SRSP, Subsystem::AF, 128, Vec::new(), 0, 0);
+    let result = std::panic::catch_unwind(|| {
+        ZpiObject::from_unpi_frame(&frame);
+    });
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn zpi_object_with_cmd_and_non_sapi_is_not_reset_command() {
-    todo!()
+    let obj = ZpiObject::new(
+        Type::SREQ,
+        Subsystem::AF,
+        "systemReset",
+        0,
+        json!({}),
+        Vec::new(),
+    );
+    assert!(!obj.is_reset_command());
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_receive() {
-    todo!()
+async fn znp_receive() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let frame = Frame::new(
+        Type::SRSP,
+        Subsystem::SYS,
+        0x02,
+        vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x01, 0x01, 0x01, 0x01],
+        0,
+        0,
+    );
+    znp.receive_frame(&frame);
+
+    assert_eq!(znp.received.len(), 1);
+    let obj = &znp.received[0];
+    assert_eq!(obj.command.name, "version");
+    assert_eq!(obj.command.id, 2);
+    assert_eq!(
+        obj.payload,
+        json!({
+            "maintrel": 5,
+            "majorrel": 3,
+            "minorrel": 4,
+            "product": 2,
+            "revision": 16843009,
+            "transportrev": 1,
+        })
+    );
+    assert_eq!(obj.subsystem, Subsystem::SYS);
+    assert_eq!(obj.r#type, Type::SRSP);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn znp_receive_malformed() {
-    todo!()
+async fn znp_receive_malformed() {
+    let mut znp = Znp::new("/dev/ttyACM0", Some(100), Some(true));
+    znp.open().await.unwrap();
+
+    let frame = Frame::new(
+        Type::SRSP,
+        Subsystem::SYS,
+        0x02,
+        vec![0x01, 0x02, 0x03, 0x04],
+        0,
+        0,
+    );
+    znp.receive_frame(&frame);
+
+    assert_eq!(znp.received.len(), 0);
 }
 
 #[test]
