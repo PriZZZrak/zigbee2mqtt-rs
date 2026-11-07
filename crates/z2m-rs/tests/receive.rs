@@ -63,7 +63,6 @@ fn has(receive: &Receive, topic: &str, payload: serde_json::Value, qos: u8, reta
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_publish_old_messages_from_state_cache_during_debouncing() {
     let mut receive = setup();
     receive.set_debounce(0.1);
@@ -125,7 +124,6 @@ async fn should_not_publish_old_messages_from_state_cache_during_debouncing() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_add_elapsed() {
     let mut receive = setup();
     receive.elapsed_enabled = true;
@@ -148,7 +146,6 @@ async fn should_add_elapsed() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_disable_the_legacy_integration() {
     let mut receive = setup();
     receive.device_mut("button").legacy = false;
@@ -166,7 +163,6 @@ async fn should_allow_to_disable_the_legacy_integration() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_invert_cover() {
     let mut receive = setup();
 
@@ -208,7 +204,6 @@ async fn should_allow_to_invert_cover() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_debounce_and_retain_messages_when_set_via_device_options() {
     let mut receive = setup();
     receive.set_debounce(0.1);
@@ -252,7 +247,6 @@ async fn should_debounce_and_retain_messages_when_set_via_device_options() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_debounce_messages() {
     let mut receive = setup();
     receive.set_debounce(0.1);
@@ -295,7 +289,6 @@ async fn should_debounce_messages() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_debounce_messages_only_with_the_same_payload_values_for_provided_debounce_ignore_keys(
 ) {
     let mut receive = setup();
@@ -348,7 +341,6 @@ async fn should_debounce_messages_only_with_the_same_payload_values_for_provided
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_emit_devices_changed_event_when_a_converter_announces_changed_exposes() {
     let mut receive = setup();
 
@@ -364,7 +356,6 @@ async fn should_emit_devices_changed_event_when_a_converter_announces_changed_ex
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_command() {
     let mut receive = setup();
 
@@ -381,7 +372,6 @@ async fn should_handle_a_command() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message() {
     let mut receive = setup();
     receive.device_mut("button").legacy = true;
@@ -399,7 +389,6 @@ async fn should_handle_a_zigbee_message() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_which_uses_ep_left() {
     let mut receive = setup();
 
@@ -422,7 +411,6 @@ async fn should_handle_a_zigbee_message_which_uses_ep_left() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_which_uses_ep_right() {
     let mut receive = setup();
 
@@ -445,7 +433,6 @@ async fn should_handle_a_zigbee_message_which_uses_ep_right() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_with_0_precision() {
     let mut receive = setup();
     receive.device_mut("weather_sensor").precision = Some(0);
@@ -469,7 +456,6 @@ async fn should_handle_a_zigbee_message_with_0_precision() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_with_1_precision() {
     let mut receive = setup();
     receive.device_mut("weather_sensor").precision = Some(1);
@@ -493,7 +479,6 @@ async fn should_handle_a_zigbee_message_with_1_precision() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_with_1_precision_when_set_via_device_options() {
     let mut receive = setup();
     receive.device_mut("weather_sensor").precision = Some(1);
@@ -517,7 +502,6 @@ async fn should_handle_a_zigbee_message_with_1_precision_when_set_via_device_opt
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_with_2_precision_when_overrides_device_options() {
     let mut receive = setup();
     receive.device_mut("weather_sensor").precision = Some(0);
@@ -541,7 +525,6 @@ async fn should_handle_a_zigbee_message_with_2_precision_when_overrides_device_o
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_with_default_precision() {
     let mut receive = setup();
 
@@ -564,7 +547,6 @@ async fn should_handle_a_zigbee_message_with_default_precision() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_a_zigbee_message_with_voltage_2990() {
     let mut receive = setup();
 
@@ -587,7 +569,6 @@ async fn should_handle_a_zigbee_message_with_voltage_2990() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_messages_from_xiaomi_router_devices() {
     let mut receive = setup();
     receive.device_mut("power_plug").linked_group = Some("switch_group".to_string());
@@ -612,7 +593,6 @@ async fn should_handle_messages_from_xiaomi_router_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_log_when_message_is_from_supported_device_but_has_no_converters() {
     let mut receive = setup();
     receive.add_device("ZNCZ02LM", 0, false);
@@ -636,7 +616,6 @@ async fn should_log_when_message_is_from_supported_device_but_has_no_converters(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_bypass_the_debounce_when_a_message_produces_no_payload() {
     let mut receive = setup();
     receive.set_debounce(0.1);
@@ -659,7 +638,6 @@ async fn should_not_bypass_the_debounce_when_a_message_produces_no_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_handle_messages_from_coordinator() {
     let mut receive = setup();
     receive.add_device("coordinator", 0, false);
@@ -671,7 +649,6 @@ async fn should_not_handle_messages_from_coordinator() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_handle_messages_from_still_interviewing_devices_with_unknown_definition() {
     let mut receive = setup();
     receive.device_mut("bulb").interviewing = true;
@@ -683,7 +660,6 @@ async fn should_not_handle_messages_from_still_interviewing_devices_with_unknown
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_1_message_when_converted_twice() {
     let mut receive = setup();
 
@@ -712,7 +688,6 @@ async fn should_publish_1_message_when_converted_twice() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_last_seen_iso_8601() {
     let mut receive = setup();
     receive.last_seen = Some("ISO_8601".to_string());
@@ -732,7 +707,6 @@ async fn should_publish_last_seen_iso_8601() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_last_seen_iso_8601_local() {
     let mut receive = setup();
     receive.last_seen = Some("ISO_8601_local".to_string());
@@ -752,7 +726,6 @@ async fn should_publish_last_seen_iso_8601_local() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_last_seen_epoch() {
     let mut receive = setup();
     receive.last_seen = Some("epoch".to_string());
@@ -772,7 +745,6 @@ async fn should_publish_last_seen_epoch() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_report_correct_energy_and_power_values_for_different_versions_of_sp600() {
     let mut receive = setup();
     let data = json!({"instantaneousDemand": 496, "currentSummDelivered": 6648});
@@ -800,7 +772,6 @@ async fn should_report_correct_energy_and_power_values_for_different_versions_of
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_throttle_multiple_messages_from_spamming_devices() {
     let mut receive = setup();
     receive.set_throttle(1.0);
@@ -853,7 +824,6 @@ async fn should_throttle_multiple_messages_from_spamming_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_republish_old_state() {
     let mut receive = setup();
     receive.set_debounce(0.1);
@@ -870,7 +840,6 @@ async fn shouldnt_republish_old_state() {
 
 // Upstream has a second test with the same title `Should publish 1 message when converted twice`.
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_1_message_when_converted_twice_2() {
     let mut receive = setup();
 
