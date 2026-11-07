@@ -151,8 +151,7 @@ measurements and the non-device core are allowed.
 - The oracle for the core is `zigbee-herdsman` (ZNP/ZDO/ZCL/network/controller
   behaviour), `zigbee2mqtt` (MQTT/HA/frontend/config/storage) and the pinned
   Windfront revision.
-- `zigbee-herdsman-converters` is **reference only** for understanding what the
-  missing device layer would do; it is not executed or copied into R1.
+- `zigbee-herdsman-converters` is **reference only** for understanding what the missing device layer would do; it is not executed or copied into R1.
 - Read the relevant upstream code, callers, tests and dependency versions before
   implementing. Record the source revision.
 - Preserve observable MQTT/HA/storage contracts; do not “clean up” quirks
@@ -162,6 +161,7 @@ measurements and the non-device core are allowed.
   real evidence exists.
 - The archived parity inventory is historical; define a new R1 checklist rather
   than reusing global catalog percentages.
+- Make link with lines on upstream name of function, variable or entity, in comment section
 
 ## 8. Workflow
 
