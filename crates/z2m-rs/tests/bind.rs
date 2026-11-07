@@ -75,7 +75,6 @@ fn has(bind: &Bind, topic: &str, payload: serde_json::Value) -> bool {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_bind_fails_when_source_device() {
     let mut bind = setup();
     bind.published.clear();
@@ -97,7 +96,6 @@ async fn error_bind_fails_when_source_device() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_bind_fails_when_source_device_does_not_exist() {
     let mut bind = setup();
     bind.published.clear();
@@ -119,7 +117,6 @@ async fn error_bind_fails_when_source_device_does_not_exist() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_bind_fails_when_target_device() {
     let mut bind = setup();
     bind.published.clear();
@@ -141,7 +138,6 @@ async fn error_bind_fails_when_target_device() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn error_bind_fails_when_target_device_or_group_does_not_exist() {
     let mut bind = setup();
     bind.published.clear();
@@ -163,7 +159,6 @@ async fn error_bind_fails_when_target_device_or_group_does_not_exist() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn filters_out_reporting_setup_based_on_bind_status() {
     let mut bind = setup();
     bind.endpoint("bulb_color", "default").binds =
@@ -193,7 +188,6 @@ async fn filters_out_reporting_setup_based_on_bind_status() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn filters_out_unsupported_clusters_for_reporting_setup() {
     let mut bind = setup();
     bind.endpoint("bulb_color", "default").input_clusters = BTreeSet::from([
@@ -226,7 +220,6 @@ async fn filters_out_unsupported_clusters_for_reporting_setup() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_bind_to_coordinator_by_ieee_addr() {
     let mut bind = setup();
 
@@ -256,7 +249,6 @@ async fn should_allow_to_bind_to_coordinator_by_ieee_addr() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_from_non_default_endpoint_ids() {
     let mut bind = setup();
 
@@ -287,7 +279,6 @@ async fn should_bind_from_non_default_endpoint_ids() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_from_non_default_endpoint_names() {
     let mut bind = setup();
 
@@ -318,7 +309,6 @@ async fn should_bind_from_non_default_endpoint_names() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_only_specified_clusters() {
     let mut bind = setup();
 
@@ -348,7 +338,6 @@ async fn should_bind_only_specified_clusters() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_server_clusters_to_client_clusters() {
     let mut bind = setup();
 
@@ -381,7 +370,6 @@ async fn should_bind_server_clusters_to_client_clusters() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_to_default_endpoint_returned_by_endpoints() {
     let mut bind = setup();
 
@@ -411,7 +399,6 @@ async fn should_bind_to_default_endpoint_returned_by_endpoints() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_to_device_and_configure_reporting() {
     let mut bind = setup();
 
@@ -457,7 +444,6 @@ async fn should_bind_to_device_and_configure_reporting() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_to_group_by_number() {
     let mut bind = setup();
 
@@ -494,7 +480,6 @@ async fn should_bind_to_group_by_number() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_bind_to_groups() {
     let mut bind = setup();
     bind.add_group_member("group_1", "bulb", "1");
@@ -543,7 +528,6 @@ async fn should_bind_to_groups() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_log_error_when_there_is_nothing_to_bind() {
     let mut bind = setup();
 
@@ -561,7 +545,6 @@ async fn should_log_error_when_there_is_nothing_to_bind() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_log_when_bind_fails() {
     let mut bind = setup();
     bind.bind_error = true;
@@ -580,7 +563,6 @@ async fn should_log_when_bind_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_poll_bounded_hue_bulb_when_receiving_message_from_hue_dimmer() {
     let mut bind = setup();
 
@@ -601,7 +583,6 @@ async fn should_poll_bounded_hue_bulb_when_receiving_message_from_hue_dimmer() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_poll_bounded_hue_bulb_when_receiving_message_from_scene_controller() {
     let mut bind = setup();
 
@@ -635,7 +616,6 @@ async fn should_poll_bounded_hue_bulb_when_receiving_message_from_scene_controll
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_poll_grouped_hue_bulb_when_receiving_message_from_tradfri_remote() {
     let mut bind = setup();
 
@@ -675,7 +655,6 @@ async fn should_poll_grouped_hue_bulb_when_receiving_message_from_tradfri_remote
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_throw_error_on_invalid_payload() {
     let mut bind = setup();
     bind.published.clear();
@@ -693,7 +672,6 @@ async fn should_throw_error_on_invalid_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_unbind() {
     let mut bind = setup();
     bind.endpoint("bulb_color", "1").binds = vec![
@@ -758,7 +736,6 @@ async fn should_unbind() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_unbind_coordinator() {
     let mut bind = setup();
 
@@ -795,7 +772,6 @@ async fn should_unbind_coordinator() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_unbind_from_default_bind_group() {
     let mut bind = setup();
 
@@ -832,7 +808,6 @@ async fn should_unbind_from_default_bind_group() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_unbind_from_group() {
     let mut bind = setup();
     bind.add_group_member("group_1", "bulb", "1");
@@ -870,7 +845,6 @@ async fn should_unbind_from_group() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_unbind_from_group_with_skip_disable_reporting_false() {
     let mut bind = setup();
     bind.add_group_member("group_1", "bulb_2", "1");
@@ -894,7 +868,6 @@ async fn should_unbind_from_group_with_skip_disable_reporting_false() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_unbind_from_group_with_skip_disable_reporting_true() {
     let mut bind = setup();
     bind.add_group_member("group_1", "bulb_2", "1");
@@ -909,7 +882,6 @@ async fn should_unbind_from_group_with_skip_disable_reporting_true() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn clears_all_bindings() {
     let mut bind = setup();
     bind.published.clear();
@@ -940,7 +912,6 @@ async fn clears_all_bindings() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn clears_targeted_bindings() {
     let mut bind = setup();
     bind.published.clear();
@@ -975,7 +946,6 @@ async fn clears_targeted_bindings() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn throw_on_invalid_clears_bindings_payload() {
     let mut bind = setup();
     bind.published.clear();
@@ -994,7 +964,6 @@ async fn throw_on_invalid_clears_bindings_payload() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn throw_on_invalid_clears_bindings_target() {
     let mut bind = setup();
     bind.published.clear();
