@@ -127,7 +127,6 @@ fn response_error(configure: &Configure, payload: serde_json::Value) -> bool {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fail_to_configure_via_mqtt_when_configure_fails() {
     let mut configure = setup();
     configure.device_mut("remote").configure_error = Some("Bind timeout after 10s".to_string());
@@ -145,7 +144,6 @@ async fn fail_to_configure_via_mqtt_when_configure_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fail_to_configure_via_mqtt_when_device_does_not_exist() {
     let mut configure = setup();
     configure.on_mqtt_configure(&json!({"id": "not_existing_device"}));
@@ -161,7 +159,6 @@ async fn fail_to_configure_via_mqtt_when_device_does_not_exist() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn fail_to_configure_via_mqtt_when_device_has_no_configure() {
     let mut configure = setup();
     configure.on_mqtt_configure(&json!({"id": "0x0017980134e45545", "transaction": 20}));
@@ -178,7 +175,6 @@ async fn fail_to_configure_via_mqtt_when_device_has_no_configure() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn handles_invalid_payload_for_configure_via_mqtt() {
     let mut configure = setup();
     configure.on_mqtt_configure(&json!({"idx": "0x0017882104a44559"}));
@@ -190,7 +186,6 @@ async fn handles_invalid_payload_for_configure_via_mqtt() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_re_configure_when_version_of_the_definition_is_0_0_0() {
     let mut configure = setup();
     configure.start();
@@ -204,7 +199,6 @@ async fn should_not_re_configure_when_version_of_the_definition_is_0_0_0() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_configure_via_mqtt() {
     let mut configure = setup();
     configure.start();
@@ -224,7 +218,6 @@ async fn should_allow_to_configure_via_mqtt() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_configure_router_on_startup() {
     let mut configure = setup();
     configure.start();
@@ -233,7 +226,6 @@ async fn should_configure_router_on_startup() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_configure_max_3_times_when_fails() {
     let mut configure = setup();
     configure.device_mut("remote").meta_configured = None;
@@ -248,7 +240,6 @@ async fn should_configure_max_3_times_when_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_configure_on_zigbee_message_when_not_configured_yet() {
     let mut configure = setup();
     configure.device_mut("bulb").meta_configured = None;
@@ -260,7 +251,6 @@ async fn should_configure_on_zigbee_message_when_not_configured_yet() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_configure_end_device_on_startup() {
     let mut configure = setup();
     configure.start();
@@ -269,7 +259,6 @@ async fn should_not_configure_end_device_on_startup() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_configure_twice() {
     let mut configure = setup();
     configure.start();
@@ -282,7 +271,6 @@ async fn should_not_configure_twice() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_configure_when_already_configuring() {
     let mut configure = setup();
     configure.device_mut("remote").meta_configured = None;
@@ -296,7 +284,6 @@ async fn should_not_configure_when_already_configuring() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_configure_when_interview_not_completed() {
     let mut configure = setup();
     configure.device_mut("remote").meta_configured = None;
@@ -309,7 +296,6 @@ async fn should_not_configure_when_interview_not_completed() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_re_configure_disabled_devices() {
     let mut configure = setup();
     configure.start();
@@ -323,7 +309,6 @@ async fn should_not_re_configure_disabled_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_re_configure_when_device_rejoins() {
     let mut configure = setup();
     configure.start();
@@ -336,7 +321,6 @@ async fn should_re_configure_when_device_rejoins() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_re_configure_when_the_version_of_the_definition_changes_to_a_different_value_than_the_default_0_0_0(
 ) {
     let mut configure = setup();
@@ -360,7 +344,6 @@ async fn should_re_configure_when_the_version_of_the_definition_changes_to_a_dif
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_reconfigure_reporting_on_reconfigure_event() {
     let mut configure = setup();
     configure.start();
@@ -375,7 +358,6 @@ async fn should_reconfigure_reporting_on_reconfigure_event() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn successfully_configures_after_couple_fails() {
     let mut configure = setup();
     configure.device_mut("remote").meta_configured = None;
@@ -392,7 +374,6 @@ async fn successfully_configures_after_couple_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn successfully_configures_with_force_after_fails() {
     let mut configure = setup();
     configure.device_mut("remote").meta_configured = None;
