@@ -83,6 +83,11 @@ const NODE_ID1_BYTES: [u8; 2] = [0x32, 0xfe];
 const CLUSTER_LIST1_BYTES: [u8; 6] = [0x09, 0x00, 0x02, 0x07, 0x03, 0x0b];
 const CLUSTER_LIST2_BYTES: [u8; 8] = [0x06, 0x00, 0x00, 0x00, 0x00, 0x05, 0x08, 0x00];
 const HA_PROFILE_ID: u16 = 0x0104;
+const UNICAST_BINDING: u8 = 0x03;
+const MULTICAST_BINDING: u8 = 0x01;
+const LEAVE_WITHOUT_REJOIN: u8 = 0x00;
+const LEAVE_AND_REJOIN: u8 = 0x80;
+const SE_METERING_ID: u16 = 0x0702;
 
 #[test]
 #[ignore = "not implemented yet"]
@@ -134,7 +139,39 @@ fn sets_gets_position() {
 #[test]
 #[ignore = "not implemented yet"]
 fn throws_when_build_bind_request_build_unbind_request_invalid_type() {
-    todo!()
+    let bind = std::panic::catch_unwind(|| {
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::BIND_REQUEST,
+            &[
+                json!(IEEE_ADDRESS1),
+                json!(2),
+                json!(SE_METERING_ID),
+                json!(99),
+                json!(IEEE_ADDRESS2),
+                json!(123),
+                json!(64),
+            ],
+        );
+    });
+    assert!(bind.is_err());
+
+    let unbind = std::panic::catch_unwind(|| {
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::UNBIND_REQUEST,
+            &[
+                json!(IEEE_ADDRESS1),
+                json!(2),
+                json!(SE_METERING_ID),
+                json!(99),
+                json!(IEEE_ADDRESS2),
+                json!(123),
+                json!(64),
+            ],
+        );
+    });
+    assert!(unbind.is_err());
 }
 
 #[test]
@@ -195,13 +232,65 @@ fn build_active_endpoints_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_bind_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.push(2);
+    expected.extend_from_slice(&SE_METERING_ID.to_le_bytes());
+    expected.push(UNICAST_BINDING);
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    expected.push(64);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::BIND_REQUEST,
+            &[
+                json!(IEEE_ADDRESS1),
+                json!(2),
+                json!(SE_METERING_ID),
+                json!(UNICAST_BINDING),
+                json!(IEEE_ADDRESS2),
+                json!(123),
+                json!(64),
+            ],
+        ),
+        expected
+    );
+
+    let mut expected = vec![0];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.push(3);
+    expected.extend_from_slice(&SE_METERING_ID.to_le_bytes());
+    expected.push(MULTICAST_BINDING);
+    expected.extend_from_slice(&123u16.to_le_bytes());
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::BIND_REQUEST,
+            &[
+                json!(IEEE_ADDRESS1),
+                json!(3),
+                json!(SE_METERING_ID),
+                json!(MULTICAST_BINDING),
+                json!(IEEE_ADDRESS2),
+                json!(123),
+                json!(64),
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_binding_table_request() {
-    todo!()
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::BINDING_TABLE_REQUEST, &[json!(1)]),
+        vec![0, 1]
+    );
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::BINDING_TABLE_REQUEST, &[json!(254)]),
+        vec![0, 254]
+    );
 }
 
 #[test]
@@ -219,7 +308,32 @@ fn build_channel_change_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_clear_all_bindings_request() {
-    todo!()
+    let eui64_list = [IEEE_ADDRESS1, IEEE_ADDRESS2];
+    let mut expected = vec![
+        0,
+        0,
+        8 * eui64_list.len() as u8 + 1 - 1,
+        eui64_list.len() as u8,
+    ];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::CLEAR_ALL_BINDINGS_REQUEST,
+            &[json!({"eui64List": eui64_list})],
+        ),
+        expected
+    );
+
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::CLEAR_ALL_BINDINGS_REQUEST,
+            &[json!({"eui64List": []})],
+        ),
+        vec![0, 0, 0, 0]
+    );
 }
 
 #[test]
@@ -289,13 +403,48 @@ fn build_ieee_address_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_leave_request() {
-    todo!()
+    let without_rejoin = {
+        let mut expected = vec![0];
+        expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+        expected.push(LEAVE_WITHOUT_REJOIN);
+        expected
+    };
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::LEAVE_REQUEST,
+            &[json!(IEEE_ADDRESS2), json!(LEAVE_WITHOUT_REJOIN)],
+        ),
+        without_rejoin
+    );
+
+    let and_rejoin = {
+        let mut expected = vec![0];
+        expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+        expected.push(LEAVE_AND_REJOIN);
+        expected
+    };
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::LEAVE_REQUEST,
+            &[json!(IEEE_ADDRESS2), json!(LEAVE_AND_REJOIN)],
+        ),
+        and_rejoin
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_lqi_table_request() {
-    todo!()
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::LQI_TABLE_REQUEST, &[json!(1)]),
+        vec![0, 1]
+    );
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::LQI_TABLE_REQUEST, &[json!(254)]),
+        vec![0, 254]
+    );
 }
 
 #[test]
@@ -412,7 +561,10 @@ fn build_nwk_beacon_survey_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_nwk_ieeejoining_list_request() {
-    todo!()
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::NWK_IEEE_JOINING_LIST_REQUEST, &[json!(3)],),
+        vec![0, 3]
+    );
 }
 
 #[test]
@@ -451,7 +603,14 @@ fn build_retrieve_authentication_token_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_routing_table_request() {
-    todo!()
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::ROUTING_TABLE_REQUEST, &[json!(1)]),
+        vec![0, 1]
+    );
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::ROUTING_TABLE_REQUEST, &[json!(254)]),
+        vec![0, 254]
+    );
 }
 
 #[test]
@@ -503,7 +662,52 @@ fn build_system_service_discovery_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_unbind_request() {
-    todo!()
+    let mut expected = vec![0];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.push(2);
+    expected.extend_from_slice(&SE_METERING_ID.to_le_bytes());
+    expected.push(UNICAST_BINDING);
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    expected.push(64);
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::UNBIND_REQUEST,
+            &[
+                json!(IEEE_ADDRESS1),
+                json!(2),
+                json!(SE_METERING_ID),
+                json!(UNICAST_BINDING),
+                json!(IEEE_ADDRESS2),
+                json!(123),
+                json!(64),
+            ],
+        ),
+        expected
+    );
+
+    let mut expected = vec![0];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.push(3);
+    expected.extend_from_slice(&SE_METERING_ID.to_le_bytes());
+    expected.push(MULTICAST_BINDING);
+    expected.extend_from_slice(&123u16.to_le_bytes());
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::UNBIND_REQUEST,
+            &[
+                json!(IEEE_ADDRESS1),
+                json!(3),
+                json!(SE_METERING_ID),
+                json!(MULTICAST_BINDING),
+                json!(IEEE_ADDRESS2),
+                json!(123),
+                json!(64),
+            ],
+        ),
+        expected
+    );
 }
 
 #[test]
