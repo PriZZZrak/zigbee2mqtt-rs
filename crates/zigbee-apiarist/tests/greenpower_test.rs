@@ -4,7 +4,6 @@ use serde_json::json;
 use zigbee_apiarist::controller::green_power::GreenPower;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn fullencr_zt_lp_zeu2_s_wh_ms_moes_2_gang_vectors_from_ember() {
     let mut green_power = GreenPower::new();
     let _ = green_power.process_command(json!({}));
@@ -12,7 +11,6 @@ fn fullencr_zt_lp_zeu2_s_wh_ms_moes_2_gang_vectors_from_ember() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn fullencr_zt_lp_zeu2_s_wh_ms_moes_2_gang_vectors_from_zstack_through_gpp() {
     let mut green_power = GreenPower::new();
     let _ = green_power.process_command(json!({}));
@@ -20,7 +18,6 @@ fn fullencr_zt_lp_zeu2_s_wh_ms_moes_2_gang_vectors_from_zstack_through_gpp() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn fullencr_zt_lp_zeu2_s_wh_ms_moes_3_gang_vectors_from_ember() {
     let mut green_power = GreenPower::new();
     let _ = green_power.process_command(json!({}));
@@ -28,15 +25,13 @@ fn fullencr_zt_lp_zeu2_s_wh_ms_moes_3_gang_vectors_from_ember() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn green_power() {
     let mut green_power = GreenPower::new();
     let _ = green_power.record("constructor");
-    assert!(green_power.called("record"));
+    assert!(green_power.called("constructor"));
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_parse_command_frame_when_fullencr_security_level_gpp() {
     let mut green_power = GreenPower::new();
     let _ = green_power.parse_command(json!({}));
@@ -44,7 +39,6 @@ fn does_not_parse_command_frame_when_fullencr_security_level_gpp() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_parse_command_frame_when_fullencr_security_level_sink() {
     let mut green_power = GreenPower::new();
     let _ = green_power.parse_command(json!({}));
@@ -52,7 +46,6 @@ fn does_not_parse_command_frame_when_fullencr_security_level_sink() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn encodes_decodes_commissioning_mode_options() {
     let mut green_power = GreenPower::new();
     let _ = green_power.decode_options(0);
@@ -60,7 +53,6 @@ fn encodes_decodes_commissioning_mode_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn encodes_decodes_pairing_options() {
     let mut green_power = GreenPower::new();
     let _ = green_power.encode_options(json!({}));
@@ -68,7 +60,6 @@ fn encodes_decodes_pairing_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn omits_gpp_data_and_mic_from_raw_payload() {
     let mut green_power = GreenPower::new();
     let _ = green_power.omit_gpp_data_and_mic(json!({}));
@@ -76,7 +67,6 @@ fn omits_gpp_data_and_mic_from_raw_payload() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn omits_gpp_data_from_raw_payload() {
     let mut green_power = GreenPower::new();
     let _ = green_power.omit_gpp_data(json!({}));
@@ -84,7 +74,6 @@ fn omits_gpp_data_from_raw_payload() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn omits_mic_from_raw_payload() {
     let mut green_power = GreenPower::new();
     let _ = green_power.omit_mic(json!({}));

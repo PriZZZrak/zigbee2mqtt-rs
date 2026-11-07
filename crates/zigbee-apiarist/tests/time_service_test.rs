@@ -86,7 +86,6 @@ fn date_cases() -> Vec<DateCase> {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_work_correctly_for_specific_dates() {
     for case in date_cases() {
         // upstream `vi.stubEnv("TZ", timeZone)` + `vi.setSystemTime(new Date(localTime))`
@@ -111,17 +110,18 @@ fn should_work_correctly_for_specific_dates() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_daylight_saving_time_correctly() {
+    // Upstream sets the system time to one second before each DST boundary;
+    // the port passes that Zigbee UTC timestamp explicitly.
     let cases = [
-        ("Europe/Berlin", 0, 3600),
-        ("Europe/Berlin", 3600, 0),
-        ("Australia/Sydney", 0, 3600),
-        ("Australia/Sydney", 3600, 0),
+        ("Europe/Berlin", 796611599, 0, 3600),
+        ("Europe/Berlin", 814755599, 3600, 0),
+        ("Australia/Sydney", 812908799, 0, 3600),
+        ("Australia/Sydney", 828633599, 3600, 0),
     ];
 
-    for (time_zone, expected_shift_before, expected_shift_after) in cases {
-        let mut time_service = TimeService::new(time_zone, 0);
+    for (time_zone, now, expected_shift_before, expected_shift_after) in cases {
+        let mut time_service = TimeService::new(time_zone, now);
 
         let first_run = time_service.get_time_cluster_attributes();
         // 1 second later
@@ -140,7 +140,6 @@ fn should_handle_daylight_saving_time_correctly() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_not_use_cached_data_for_dynamic_attributes() {
     let mut time_service = TimeService::new("Europe/Berlin", 0);
     let first_run = time_service.get_time_cluster_attributes();
@@ -157,7 +156,6 @@ fn should_not_use_cached_data_for_dynamic_attributes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_return_cached_information_within_24_hours() {
     let mut time_service = TimeService::new("Europe/Berlin", 0);
     let first_run = time_service.get_time_cluster_attributes();
@@ -170,7 +168,6 @@ fn should_return_cached_information_within_24_hours() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_recalculate_the_cache_after_24_hours() {
     let mut time_service = TimeService::new("Europe/Berlin", 0);
     let first_run = time_service.get_time_cluster_attributes();

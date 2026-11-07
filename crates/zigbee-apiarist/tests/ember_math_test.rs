@@ -6,7 +6,6 @@ const ASH_CRC_INIT: u16 = 0xffff;
 const B32: u32 = 0xbeefface;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn inc8() {
     assert_eq!(m::inc8(0x00), 1);
     assert_eq!(m::inc8(0x03), 4);
@@ -18,7 +17,6 @@ fn inc8() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn within_range() {
     assert!(m::within_range(0x00, 0x04, 0x07));
     assert!(!m::within_range(0x00, 0x04, 0x08));
@@ -27,7 +25,6 @@ fn within_range() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn hal_common_crc16() {
     let mut t = m::hal_common_crc16(0x00, ASH_CRC_INIT);
     assert_eq!(t, 57840);
@@ -40,21 +37,18 @@ fn hal_common_crc16() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn low_bits() {
     assert_eq!(m::low_bits(10), 10);
     assert_eq!(m::low_bits(100), 4);
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn high_bits() {
     assert_eq!(m::high_bits(10), 0);
     assert_eq!(m::high_bits(100), 6);
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn low_byte() {
     assert_eq!(m::low_byte(10), 10);
     assert_eq!(m::low_byte(100), 100);
@@ -65,7 +59,6 @@ fn low_byte() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn high_byte() {
     assert_eq!(m::high_byte(10), 0);
     assert_eq!(m::high_byte(100), 0);
@@ -76,7 +69,6 @@ fn high_byte() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn high_low_to_int() {
     assert_eq!(m::high_low_to_int(254, 10), 65034);
     assert_eq!(m::high_low_to_int(10, 100), 2660);
@@ -88,7 +80,6 @@ fn high_low_to_int() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn bit() {
     assert_eq!(m::bit(11), 2048);
     assert_eq!(m::bit(15), 32768);
@@ -116,7 +107,6 @@ fn bit() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn bit32() {
     assert_eq!(m::bit32(11), 2048);
     assert_eq!(m::bit32(15), 32768);
@@ -146,7 +136,6 @@ fn bit32() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn low_high_bytes() {
     let (l, h) = m::low_high_bytes(1024);
     assert_eq!(l, 0);
@@ -159,7 +148,6 @@ fn low_high_bytes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn low_high_bits() {
     let (l, h) = m::low_high_bits(10);
     assert_eq!(l, 10);
@@ -172,7 +160,6 @@ fn low_high_bits() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn byte_to_bits() {
     assert_eq!(m::byte_to_bits(2), "00000010");
     assert_eq!(m::byte_to_bits(4), "00000100");
