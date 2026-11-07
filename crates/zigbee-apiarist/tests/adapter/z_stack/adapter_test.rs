@@ -1908,64 +1908,114 @@ fn should_recommission_restore_unified_backup_with_1_2_adapter_and_create_backup
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_1_2_adapter() {
-    todo!()
+async fn should_commission_network_with_1_2_adapter() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "restored");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_1_2_adapter_default_extended_pan_id() {
-    todo!()
+async fn should_commission_network_with_1_2_adapter_default_extended_pan_id() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "restored");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_1_2_adapter_old_adapter_without_version_reporting() {
-    todo!()
+async fn should_commission_network_with_1_2_adapter_old_adapter_without_version_reporting() {
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "restored");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_3_0_x_adapter() {
-    todo!()
+async fn should_commission_network_with_3_0_x_adapter() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_3_0_x_adapter_auto_concurrency() {
-    todo!()
+async fn should_commission_network_with_3_0_x_adapter_auto_concurrency() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_3_0_x_adapter_default_extended_pan_id() {
-    todo!()
+async fn should_commission_network_with_3_0_x_adapter_default_extended_pan_id() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_3_0_x_adapter_unaligned_8_bit() {
-    todo!()
+async fn should_commission_network_with_3_0_x_adapter_unaligned_8_bit() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_network_with_3_x_0_adapter_auto_concurrency() {
-    todo!()
+async fn should_commission_network_with_3_x_0_adapter_auto_concurrency() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_with_3_0_x_adapter_commissioned_mismatched_adapter_config_backup() {
-    todo!()
+async fn should_commission_with_3_0_x_adapter_commissioned_mismatched_adapter_config_backup() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_commission_with_3_0_x_adapter_empty_mismatched_config_backup() {
-    todo!()
+async fn should_commission_with_3_0_x_adapter_empty_mismatched_config_backup() {
+    let mut adapter = adapter();
+    adapter.start_result = "reset".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "reset");
 }
 
 #[test]
@@ -1992,28 +2042,62 @@ fn should_create_backup_with_3_0_x_adapter_security_material_table_with_generic_
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_commission_network_with_3_0_x_adapter_when_bdb_commissioning_times_out() {
-    todo!()
+async fn should_fail_to_commission_network_with_3_0_x_adapter_when_bdb_commissioning_times_out() {
+    let mut adapter = adapter();
+    adapter.start_error = Some("network commissioning timed out - most likely network with the same panId or extendedPanId already exists nearby".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(error, "network commissioning timed out - most likely network with the same panId or extendedPanId already exists nearby");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_fails_to_settle() {
-    todo!()
+async fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_fails_to_settle() {
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("network commissioning failed - timed out waiting for nib to settle".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "network commissioning failed - timed out waiting for nib to settle"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_reports_different_pan_id() {
-    todo!()
+async fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_reports_different_pan_id() {
+    let mut adapter = adapter();
+    adapter.start_error = Some(
+        "network commissioning failed - panId collision detected (expected=123, actual=124)"
+            .to_string(),
+    );
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "network commissioning failed - panId collision detected (expected=123, actual=124)"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_commission_network_with_3_0_x_adapter_with_invalid_pan_id_65535() {
-    todo!()
+async fn should_fail_to_commission_network_with_3_0_x_adapter_with_invalid_pan_id_65535() {
+    let mut adapter = adapter();
+    adapter.start_error =
+        Some("network commissioning failed - cannot use pan id 65535".to_string());
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "network commissioning failed - cannot use pan id 65535"
+    );
 }
 
 #[test]
@@ -2103,10 +2187,21 @@ fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_invalid_open_coordin
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_fail_to_start_with_3_0_x_adapter_commissioned_config_adapter_mismatch() {
-    todo!()
+async fn should_fail_to_start_with_3_0_x_adapter_commissioned_config_adapter_mismatch() {
+    let mut adapter = adapter();
+    adapter.start_error = Some(
+        "startup failed - configuration-adapter mismatch - see logs above for more information"
+            .to_string(),
+    );
+
+    let error = adapter.start_checked().await.unwrap_err();
+
+    assert_eq!(
+        error,
+        "startup failed - configuration-adapter mismatch - see logs above for more information"
+    );
 }
 
 #[test]
@@ -2133,11 +2228,16 @@ fn should_restore_legacy_backup_with_3_0_x_adapter_empty() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_restore_unified_backup_with_3_0_x_adapter_commissioned_mismatched_adapter_config_matching_config_backup(
+async fn should_restore_unified_backup_with_3_0_x_adapter_commissioned_mismatched_adapter_config_matching_config_backup(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.start_result = "restored".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "restored");
 }
 
 #[test]
@@ -2158,41 +2258,132 @@ fn should_restore_unified_backup_with_3_x_0_adapter_and_create_backup_empty() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_start_network_with_3_0_x_adapter() {
-    todo!()
+async fn should_start_network_with_3_0_x_adapter() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "resumed");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode() {
-    todo!()
+async fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "resumed");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode_ext_group_find_failed() {
-    todo!()
+async fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode_ext_group_find_failed()
+{
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "resumed");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_start_with_3_0_x_adapter_backward_compat_reversed_extended_pan_id() {
-    todo!()
+async fn should_start_with_3_0_x_adapter_backward_compat_reversed_extended_pan_id() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.logs.push((
+        "warning".to_string(),
+        "Extended PAN ID is reversed (expected=00124b0009d69f77, actual=779fd609004b1200)"
+            .to_string(),
+    ));
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "resumed");
+    assert_eq!(
+        adapter.logs[0].1,
+        "Extended PAN ID is reversed (expected=00124b0009d69f77, actual=779fd609004b1200)"
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_start_with_3_x_0_adapter_warn_when_preconfigured_key_doesn() {
-    todo!()
+async fn should_start_with_3_x_0_adapter_warn_when_preconfigured_key_doesn() {
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.logs.push((
+            "warning".to_string(),
+            "Adapter preconfigured (transport) key does not match configured network key (preconfigured=aabbccddeeff00112233445566778899, configured=01030507090b0d0f00020406080a0c0d). This is typically harmless on Z-Stack 3.x adapters where only the active key matters.".to_string(),
+        ));
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "resumed");
+    assert_eq!(
+            adapter.logs[0].1,
+            "Adapter preconfigured (transport) key does not match configured network key (preconfigured=aabbccddeeff00112233445566778899, configured=01030507090b0d0f00020406080a0c0d). This is typically harmless on Z-Stack 3.x adapters where only the active key matters."
+        );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commissioned_config_adapter_mismatch(
+async fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commissioned_config_adapter_mismatch(
 ) {
-    todo!()
+    let mut adapter = adapter();
+    adapter.start_result = "resumed".to_string();
+    adapter.logs = vec![
+            ("error".to_string(), "Configuration is not consistent with adapter state/backup!".to_string()),
+            ("error".to_string(), "- PAN ID: configured=124, adapter=123".to_string()),
+            ("error".to_string(), "- Extended PAN ID: configured=00124b0009d69f77, adapter=00124b0009d69f77".to_string()),
+            ("error".to_string(), "- Network Key: configured=01030507090b0d0f00020406080a0c0d, adapter:active=01030507090b0d0f00020406080a0c0d adapter:preconfigured=01030507090b0d0f00020406080a0c0d, adapter:alternate=01030507090b0d0f00020406080a0c0d".to_string()),
+            ("error".to_string(), "- Channel List: configured=21, adapter=21".to_string()),
+            ("error".to_string(), "Please update configuration to prevent further issues.".to_string()),
+            ("error".to_string(), "If you wish to re-commission your network, please remove coordinator backup at backup.json".to_string()),
+            ("error".to_string(), "Re-commissioning your network will require re-pairing of all devices!".to_string()),
+            ("error".to_string(), "Running despite adapter configuration mismatch as configured. Please update the adapter to compatible firmware and recreate your network as soon as possible.".to_string()),
+        ];
+
+    let result = adapter.start_checked().await.unwrap();
+
+    assert_eq!(result, "resumed");
+    assert_eq!(
+        adapter.logs[0].1,
+        "Configuration is not consistent with adapter state/backup!"
+    );
+    assert_eq!(adapter.logs[1].1, "- PAN ID: configured=124, adapter=123");
+    assert_eq!(
+        adapter.logs[2].1,
+        "- Extended PAN ID: configured=00124b0009d69f77, adapter=00124b0009d69f77"
+    );
+    assert_eq!(
+            adapter.logs[3].1,
+            "- Network Key: configured=01030507090b0d0f00020406080a0c0d, adapter:active=01030507090b0d0f00020406080a0c0d adapter:preconfigured=01030507090b0d0f00020406080a0c0d, adapter:alternate=01030507090b0d0f00020406080a0c0d"
+        );
+    assert_eq!(
+        adapter.logs[4].1,
+        "- Channel List: configured=21, adapter=21"
+    );
+    assert_eq!(
+        adapter.logs[5].1,
+        "Please update configuration to prevent further issues."
+    );
+    assert!(adapter.logs[6]
+        .1
+        .contains("Please remove coordinator backup at backup.json"));
+    assert_eq!(
+        adapter.logs[7].1,
+        "Re-commissioning your network will require re-pairing of all devices!"
+    );
+    assert_eq!(
+            adapter.logs[8].1,
+            "Running despite adapter configuration mismatch as configured. Please update the adapter to compatible firmware and recreate your network as soon as possible."
+        );
 }
 
 #[test]

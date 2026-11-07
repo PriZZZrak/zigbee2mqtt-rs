@@ -146,6 +146,9 @@ pub struct ZStackAdapter {
     pub data_request_ext_code: u8,
     pub interpan_response: Option<serde_json::Value>,
     pub ping_error: Option<String>,
+    pub start_error: Option<String>,
+    /// `(level, message)` emitted while starting.
+    pub logs: Vec<(String, String)>,
 }
 
 impl ZStackAdapter {
@@ -198,6 +201,8 @@ impl ZStackAdapter {
             data_request_ext_code: 0,
             interpan_response: None,
             ping_error: None,
+            start_error: None,
+            logs: Vec::new(),
         }
     }
 
