@@ -141,6 +141,7 @@ pub struct ZStackAdapter {
     pub device_leaves: Vec<serde_json::Value>,
     pub disconnected: usize,
     pub route_disc_calls: Vec<serde_json::Value>,
+    pub led_firmware: bool,
 }
 
 impl ZStackAdapter {
@@ -188,6 +189,7 @@ impl ZStackAdapter {
             device_leaves: Vec::new(),
             disconnected: 0,
             route_disc_calls: Vec::new(),
+            led_firmware: false,
         }
     }
 
@@ -226,6 +228,26 @@ impl ZStackAdapter {
 
     /// Upstream `znp.on("close")`.
     pub fn on_znp_close(&mut self) {
+        todo!()
+    }
+
+    pub fn set_led_firmware(&mut self, handles_leds: bool) {
+        self.led_firmware = handles_leds;
+    }
+
+    /// Upstream: `adapter.addInstallCode(ieee, key, hashed)`.
+    pub async fn add_install_code(&mut self, _ieee_address: &str, _key: &[u8], _hashed: bool) {
+        todo!()
+    }
+
+    /// Upstream: `adapter.sendZclFrameToAll(destEndpoint, frame, sourceEndpoint, broadcastAddress)`.
+    pub async fn send_zcl_frame_to_all(
+        &mut self,
+        _destination_endpoint: u8,
+        _data: Vec<u8>,
+        _source_endpoint: u8,
+        _broadcast_address: u16,
+    ) {
         todo!()
     }
 

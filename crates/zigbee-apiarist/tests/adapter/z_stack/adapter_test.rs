@@ -169,16 +169,62 @@ async fn adapter_disconnected_dont_emit_when_closing() {
     assert_eq!(adapter.disconnected, 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn add_install_code_install_code_crc() {
-    todo!()
+async fn add_install_code_install_code_crc() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .add_install_code(
+            "0x9035EAFFFE424783",
+            &[
+                0xae, 0x3b, 0x28, 0x72, 0x81, 0xcf, 0x16, 0xf5, 0x50, 0x73, 0x3a, 0x0c, 0xec, 0x38,
+                0xaa, 0x31, 0xe8, 0x02,
+            ],
+            false,
+        )
+        .await;
+
+    assert!(adapter.znp_calls.contains(&ZnpCall {
+            subsystem: "APP_CNF".to_string(),
+            command: "bdbAddInstallCode".to_string(),
+            payload: json!({
+                "installCodeFormat": 0x1,
+                "ieeeaddr": "0x9035EAFFFE424783",
+                "installCode": [0xae, 0x3b, 0x28, 0x72, 0x81, 0xcf, 0x16, 0xf5, 0x50, 0x73, 0x3a, 0x0c, 0xec, 0x38, 0xaa, 0x31, 0xe8, 0x02],
+            }),
+        }));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn add_install_code_key_derived_from_install_code() {
-    todo!()
+async fn add_install_code_key_derived_from_install_code() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .add_install_code(
+            "0x9035EAFFFE424783",
+            &[
+                0xae, 0x3b, 0x28, 0x72, 0x81, 0xcf, 0x16, 0xf5, 0x50, 0x73, 0x3a, 0x0c, 0xec, 0x38,
+                0xaa, 0x31,
+            ],
+            true,
+        )
+        .await;
+
+    assert!(adapter.znp_calls.contains(&ZnpCall {
+            subsystem: "APP_CNF".to_string(),
+            command: "bdbAddInstallCode".to_string(),
+            payload: json!({
+                "installCodeFormat": 0x2,
+                "ieeeaddr": "0x9035EAFFFE424783",
+                "installCode": [0xae, 0x3b, 0x28, 0x72, 0x81, 0xcf, 0x16, 0xf5, 0x50, 0x73, 0x3a, 0x0c, 0xec, 0x38, 0xaa, 0x31],
+            }),
+        }));
 }
 
 #[tokio::test]
@@ -474,28 +520,123 @@ async fn incoming_message_raw_not_zcl() {
     assert_eq!(payload["data"], json!([0x00, 0x01]));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn led_behaviour_disable_led_false_firmware_handling_leds() {
-    todo!()
+async fn led_behaviour_disable_led_false_firmware_handling_leds() {
+    let mut adapter = ZStackAdapter::new(
+        json!({}),
+        json!({"path": "dummy", "baudRate": 800, "rtscts": false}),
+        "backup.json",
+        json!({"disableLED": false}),
+    );
+    adapter.set_led_firmware(true);
+    adapter.start().await;
+
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
+    adapter.znp_calls.clear();
+    adapter.permit_join(255, Some(0)).await;
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
+    adapter.znp_calls.clear();
+    adapter.permit_join(0, Some(0)).await;
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn led_behaviour_disable_led_false_firmware_not_handling_leds() {
-    todo!()
+async fn led_behaviour_disable_led_false_firmware_not_handling_leds() {
+    let mut adapter = ZStackAdapter::new(
+        json!({}),
+        json!({"path": "dummy", "baudRate": 800, "rtscts": false}),
+        "backup.json",
+        json!({"disableLED": false}),
+    );
+    adapter.set_led_firmware(false);
+    adapter.start().await;
+
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
+    adapter.znp_calls.clear();
+    adapter.permit_join(255, Some(0)).await;
+    assert!(adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl" && call.payload["mode"] == json!(1)));
+    adapter.znp_calls.clear();
+    adapter.permit_join(0, Some(0)).await;
+    assert!(adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl" && call.payload["mode"] == json!(0)));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn led_behaviour_disable_led_true_firmware_handling_leds() {
-    todo!()
+async fn led_behaviour_disable_led_true_firmware_handling_leds() {
+    let mut adapter = ZStackAdapter::new(
+        json!({}),
+        json!({"path": "dummy", "baudRate": 800, "rtscts": false}),
+        "backup.json",
+        json!({"disableLED": true}),
+    );
+    adapter.set_led_firmware(true);
+    adapter.start().await;
+
+    assert!(adapter.znp_calls.iter().any(|call| {
+        call.command == "ledControl" && call.payload == json!({"ledid": 0xff, "mode": 5})
+    }));
+    adapter.znp_calls.clear();
+    adapter.permit_join(255, Some(0)).await;
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
+    adapter.znp_calls.clear();
+    adapter.permit_join(0, Some(0)).await;
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn led_behaviour_disable_led_true_firmware_not_handling_leds() {
-    todo!()
+async fn led_behaviour_disable_led_true_firmware_not_handling_leds() {
+    let mut adapter = ZStackAdapter::new(
+        json!({}),
+        json!({"path": "dummy", "baudRate": 800, "rtscts": false}),
+        "backup.json",
+        json!({"disableLED": true}),
+    );
+    adapter.set_led_firmware(false);
+    adapter.start().await;
+
+    assert!(adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl" && call.payload["mode"] == json!(0)));
+    adapter.znp_calls.clear();
+    adapter.permit_join(255, Some(0)).await;
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
+    adapter.znp_calls.clear();
+    adapter.permit_join(0, Some(0)).await;
+    assert!(!adapter
+        .znp_calls
+        .iter()
+        .any(|call| call.command == "ledControl"));
 }
 
 #[tokio::test]
@@ -792,22 +933,103 @@ fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_care_be
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_to_all_default() {
-    todo!()
+async fn send_zcl_frame_to_all_default() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_all(242, vec![0x18, 100, 0, 0, 0], 250, 65532)
+        .await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0, 0, 0],
+                "destendpoint": 242,
+                "dstaddr": "0x000000000000fffc",
+                "len": 5,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 250,
+                "transid": 1,
+                "dstaddrmode": 2,
+                "dstpanid": 0,
+            }),
+        }]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_to_all_rx_on_when_idle() {
-    todo!()
+async fn send_zcl_frame_to_all_rx_on_when_idle() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_all(255, vec![0x18, 100, 0, 0, 0], 1, 65533)
+        .await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0, 0, 0],
+                "destendpoint": 255,
+                "dstaddr": "0x000000000000fffd",
+                "len": 5,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+                "dstaddrmode": 2,
+                "dstpanid": 0,
+            }),
+        }]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_to_all_sleepy() {
-    todo!()
+async fn send_zcl_frame_to_all_sleepy() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_all(255, vec![0x18, 100, 0, 0, 0], 1, 65535)
+        .await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0, 0, 0],
+                "destendpoint": 255,
+                "dstaddr": "0x000000000000ffff",
+                "len": 5,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+                "dstaddrmode": 2,
+                "dstpanid": 0,
+            }),
+        }]
+    );
 }
 
 #[test]
