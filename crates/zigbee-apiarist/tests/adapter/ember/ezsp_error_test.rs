@@ -1,16 +1,13 @@
 // Original: .upstream/zigbee-herdsman/test/adapter/ember/ezspError.test.ts
-// Upstream test titles (ported as #[test] #[ignore] stubs):
-//   - Creates error
-//   - Ezsp Error
+
+use zigbee_apiarist::adapter::ember::ezsp_error::EzspError;
+use zigbee_apiarist::adapter::ezsp::driver::types::basic::EzspStatus;
 
 #[test]
 #[ignore = "not implemented yet"]
 fn creates_error() {
-    todo!()
-}
+    let error = EzspError::new(EzspStatus::ASH_ACK_TIMEOUT);
 
-#[test]
-#[ignore = "not implemented yet"]
-fn ezsp_error() {
-    todo!()
+    assert_eq!(error.message(), "ASH_ACK_TIMEOUT");
+    assert_eq!(error.code, EzspStatus::ASH_ACK_TIMEOUT);
 }
