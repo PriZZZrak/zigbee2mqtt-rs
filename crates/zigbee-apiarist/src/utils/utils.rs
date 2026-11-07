@@ -1,24 +1,25 @@
 // Original: .upstream/zigbee-herdsman/src/utils/utils.ts
-// TODO: port public API from the original file.
+// TODO: port remaining helpers.
 
-// pub fn assertString() { todo!() }
-// pub fn isNumberArray() { todo!() }
-// pub fn isNumberArrayOfLength() { todo!() }
-// pub fn isObjectEmpty() { todo!() }
+use serde_json::Value;
 
-#[allow(unused)]
-pub fn assert_string(value: &serde_json::Value, property: &str) {
-    todo!()
+pub fn assert_string(value: &Value, _property: &str) {
+    if !value.is_string() {
+        panic!("Input must be a string!");
+    }
 }
-#[allow(unused)]
-pub fn is_number_array(value: &serde_json::Value) -> bool {
-    todo!()
+
+pub fn is_number_array(value: &Value) -> bool {
+    matches!(value, Value::Array(items) if items.iter().all(Value::is_number))
 }
-#[allow(unused)]
-pub fn is_number_array_of_length(value: &serde_json::Value, length: usize) -> bool {
-    todo!()
+
+pub fn is_number_array_of_length(value: &Value, length: usize) -> bool {
+    is_number_array(value) && value.as_array().is_some_and(|items| items.len() == length)
 }
-#[allow(unused)]
-pub fn is_object_empty(value: &serde_json::Value) -> bool {
-    todo!()
+
+pub fn is_object_empty(value: &Value) -> bool {
+    match value {
+        Value::Object(map) => map.is_empty(),
+        _ => false,
+    }
 }

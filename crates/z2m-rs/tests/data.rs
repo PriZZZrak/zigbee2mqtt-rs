@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use z2m_rs::util::data;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_return_correct_path() {
     let expected = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data");
     let actual = data::get_path();
@@ -13,7 +12,6 @@ fn should_return_correct_path() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_return_correct_path_when_zigbee2mqtt_data_set() {
     let expected = std::env::temp_dir().join(format!("z2m-data-test-{}", std::process::id()));
     env::set_var("ZIGBEE2MQTT_DATA", &expected);
@@ -29,7 +27,6 @@ fn should_return_correct_path_when_zigbee2mqtt_data_set() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_return_data_path_when_join_path_with_empty_string() {
     let expected = data::get_path();
     assert_eq!(data::join_path(""), expected);

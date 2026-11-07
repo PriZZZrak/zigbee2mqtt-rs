@@ -8,14 +8,12 @@ use z2m_rs::util::stringify;
 use z2m_rs::util::utils;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn object_is_empty() {
     assert!(utils::object_is_empty(&json!({})));
     assert!(!utils::object_is_empty(&json!({"a": 1})));
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn object_has_properties() {
     assert!(utils::object_has_properties(
         &json!({"a": 1, "b": 2, "c": 3}),
@@ -28,7 +26,6 @@ fn object_has_properties() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn get_z2m_version() {
     // Upstream mocks `exec` and `readFileSync`; those failure paths are not
     // portable to Rust without a process/file abstraction. Happy path only.
@@ -53,15 +50,14 @@ async fn get_z2m_version() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn check_dependency_version() {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let herdsman_pkg = format!(
-        "{}/../../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman/package.json",
+        "{}/../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman/package.json",
         manifest_dir
     );
     let converters_pkg = format!(
-        "{}/../../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman-converters/package.json",
+        "{}/../../.upstream/zigbee2mqtt/node_modules/zigbee-herdsman-converters/package.json",
         manifest_dir
     );
 
@@ -90,7 +86,6 @@ async fn check_dependency_version() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn to_local_iso_string() {
     let date = 1755644130000i64; // 2025-08-19T23:15:30Z approx
                                  // Upstream mocks Date.getTimezoneOffset; Rust has no built-in TZ offset,
@@ -102,7 +97,6 @@ fn to_local_iso_string() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn assert_string() {
     utils::assert_string(&json!("test"), "property");
     // Upstream expects a thrown error; Rust uses panic or Result. Kept as
@@ -111,7 +105,6 @@ fn assert_string() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_null_properties_from_object() {
     let mut obj1 = json!({
         "ab": 0,
@@ -155,7 +148,6 @@ fn removes_null_properties_from_object() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn stable_stringify() {
     // Upstream covers typed arrays, Buffer, BigInt, NaN, circular refs and
     // toJSON. serde_json cannot represent all of these; the portable core is

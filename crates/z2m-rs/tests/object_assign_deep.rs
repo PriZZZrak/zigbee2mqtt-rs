@@ -11,7 +11,6 @@ fn parse(json_text: &str) -> serde_json::Value {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn mutates_and_returns_the_target() {
     let mut target = json!({"a": 1});
     let target_ptr = &target as *const serde_json::Value;
@@ -22,7 +21,6 @@ fn mutates_and_returns_the_target() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn applies_sources_in_order_later_ones_win() {
     let mut target = json!({});
     let result = object_assign_deep(
@@ -33,7 +31,6 @@ fn applies_sources_in_order_later_ones_win() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn copies_keys_missing_from_the_target() {
     let mut target = json!({});
     let source = json!({"nested": {"deep": {"value": 1}}});
@@ -42,7 +39,6 @@ fn copies_keys_missing_from_the_target() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn deep_merges_nested_objects_present_in_both() {
     let mut target = json!({"mqtt": {"base_topic": "zigbee2mqtt", "server": "old"}, "advanced": {"channel": 11}});
     let result = object_assign_deep(&mut target, &[json!({"mqtt": {"server": "new"}})]);
@@ -54,7 +50,6 @@ fn deep_merges_nested_objects_present_in_both() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn replaces_nested_objects_of_the_target_instead_of_mutating_them() {
     let nested = json!({"a": 1});
     let mut target = json!({"nested": nested.clone()});
@@ -71,7 +66,6 @@ fn replaces_nested_objects_of_the_target_instead_of_mutating_them() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn replaces_an_existing_non_object_value_with_a_clone_of_the_source_object() {
     assert_eq!(
         object_assign_deep(&mut json!({"a": 5}), &[json!({"a": {"b": 1}})]),
@@ -93,7 +87,6 @@ fn replaces_an_existing_non_object_value_with_a_clone_of_the_source_object() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn overwrites_with_null() {
     // Upstream also covers `undefined`, which has no JSON representation in Rust.
     let mut target = json!({"a": {"b": 1}, "c": 1});
@@ -102,7 +95,6 @@ fn overwrites_with_null() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn replaces_arrays_instead_of_concatenating_them() {
     assert_eq!(
         object_assign_deep(&mut json!({"a": [1, 2, 3]}), &[json!({"a": [4]})]),
@@ -123,7 +115,6 @@ fn replaces_arrays_instead_of_concatenating_them() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn clones_arrays_and_the_objects_nested_inside_them() {
     let source = json!({"a": [{"b": 1}, [{"c": 2}]]});
     let mut target = json!({});
@@ -145,7 +136,6 @@ fn clones_arrays_and_the_objects_nested_inside_them() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn breaks_all_references_to_the_sources() {
     let mut source = json!({"a": {"b": {"c": 1}}});
     let mut target = json!({});
@@ -157,7 +147,6 @@ fn breaks_all_references_to_the_sources() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_mutate_the_sources() {
     let source = json!({"a": {"b": 1}});
 
@@ -167,7 +156,6 @@ fn does_not_mutate_the_sources() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn copies_primitives_by_value() {
     // Upstream also covers functions, symbols and BigInt, which have no JSON
     // representation in Rust/serde_json and are therefore not portable.
@@ -184,7 +172,6 @@ fn copies_primitives_by_value() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reduces_non_plain_objects_to_their_own_enumerable_properties() {
     // serde_json only has plain objects/arrays, so non-plain inputs are
     // represented by their own enumerable properties already.
@@ -199,7 +186,6 @@ fn reduces_non_plain_objects_to_their_own_enumerable_properties() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn merges_deeply_nested_objects_coming_from_multiple_sources() {
     let mut target = json!({});
     let result = object_assign_deep(
@@ -214,7 +200,6 @@ fn merges_deeply_nested_objects_coming_from_multiple_sources() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn never_copies_keys_that_could_tamper_with_the_prototype_chain() {
     let mut target = json!({});
     let result = object_assign_deep(
@@ -231,7 +216,6 @@ fn never_copies_keys_that_could_tamper_with_the_prototype_chain() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn never_copies_unsafe_keys_nested_inside_cloned_objects() {
     let mut target = json!({});
     let result = object_assign_deep(
@@ -248,13 +232,12 @@ fn never_copies_unsafe_keys_nested_inside_cloned_objects() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn never_copies_unsafe_keys_when_merging_into_an_existing_object() {
     let mut target = json!({"nested": {"safe": 1}});
     let result = object_assign_deep(
         &mut target,
         &[parse(
-            r#"{"nested": {"__proto__": {"polluted": "yes"}, "other": 2}"#,
+            r#"{"nested": {"__proto__": {"polluted": "yes"}, "other": 2}}"#,
         )],
     );
 
@@ -263,7 +246,6 @@ fn never_copies_unsafe_keys_when_merging_into_an_existing_object() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn leaves_every_source_untouched_when_given_an_empty_target() {
     let first = json!({"a": {"b": 1}});
     let second = json!({"a": {"c": 2}});

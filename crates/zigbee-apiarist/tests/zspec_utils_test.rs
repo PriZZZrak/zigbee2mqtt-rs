@@ -12,7 +12,6 @@ const BROADCAST_SLEEPY: u16 = 0xffff;
 const BROADCAST_LOW_POWER_ROUTERS: u16 = 0xfffb;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn converts_channels_number_array_to_uint32_mask() {
     assert_eq!(
         utils::channels_to_uint32_mask(&ALL_802_15_4_CHANNELS),
@@ -25,7 +24,6 @@ fn converts_channels_number_array_to_uint32_mask() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn converts_channels_uint32_mask_to_number_array() {
     assert_eq!(
         utils::uint32_mask_to_channels(ALL_802_15_4_CHANNELS_MASK),
@@ -38,7 +36,6 @@ fn converts_channels_uint32_mask_to_number_array() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_if_address_is_broadcast() {
     assert!(utils::is_broadcast_address(BROADCAST_DEFAULT));
     assert!(utils::is_broadcast_address(BROADCAST_RX_ON_WHEN_IDLE));
@@ -48,7 +45,6 @@ fn checks_if_address_is_broadcast() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn converts_eui64_le_buffer_to_0x() {
     let buffer = vec![0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11];
     assert_eq!(utils::eui64_le_buffer_to_hex(&buffer), "0x1122334455667788");
@@ -56,14 +52,12 @@ fn converts_eui64_le_buffer_to_0x() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn converts_eui64_be_buffer_to_0x() {
     let buffer = vec![0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11];
     assert_eq!(utils::eui64_be_buffer_to_hex(&buffer), "0x8877665544332211");
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn calculates_crc_variants() {
     let val1 = hex_decode("83FED3407A939723A5C639FF4C12");
     let val2 = hex_decode("83FED3407A939723A5C639B26916D505C3B5");
@@ -82,7 +76,6 @@ fn calculates_crc_variants() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn hashes_using_aes_128_mmo() {
     let val1 = hex_decode("83FED3407A939723A5C639FF4C12");
     let val2 = hex_decode("83FED3407A939723A5C639B26916D505C3B5");
