@@ -30,6 +30,11 @@ pub struct Receive {
     pub published: Vec<(String, Value, Value)>,
     pub logs: Vec<(String, String)>,
     pub exposes_changed: usize,
+    pub debounce_seconds: Option<f64>,
+    pub debounce_ignore: Vec<String>,
+    pub throttle_seconds: Option<f64>,
+    pub elapsed_enabled: bool,
+    pub pending: BTreeMap<String, Value>,
 }
 
 impl Receive {
@@ -58,6 +63,32 @@ impl Receive {
 
     pub fn device_mut(&mut self, friendly_name: &str) -> &mut ReceiveDevice {
         self.devices.get_mut(friendly_name).expect("device")
+    }
+
+    pub fn set_debounce(&mut self, seconds: f64) {
+        self.debounce_seconds = Some(seconds);
+    }
+
+    pub fn set_throttle(&mut self, seconds: f64) {
+        self.throttle_seconds = Some(seconds);
+    }
+
+    pub fn flush_debounce(&mut self, _device: &str) {
+        todo!()
+    }
+
+    pub fn advance_time(&mut self, _milliseconds: u64) {
+        todo!()
+    }
+
+    /// Upstream `controller.publishEntityState(device, state)`.
+    pub fn publish_entity_state(&mut self, _device: &str, _state: &Value) {
+        todo!()
+    }
+
+    /// Upstream MQTT `<device>/set` handling.
+    pub fn on_mqtt_set(&mut self, _device: &str, _payload: &Value) {
+        todo!()
     }
 
     /// Upstream `zhe.message` handling.
