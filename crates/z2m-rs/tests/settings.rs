@@ -205,13 +205,33 @@ fn should_add_and_remove_devices_to_a_separate_file_if_devices_yaml_doesnt_exist
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_devices() {
-    todo!()
+    let mut settings = Settings::from_config(json!({}));
+    settings.add_device("0x12345678");
+
+    assert_eq!(
+        settings.configuration,
+        json!({
+            "devices": {
+                "0x12345678": {"friendly_name": "0x12345678"},
+            },
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_devices_even_when_devices_exist_empty() {
-    todo!()
+    let mut settings = Settings::from_config(json!({"devices": []}));
+    settings.add_device("0x12345678");
+
+    assert_eq!(
+        settings.configuration,
+        json!({
+            "devices": {
+                "0x12345678": {"friendly_name": "0x12345678"},
+            },
+        })
+    );
 }
 
 #[test]
@@ -253,13 +273,34 @@ fn should_add_devices_to_blocklist() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_groups() {
-    todo!()
+    let mut settings = Settings::from_config(json!({}));
+
+    settings.add_group("test123", None);
+    assert_eq!(
+        settings.get()["groups"],
+        json!({"1": {"friendly_name": "test123"}})
+    );
+
+    settings.add_group("test456", Some(""));
+    assert_eq!(
+        settings.get()["groups"],
+        json!({
+            "1": {"friendly_name": "test123"},
+            "2": {"friendly_name": "test456"},
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_add_groups_with_specific_id() {
-    todo!()
+    let mut settings = Settings::from_config(json!({}));
+
+    settings.add_group("test123", Some("123"));
+    assert_eq!(
+        settings.get()["groups"],
+        json!({"123": {"friendly_name": "test123"}})
+    );
 }
 
 #[test]
@@ -296,25 +337,94 @@ fn should_apply_environment_variables_as_overrides() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_keep_homeassistant_null_properties_on_apply() {
-    todo!()
+    let mut settings = Settings::from_config(json!({
+        "device_options": {
+            "homeassistant": {"temperature": null},
+        },
+        "devices": {
+            "0x1234567812345678": {
+                "friendly_name": "custom discovery",
+                "homeassistant": {"humidity": null},
+            },
+        },
+    }));
+    settings.re_read();
+    settings.apply(json!({"external_converters": []}));
+
+    assert_eq!(
+        settings.get()["device_options"]["homeassistant"],
+        json!({"temperature": null})
+    );
+    assert_eq!(
+        settings.get()["devices"]["0x1234567812345678"]["homeassistant"],
+        json!({"humidity": null})
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_keep_homeassistant_null_property_on_device_setting_change() {
-    todo!()
+    let mut settings = Settings::from_config(json!({
+        "devices": {
+            "0x12345678": {
+                "friendly_name": "custom discovery",
+                "homeassistant": {
+                    "entityXYZ": {"entity_category": null},
+                },
+            },
+        },
+    }));
+
+    settings
+        .change_entity_options("0x12345678", json!({"disabled": true}))
+        .unwrap();
+
+    assert_eq!(
+        settings.configuration,
+        json!({
+            "devices": {
+                "0x12345678": {
+                    "friendly_name": "custom discovery",
+                    "disabled": true,
+                    "homeassistant": {
+                        "entityXYZ": {"entity_category": null},
+                    },
+                },
+            },
+        })
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_not_add_duplicate_groups() {
-    todo!()
+    let mut settings = Settings::from_config(json!({}));
+
+    settings.add_group("test123", None);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        settings.add_group("test123", None);
+    }));
+    assert!(result.is_err());
+    assert_eq!(
+        settings.get()["groups"],
+        json!({"1": {"friendly_name": "test123"}})
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_not_add_duplicate_groups_with_specific_id() {
-    todo!()
+    let mut settings = Settings::from_config(json!({}));
+
+    settings.add_group("test123", Some("123"));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        settings.add_group("test_id_123", Some("123"));
+    }));
+    assert!(result.is_err());
+    assert_eq!(
+        settings.get()["groups"],
+        json!({"123": {"friendly_name": "test123"}})
+    );
 }
 
 #[test]
@@ -376,7 +486,9 @@ fn should_not_allow_retention_configuration_without_mqtt_v5() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_not_throw_error_when_devices_is_null() {
-    todo!()
+    let settings = Settings::from_config(json!({"devices": null}));
+    // Upstream only checks that this does not throw.
+    let _ = settings.get_device("0x12345678");
 }
 
 #[test]
@@ -394,7 +506,23 @@ fn should_read_mqtt_username_and_password_form_a_separate_file() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_read_devices() {
-    todo!()
+    let settings = Settings::from_config(json!({
+        "devices": {
+            "0x12345678": {
+                "friendly_name": "0x12345678",
+                "retain": false,
+            },
+        },
+    }));
+
+    assert_eq!(
+        settings.get_device("0x12345678"),
+        Some(json!({
+            "ID": "0x12345678",
+            "friendly_name": "0x12345678",
+            "retain": false,
+        }))
+    );
 }
 
 #[test]
@@ -436,25 +564,53 @@ fn should_return_settings() {
 #[test]
 #[ignore = "not implemented yet"]
 fn should_throw_error_when_changing_entity_friendly_name_of_non_existing_device() {
-    todo!()
+    let mut settings = Settings::from_config(json!({}));
+
+    let error = settings
+        .change_friendly_name("not_existing_123", "non_existing_456")
+        .unwrap_err();
+    assert_eq!(error, "Device or group 'not_existing_123' does not exist");
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_throw_error_when_changing_entity_options_of_non_existing_device() {
-    todo!()
+    let mut settings = Settings::from_config(json!({}));
+
+    let error = settings
+        .change_entity_options("not_existing_123", json!({}))
+        .unwrap_err();
+    assert_eq!(error, "Device or group 'not_existing_123' does not exist");
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_throw_when_adding_device_which_already_exists() {
-    todo!()
+    let mut settings = Settings::from_config(json!({
+        "devices": {
+            "0x123": {"friendly_name": "bulb", "retain": true},
+        },
+    }));
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        settings.add_device("0x123");
+    }));
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn should_throw_when_removing_device_which_doesnt_exist() {
-    todo!()
+    let mut settings = Settings::from_config(json!({
+        "devices": {
+            "0x0017880104e45519": {"friendly_name": "myname", "retain": false},
+            "0x0017880104e45511": {"friendly_name": "myname1", "retain": false},
+        },
+    }));
+    settings.re_read();
+
+    let error = settings.remove_device("myname33").unwrap_err();
+    assert_eq!(error, "Device 'myname33' does not exist");
 }
 
 #[test]

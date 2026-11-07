@@ -97,13 +97,55 @@ pub fn write_minimal_defaults() {
 /// Minimal settings document used by the ported tests.
 #[derive(Debug, Clone, Default)]
 pub struct Settings {
+    /// Effective settings document (`settings.get()`).
     pub data: serde_json::Value,
+    /// Persisted `configuration.yaml` document.
+    pub configuration: serde_json::Value,
 }
 
 impl Settings {
     pub fn new(data: serde_json::Value) -> Self {
-        Self { data }
+        Self {
+            configuration: data.clone(),
+            data,
+        }
     }
+
+    pub fn from_config(configuration: serde_json::Value) -> Self {
+        Self::new(configuration)
+    }
+
+    /// Upstream: `settings.addDevice(ieeeAddr)`.
+    pub fn add_device(&mut self, _ieee_address: &str) {
+        todo!()
+    }
+
+    /// Upstream: `settings.getDevice(ieeeAddr)`.
+    pub fn get_device(&self, _ieee_address: &str) -> Option<serde_json::Value> {
+        todo!()
+    }
+
+    /// Upstream: `settings.addGroup(friendlyName, id?)`.
+    pub fn add_group(&mut self, _friendly_name: &str, _id: Option<&str>) {
+        todo!()
+    }
+
+    /// Upstream: `settings.removeDevice(idOrIeee)`.
+    pub fn remove_device(&mut self, _id: &str) -> Result<(), String> {
+        todo!()
+    }
+
+    /// Upstream: `settings.changeEntityOptions(idOrIeee, options)`.
+    pub fn change_entity_options(
+        &mut self,
+        _id: &str,
+        _options: serde_json::Value,
+    ) -> Result<(), String> {
+        todo!()
+    }
+
+    /// Upstream: `settings.apply(settings)`.
+    pub fn apply(&mut self, _options: serde_json::Value) {}
 
     /// Upstream: `settings.reRead()`.
     pub fn re_read(&mut self) {}
