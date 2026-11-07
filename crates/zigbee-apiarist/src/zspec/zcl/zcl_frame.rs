@@ -311,7 +311,7 @@ fn push_selector(buffer: &mut Vec<u8>, selector: &Value) {
     }
 }
 
-fn write_data_type(buffer: &mut Vec<u8>, data_type: u8, value: &Value) {
+pub(crate) fn write_data_type(buffer: &mut Vec<u8>, data_type: u8, value: &Value) {
     match data_type {
         0x00 => {}
         0x08 | 0x10 | 0x18 | 0x20 | 0x28 | 0x30 => buffer.push(u8_value(value)),
@@ -386,7 +386,7 @@ fn f32_to_half(value: f32) -> u16 {
     sign | ((exponent as u16) << 10) | mantissa as u16
 }
 
-fn read_data_type(buffer: &[u8], position: &mut usize, data_type: u8) -> Value {
+pub(crate) fn read_data_type(buffer: &[u8], position: &mut usize, data_type: u8) -> Value {
     let take = |length: usize, position: &mut usize| -> Vec<u8> {
         let end = (*position + length).min(buffer.len());
         let values = buffer[*position..end].to_vec();
