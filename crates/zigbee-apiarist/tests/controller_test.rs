@@ -8,7 +8,6 @@ fn new_controller() -> Controller {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_disconnected_event() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -16,7 +15,6 @@ fn adapter_disconnected_event() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_permit_join_fails_during_stop() {
     let mut controller = new_controller();
     controller.permit_join(Some(60), None);
@@ -24,7 +22,6 @@ fn adapter_permit_join_fails_during_stop() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_stop_fails_after_adapter_disconnected() {
     let mut controller = new_controller();
     controller.stop();
@@ -32,7 +29,6 @@ fn adapter_stop_fails_after_adapter_disconnected() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_endpoint_to_group() {
     let mut controller = new_controller();
     controller.add_to_group("bulb", "1");
@@ -40,7 +36,6 @@ fn add_endpoint_to_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_16_byte_missing_crc_is_appended() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -48,7 +43,6 @@ fn add_install_code_16_byte_missing_crc_is_appended() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_18_byte() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -56,7 +50,6 @@ fn add_install_code_18_byte() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_aqara() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -64,7 +57,6 @@ fn add_install_code_aqara() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_hue() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -72,7 +64,6 @@ fn add_install_code_hue() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_invalid() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -80,7 +71,6 @@ fn add_install_code_invalid() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_pipe() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -88,7 +78,6 @@ fn add_install_code_pipe() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_pipe_enclosed() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -96,7 +85,6 @@ fn add_install_code_pipe_enclosed() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_unknown_format() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -104,7 +92,6 @@ fn add_install_code_unknown_format() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn add_install_code_widely_adopted_format() {
     let mut controller = new_controller();
     controller.add_install_code("0x00124b0009d69f77", "ABCDEF");
@@ -112,7 +99,6 @@ fn add_install_code_widely_adopted_format() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn allow_to_override_read_response_through_device_custom_read_response() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -120,7 +106,6 @@ fn allow_to_override_read_response_through_device_custom_read_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn bind_error() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -128,7 +113,6 @@ fn bind_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn call_controller_constructor_error_on_invalid_channel() {
     let mut controller = new_controller();
     controller.record("constructor");
@@ -136,7 +120,6 @@ fn call_controller_constructor_error_on_invalid_channel() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn call_controller_constructor_error_when_extended_pan_id_is_too_long() {
     let mut controller = new_controller();
     controller.record("constructor");
@@ -144,7 +127,6 @@ fn call_controller_constructor_error_when_extended_pan_id_is_too_long() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn call_controller_constructor_error_when_network_key_too_small() {
     let mut controller = new_controller();
     controller.record("constructor");
@@ -152,7 +134,6 @@ fn call_controller_constructor_error_when_network_key_too_small() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn call_controller_constructor_error_with_invalid_pan_id() {
     let mut controller = new_controller();
     controller.record("constructor");
@@ -160,7 +141,6 @@ fn call_controller_constructor_error_with_invalid_pan_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn call_controller_constructor_options_mixed_with_default_options() {
     let mut controller = new_controller();
     controller.record("constructor");
@@ -168,7 +148,6 @@ fn call_controller_constructor_options_mixed_with_default_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn change_channel_on_start() {
     let mut controller = new_controller();
     controller.set_channel(11);
@@ -176,7 +155,6 @@ fn change_channel_on_start() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn change_channel_on_start_when_nwk_update_id_is_0xff() {
     let mut controller = new_controller();
     controller.set_channel(11);
@@ -184,7 +162,6 @@ fn change_channel_on_start_when_nwk_update_id_is_0xff() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn command_response() {
     let mut controller = new_controller();
     controller.command_response("bulb", "genOnOff", "on", json!({}));
@@ -192,7 +169,6 @@ fn command_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configure_reporting_endpoint_custom_attributes() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -200,7 +176,6 @@ fn configure_reporting_endpoint_custom_attributes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn configure_reporting_error() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -208,7 +183,6 @@ fn configure_reporting_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn control4_device_join_gen_basic_reads_fail_interview_completes_via_quirk() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -216,7 +190,6 @@ fn control4_device_join_gen_basic_reads_fail_interview_completes_via_quirk() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -224,7 +197,6 @@ fn controller() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_permit_joining_all_disabled_automatically() {
     let mut controller = new_controller();
     controller.permit_join(Some(60), None);
@@ -232,7 +204,6 @@ fn controller_permit_joining_all_disabled_automatically() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_permit_joining_all_disabled_manually() {
     let mut controller = new_controller();
     controller.permit_join(Some(60), None);
@@ -240,7 +211,6 @@ fn controller_permit_joining_all_disabled_manually() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_permit_joining_for_specific_time() {
     let mut controller = new_controller();
     controller.permit_join(Some(60), None);
@@ -248,7 +218,6 @@ fn controller_permit_joining_for_specific_time() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_permit_joining_for_too_long_time_throws() {
     let mut controller = new_controller();
     controller.permit_join(Some(60), None);
@@ -256,7 +225,6 @@ fn controller_permit_joining_for_too_long_time_throws() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_permit_joining_through_specific_device() {
     let mut controller = new_controller();
     controller.permit_join(Some(60), None);
@@ -264,7 +232,6 @@ fn controller_permit_joining_through_specific_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_should_ignore_touchlink_messages() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -272,7 +239,6 @@ fn controller_should_ignore_touchlink_messages() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_start() {
     let mut controller = new_controller();
     controller.start();
@@ -280,7 +246,6 @@ fn controller_start() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_stop_should_create_backup() {
     let mut controller = new_controller();
     controller.backup();
@@ -288,7 +253,6 @@ fn controller_stop_should_create_backup() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_update_ieee_addr_if_changed() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -296,7 +260,6 @@ fn controller_update_ieee_addr_if_changed() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn default_response_error() {
     let mut controller = new_controller();
     controller.default_response("bulb", 0, 0);
@@ -304,7 +267,6 @@ fn default_response_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn default_response_error_when_transaction_sequence_number_provided_through_options() {
     let mut controller = new_controller();
     controller.default_response("bulb", 0, 0);
@@ -312,7 +274,6 @@ fn default_response_error_when_transaction_sequence_number_provided_through_opti
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_lqi_table_fails() {
     let mut controller = new_controller();
     controller.lqi("bulb");
@@ -320,7 +281,6 @@ fn device_lqi_table_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_lqi_table_with_more_than_1_request() {
     let mut controller = new_controller();
     controller.lqi("bulb");
@@ -328,7 +288,6 @@ fn device_lqi_table_with_more_than_1_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_active_endpoints_fails() {
     let mut controller = new_controller();
     controller.active_endpoints("bulb");
@@ -336,7 +295,6 @@ fn device_active_endpoints_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_announce_event() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -344,7 +302,6 @@ fn device_announce_event() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_announce_event_should_update_network_address_when_different() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -352,7 +309,6 @@ fn device_announce_event_should_update_network_address_when_different() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_binding_table() {
     let mut controller = new_controller();
     controller.binding_table("bulb");
@@ -360,7 +316,6 @@ fn device_binding_table() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_binding_table_fails() {
     let mut controller = new_controller();
     controller.binding_table("bulb");
@@ -368,7 +323,6 @@ fn device_binding_table_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_binding_table_with_more_than_1_request() {
     let mut controller = new_controller();
     controller.binding_table("bulb");
@@ -376,7 +330,6 @@ fn device_binding_table_with_more_than_1_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_clear_all_bindings_fails() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -384,7 +337,6 @@ fn device_clear_all_bindings_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_clears_all_bindings() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -392,7 +344,6 @@ fn device_clears_all_bindings() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_and_interview_fails() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -400,7 +351,6 @@ fn device_joins_and_interview_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_and_interview_i_as_enrollment_fails() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -408,7 +358,6 @@ fn device_joins_and_interview_i_as_enrollment_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_and_interview_i_as_enrollment_succeeds() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -416,7 +365,6 @@ fn device_joins_and_interview_i_as_enrollment_succeeds() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_and_interview_i_as_enrollment_throws() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -424,7 +372,6 @@ fn device_joins_and_interview_i_as_enrollment_throws() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_and_interview_succeeds() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -432,7 +379,6 @@ fn device_joins_and_interview_succeeds() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_another_time_with_different_network_address() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -440,7 +386,6 @@ fn device_joins_another_time_with_different_network_address() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_with_endpoints_4_1_should_read_model_id_from_1() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -448,7 +393,6 @@ fn device_joins_with_endpoints_4_1_should_read_model_id_from_1() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_shouldnt_enroll_when_already_enrolled() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -456,7 +400,6 @@ fn device_joins_shouldnt_enroll_when_already_enrolled() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_leave_event_and_remove_from_database() {
     let mut controller = new_controller();
     controller.leave_device("bulb");
@@ -464,7 +407,6 @@ fn device_leave_event_and_remove_from_database() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_leave_event_with_only_nwk_addr_and_remove_from_database() {
     let mut controller = new_controller();
     controller.leave_device("bulb");
@@ -472,7 +414,6 @@ fn device_leave_event_with_only_nwk_addr_and_remove_from_database() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_lqi() {
     let mut controller = new_controller();
     controller.lqi("bulb");
@@ -480,7 +421,6 @@ fn device_lqi() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_network_address_changed_while_z2_m_was_offline_fails_to_retrieve_new_one() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -488,7 +428,6 @@ fn device_network_address_changed_while_z2_m_was_offline_fails_to_retrieve_new_o
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_network_address_changed_while_z2_m_was_offline_no_duplicate_triggering_of_ieee_request() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -496,7 +435,6 @@ fn device_network_address_changed_while_z2_m_was_offline_no_duplicate_triggering
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_network_address_changed_while_z2_m_was_offline_received_no_notification_on_start() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -504,7 +442,6 @@ fn device_network_address_changed_while_z2_m_was_offline_received_no_notificatio
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_network_address_changed_while_z2_m_was_running_received_no_notification() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -512,7 +449,6 @@ fn device_network_address_changed_while_z2_m_was_running_received_no_notificatio
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_node_descriptor_fails() {
     let mut controller = new_controller();
     controller.node_descriptor("bulb");
@@ -520,7 +456,6 @@ fn device_node_descriptor_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_ping() {
     let mut controller = new_controller();
     controller.ping("bulb");
@@ -528,7 +463,6 @@ fn device_ping() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_remove_from_network_fails() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -536,7 +470,6 @@ fn device_remove_from_network_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_requests_network_address_changed() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -544,7 +477,6 @@ fn device_requests_network_address_changed() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_requests_network_address_unchanged() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -552,7 +484,6 @@ fn device_requests_network_address_unchanged() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_routing_table() {
     let mut controller = new_controller();
     controller.routing_table("bulb");
@@ -560,7 +491,6 @@ fn device_routing_table() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_routing_table_fails() {
     let mut controller = new_controller();
     controller.routing_table("bulb");
@@ -568,7 +498,6 @@ fn device_routing_table_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_routing_table_with_more_than_1_request() {
     let mut controller = new_controller();
     controller.routing_table("bulb");
@@ -576,7 +505,6 @@ fn device_routing_table_with_more_than_1_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_selectively_clears_multi_target_bindings() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -584,7 +512,6 @@ fn device_selectively_clears_multi_target_bindings() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_selectively_clears_target_bindings() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -592,7 +519,6 @@ fn device_selectively_clears_target_bindings() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_should_update_properties_when_reported() {
     let mut controller = new_controller();
     controller.report("bulb", "genOnOff", json!({"onOff": 1}));
@@ -600,7 +526,6 @@ fn device_should_update_properties_when_reported() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_updates_endpoint_bindings_from_binding_table() {
     let mut controller = new_controller();
     controller.binding_table("bulb");
@@ -608,7 +533,6 @@ fn device_updates_endpoint_bindings_from_binding_table() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_updates_existing_endpoint_bindings_from_binding_table() {
     let mut controller = new_controller();
     controller.binding_table("bulb");
@@ -616,7 +540,6 @@ fn device_updates_existing_endpoint_bindings_from_binding_table() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_without_meta_should_set_meta_to() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -624,7 +547,6 @@ fn device_without_meta_should_set_meta_to() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_add_endpoint_to_group_when_add_group_response_reports_failure() {
     let mut controller = new_controller();
     controller.add_to_group("bulb", "1");
@@ -632,7 +554,6 @@ fn does_not_add_endpoint_to_group_when_add_group_response_reports_failure() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_change_channel_on_start_if_not_changed() {
     let mut controller = new_controller();
     controller.set_channel(11);
@@ -640,7 +561,6 @@ fn does_not_change_channel_on_start_if_not_changed() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_remove_endpoint_from_group_when_remove_group_response_reports_failure() {
     let mut controller = new_controller();
     controller.remove_from_group("bulb", "1");
@@ -648,7 +568,6 @@ fn does_not_remove_endpoint_from_group_when_remove_group_response_reports_failur
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn emit_last_seen_changed_event_even_when_no_message_is_emitted_from_it() {
     let mut controller = new_controller();
     controller.update_last_seen("bulb");
@@ -656,7 +575,6 @@ fn emit_last_seen_changed_event_even_when_no_message_is_emitted_from_it() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn emit_read_from_device() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -664,7 +582,6 @@ fn emit_read_from_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn emit_write_from_device() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -672,7 +589,6 @@ fn emit_write_from_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_add_binding() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -680,7 +596,6 @@ fn endpoint_add_binding() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_bind() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -688,7 +603,6 @@ fn endpoint_bind() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_command_error() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -696,7 +610,6 @@ fn endpoint_command_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_command_with_duplicate_cluster_id() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -704,7 +617,6 @@ fn endpoint_command_with_duplicate_cluster_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_command_with_duplicate_identifier() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -712,7 +624,6 @@ fn endpoint_command_with_duplicate_identifier() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_command_with_options() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -720,7 +631,6 @@ fn endpoint_command_with_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_command_response() {
     let mut controller = new_controller();
     controller.command_response("bulb", "genOnOff", "on", json!({}));
@@ -728,7 +638,6 @@ fn endpoint_command_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_command_response_error() {
     let mut controller = new_controller();
     controller.command_response("bulb", "genOnOff", "on", json!({}));
@@ -736,7 +645,6 @@ fn endpoint_command_response_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_command_response_error_when_transaction_sequence_number_provided_through_options() {
     let mut controller = new_controller();
     controller.command_response("bulb", "genOnOff", "on", json!({}));
@@ -744,7 +652,6 @@ fn endpoint_command_response_error_when_transaction_sequence_number_provided_thr
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_configure_reporting() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -752,7 +659,6 @@ fn endpoint_configure_reporting() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_configure_reporting_fails_when_status_code_is_not_0() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -760,7 +666,6 @@ fn endpoint_configure_reporting_fails_when_status_code_is_not_0() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_configure_reporting_fails_when_status_code_is_not_0_default_rsp() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -768,7 +673,6 @@ fn endpoint_configure_reporting_fails_when_status_code_is_not_0_default_rsp() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_configure_reporting_for_manufacturer_specific_attribute() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -776,7 +680,6 @@ fn endpoint_configure_reporting_for_manufacturer_specific_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_configure_reporting_for_manufacturer_specific_attribute_from_definition() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -784,7 +687,6 @@ fn endpoint_configure_reporting_for_manufacturer_specific_attribute_from_definit
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_configure_reporting_with_disable_response() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -792,7 +694,6 @@ fn endpoint_configure_reporting_with_disable_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_get_binds_non_existing_device() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -800,7 +701,6 @@ fn endpoint_get_binds_non_existing_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_get_id() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -808,7 +708,6 @@ fn endpoint_get_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_get_id_by_endpoint_device_type() {
     let mut controller = new_controller();
     controller.set_type("Router");
@@ -816,7 +715,6 @@ fn endpoint_get_id_by_endpoint_device_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_ignores_unknown_attributes_for_read_reporting_config() {
     let mut controller = new_controller();
     controller.read_reporting_config("bulb", json!([]));
@@ -824,7 +722,6 @@ fn endpoint_ignores_unknown_attributes_for_read_reporting_config() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_manuf_spec_read_reporting_config() {
     let mut controller = new_controller();
     controller.read_reporting_config("bulb", json!([]));
@@ -832,7 +729,6 @@ fn endpoint_manuf_spec_read_reporting_config() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_read_reporting_config() {
     let mut controller = new_controller();
     controller.read_reporting_config("bulb", json!([]));
@@ -840,7 +736,6 @@ fn endpoint_read_reporting_config() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_simple_descriptor_fails() {
     let mut controller = new_controller();
     controller.simple_descriptor("bulb");
@@ -848,7 +743,6 @@ fn endpoint_simple_descriptor_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_throws_without_response_to_read_reporting_config() {
     let mut controller = new_controller();
     controller.read_reporting_config("bulb", json!([]));
@@ -856,7 +750,6 @@ fn endpoint_throws_without_response_to_read_reporting_config() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn endpoint_unbind() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -864,7 +757,6 @@ fn endpoint_unbind() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn existing_database_tmp_should_not_be_overwritten() {
     let mut controller = new_controller();
     controller.load_database();
@@ -872,7 +764,6 @@ fn existing_database_tmp_should_not_be_overwritten() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn get_coordinator_version() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -880,7 +771,6 @@ fn get_coordinator_version() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn get_device_should_return_same_instance() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -888,7 +778,6 @@ fn get_device_should_return_same_instance() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn get_input_ouptut_clusters() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -896,7 +785,6 @@ fn get_input_ouptut_clusters() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn get_network_parameters() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -904,7 +792,6 @@ fn get_network_parameters() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gledopto_gl_c_007_gl_c_008_join_all_endpoints_support_gen_basic_but_only_12_responds() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -912,7 +799,6 @@ fn gledopto_gl_c_007_gl_c_008_join_all_endpoints_support_gen_basic_but_only_12_r
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn green_power() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -920,7 +806,6 @@ fn green_power() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn green_power_channel_request() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -928,7 +813,6 @@ fn green_power_channel_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn green_power_rx_on_cap() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -936,7 +820,6 @@ fn green_power_rx_on_cap() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn green_power_unicast() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -944,7 +827,6 @@ fn green_power_unicast() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_add_binding() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -952,7 +834,6 @@ fn group_add_binding() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_add_binding_by_number_should_create_group() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -960,7 +841,6 @@ fn group_add_binding_by_number_should_create_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_bind() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -968,7 +848,6 @@ fn group_bind() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_bind_by_number_should_create_group() {
     let mut controller = new_controller();
     controller.bind("bulb", 1, "genOnOff");
@@ -976,7 +855,6 @@ fn group_bind_by_number_should_create_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_command() {
     let mut controller = new_controller();
     controller.group_command("1", "on");
@@ -984,7 +862,6 @@ fn group_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_command_error() {
     let mut controller = new_controller();
     controller.group_command("1", "on");
@@ -992,7 +869,6 @@ fn group_command_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_unbind() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -1000,7 +876,6 @@ fn group_unbind() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_unbind_by_number() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -1008,7 +883,6 @@ fn group_unbind_by_number() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn group_unbind_by_number_non_existing_group_and_non_existing_bind_with_force_true() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -1016,7 +890,6 @@ fn group_unbind_by_number_non_existing_group_and_non_existing_bind_with_force_tr
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn handle_retransmitted_xiaomi_messages() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1024,7 +897,6 @@ fn handle_retransmitted_xiaomi_messages() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn handle_unbind_with_number_not_matching_any_group() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -1032,7 +904,6 @@ fn handle_unbind_with_number_not_matching_any_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn hard_reset() {
     let mut controller = new_controller();
     controller.hard_reset();
@@ -1040,7 +911,6 @@ fn hard_reset() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieee_address_event_from_unknown_device() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1048,7 +918,6 @@ fn ieee_address_event_from_unknown_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieee_address_event_should_update_network_address_when_different() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1056,7 +925,6 @@ fn ieee_address_event_should_update_network_address_when_different() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieee_address_event_should_update_the_last_seen_value() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1064,7 +932,6 @@ fn ieee_address_event_should_update_the_last_seen_value() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ieee_address_event_shouldnt_update_network_address_when_the_same() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1072,7 +939,6 @@ fn ieee_address_event_shouldnt_update_network_address_when_the_same() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn implicit_checkin_while_send_already_in_progress() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1080,7 +946,6 @@ fn implicit_checkin_while_send_already_in_progress() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn interview_on_coordinator() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1088,7 +953,6 @@ fn interview_on_coordinator() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn iterates_over_all_devices() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -1096,7 +960,6 @@ fn iterates_over_all_devices() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn iterates_over_all_groups() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1104,7 +967,6 @@ fn iterates_over_all_groups() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn iterates_over_devices_with_predicate() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -1112,7 +974,6 @@ fn iterates_over_devices_with_predicate() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn iterates_over_groups_with_predicate() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1120,7 +981,6 @@ fn iterates_over_groups_with_predicate() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn join_a_device() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -1128,7 +988,6 @@ fn join_a_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn join_a_device_and_explictly_accept_it() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -1136,7 +995,6 @@ fn join_a_device_and_explictly_accept_it() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn join_a_device_and_explictly_refuses_it() {
     let mut controller = new_controller();
     controller.join_device(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -1144,7 +1002,6 @@ fn join_a_device_and_explictly_refuses_it() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn join_a_device_and_explictly_refuses_it_but_leave_request_fails() {
     let mut controller = new_controller();
     controller.leave_device("bulb");
@@ -1152,7 +1009,6 @@ fn join_a_device_and_explictly_refuses_it_but_leave_request_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn load_database() {
     let mut controller = new_controller();
     controller.load_database();
@@ -1160,7 +1016,6 @@ fn load_database() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn load_database_interview_state_migration_and_reset_in_progress() {
     let mut controller = new_controller();
     controller.load_database();
@@ -1168,7 +1023,6 @@ fn load_database_interview_state_migration_and_reset_in_progress() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn network_address_event_from_unknown_device() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1176,7 +1030,6 @@ fn network_address_event_from_unknown_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn network_address_event_should_update_network_address_when_different() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1184,7 +1037,6 @@ fn network_address_event_should_update_network_address_when_different() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn network_address_event_should_update_the_last_seen_value() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1192,7 +1044,6 @@ fn network_address_event_should_update_the_last_seen_value() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn network_address_event_shouldnt_update_network_address_when_the_same() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -1200,7 +1051,6 @@ fn network_address_event_shouldnt_update_network_address_when_the_same() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn node_descriptor_on_r_pre_21_device() {
     let mut controller = new_controller();
     controller.node_descriptor("bulb");
@@ -1208,7 +1058,6 @@ fn node_descriptor_on_r_pre_21_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn node_descriptor_on_r21_device() {
     let mut controller = new_controller();
     controller.node_descriptor("bulb");
@@ -1216,7 +1065,6 @@ fn node_descriptor_on_r21_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn poll_control_supported() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1224,7 +1072,6 @@ fn poll_control_supported() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn poll_control_unsupported() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1232,7 +1079,6 @@ fn poll_control_unsupported() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_error() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1240,7 +1086,6 @@ fn read_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_from_endpoint_unknown_attribute_with_options() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1248,7 +1093,6 @@ fn read_from_endpoint_unknown_attribute_with_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_from_endpoint_with_custom_attribute() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1256,7 +1100,6 @@ fn read_from_endpoint_with_custom_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_from_endpoint_with_string() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1264,7 +1107,6 @@ fn read_from_endpoint_with_string() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_from_endpoint_with_string_ignores_unknown() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1272,7 +1114,6 @@ fn read_from_endpoint_with_string_ignores_unknown() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_from_group() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1280,7 +1121,6 @@ fn read_from_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_from_group_fails() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1288,7 +1128,6 @@ fn read_from_group_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_from_group_ignores_unknown_attributes() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1296,7 +1135,6 @@ fn read_from_group_ignores_unknown_attributes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_response_to_endpoint_throw_when_transaction_sequence_number_provided_through_options() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1304,7 +1142,6 @@ fn read_response_to_endpoint_throw_when_transaction_sequence_number_provided_thr
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_response_to_endpoint_with_non_zcl_attribute() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1312,7 +1149,6 @@ fn read_response_to_endpoint_with_non_zcl_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_response_to_endpoint_with_unknown_string_attribute() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1320,7 +1156,6 @@ fn read_response_to_endpoint_with_unknown_string_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_with_disable_response() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1328,7 +1163,6 @@ fn read_with_disable_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_response_error() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1336,7 +1170,6 @@ fn read_response_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_cluster_command() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -1344,7 +1177,6 @@ fn receive_cluster_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_cluster_command_from_unknown_cluster() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -1352,7 +1184,6 @@ fn receive_cluster_command_from_unknown_cluster() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_raw_data() {
     let mut controller = new_controller();
     controller.receive_raw_data(json!({}));
@@ -1360,7 +1191,6 @@ fn receive_raw_data() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_raw_data_from_unknown_cluster() {
     let mut controller = new_controller();
     controller.receive_raw_data(json!({}));
@@ -1368,7 +1198,6 @@ fn receive_raw_data_from_unknown_cluster() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_read_response_from_unknown_endpoint() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1376,7 +1205,6 @@ fn receive_read_response_from_unknown_endpoint() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_dont_send_default_resopnse_when_broadcast() {
     let mut controller = new_controller();
     controller.receive_zcl_data(json!({}));
@@ -1384,7 +1212,6 @@ fn receive_zcl_data_dont_send_default_resopnse_when_broadcast() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_dont_send_default_resopnse_with_skip_default_response() {
     let mut controller = new_controller();
     controller.default_response("bulb", 0, 0);
@@ -1392,7 +1219,6 @@ fn receive_zcl_data_dont_send_default_resopnse_with_skip_default_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_from_unkonwn_device_shouldnt_emit_anything() {
     let mut controller = new_controller();
     controller.receive_zcl_data(json!({}));
@@ -1400,7 +1226,6 @@ fn receive_zcl_data_from_unkonwn_device_shouldnt_emit_anything() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_occupancy_report() {
     let mut controller = new_controller();
     controller.report("bulb", "genOnOff", json!({"onOff": 1}));
@@ -1408,7 +1233,6 @@ fn receive_zcl_data_occupancy_report() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_report_from_unkown_attribute() {
     let mut controller = new_controller();
     controller.report("bulb", "genOnOff", json!({"onOff": 1}));
@@ -1416,7 +1240,6 @@ fn receive_zcl_data_report_from_unkown_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_send_default_response() {
     let mut controller = new_controller();
     controller.default_response("bulb", 0, 0);
@@ -1424,7 +1247,6 @@ fn receive_zcl_data_send_default_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_with_device_deleted_during_processing_prevent_race_condition() {
     let mut controller = new_controller();
     controller.receive_zcl_data(json!({}));
@@ -1432,7 +1254,6 @@ fn receive_zcl_data_with_device_deleted_during_processing_prevent_race_condition
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn remove_endpoint_from_all_groups() {
     let mut controller = new_controller();
     controller.remove_endpoint_from_all_groups("bulb", 1);
@@ -1440,7 +1261,6 @@ fn remove_endpoint_from_all_groups() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn remove_endpoint_from_group() {
     let mut controller = new_controller();
     controller.remove_from_group("bulb", "1");
@@ -1448,7 +1268,6 @@ fn remove_endpoint_from_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn remove_endpoint_from_group_by_number() {
     let mut controller = new_controller();
     controller.remove_from_group("bulb", "1");
@@ -1456,7 +1275,6 @@ fn remove_endpoint_from_group_by_number() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_device_from_database_and_clears_cache() {
     let mut controller = new_controller();
     controller.remove_device("bulb", false, false);
@@ -1464,7 +1282,6 @@ fn removes_device_from_database_and_clears_cache() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_device_from_database_but_keep_in_cache() {
     let mut controller = new_controller();
     controller.remove_device("bulb", false, false);
@@ -1472,7 +1289,6 @@ fn removes_device_from_database_but_keep_in_cache() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_device_from_network_and_clears_cache() {
     let mut controller = new_controller();
     controller.remove_device("bulb", false, false);
@@ -1480,7 +1296,6 @@ fn removes_device_from_network_and_clears_cache() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_device_from_network_and_database_but_keep_in_cache() {
     let mut controller = new_controller();
     controller.remove_device("bulb", false, false);
@@ -1488,7 +1303,6 @@ fn removes_device_from_network_and_database_but_keep_in_cache() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_endpoint_from_group_database_when_remove_group_response_reports_not_found() {
     let mut controller = new_controller();
     controller.remove_group("1");
@@ -1496,7 +1310,6 @@ fn removes_endpoint_from_group_database_when_remove_group_response_reports_not_f
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_every_member_when_removing_a_group_from_the_network() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1504,7 +1317,6 @@ fn removes_every_member_when_removing_a_group_from_the_network() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_group_from_database() {
     let mut controller = new_controller();
     controller.remove_group("1");
@@ -1512,7 +1324,6 @@ fn removes_group_from_database() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn removes_group_from_network_and_database() {
     let mut controller = new_controller();
     controller.remove_group("1");
@@ -1520,7 +1331,6 @@ fn removes_group_from_network_and_database() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn report_error() {
     let mut controller = new_controller();
     controller.report("bulb", "genOnOff", json!({"onOff": 1}));
@@ -1528,7 +1338,6 @@ fn report_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn report_to_endpoint_custom_attributes() {
     let mut controller = new_controller();
     controller.report("bulb", "genOnOff", json!({"onOff": 1}));
@@ -1536,7 +1345,6 @@ fn report_to_endpoint_custom_attributes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn report_to_endpoint_with_unknown_string_attribute() {
     let mut controller = new_controller();
     controller.report("bulb", "genOnOff", json!({"onOff": 1}));
@@ -1544,7 +1352,6 @@ fn report_to_endpoint_with_unknown_string_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn respond_to_gen_time_read() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1552,7 +1359,6 @@ fn respond_to_gen_time_read() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn respond_to_gen_time_read_fails() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1560,7 +1366,6 @@ fn respond_to_gen_time_read_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn respond_to_read_of_attribute() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1568,7 +1373,6 @@ fn respond_to_read_of_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn return_device_from_databse_when_not_in_lookup() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1576,7 +1380,6 @@ fn return_device_from_databse_when_not_in_lookup() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn return_group_from_databse_when_not_in_lookup() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1584,7 +1387,6 @@ fn return_group_from_databse_when_not_in_lookup() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn save_endpoint_configure_reporting() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -1592,7 +1394,6 @@ fn save_endpoint_configure_reporting() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn send_to_device_with_pending_request_timeout_0_fails_on_non_timeout_error() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1600,7 +1401,6 @@ fn send_to_device_with_pending_request_timeout_0_fails_on_non_timeout_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn send_to_device_with_pending_request_timeout_0_retry_on_timeout_error() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1608,7 +1408,6 @@ fn send_to_device_with_pending_request_timeout_0_retry_on_timeout_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn send_zcl_command_to_all_no_options() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -1616,7 +1415,6 @@ fn send_zcl_command_to_all_no_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn send_zcl_command_to_all_with_manufacturer_option() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -1624,7 +1422,6 @@ fn send_zcl_command_to_all_with_manufacturer_option() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn sends_read_response_for_unsupported_attribute() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1632,7 +1429,6 @@ fn sends_read_response_for_unsupported_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn set_device_powersource_by_string() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1640,7 +1436,6 @@ fn set_device_powersource_by_string() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_to_set_type() {
     let mut controller = new_controller();
     controller.set_type("Router");
@@ -1648,7 +1443,6 @@ fn should_allow_to_set_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_to_specify_custom_attributes_for_existing_cluster() {
     let mut controller = new_controller();
     controller.add_custom_cluster(json!({}));
@@ -1656,7 +1450,6 @@ fn should_allow_to_specify_custom_attributes_for_existing_cluster() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_to_specify_custom_cluster() {
     let mut controller = new_controller();
     controller.add_custom_cluster(json!({}));
@@ -1664,7 +1457,6 @@ fn should_allow_to_specify_custom_cluster() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_allow_to_specify_custom_cluster_as_override_for_zcl_cluster() {
     let mut controller = new_controller();
     controller.add_custom_cluster(json!({}));
@@ -1672,7 +1464,6 @@ fn should_allow_to_specify_custom_cluster_as_override_for_zcl_cluster() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_create_backup_of_databse_before_clearing_when_datbase_backup_path_is_provided() {
     let mut controller = new_controller();
     controller.backup();
@@ -1680,7 +1471,6 @@ fn should_create_backup_of_databse_before_clearing_when_datbase_backup_path_is_p
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_do_a_coordinator_check() {
     let mut controller = new_controller();
     controller.coordinator_check();
@@ -1688,7 +1478,6 @@ fn should_do_a_coordinator_check() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_drop_non_success_records_from_read_rsp_payloads() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1696,7 +1485,6 @@ fn should_drop_non_success_records_from_read_rsp_payloads() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_green_power_broadcast_commissioning() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -1704,7 +1492,6 @@ fn should_handle_green_power_broadcast_commissioning() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_green_power_commissioning_frame_with_ieee_addressing_gracefully() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -1712,7 +1499,6 @@ fn should_handle_green_power_commissioning_frame_with_ieee_addressing_gracefully
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_green_power_commissioning_frame_with_switch_info() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -1720,7 +1506,6 @@ fn should_handle_green_power_commissioning_frame_with_switch_info() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_green_power_responses_gracefully() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -1728,7 +1513,6 @@ fn should_handle_green_power_responses_gracefully() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_green_power_unicast_commissioning_failure() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -1736,7 +1520,6 @@ fn should_handle_green_power_unicast_commissioning_failure() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_handle_green_power_unicast_commissioning_success() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -1744,7 +1527,6 @@ fn should_handle_green_power_unicast_commissioning_success() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_ignore_invalid_green_power_frame() {
     let mut controller = new_controller();
     controller.green_power(json!({}));
@@ -1752,7 +1534,6 @@ fn should_ignore_invalid_green_power_frame() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_remove_disappeared_endpoints_on_update_active_endpoints() {
     let mut controller = new_controller();
     controller.active_endpoints("bulb");
@@ -1760,7 +1541,6 @@ fn should_remove_disappeared_endpoints_on_update_active_endpoints() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_replace_legacy_configured_reportings_without_manufacturer_code() {
     let mut controller = new_controller();
     controller.report("bulb", "genOnOff", json!({"onOff": 1}));
@@ -1768,7 +1548,6 @@ fn should_replace_legacy_configured_reportings_without_manufacturer_code() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_resolve_generic_cluster_attribute_names_on_generic_zcl_frames_generic_target_device() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1776,7 +1555,6 @@ fn should_resolve_generic_cluster_attribute_names_on_generic_zcl_frames_generic_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_roll_over_transaction_id() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1784,7 +1562,6 @@ fn should_roll_over_transaction_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_save_received_attributes() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1792,7 +1569,6 @@ fn should_save_received_attributes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_throw_datbase_basic_crud_errors() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1800,7 +1576,6 @@ fn should_throw_datbase_basic_crud_errors() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn shouldnt_create_backup_when_adapter_doesnt_support_it() {
     let mut controller = new_controller();
     controller.backup();
@@ -1808,7 +1583,6 @@ fn shouldnt_create_backup_when_adapter_doesnt_support_it() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn shouldnt_load_device_from_group_databaseentry() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1816,7 +1590,6 @@ fn shouldnt_load_device_from_group_databaseentry() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn shouldnt_throw_error_on_coordinator_check_when_adapter_doesnt_support_backups() {
     let mut controller = new_controller();
     controller.coordinator_check();
@@ -1824,7 +1597,6 @@ fn shouldnt_throw_error_on_coordinator_check_when_adapter_doesnt_support_backups
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn skip_device_announce_event_from_unknown_device() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1832,7 +1604,6 @@ fn skip_device_announce_event_from_unknown_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn skip_unbind_if_not_bound() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -1840,7 +1611,6 @@ fn skip_unbind_if_not_bound() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn soft_reset() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1848,7 +1618,6 @@ fn soft_reset() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn start_with_reset_should_clear_database() {
     let mut controller = new_controller();
     controller.load_database();
@@ -1856,7 +1625,6 @@ fn start_with_reset_should_clear_database() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn syncs_runtime_lookups() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1864,7 +1632,6 @@ fn syncs_runtime_lookups() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throw_error_when_creating_endpoint_which_already_exists() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1872,7 +1639,6 @@ fn throw_error_when_creating_endpoint_which_already_exists() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throw_error_when_creating_group_already_exists() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -1880,7 +1646,6 @@ fn throw_error_when_creating_group_already_exists() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throw_error_when_device_with_ieee_address_already_exists() {
     let mut controller = new_controller();
     controller.read("bulb", "genOnOff", json!(["onOff"]));
@@ -1888,7 +1653,6 @@ fn throw_error_when_device_with_ieee_address_already_exists() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throw_error_when_interviewing_and_calling_interview_again() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1896,7 +1660,6 @@ fn throw_error_when_interviewing_and_calling_interview_again() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn touchlink_factory_reset() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -1904,7 +1667,6 @@ fn touchlink_factory_reset() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn touchlink_factory_reset_first() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -1912,7 +1674,6 @@ fn touchlink_factory_reset_first() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn touchlink_fails_to_stop_during_stop() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -1920,7 +1681,6 @@ fn touchlink_fails_to_stop_during_stop() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn touchlink_identify() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -1928,7 +1688,6 @@ fn touchlink_identify() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn touchlink_lock() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -1936,7 +1695,6 @@ fn touchlink_lock() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn touchlink_scan() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -1944,7 +1702,6 @@ fn touchlink_scan() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn touchlink_stops_during_stop() {
     let mut controller = new_controller();
     controller.touchlink("scan", json!({}));
@@ -1952,7 +1709,6 @@ fn touchlink_stops_during_stop() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn try_to_get_deleted_device_from_endpoint() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1960,7 +1716,6 @@ fn try_to_get_deleted_device_from_endpoint() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn unbind_against_unbound_cluster() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -1968,7 +1723,6 @@ fn unbind_against_unbound_cluster() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn unbind_error() {
     let mut controller = new_controller();
     controller.unbind("bulb", 1, "genOnOff");
@@ -1976,7 +1730,6 @@ fn unbind_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn updates_a_device_gen_basic_properties() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -1984,7 +1737,6 @@ fn updates_a_device_gen_basic_properties() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_error() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -1992,7 +1744,6 @@ fn write_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_response_to_endpoint_throw_when_transaction_sequence_number_provided_through_options() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2000,7 +1751,6 @@ fn write_response_to_endpoint_throw_when_transaction_sequence_number_provided_th
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_response_to_endpoint_with_zcl_attribute() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2008,7 +1758,6 @@ fn write_response_to_endpoint_with_zcl_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_response_to_endpoint_with_no_status_attribute_specified() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2016,7 +1765,6 @@ fn write_response_to_endpoint_with_no_status_attribute_specified() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_response_to_endpoint_with_non_zcl_attribute() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2024,7 +1772,6 @@ fn write_response_to_endpoint_with_non_zcl_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_response_to_endpoint_with_options() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2032,7 +1779,6 @@ fn write_response_to_endpoint_with_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_response_to_endpoint_with_unknown_string_attribute() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2040,7 +1786,6 @@ fn write_response_to_endpoint_with_unknown_string_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_structured() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2048,7 +1793,6 @@ fn write_structured() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_structured_error() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2056,7 +1800,6 @@ fn write_structured_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_structured_with_disable_response() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2064,7 +1807,6 @@ fn write_structured_with_disable_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_device_with_pending_request_timeout_0() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2072,7 +1814,6 @@ fn write_to_device_with_pending_request_timeout_0() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_device_with_pending_request_timeout_0_discard_messages_after_expiration() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2080,7 +1821,6 @@ fn write_to_device_with_pending_request_timeout_0_discard_messages_after_expirat
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_device_with_pending_request_timeout_0_error() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2088,7 +1828,6 @@ fn write_to_device_with_pending_request_timeout_0_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_device_with_pending_request_timeout_0_override_default_send_policy() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2096,7 +1835,6 @@ fn write_to_device_with_pending_request_timeout_0_override_default_send_policy()
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_device_with_pending_request_timeout_0_replace_queued_messages() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2104,7 +1842,6 @@ fn write_to_device_with_pending_request_timeout_0_replace_queued_messages() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_device_with_pending_request_timeout_0_send_bulk_messages() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2112,7 +1849,6 @@ fn write_to_device_with_pending_request_timeout_0_send_bulk_messages() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_endpoint_custom_attributes() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2120,7 +1856,6 @@ fn write_to_endpoint_custom_attributes() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_endpoint_custom_attributes_without_specifying_manufacturer_code() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2128,7 +1863,6 @@ fn write_to_endpoint_custom_attributes_without_specifying_manufacturer_code() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_endpoint_with_unknown_string_attribute() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2136,7 +1870,6 @@ fn write_to_endpoint_with_unknown_string_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_group() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -2144,7 +1877,6 @@ fn write_to_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_group_fails() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -2152,7 +1884,6 @@ fn write_to_group_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_to_group_with_unknown_attribute_should_fail() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -2160,7 +1891,6 @@ fn write_to_group_with_unknown_attribute_should_fail() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_with_custom_payload() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2168,7 +1898,6 @@ fn write_with_custom_payload() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_with_disable_response() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2176,7 +1905,6 @@ fn write_with_disable_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_response_error() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2184,7 +1912,6 @@ fn write_response_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn write_undiv_to_endpoint_custom_attributes_without_response() {
     let mut controller = new_controller();
     controller.write("bulb", "genOnOff", json!({"onOff": 1}));
@@ -2192,7 +1919,6 @@ fn write_undiv_to_endpoint_custom_attributes_without_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn xiaomi_wxcjkg11_lm_join_get_simple_descriptor_for_endpoint_2_fails() {
     let mut controller = new_controller();
     controller.simple_descriptor("bulb");
@@ -2200,7 +1926,6 @@ fn xiaomi_wxcjkg11_lm_join_get_simple_descriptor_for_endpoint_2_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn xiaomi_end_device_joins_node_descriptor_fails() {
     let mut controller = new_controller();
     controller.node_descriptor("bulb");
@@ -2208,7 +1933,6 @@ fn xiaomi_end_device_joins_node_descriptor_fails() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn xiaomi_end_device_joins_node_descriptor_succeeds_but_active_endpoint_response_fails() {
     let mut controller = new_controller();
     controller.node_descriptor("bulb");
@@ -2216,7 +1940,6 @@ fn xiaomi_end_device_joins_node_descriptor_succeeds_but_active_endpoint_response
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zcl_frame_converter_attribute_key_value() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2224,7 +1947,6 @@ fn zcl_frame_converter_attribute_key_value() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zcl_frame_converter_attribute_list() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2232,7 +1954,6 @@ fn zcl_frame_converter_attribute_list() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_end_device_announce_from_unknown_device() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2240,7 +1961,6 @@ fn zdo_response_for_end_device_announce_from_unknown_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_end_device_announce_should_bubble_up_event() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2248,7 +1968,6 @@ fn zdo_response_for_end_device_announce_should_bubble_up_event() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_end_device_announce_should_update_network_address_when_different() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -2256,7 +1975,6 @@ fn zdo_response_for_end_device_announce_should_update_network_address_when_diffe
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_network_address_response_from_unknown_device() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -2264,7 +1982,6 @@ fn zdo_response_for_network_address_response_from_unknown_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_network_address_response_should_update_network_address_when_different() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -2272,7 +1989,6 @@ fn zdo_response_for_network_address_response_should_update_network_address_when_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_network_address_response_should_update_the_last_seen_value() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -2280,7 +1996,6 @@ fn zdo_response_for_network_address_response_should_update_the_last_seen_value()
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_network_address_response_shouldnt_update_network_address_when_the_same() {
     let mut controller = new_controller();
     controller.update_network_address("bulb", 0x1234);
@@ -2288,7 +2003,6 @@ fn zdo_response_for_network_address_response_shouldnt_update_network_address_whe
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zdo_response_for_cluster_id_with_no_extra_processing() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2296,7 +2010,6 @@ fn zdo_response_for_cluster_id_with_no_extra_processing() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn n() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2304,7 +2017,6 @@ fn n() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn aborts_start_on_signal() {
     let mut controller = new_controller();
     controller.start();
@@ -2312,7 +2024,6 @@ fn aborts_start_on_signal() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_should_backup_at_defined_interval() {
     let mut controller = new_controller();
     controller.backup();
@@ -2320,7 +2031,6 @@ fn controller_should_backup_at_defined_interval() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn controller_should_not_crash_on_failed_interval_backup() {
     let mut controller = new_controller();
     controller.backup();
@@ -2328,7 +2038,6 @@ fn controller_should_not_crash_on_failed_interval_backup() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_read_write_to_group_with_non_common_custom_clusters() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -2336,7 +2045,6 @@ fn does_not_read_write_to_group_with_non_common_custom_clusters() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn does_not_try_to_identify_unknown_device_when_deleted() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2344,7 +2052,6 @@ fn does_not_try_to_identify_unknown_device_when_deleted() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ensures_manufacturer_code_is_always_unique_in_a_single_call() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2352,7 +2059,6 @@ fn ensures_manufacturer_code_is_always_unique_in_a_single_call() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn handles_configure_reporting_with_non_analog_data_type() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -2360,7 +2066,6 @@ fn handles_configure_reporting_with_non_analog_data_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ignores_invalid_attributes_when_processing_zcl_attribute() {
     let mut controller = new_controller();
     controller.receive_event(json!({}));
@@ -2368,7 +2073,6 @@ fn ignores_invalid_attributes_when_processing_zcl_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn merges_added_custom_clusters_definitions() {
     let mut controller = new_controller();
     controller.add_custom_cluster(json!({}));
@@ -2376,7 +2080,6 @@ fn merges_added_custom_clusters_definitions() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn reads_writes_to_group_with_custom_cluster_when_common_to_all_members() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -2384,7 +2087,6 @@ fn reads_writes_to_group_with_custom_cluster_when_common_to_all_members() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn sends_receives_command_to_group_with_custom_cluster_when_common_to_all_members() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -2392,7 +2094,6 @@ fn sends_receives_command_to_group_with_custom_cluster_when_common_to_all_member
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_trying_to_configure_reporting_on_endpoint_with_bad_attribute() {
     let mut controller = new_controller();
     controller.configure_reporting("bulb", json!([]));
@@ -2400,7 +2101,6 @@ fn throws_when_trying_to_configure_reporting_on_endpoint_with_bad_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn triggers_send_zcl_frame_inter_panbroadcast_on_send_raw() {
     let mut controller = new_controller();
     controller.send_raw(json!({}));
@@ -2408,7 +2108,6 @@ fn triggers_send_zcl_frame_inter_panbroadcast_on_send_raw() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn triggers_send_zcl_frame_inter_panto_ieee_addr_on_send_raw() {
     let mut controller = new_controller();
     controller.send_raw(json!({}));
@@ -2416,7 +2115,6 @@ fn triggers_send_zcl_frame_inter_panto_ieee_addr_on_send_raw() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn triggers_send_zcl_frame_to_all_on_send_raw() {
     let mut controller = new_controller();
     controller.send_raw(json!({}));
@@ -2424,7 +2122,6 @@ fn triggers_send_zcl_frame_to_all_on_send_raw() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn triggers_send_zcl_frame_to_endpoint_on_send_raw() {
     let mut controller = new_controller();
     controller.send_raw(json!({}));
@@ -2432,7 +2129,6 @@ fn triggers_send_zcl_frame_to_endpoint_on_send_raw() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn triggers_send_zcl_frame_to_endpoint_with_custom_cluster_on_send_raw() {
     let mut controller = new_controller();
     controller.send_raw(json!({}));
@@ -2440,7 +2136,6 @@ fn triggers_send_zcl_frame_to_endpoint_with_custom_cluster_on_send_raw() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn triggers_send_zcl_frame_to_group_on_send_raw() {
     let mut controller = new_controller();
     controller.create_group(json!({"groupID": 1}));
@@ -2448,7 +2143,6 @@ fn triggers_send_zcl_frame_to_group_on_send_raw() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn triggers_send_zdo_on_send_raw() {
     let mut controller = new_controller();
     controller.send_raw(json!({}));
@@ -2456,7 +2150,6 @@ fn triggers_send_zdo_on_send_raw() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zcl_command() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -2464,7 +2157,6 @@ fn zcl_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zcl_command_with_cluster_command_objects() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -2472,7 +2164,6 @@ fn zcl_command_with_cluster_command_objects() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zcl_command_with_error() {
     let mut controller = new_controller();
     controller.command("bulb", "genOnOff", "on", json!({}));
@@ -2480,7 +2171,6 @@ fn zcl_command_with_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_joins_with_endpoints_2_1_as_2_is_the_only_endpoint_supporting_gen_basic_it_should_read_model_id_from_that(
 ) {
     let mut controller = new_controller();
@@ -2489,7 +2179,6 @@ fn device_joins_with_endpoints_2_1_as_2_is_the_only_endpoint_supporting_gen_basi
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_network_address_changed_while_z2_m_was_offline_no_spamming_of_ieee_request_when_device_doesnt_respond(
 ) {
     let mut controller = new_controller();
@@ -2498,7 +2187,6 @@ fn device_network_address_changed_while_z2_m_was_offline_no_spamming_of_ieee_req
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receive_zcl_data_send_default_response_fails_should_not_attempt_route_discover_when_adapter_does_not_support_it(
 ) {
     let mut controller = new_controller();
@@ -2507,7 +2195,6 @@ fn receive_zcl_data_send_default_response_fails_should_not_attempt_route_discove
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_resolve_manufacturer_specific_cluster_attribute_names_on_generic_zcl_frames_legrand_target_device(
 ) {
     let mut controller = new_controller();
@@ -2516,7 +2203,6 @@ fn should_resolve_manufacturer_specific_cluster_attribute_names_on_generic_zcl_f
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_resolve_manufacturer_specific_cluster_attribute_names_on_specific_zcl_frames_generic_target_device(
 ) {
     let mut controller = new_controller();
@@ -2525,7 +2211,6 @@ fn should_resolve_manufacturer_specific_cluster_attribute_names_on_specific_zcl_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_resolve_manufacturer_specific_cluster_attribute_names_on_specific_zcl_frames_specific_target_device(
 ) {
     let mut controller = new_controller();
@@ -2534,7 +2219,6 @@ fn should_resolve_manufacturer_specific_cluster_attribute_names_on_specific_zcl_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn should_use_cached_node_descriptor_when_device_is_re_interviewed_but_retrieve_it_when_ignore_cache_true(
 ) {
     let mut controller = new_controller();
@@ -2543,7 +2227,6 @@ fn should_use_cached_node_descriptor_when_device_is_re_interviewed_but_retrieve_
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn tuya_end_devices_joins_stops_responding_after_1_requests_should_read_model_id_and_manufacturer_name_immediately_on_second_pair(
 ) {
     let mut controller = new_controller();

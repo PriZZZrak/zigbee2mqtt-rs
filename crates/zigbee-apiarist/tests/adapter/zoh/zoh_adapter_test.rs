@@ -4,7 +4,6 @@ use serde_json::json;
 use zigbee_apiarist::adapter::zoh::adapter::zoh_adapter::ZoHAdapter;
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_impl_gets_state() {
     let mut adapter = ZoHAdapter::new();
     adapter.get_state();
@@ -12,7 +11,6 @@ fn adapter_impl_gets_state() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_impl_permit_join() {
     let mut adapter = ZoHAdapter::new();
     adapter.permit_join(Some(60), None);
@@ -20,7 +18,6 @@ fn adapter_impl_permit_join() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_impl_send_zcl_frame_to_all() {
     let mut adapter = ZoHAdapter::new();
     adapter.send_zcl_frame_to_all();
@@ -28,7 +25,6 @@ fn adapter_impl_send_zcl_frame_to_all() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_impl_send_zcl_frame_to_endpoint() {
     let mut adapter = ZoHAdapter::new();
     adapter.send_zcl_frame_to_endpoint();
@@ -36,7 +32,6 @@ fn adapter_impl_send_zcl_frame_to_endpoint() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_impl_send_zcl_frame_to_group() {
     let mut adapter = ZoHAdapter::new();
     adapter.send_zcl_frame_to_group();
@@ -44,7 +39,6 @@ fn adapter_impl_send_zcl_frame_to_group() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_impl_send_zdo_to_coordinator() {
     let mut adapter = ZoHAdapter::new();
     adapter.send_zdo(true);
@@ -52,7 +46,6 @@ fn adapter_impl_send_zdo_to_coordinator() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adapter_impl_send_zdo_to_device() {
     let mut adapter = ZoHAdapter::new();
     adapter.send_zdo(false);
@@ -60,7 +53,6 @@ fn adapter_impl_send_zdo_to_device() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn zigbee_on_host() {
     let mut adapter = ZoHAdapter::new();
     adapter.record("constructor");
@@ -68,7 +60,6 @@ fn zigbee_on_host() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adds_hashed_install_code() {
     let mut adapter = ZoHAdapter::new();
     adapter.add_install_code(true);
@@ -76,7 +67,6 @@ fn adds_hashed_install_code() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn adds_install_code() {
     let mut adapter = ZoHAdapter::new();
     adapter.add_install_code(false);
@@ -84,7 +74,6 @@ fn adds_install_code() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_authorized() {
     let mut adapter = ZoHAdapter::new();
     adapter.device_authorized(json!({"ieeeAddr": "0x00124b0009d69f77"}));
@@ -92,7 +81,6 @@ fn device_authorized() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receives_gp_frame() {
     let mut adapter = ZoHAdapter::new();
     adapter.handle_gp_frame();
@@ -100,7 +88,6 @@ fn receives_gp_frame() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receives_zcl_frame() {
     let mut adapter = ZoHAdapter::new();
     adapter.handle_zcl_frame();
@@ -108,7 +95,6 @@ fn receives_zcl_frame() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receives_zdo_frame() {
     let mut adapter = ZoHAdapter::new();
     adapter.handle_zdo_frame();
@@ -116,7 +102,6 @@ fn receives_zdo_frame() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn receives_device_events() {
     let mut adapter = ZoHAdapter::new();
     adapter.handle_device_event();
@@ -124,7 +109,6 @@ fn receives_device_events() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn resets_network_on_mismatch_pan_id() {
     let mut adapter = ZoHAdapter::new();
     adapter.reset();
@@ -132,7 +116,6 @@ fn resets_network_on_mismatch_pan_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn resets_network_on_mismatch_extended_pan_id() {
     let mut adapter = ZoHAdapter::new();
     adapter.reset();
@@ -140,7 +123,6 @@ fn resets_network_on_mismatch_extended_pan_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn resets_network_on_mismatch_network_key() {
     let mut adapter = ZoHAdapter::new();
     adapter.reset();
@@ -148,7 +130,6 @@ fn resets_network_on_mismatch_network_key() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn resumes_network() {
     let mut adapter = ZoHAdapter::new();
     adapter.start();
@@ -156,7 +137,6 @@ fn resumes_network() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uses_custom_stack_config() {
     let mut adapter = ZoHAdapter::new();
     adapter.load_stack_config(json!({"custom": true}));
@@ -164,7 +144,6 @@ fn uses_custom_stack_config() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uses_default_stack_config_when_json_not_present() {
     let mut adapter = ZoHAdapter::new();
     adapter.load_stack_config(json!({}));
@@ -172,7 +151,6 @@ fn uses_default_stack_config_when_json_not_present() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uses_defaults_when_custom_stack_config_invalid() {
     let mut adapter = ZoHAdapter::new();
     adapter.load_stack_config(json!({"custom": true}));
@@ -180,7 +158,6 @@ fn uses_defaults_when_custom_stack_config_invalid() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn uses_defaults_when_custom_stack_config_partial() {
     let mut adapter = ZoHAdapter::new();
     adapter.load_stack_config(json!({"custom": true}));

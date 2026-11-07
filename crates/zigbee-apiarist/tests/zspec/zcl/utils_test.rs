@@ -70,7 +70,6 @@ fn assert_cluster(cluster: &Cluster, expected: &Cluster, name: &str) {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn creates_status_error() {
     // upstream: `new Zcl.StatusError(Zcl.Status.ABORT)`
     let zcl_error = ZclStatusError::new(Status::ABORT);
@@ -80,7 +79,6 @@ fn creates_status_error() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_analog_data_type() {
     // upstream: `Zcl.Utils.isAnalogDataType(type)`
     assert!(Utils::is_analog_data_type(DataType::UINT16));
@@ -89,7 +87,6 @@ fn checks_analog_data_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_cluster() {
     // upstream: `Zcl.Utils.getCluster(key, manufacturerCode, customClusters)`
     let empty = CustomClusters::empty();
@@ -160,7 +157,6 @@ fn gets_cluster() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn creates_empty_cluster_when_getting_by_invalid_id() {
     // upstream: `Zcl.Utils.getCluster(99999, undefined, {})`
     let cluster = Utils::get_cluster(99999, None, &CustomClusters::empty());
@@ -174,7 +170,6 @@ fn creates_empty_cluster_when_getting_by_invalid_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_getting_invalid_cluster_name() {
     assert_panics(|| {
         Utils::get_cluster("invalid", None, &CustomClusters::empty());
@@ -182,7 +177,6 @@ fn throws_when_getting_invalid_cluster_name() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_cluster_attribute() {
     let empty = CustomClusters::empty();
     let customs = custom_clusters();
@@ -222,7 +216,6 @@ fn gets_cluster_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_undefined_when_getting_invalid_attribute() {
     let cluster = Utils::get_cluster(0x0009, None, &CustomClusters::empty());
 
@@ -231,7 +224,6 @@ fn returns_undefined_when_getting_invalid_attribute() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_undefined_when_getting_attribute_with_invalid_manufacturer_code() {
     let customs = custom_clusters();
     let cluster = Utils::get_cluster(0x0b05, Some(123), &customs);
@@ -243,7 +235,6 @@ fn returns_undefined_when_getting_attribute_with_invalid_manufacturer_code() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_cluster_command() {
     // by ID
     let cluster = Utils::get_cluster(0x0000, None, &CustomClusters::empty());
@@ -257,7 +248,6 @@ fn gets_cluster_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_getting_invalid_command() {
     let cluster = Utils::get_cluster(0x0009, None, &CustomClusters::empty());
 
@@ -270,7 +260,6 @@ fn throws_when_getting_invalid_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_cluster_command_response() {
     // by ID
     let cluster = Utils::get_cluster(0x0003, None, &CustomClusters::empty());
@@ -284,7 +273,6 @@ fn gets_cluster_command_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_getting_invalid_command_response() {
     let cluster = Utils::get_cluster(0x0009, None, &CustomClusters::empty());
 
@@ -297,7 +285,6 @@ fn throws_when_getting_invalid_command_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_global_command() {
     // by ID
     let command = Utils::get_global_command(2);
@@ -312,7 +299,6 @@ fn gets_global_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_getting_invalid_global_command() {
     assert_panics(|| {
         Utils::get_global_command(99999);
@@ -323,7 +309,6 @@ fn throws_when_getting_invalid_global_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_cluster_name() {
     // upstream: `Zcl.Utils.isClusterName(name)`
     assert!(Utils::is_cluster_name("genBasic"));
@@ -332,7 +317,6 @@ fn checks_cluster_name() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn gets_foundation_command() {
     // upstream: `Zcl.Utils.getFoundationCommand(0)`
     let command = Utils::get_foundation_command(0);
@@ -345,7 +329,6 @@ fn gets_foundation_command() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_getting_invalid_foundation_command_id() {
     assert_panics(|| {
         Utils::get_foundation_command(9999);
@@ -356,7 +339,6 @@ fn throws_when_getting_invalid_foundation_command_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_attribute_not_writable() {
     let attribute = create_attribute();
 
@@ -366,7 +348,6 @@ fn throws_when_attribute_not_writable() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_default_when_value_is_null_and_default_exists() {
     let attribute = Attribute {
         write: true,
@@ -381,7 +362,6 @@ fn returns_default_when_value_is_null_and_default_exists() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn na_n_with_default_returns_default() {
     let attribute = Attribute {
         write: true,
@@ -396,7 +376,6 @@ fn na_n_with_default_returns_default() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn na_n_without_default_returns_non_value_sentinel() {
     let attribute = Attribute {
         write: true,
@@ -411,7 +390,6 @@ fn na_n_without_default_returns_non_value_sentinel() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_trying_to_write_non_value_on_unsupported_datatype() {
     let attribute = Attribute {
         write: true,
@@ -434,7 +412,6 @@ fn throws_when_trying_to_write_non_value_on_unsupported_datatype() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn level_control_for_lighting_attributes_current_level_and_options() {
     let cluster = Utils::get_cluster("genLevelCtrl", None, &CustomClusters::empty());
     let options = Utils::get_cluster_attribute(&cluster, "options", None).expect("options");
@@ -455,7 +432,6 @@ fn level_control_for_lighting_attributes_current_level_and_options() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn lighting_control_ctrl_attributes_start_up_color_temperature() {
     let cluster = Utils::get_cluster("lightingColorCtrl", None, &CustomClusters::empty());
     let attribute = Utils::get_cluster_attribute(&cluster, "startUpColorTemperature", None)
@@ -475,7 +451,6 @@ fn lighting_control_ctrl_attributes_start_up_color_temperature() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn rssi_location_attributes_coordinate1_and_path_loss_exponent() {
     let cluster = Utils::get_cluster("genRssiLocation", None, &CustomClusters::empty());
     let coordinate1 =
@@ -506,7 +481,6 @@ fn rssi_location_attributes_coordinate1_and_path_loss_exponent() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn process_attribute_pre_read_specific() {
     // upstream: `processAttributePreRead(attr)` throws when `read: false`
     let attribute = Attribute {
@@ -520,7 +494,6 @@ fn process_attribute_pre_read_specific() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn process_attribute_write_specific() {
     // upstream duplicate of the level-control write case
     let cluster = Utils::get_cluster("genLevelCtrl", None, &CustomClusters::empty());
@@ -537,7 +510,6 @@ fn process_attribute_write_specific() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn process_attribute_post_read_specific() {
     let cluster = Utils::get_cluster("genLevelCtrl", None, &CustomClusters::empty());
     let current_level =
@@ -565,7 +537,6 @@ fn process_attribute_post_read_specific() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn basic_attributes_zcl_version_and_power_source() {
     let cluster = Utils::get_cluster("genBasic", None, &CustomClusters::empty());
     let zcl_version =
@@ -594,7 +565,6 @@ fn basic_attributes_zcl_version_and_power_source() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn device_temperature_config_attribute_current_temperature() {
     let cluster = Utils::get_cluster("genDeviceTempCfg", None, &CustomClusters::empty());
     let attribute = Utils::get_cluster_attribute(&cluster, "currentTemperature", None)
@@ -615,7 +585,6 @@ fn device_temperature_config_attribute_current_temperature() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn maps_invalid_sentinel_to_na_n() {
     let attribute = Attribute {
         write: true,
@@ -633,7 +602,6 @@ fn maps_invalid_sentinel_to_na_n() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn maps_invalid_sentinel_to_na_n_with_different_min() {
     let attribute = Attribute {
         write: true,
@@ -652,7 +620,6 @@ fn maps_invalid_sentinel_to_na_n_with_different_min() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn maps_invalid_sentinel_to_na_n_with_different_max() {
     let attribute = Attribute {
         write: true,
@@ -671,7 +638,6 @@ fn maps_invalid_sentinel_to_na_n_with_different_max() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_invalid_sentinel_unchanged_if_same_as_min_ignore_invalid_sentinel() {
     let attribute = Attribute {
         write: true,
@@ -687,7 +653,6 @@ fn returns_invalid_sentinel_unchanged_if_same_as_min_ignore_invalid_sentinel() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_invalid_sentinel_unchanged_if_same_as_min_skips_invalid_sentinel() {
     let parameter = Parameter {
         r#type: DataType::INT16,
@@ -702,7 +667,6 @@ fn returns_invalid_sentinel_unchanged_if_same_as_min_skips_invalid_sentinel() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_invalid_sentinel_unchanged_if_same_as_max_ignore_invalid_sentinel() {
     let attribute = Attribute {
         write: true,
@@ -718,7 +682,6 @@ fn returns_invalid_sentinel_unchanged_if_same_as_max_ignore_invalid_sentinel() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_invalid_sentinel_unchanged_if_same_as_max_skips_invalid_sentinel() {
     let parameter = Parameter {
         r#type: DataType::UINT16,
@@ -733,7 +696,6 @@ fn returns_invalid_sentinel_unchanged_if_same_as_max_skips_invalid_sentinel() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_null_when_value_is_null_and_no_default() {
     let attribute = Attribute {
         write: true,
@@ -751,7 +713,6 @@ fn returns_null_when_value_is_null_and_no_default() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_value_unchanged_when_it_equals_default_skips_restrictions() {
     let attribute = Attribute {
         write: true,
@@ -771,7 +732,6 @@ fn returns_value_unchanged_when_it_equals_default_skips_restrictions() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn returns_value_when_null() {
     let parameter = create_parameter();
 
@@ -786,7 +746,6 @@ fn returns_value_when_null() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_below_min() {
     let attribute = Attribute {
         write: true,
@@ -813,7 +772,6 @@ fn throws_below_min() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_below_min_excl() {
     let attribute = Attribute {
         write: true,
@@ -840,7 +798,6 @@ fn throws_below_min_excl() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_at_min_excl() {
     let attribute = Attribute {
         write: true,
@@ -867,7 +824,6 @@ fn throws_at_min_excl() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_above_max() {
     let attribute = Attribute {
         write: true,
@@ -894,7 +850,6 @@ fn throws_above_max() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_above_max_excl() {
     let attribute = Attribute {
         write: true,
@@ -921,7 +876,6 @@ fn throws_above_max_excl() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_at_max_excl() {
     let attribute = Attribute {
         write: true,
@@ -948,7 +902,6 @@ fn throws_at_max_excl() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_not_length() {
     let attribute = Attribute {
         write: true,
@@ -975,7 +928,6 @@ fn throws_not_length() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_below_min_len() {
     let attribute = Attribute {
         write: true,
@@ -1002,7 +954,6 @@ fn throws_below_min_len() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_above_max_len() {
     let attribute = Attribute {
         write: true,
@@ -1029,7 +980,6 @@ fn throws_above_max_len() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn process_parameter_write_specific() {
     let cluster = Utils::get_cluster("genRssiLocation", None, &CustomClusters::empty());
     let command = Utils::get_cluster_command(&cluster, "setAbsolute");
@@ -1069,7 +1019,6 @@ fn process_parameter_write_specific() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn process_parameter_read_specific() {
     let cluster = Utils::get_cluster("genRssiLocation", None, &CustomClusters::empty());
     let command = Utils::get_cluster_command_response(&cluster, "locationDataNotification");
@@ -1103,7 +1052,6 @@ fn process_parameter_read_specific() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn scenes_attributes_last_cfg_by() {
     let cluster = Utils::get_cluster("genScenes", None, &CustomClusters::empty());
     let attribute = Utils::get_cluster_attribute(&cluster, "lastCfgBy", None).expect("lastCfgBy");
@@ -1115,7 +1063,6 @@ fn scenes_attributes_last_cfg_by() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn scenes_cmd_rsp_get_scene_membership_rsp_parameter_capacity() {
     let cluster = Utils::get_cluster("genScenes", None, &CustomClusters::empty());
     let command = Utils::get_cluster_command_response(&cluster, "getSceneMembershipRsp");

@@ -32,7 +32,6 @@ fn create_adapter(pan_id: u16) -> ZBOSSAdapter {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn reports_the_formed_network_after_forming_on_a_blank_ncp() {
     let mut adapter = create_adapter(0x1872);
     assert_eq!(adapter.start().await, "reset");
@@ -48,7 +47,6 @@ async fn reports_the_formed_network_after_forming_on_a_blank_ncp() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn reports_the_new_network_after_a_factory_reset_and_reform() {
     let mut adapter = create_adapter(0x1873);
     assert_eq!(adapter.start().await, "reset");

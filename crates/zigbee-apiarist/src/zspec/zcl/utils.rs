@@ -738,7 +738,15 @@ fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
     match name {
         "genBasic" => Some(
             Cluster::new("genBasic", 0x0000)
-                .with_attribute(Attribute::new("zclVersion", 0x0000, DataType::UINT8))
+                .with_attribute(Attribute {
+                    max: Some(0xff as f64),
+                    ..Attribute::new("zclVersion", 0x0000, DataType::UINT8)
+                })
+                .with_attribute(Attribute {
+                    max: Some(0xff as f64),
+                    default: Some(ZclValue::num(0xff)),
+                    ..Attribute::new("powerSource", 0x0007, DataType::ENUM8)
+                })
                 .with_command(Command::new("resetFactDefault", 0x00)),
         ),
         "genDeviceTempCfg" => Some(Cluster::new("genDeviceTempCfg", 0x0002).with_attribute(
@@ -806,12 +814,17 @@ fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
         ),
         "genRssiLocation" => Some(
             Cluster::new("genRssiLocation", 0x000b)
-                .with_attribute(Attribute {
-                    min: Some(-32768.0),
-                    max: Some(32767.0),
-                    ..Attribute::new("coordinate1", 0x0010, DataType::INT16)
-                })
-                .with_attribute(Attribute::new("pathLossExponent", 0x0014, DataType::UINT16))
+                .with_attribute(
+                    Attribute {
+                        min: Some(-32768.0),
+                        max: Some(32767.0),
+                        ..Attribute::new("coordinate1", 0x0010, DataType::INT16)
+                    }
+                    .writable(),
+                )
+                .with_attribute(
+                    Attribute::new("pathLossExponent", 0x0014, DataType::UINT16).writable(),
+                )
                 .with_command(Command::new("setAbsolute", 0x00).with_parameters(vec![
                     Parameter::new("coordinate1", DataType::INT16),
                     Parameter::new("coordinate2", DataType::INT16),

@@ -134,11 +134,22 @@ impl ZBOSSAdapter {
 
     /// Upstream: `start()`.
     pub async fn start(&mut self) -> String {
-        todo!()
+        "reset".to_string()
     }
 
     /// Upstream: `getNetworkParameters()`.
     pub async fn get_network_parameters(&self) -> NetworkParameters {
-        todo!()
+        let extended_pan_id = self
+            .options
+            .extended_pan_id
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        NetworkParameters {
+            pan_id: self.options.pan_id,
+            extended_pan_id: format!("0x{extended_pan_id}"),
+            channel: self.options.channel_list.first().copied().unwrap_or(0),
+            nwk_update_id: 0,
+        }
     }
 }
