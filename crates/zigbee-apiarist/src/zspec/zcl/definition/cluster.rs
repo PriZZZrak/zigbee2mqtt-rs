@@ -520,3 +520,27 @@ pub mod greenPower {
             Command::new("notification", 0).with_parameters(NOTIFICATION_PARAMS);
     }
 }
+
+#[allow(non_snake_case)]
+pub mod genTime {
+    pub const ID: u16 = 0x000a;
+    pub const name: &str = "genTime";
+}
+
+#[allow(non_snake_case)]
+pub mod ssIasZone {
+    pub const ID: u16 = 0x0500;
+    pub const name: &str = "ssIasZone";
+}
+
+#[allow(non_snake_case)]
+pub mod genPollCtrl {
+    pub const ID: u16 = 0x0020;
+    pub const name: &str = "genPollCtrl";
+}
+
+#[allow(non_snake_case)]
+pub mod genScenes {
+    pub const ID: u16 = 0x0005;
+    pub const name: &str = "genScenes";
+}
