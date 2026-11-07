@@ -1,8 +1,19 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/zclStatusError.ts
-// TODO: port public API from the original file.
 
-// pub fn ZclStatusError() { todo!() }
+use crate::zspec::zcl::definition::status::Status;
 
-pub fn zcl_status_error() {
-    todo!()
+/// Upstream `ZclStatusError`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZclStatusError {
+    pub code: Status,
+}
+
+impl ZclStatusError {
+    pub fn new(code: Status) -> Self {
+        Self { code }
+    }
+
+    pub fn message(&self) -> String {
+        format!("Status '{}'", self.code.name())
+    }
 }
