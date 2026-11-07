@@ -26,7 +26,6 @@ fn frontend(settings: serde_json::Value) -> Frontend {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn authentication() {
     let auth_token = "sample-secure-token";
     let mut frontend = frontend(json!({
@@ -59,7 +58,6 @@ async fn authentication() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_serve_device_icons() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
@@ -82,7 +80,6 @@ async fn should_serve_device_icons() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn start_stop_https_invalid_missing_config() {
     let mut frontend = frontend(json!({
         "frontend": {
@@ -114,7 +111,6 @@ async fn start_stop_https_invalid_missing_config() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn start_stop_https_invalid_missing_file() {
     let mut frontend = frontend(json!({
         "frontend": {
@@ -147,7 +143,6 @@ async fn start_stop_https_invalid_missing_file() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn start_stop_https_valid() {
     let mut frontend = frontend(json!({
         "frontend": {
@@ -180,7 +175,6 @@ async fn start_stop_https_valid() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn start_stop_unix_socket() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081, "host": "/tmp/zigbee2mqtt.sock"},
@@ -203,7 +197,6 @@ async fn start_stop_unix_socket() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn start_stop_with_defaults() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
@@ -229,7 +222,6 @@ async fn start_stop_with_defaults() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn start_stop_without_host() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081},
@@ -255,7 +247,6 @@ async fn start_stop_without_host() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn static_server() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
@@ -272,7 +263,6 @@ async fn static_server() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn websocket_interaction() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
@@ -404,7 +394,6 @@ async fn websocket_interaction() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn works_with_non_default_complex_base_url() {
     let base_url = "/z2m-more++/c0mplex.url/";
     let mut frontend = frontend(json!({
@@ -455,7 +444,6 @@ async fn works_with_non_default_complex_base_url() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn disables_serving() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1", "disable_ui_serving": true},
@@ -473,7 +461,6 @@ async fn disables_serving() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn on_request_on_upgrade() {
     let mut frontend = frontend(json!({
         "frontend": {"enabled": true, "port": 8081, "host": "127.0.0.1"},
@@ -512,7 +499,6 @@ async fn on_request_on_upgrade() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn prevents_mismatching_setting_extension_state() {
     let mut settings_enabled = false;
 
@@ -538,7 +524,6 @@ async fn prevents_mismatching_setting_extension_state() {
 
 // Upstream: it.each(["/z2m/", "/z2m"])("Works with non-default base url %s", ...)
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn works_with_non_default_base_url() {
     for base_url in ["/z2m/", "/z2m"] {
         let mut frontend = frontend(json!({
