@@ -134,6 +134,14 @@ fn setup() -> Publish {
     publish.add_device("MKS-CM-W5", &["1"]);
     publish.add_endpoint_alias("MKS-CM-W5", "l3", "3");
     publish.add_device("GL-S-007ZS", &["1"]);
+    publish.add_device("bulb", &["1"]);
+    publish.add_device("curtain", &["1"]);
+    publish.add_device("TS0601_switch", &["1"]);
+    publish.add_device("TS0601_cover_switch", &["1"]);
+    publish.add_device("QS-Zigbee-D02-TRIAC-2C-LN", &["2"]);
+    publish.add_endpoint_alias("QS-Zigbee-D02-TRIAC-2C-LN", "l2", "2");
+    publish.add_group("switch_group");
+    publish.add_group("group_with_tradfri");
     publish.add_device("button_double_key_interviewing", &["1"]);
     publish
         .devices
@@ -248,47 +256,221 @@ async fn hs2_wd_e_wrong_payload_should_use_defaults() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn home_assistant_should_not_set_state_when_color_is_also_set() {
-    todo!()
+async fn home_assistant_should_not_set_state_when_color_is_also_set() {
+    let mut publish = setup();
+    publish.homeassistant_enabled = true;
+    publish.set_device_state("bulb_color", json!({"state": "ON"}));
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "color": {"x": 0.41, "y": 0.25}}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "lightingColorCtrl".to_string(),
+            "moveToColor".to_string(),
+            json!({"colorx": 26869, "colory": 16384, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/bulb_color",
+        json!({"color": {"x": 0.41, "y": 0.25}, "state": "ON", "color_mode": "xy"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn home_assistant_should_not_set_state_when_color_temperature_is_also_set_and_device_is_already_on()
-{
-    todo!()
+async fn home_assistant_should_not_set_state_when_color_temperature_is_also_set_and_device_is_already_on(
+) {
+    let mut publish = setup();
+    publish.homeassistant_enabled = true;
+    publish.set_device_state("bulb_color", json!({"state": "ON"}));
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "color_temp": 100}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "lightingColorCtrl".to_string(),
+            "moveToColorTemp".to_string(),
+            json!({"colortemp": 100, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/bulb_color",
+        json!({"state": "ON", "color_temp": 100, "color_mode": "color_temp"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn home_assistant_should_set_state() {
-    todo!()
+async fn home_assistant_should_set_state() {
+    let mut publish = setup();
+    publish.homeassistant_enabled = true;
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "ON"}));
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "on".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/bulb_color",
+        json!({"state": "ON"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn home_assistant_should_set_state_when_color_temperature_is_also_set_and_device_is_off() {
-    todo!()
+async fn home_assistant_should_set_state_when_color_temperature_is_also_set_and_device_is_off() {
+    let mut publish = setup();
+    publish.homeassistant_enabled = true;
+    publish.set_device_state("bulb_color", json!({"state": "OFF"}));
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "color_temp": 100}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![
+            (
+                "genOnOff".to_string(),
+                "on".to_string(),
+                json!({}),
+                json!({})
+            ),
+            (
+                "lightingColorCtrl".to_string(),
+                "moveToColorTemp".to_string(),
+                json!({"colortemp": 100, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/bulb_color",
+        json!({"state": "ON", "color_temp": 100, "color_mode": "color_temp"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn log_an_error_when_entity_is_not_found() {
-    todo!()
+async fn log_an_error_when_entity_is_not_found() {
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/an_unknown_entity/set", &json!({}));
+
+    assert!(publish.logs.iter().any(|(level, message, _)| {
+        level == "error" && message == "Entity 'an_unknown_entity' is unknown"
+    }));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn message_transition_should_overrule_options_transition() {
-    todo!()
+async fn message_transition_should_overrule_options_transition() {
+    let mut publish = setup();
+    publish.devices.get_mut("bulb_color").unwrap().transition = Some(20);
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"brightness": 200, "transition": 10}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 200, "transtime": 100, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn scenes() {
-    todo!()
+async fn scenes() {
+    let mut publish = setup();
+    publish.add_group("group_tradfri_remote");
+    publish.add_group_member("group_tradfri_remote", "bulb_color_2", "1");
+    publish.add_group_member("group_tradfri_remote", "bulb_2", "1");
+    publish.add_group("ha_discovery_group");
+    publish.add_group_member("ha_discovery_group", "bulb_color_2", "1");
+    publish.add_group_member("ha_discovery_group", "bulb_2", "1");
+    publish.add_group_member("group_with_tradfri", "bulb_2", "1");
+    publish.add_group_member("switch_group", "bulb_2", "1");
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color_2/set",
+        &json!({"state": "ON", "brightness": 50, "color_temp": 290}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_2/set",
+        &json!({"state": "ON", "brightness": 100}),
+    );
+
+    publish.on_mqtt(
+        "zigbee2mqtt/group_tradfri_remote/set",
+        &json!({"scene_store": 1}),
+    );
+    assert_eq!(
+        publish.group("group_tradfri_remote").commands,
+        vec![(
+            "genScenes".to_string(),
+            "store".to_string(),
+            json!({"groupid": 15071, "sceneid": 1}),
+            json!({})
+        )]
+    );
+    assert!(publish
+        .published
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/devices"));
+    assert!(publish
+        .published
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/groups"));
+
+    publish.group("group_tradfri_remote").commands.clear();
+    publish.published.clear();
+    publish.on_mqtt(
+        "zigbee2mqtt/group_tradfri_remote/set",
+        &json!({"scene_recall": 1}),
+    );
+    assert_eq!(
+        publish.group("group_tradfri_remote").commands,
+        vec![(
+            "genScenes".to_string(),
+            "recall".to_string(),
+            json!({"groupid": 15071, "sceneid": 1, "transitionTime": 0xffff}),
+            json!({})
+        )]
+    );
+    assert_eq!(publish.published.len(), 8);
+    assert_eq!(
+        publish.published[0].1,
+        json!({"brightness": 50, "color_temp": 290, "state": "ON", "color_mode": "color_temp"})
+    );
 }
 
 #[tokio::test]
@@ -323,16 +505,83 @@ async fn should_allow_to_invert_cover() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_allow_to_set_color_via_hue_and_saturation() {
-    todo!()
+async fn should_allow_to_set_color_via_hue_and_saturation() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"color": {"hue": 250, "saturation": 50}}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "lightingColorCtrl".to_string(),
+            "enhancedMoveToHueAndSaturation".to_string(),
+            json!({"enhancehue": 45510, "saturation": 127, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/bulb_color",
+        json!({"color": {"hue": 250, "saturation": 50}, "color_mode": "hs"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_also_use_on_off_cluster_when_controlling_group_with_switch() {
-    todo!()
+async fn should_also_use_on_off_cluster_when_controlling_group_with_switch() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/switch_group/set",
+        &json!({"state": "ON", "brightness": 100}),
+    );
+
+    assert_eq!(
+        publish.group("switch_group").commands,
+        vec![
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 100, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genOnOff".to_string(),
+                "on".to_string(),
+                json!({}),
+                json!({})
+            ),
+        ]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/switch_group",
+        json!({"state": "ON", "brightness": 100})
+    ));
+
+    publish.group("switch_group").commands.clear();
+    publish.published.clear();
+    publish.on_mqtt("zigbee2mqtt/switch_group/set", &json!({"state": "OFF"}));
+
+    assert_eq!(
+        publish.group("switch_group").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "off".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/switch_group",
+        json!({"state": "OFF", "brightness": 100})
+    ));
 }
 
 #[tokio::test]
@@ -830,16 +1079,83 @@ async fn should_publish_messages_groups() {
     assert_eq!(publish.published[1].1, json!({"state": "ON"}));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_messages_to_tuya_cover_switch_with_dummy_endpoints() {
-    todo!()
+async fn should_publish_messages_to_tuya_cover_switch_with_dummy_endpoints() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/TS0601_cover_switch/set",
+        &json!({"state": "OPEN"}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/TS0601_cover_switch/set",
+        &json!({"state_l1": "ON"}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/TS0601_cover_switch/l2/set",
+        &json!({"state": "OFF"}),
+    );
+
+    assert_eq!(
+        publish.endpoint("TS0601_cover_switch", "1").commands.len(),
+        3
+    );
+    assert!(publish
+        .endpoint("TS0601_cover_switch", "1")
+        .commands
+        .contains(&(
+            "manuSpecificTuya".to_string(),
+            "dataRequest".to_string(),
+            json!({"dpValues": [{"data": [0], "datatype": 4, "dp": 1}], "seq": 0}),
+            json!({"disableDefaultResponse": true})
+        )));
+    assert!(publish
+        .endpoint("TS0601_cover_switch", "1")
+        .commands
+        .contains(&(
+            "manuSpecificTuya".to_string(),
+            "dataRequest".to_string(),
+            json!({"dpValues": [{"data": [1], "datatype": 1, "dp": 102}], "seq": 0}),
+            json!({"disableDefaultResponse": true})
+        )));
+    assert!(publish
+        .endpoint("TS0601_cover_switch", "1")
+        .commands
+        .contains(&(
+            "manuSpecificTuya".to_string(),
+            "dataRequest".to_string(),
+            json!({"dpValues": [{"data": [0], "datatype": 1, "dp": 101}], "seq": 0}),
+            json!({"disableDefaultResponse": true})
+        )));
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/TS0601_cover_switch",
+        json!({"state_l2": "OFF", "state_l1": "ON", "state": "OPEN"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_messages_to_tuya_switch_with_dummy_endpoints() {
-    todo!()
+async fn should_publish_messages_to_tuya_switch_with_dummy_endpoints() {
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/TS0601_switch/set", &json!({"state_l2": "ON"}));
+
+    assert_eq!(
+        publish.endpoint("TS0601_switch", "1").commands,
+        vec![(
+            "manuSpecificTuya".to_string(),
+            "dataRequest".to_string(),
+            json!({"dpValues": [{"data": [1], "datatype": 1, "dp": 2}], "seq": 0}),
+            json!({"disableDefaultResponse": true})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/TS0601_switch",
+        json!({"state_l2": "ON"})
+    ));
 }
 
 #[tokio::test]
@@ -1047,16 +1363,56 @@ async fn should_publish_messages_to_zigbee_devices() {
     ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_brightness_ep() {
-    todo!()
+async fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_brightness_ep() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/0x0017882194e45543/set",
+        &json!({"state_l2": "ON", "brightness_l2": 50}),
+    );
+
+    assert_eq!(
+        publish.endpoint("QS-Zigbee-D02-TRIAC-2C-LN", "2").commands,
+        vec![(
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 50, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/QS-Zigbee-D02-TRIAC-2C-LN",
+        json!({"brightness_l2": 50, "state_l2": "ON"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_state_ep() {
-    todo!()
+async fn should_publish_messages_to_zigbee_devices_to_non_default_ep_with_state_ep() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/wall_switch_double/set",
+        &json!({"state_right": "OFF"}),
+    );
+
+    assert_eq!(
+        publish.endpoint("wall_switch_double", "3").commands,
+        vec![(
+            "genOnOff".to_string(),
+            "off".to_string(),
+            json!({}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/wall_switch_double",
+        json!({"state_right": "OFF"})
+    ));
 }
 
 #[tokio::test]
@@ -1629,17 +1985,81 @@ async fn should_publish_to_mks_cm_w5() {
     ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_restore_brightness_when_its_turned_off_without_transition_and_is_turned_on_with() {
-    todo!()
+async fn should_restore_brightness_when_its_turned_off_without_transition_and_is_turned_on_with() {
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "ON"}));
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "brightness": 123}),
+    );
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "OFF"}));
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 1.0}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![
+            (
+                "genOnOff".to_string(),
+                "on".to_string(),
+                json!({}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 123, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genOnOff".to_string(),
+                "off".to_string(),
+                json!({}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 123, "transtime": 10, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_restore_brightness_when_its_turned_on_with_transition_z2_m_is_restarted_and_turned_on_again(
+async fn should_restore_brightness_when_its_turned_on_with_transition_z2_m_is_restarted_and_turned_on_again(
 ) {
-    todo!()
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "brightness": 20, "transition": 0.0}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 1.0}),
+    );
+
+    assert_eq!(publish.endpoint("bulb_color", "1").commands.len(), 2);
+    assert!(publish.endpoint("bulb_color", "1").commands.contains(&(
+        "genLevelCtrl".to_string(),
+        "moveToLevelWithOnOff".to_string(),
+        json!({"level": 20, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+        json!({})
+    )));
+    assert!(publish.endpoint("bulb_color", "1").commands.contains(&(
+        "genLevelCtrl".to_string(),
+        "moveToLevelWithOnOff".to_string(),
+        json!({"level": 20, "transtime": 10, "optionsMask": 0, "optionsOverride": 0}),
+        json!({})
+    )));
 }
 
 #[tokio::test]
@@ -1701,29 +2121,176 @@ async fn should_set_state_before_color() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_set_state_with_brightness_before_color() {
-    todo!()
+async fn should_set_state_with_brightness_before_color() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+            "zigbee2mqtt/bulb_color/set",
+            &json!({"state": "ON", "color": {"x": 0.701, "y": 0.299}, "transition": 3, "brightness": 100}),
+        );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 100, "transtime": 30, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "lightingColorCtrl".to_string(),
+                "moveToColor".to_string(),
+                json!({"colorx": 45940, "colory": 19595, "transtime": 30, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_sync_colors() {
-    todo!()
+async fn should_sync_colors() {
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"color_temp": 100}));
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"color": {"x": 0.1, "y": 0.5}}),
+    );
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"color_temp": 300}));
+
+    assert_eq!(publish.published.len(), 3);
+    assert_eq!(
+        publish.published[0].1,
+        json!({"color_mode": "color_temp", "color_temp": 100})
+    );
+    assert_eq!(
+        publish.published[1].1,
+        json!({"color": {"x": 0.1, "y": 0.5}, "color_mode": "xy", "color_temp": 79})
+    );
+    assert_eq!(
+        publish.published[2].1,
+        json!({"color": {"x": 0.4152, "y": 0.3954}, "color_mode": "color_temp", "color_temp": 300})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_turn_bulb_on_with_correct_brightness_when_device_is_turned_off_twice_and_brightness_is_reported(
+async fn should_turn_bulb_on_with_correct_brightness_when_device_is_turned_off_twice_and_brightness_is_reported(
 ) {
-    todo!()
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "brightness": 200}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "OFF", "transition": 0}),
+    );
+    publish.set_device_state("bulb_color", json!({"state": "OFF", "brightness": 1}));
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "OFF", "transition": 0}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 0}),
+    );
+
+    assert_eq!(publish.published.len(), 5);
+    assert_eq!(
+        publish.published[0].1,
+        json!({"state": "ON", "brightness": 200})
+    );
+    assert_eq!(
+        publish.published[1].1,
+        json!({"state": "OFF", "brightness": 200})
+    );
+    assert_eq!(
+        publish.published[2].1,
+        json!({"state": "OFF", "brightness": 1})
+    );
+    assert_eq!(
+        publish.published[3].1,
+        json!({"state": "OFF", "brightness": 1})
+    );
+    assert_eq!(
+        publish.published[4].1,
+        json!({"state": "ON", "brightness": 200})
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 200, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 0, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 0, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 200, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_turn_bulb_on_with_full_brightness_when_transition_is_used_and_no_brightness_is_known() {
-    todo!()
+async fn should_turn_bulb_on_with_full_brightness_when_transition_is_used_and_no_brightness_is_known(
+) {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "OFF", "transition": 0.5}),
+    );
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 0.5}),
+    );
+
+    assert_eq!(publish.published[0].1, json!({"state": "OFF"}));
+    assert_eq!(
+        publish.published[1].1,
+        json!({"state": "ON", "brightness": 254})
+    );
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 0, "transtime": 5, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 254, "transtime": 5, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
 }
 
 #[tokio::test]
@@ -1816,22 +2383,72 @@ async fn should_turn_device_off_when_brightness_0_is_send_with_transition() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_turn_device_off_with_on_off_on_off_with_transition() {
-    todo!()
+async fn should_turn_device_off_with_on_off_on_off_with_transition() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "OFF", "transition": 1}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 0, "transtime": 10, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert!(has(
+        &publish,
+        "zigbee2mqtt/bulb_color",
+        json!({"state": "OFF"})
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_turn_device_on_with_on_off_when_transition_is_provided() {
-    todo!()
+async fn should_turn_device_on_with_on_off_when_transition_is_provided() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 3}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 254, "transtime": 30, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_turn_device_on_with_on_off_with_transition_when_transition_0_is_provided() {
-    todo!()
+async fn should_turn_device_on_with_on_off_with_transition_when_transition_0_is_provided() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 0}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 254, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
 }
 
 #[tokio::test]
@@ -1872,17 +2489,64 @@ async fn should_use_transition_on_brightness_command() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_use_transition_only_once_when_setting_brightness_and_color_temperature_for_tradfri() {
-    todo!()
+async fn should_use_transition_only_once_when_setting_brightness_and_color_temperature_for_tradfri()
+{
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb/set",
+        &json!({"state": "ON", "brightness": 20, "color_temp": 200, "transition": 20}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb", "1").commands,
+        vec![
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 20, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "lightingColorCtrl".to_string(),
+                "moveToColorTemp".to_string(),
+                json!({"colortemp": 200, "transtime": 200, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_use_transition_only_once_when_setting_brightness_and_color_temperature_for_group_which_contains_tradfri(
+async fn should_use_transition_only_once_when_setting_brightness_and_color_temperature_for_group_which_contains_tradfri(
 ) {
-    todo!()
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/group_with_tradfri/set",
+        &json!({"state": "ON", "transition": 60, "brightness": 20, "color_temp": 400}),
+    );
+
+    assert_eq!(
+        publish.group("group_with_tradfri").commands,
+        vec![
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 20, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "lightingColorCtrl".to_string(),
+                "moveToColorTemp".to_string(),
+                json!({"colortemp": 400, "transtime": 600, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
 }
 
 #[tokio::test]
@@ -1911,10 +2575,23 @@ async fn should_use_transition_when_brightness_with_group() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_use_transition_when_color_temp() {
-    todo!()
+async fn should_use_transition_when_color_temp() {
+    let mut publish = setup();
+    publish.devices.get_mut("bulb_color").unwrap().transition = Some(20);
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"color_temp": 200}));
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "lightingColorCtrl".to_string(),
+            "moveToColorTemp".to_string(),
+            json!({"colortemp": 200, "transtime": 200, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
 }
 
 #[tokio::test]
@@ -1983,43 +2660,228 @@ async fn shouldnt_publish_new_state_when_optimistic_false_for_group() {
     assert_eq!(publish.published.len(), 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn shouldnt_use_move_to_level_with_on_off_on_turn_on_when_no_transition_has_been_used_as_some_devices_do_not_turn_on_in_that_case(
+async fn shouldnt_use_move_to_level_with_on_off_on_turn_on_when_no_transition_has_been_used_as_some_devices_do_not_turn_on_in_that_case(
 ) {
-    todo!()
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "ON"}));
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"brightness": 150}));
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "OFF"}));
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "ON"}));
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![
+            (
+                "genOnOff".to_string(),
+                "on".to_string(),
+                json!({}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 150, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genOnOff".to_string(),
+                "off".to_string(),
+                json!({}),
+                json!({})
+            ),
+            (
+                "genOnOff".to_string(),
+                "on".to_string(),
+                json!({}),
+                json!({})
+            ),
+        ]
+    );
+    assert_eq!(publish.published.len(), 4);
+    assert_eq!(publish.published[0].1, json!({"state": "ON"}));
+    assert_eq!(
+        publish.published[1].1,
+        json!({"state": "ON", "brightness": 150})
+    );
+    assert_eq!(
+        publish.published[2].1,
+        json!({"state": "OFF", "brightness": 150})
+    );
+    assert_eq!(
+        publish.published[3].1,
+        json!({"state": "ON", "brightness": 150})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn transition_parameter_should_not_influence_brightness_on_state_on() {
-    todo!()
+async fn transition_parameter_should_not_influence_brightness_on_state_on() {
+    let mut publish = setup();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "brightness": 50}),
+    );
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "ON"}));
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 1}),
+    );
+
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 50, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+            (
+                "genOnOff".to_string(),
+                "on".to_string(),
+                json!({}),
+                json!({})
+            ),
+            (
+                "genLevelCtrl".to_string(),
+                "moveToLevelWithOnOff".to_string(),
+                json!({"level": 50, "transtime": 10, "optionsMask": 0, "optionsOverride": 0}),
+                json!({})
+            ),
+        ]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn when_device_is_turned_off_and_on_with_transition_with_report_enabled_it_should_restore_correct_brightness(
+async fn when_device_is_turned_off_and_on_with_transition_with_report_enabled_it_should_restore_correct_brightness(
 ) {
-    todo!()
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"brightness": 200}));
+    publish.endpoint("bulb_color", "1").commands.clear();
+    publish.published.clear();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "OFF", "transition": 3}),
+    );
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 0, "transtime": 30, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert_eq!(
+        publish.published[0].1,
+        json!({"state": "OFF", "brightness": 200})
+    );
+
+    publish.set_device_state("bulb_color", json!({"state": "OFF", "brightness": 1}));
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "ON", "transition": 3}),
+    );
+
+    assert_eq!(publish.endpoint("bulb_color", "1").commands.len(), 2);
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands[1],
+        (
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 200, "transtime": 30, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )
+    );
+    assert_eq!(
+        publish.published[2].1,
+        json!({"state": "ON", "brightness": 200})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn when_device_is_turned_off_with_transition_and_turned_on_without_transition_it_should_restore_the_brightness(
+async fn when_device_is_turned_off_with_transition_and_turned_on_without_transition_it_should_restore_the_brightness(
 ) {
-    todo!()
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"brightness": 200}));
+    publish.endpoint("bulb_color", "1").commands.clear();
+    publish.published.clear();
+
+    publish.on_mqtt(
+        "zigbee2mqtt/bulb_color/set",
+        &json!({"state": "OFF", "transition": 3}),
+    );
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands,
+        vec![(
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 0, "transtime": 30, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )]
+    );
+    assert_eq!(
+        publish.published[0].1,
+        json!({"state": "OFF", "brightness": 200})
+    );
+
+    publish.on_mqtt("zigbee2mqtt/bulb_color/set", &json!({"state": "ON"}));
+    assert_eq!(
+        publish.endpoint("bulb_color", "1").commands[1],
+        (
+            "genLevelCtrl".to_string(),
+            "moveToLevelWithOnOff".to_string(),
+            json!({"level": 200, "transtime": 0, "optionsMask": 0, "optionsOverride": 0}),
+            json!({})
+        )
+    );
+    assert_eq!(
+        publish.published[1].1,
+        json!({"state": "ON", "brightness": 200})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn zncldj11_lm_open() {
-    todo!()
+async fn zncldj11_lm_open() {
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/curtain/set", &json!({"state": "OPEN"}));
+
+    assert_eq!(
+        publish.endpoint("curtain", "1").writes,
+        vec![(
+            "genAnalogOutput".to_string(),
+            json!({"presentValue": 100}),
+            json!({})
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn zncldj11_lm_position() {
-    todo!()
+async fn zncldj11_lm_position() {
+    let mut publish = setup();
+
+    publish.on_mqtt("zigbee2mqtt/curtain/set", &json!({"position": 10}));
+
+    assert_eq!(
+        publish.endpoint("curtain", "1").writes,
+        vec![(
+            "genAnalogOutput".to_string(),
+            json!({"presentValue": 10}),
+            json!({})
+        )]
+    );
 }
 
 // Upstream has several additional tests with the same title `Should handle non-valid topics`.

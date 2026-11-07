@@ -49,6 +49,8 @@ pub struct Publish {
     /// `(level, message, namespace)`.
     pub logs: Vec<(String, String, String)>,
     pub base_topic: String,
+    pub device_states: BTreeMap<String, Value>,
+    pub homeassistant_enabled: bool,
 }
 
 impl Publish {
@@ -78,6 +80,10 @@ impl Publish {
                 invert_cover: false,
             },
         );
+    }
+
+    pub fn set_device_state(&mut self, device: &str, state: Value) {
+        self.device_states.insert(device.to_string(), state);
     }
 
     pub fn add_endpoint_alias(&mut self, device: &str, alias: &str, endpoint: &str) {
