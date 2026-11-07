@@ -82,7 +82,6 @@ fn total_pings(availability: &Availability, devices: &[&str]) -> usize {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_be_disabled() {
     let mut availability = setup();
     availability.set_enabled(false);
@@ -100,7 +99,6 @@ async fn should_allow_to_be_disabled() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_change_availability_timeout_via_avaiability_options() {
     let mut availability = setup();
     availability.set_active_timeout(30);
@@ -120,7 +118,6 @@ async fn should_allow_to_change_availability_timeout_via_avaiability_options() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_change_availability_timeout_via_device_options() {
     let mut availability = setup();
     availability.set_timeout("bulb_color", 40);
@@ -140,7 +137,6 @@ async fn should_allow_to_change_availability_timeout_via_device_options() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_enable_availability_for_just_one_device() {
     let mut availability = setup();
     availability.set_enabled(false);
@@ -159,7 +155,6 @@ async fn should_allow_to_enable_availability_for_just_one_device() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_clear_the_ping_queue_on_stop() {
     let mut availability = setup();
     availability.start();
@@ -173,7 +168,6 @@ async fn should_clear_the_ping_queue_on_stop() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_immediately_mark_device_as_online_when_it_last_seen_changes() {
     let mut availability = setup();
     availability.start();
@@ -197,7 +191,6 @@ async fn should_immediately_mark_device_as_online_when_it_last_seen_changes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_ping_disabled_devices() {
     let mut availability = setup();
     availability.set_disabled("bulb_color");
@@ -215,7 +208,6 @@ async fn should_not_ping_disabled_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_ping_on_startup_for_available_or_disabled_devices() {
     let mut availability = setup();
     availability.set_availability("bulb_color_2", true);
@@ -231,7 +223,6 @@ async fn should_not_ping_on_startup_for_available_or_disabled_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_ping_again_when_first_ping_fails() {
     let mut availability = setup();
     availability.start();
@@ -245,7 +236,6 @@ async fn should_ping_again_when_first_ping_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_ping_on_startup_for_enabled_and_unavailable_devices() {
     let mut availability = setup();
     availability.set_availability("bulb_color_2", true);
@@ -260,7 +250,6 @@ async fn should_ping_on_startup_for_enabled_and_unavailable_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_prevent_instance_restart() {
     let mut availability = setup();
     availability.start();
@@ -271,7 +260,6 @@ async fn should_prevent_instance_restart() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_availability_for_groups() {
     let mut availability = setup();
     availability.set_availability("bulb_color_2", true);
@@ -308,7 +296,6 @@ async fn should_publish_availability_for_groups() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_availability_on_startup_for_device_where_it_is_enabled_for() {
     let mut availability = setup();
     availability.start();
@@ -331,7 +318,6 @@ async fn should_publish_availability_on_startup_for_device_where_it_is_enabled_f
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_availability_payload_in_json_format() {
     let mut availability = setup();
     availability.start();
@@ -354,7 +340,6 @@ async fn should_publish_availability_payload_in_json_format() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_offline_for_active_device_when_not_seen_for_10_minutes() {
     let mut availability = setup();
     availability.start();
@@ -373,7 +358,6 @@ async fn should_publish_offline_for_active_device_when_not_seen_for_10_minutes()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_offline_for_passive_device_when_not_seen_for_25_hours() {
     let mut availability = setup();
     availability.start();
@@ -390,7 +374,6 @@ async fn should_publish_offline_for_passive_device_when_not_seen_for_25_hours() 
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_republish_availability_when_device_is_renamed() {
     let mut availability = setup();
     availability.start();
@@ -418,7 +401,6 @@ async fn should_republish_availability_when_device_is_renamed() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_reset_ping_timer_when_device_last_seen_changes_for_active_device() {
     let mut availability = setup();
     availability.start();
@@ -442,7 +424,6 @@ async fn should_reset_ping_timer_when_device_last_seen_changes_for_active_device
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_reset_ping_timer_when_device_last_seen_changes_for_passive_device() {
     let mut availability = setup();
     availability.start();
@@ -466,7 +447,6 @@ async fn should_reset_ping_timer_when_device_last_seen_changes_for_passive_devic
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_retrieve_device_state_when_it_reconnects() {
     let mut availability = setup();
     availability.start();
@@ -486,7 +466,6 @@ async fn should_retrieve_device_state_when_it_reconnects() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_stop_pinging_device_when_it_is_removed() {
     let mut availability = setup();
     availability.start();
@@ -501,7 +480,6 @@ async fn should_stop_pinging_device_when_it_is_removed() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_stop_pinging_device_when_it_leaves() {
     let mut availability = setup();
     availability.start();
@@ -516,7 +494,6 @@ async fn should_stop_pinging_device_when_it_leaves() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn shouldnt_do_anything_for_a_device_when_availability_false_is_set_for_device() {
     let mut availability = setup();
     availability.start();
@@ -528,7 +505,6 @@ async fn shouldnt_do_anything_for_a_device_when_availability_false_is_set_for_de
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn allows_to_disable_backoff() {
     let mut availability = setup();
     availability.set_max_jitter(0);
@@ -560,7 +536,6 @@ async fn allows_to_disable_backoff() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn clamps_the_ping_delay_to_the_maximum_supported_timeout() {
     let mut availability = setup();
     // ~27.8 days
@@ -575,7 +550,6 @@ async fn clamps_the_ping_delay_to_the_maximum_supported_timeout() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn does_not_trigger_backoff_on_ping_success() {
     let mut availability = setup();
     availability.set_max_jitter(0);
@@ -590,7 +564,6 @@ async fn does_not_trigger_backoff_on_ping_success() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn jitters_pings() {
     let mut availability = setup_with_jitter_devices();
     availability.set_device_max_jitter("hue_twilight", 1000);
@@ -631,7 +604,6 @@ async fn jitters_pings() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn pauses_when_backoff_reaches_configured_value_and_unpauses_on_last_seen() {
     let mut availability = setup_with_jitter_devices();
     availability.set_max_jitter(0);
@@ -681,7 +653,6 @@ async fn pauses_when_backoff_reaches_configured_value_and_unpauses_on_last_seen(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn resets_backoff_on_last_seen() {
     let mut availability = setup();
     availability.set_max_jitter(0);
@@ -700,7 +671,6 @@ async fn resets_backoff_on_last_seen() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn triggers_backoff_on_successive_ping_failures() {
     let mut availability = setup_with_jitter_devices();
     availability.set_max_jitter(0);
