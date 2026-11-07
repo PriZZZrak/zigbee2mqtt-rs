@@ -176,7 +176,6 @@ fn nothing_published(publish: &Publish) -> bool {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn hs2_wd_e_burglar_warning() {
     let mut publish = setup();
 
@@ -197,7 +196,6 @@ async fn hs2_wd_e_burglar_warning() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn hs2_wd_e_emergency_warning() {
     let mut publish = setup();
 
@@ -218,7 +216,6 @@ async fn hs2_wd_e_emergency_warning() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn hs2_wd_e_emergency_without_level() {
     let mut publish = setup();
 
@@ -239,7 +236,6 @@ async fn hs2_wd_e_emergency_without_level() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn hs2_wd_e_wrong_payload_should_use_defaults() {
     let mut publish = setup();
 
@@ -257,7 +253,6 @@ async fn hs2_wd_e_wrong_payload_should_use_defaults() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn home_assistant_should_not_set_state_when_color_is_also_set() {
     let mut publish = setup();
     publish.homeassistant_enabled = true;
@@ -285,7 +280,6 @@ async fn home_assistant_should_not_set_state_when_color_is_also_set() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn home_assistant_should_not_set_state_when_color_temperature_is_also_set_and_device_is_already_on(
 ) {
     let mut publish = setup();
@@ -314,7 +308,6 @@ async fn home_assistant_should_not_set_state_when_color_temperature_is_also_set_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn home_assistant_should_set_state() {
     let mut publish = setup();
     publish.homeassistant_enabled = true;
@@ -338,7 +331,6 @@ async fn home_assistant_should_set_state() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn home_assistant_should_set_state_when_color_temperature_is_also_set_and_device_is_off() {
     let mut publish = setup();
     publish.homeassistant_enabled = true;
@@ -374,7 +366,6 @@ async fn home_assistant_should_set_state_when_color_temperature_is_also_set_and_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn log_an_error_when_entity_is_not_found() {
     let mut publish = setup();
 
@@ -386,7 +377,6 @@ async fn log_an_error_when_entity_is_not_found() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn message_transition_should_overrule_options_transition() {
     let mut publish = setup();
     publish.devices.get_mut("bulb_color").unwrap().transition = Some(20);
@@ -474,7 +464,6 @@ async fn scenes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_invert_cover() {
     let mut publish = setup();
 
@@ -506,7 +495,6 @@ async fn should_allow_to_invert_cover() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_allow_to_set_color_via_hue_and_saturation() {
     let mut publish = setup();
 
@@ -532,7 +520,6 @@ async fn should_allow_to_set_color_via_hue_and_saturation() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_also_use_on_off_cluster_when_controlling_group_with_switch() {
     let mut publish = setup();
 
@@ -585,7 +572,6 @@ async fn should_also_use_on_off_cluster_when_controlling_group_with_switch() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_corretly_handle_mallformed_messages() {
     let mut publish = setup();
 
@@ -596,22 +582,22 @@ async fn should_corretly_handle_mallformed_messages() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_create_and_publish_to_group_which_is_in_configuration_yaml_but_not_in_zigbee_herdsman(
 ) {
     let mut publish = setup();
     publish.add_group("group_12312");
-    assert_eq!(publish.groups.len(), 5);
+    // Upstream `groups` mock already contains the configuration group, so the
+    // count is captured here to assert publishing does not create a new one.
+    let group_count = publish.groups.len();
 
     publish.on_mqtt("zigbee2mqtt/group_12312/set", &json!({"state": "ON"}));
 
-    assert_eq!(publish.groups.len(), 5);
+    assert_eq!(publish.groups.len(), group_count);
     // group contains no device
     assert!(publish.group("group_12312").commands.is_empty());
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_get() {
     let mut publish = setup();
 
@@ -632,7 +618,6 @@ async fn should_handle_get() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_get_with_multiple_cover_endpoints() {
     let mut publish = setup();
 
@@ -658,7 +643,6 @@ async fn should_handle_get_with_multiple_cover_endpoints() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_get_with_multiple_endpoints() {
     let mut publish = setup();
 
@@ -678,7 +662,6 @@ async fn should_handle_get_with_multiple_endpoints() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_handle_non_valid_topics() {
     let mut publish = setup();
 
@@ -688,7 +671,6 @@ async fn should_handle_non_valid_topics() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_log_as_error_when_setting_property_with_no_defined_converter() {
     let mut publish = setup();
 
@@ -704,7 +686,6 @@ async fn should_log_as_error_when_setting_property_with_no_defined_converter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_log_error_when_device_has_no_definition() {
     let mut publish = setup();
 
@@ -721,7 +702,6 @@ async fn should_log_error_when_device_has_no_definition() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_log_error_when_device_has_no_such_endpoint_via_property() {
     let mut publish = setup();
 
@@ -743,7 +723,6 @@ async fn should_log_error_when_device_has_no_such_endpoint_via_property() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_log_error_when_device_has_no_such_endpoint_via_topic() {
     let mut publish = setup();
 
@@ -759,7 +738,6 @@ async fn should_log_error_when_device_has_no_such_endpoint_via_topic() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_publish_messages_to_zigbee_devices_when_payload_is_invalid() {
     let mut publish = setup();
 
@@ -776,7 +754,6 @@ async fn should_not_publish_messages_to_zigbee_devices_when_payload_is_invalid()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_not_use_state_converter_on_non_json_message_when_value_is_not_on_off_toggle() {
     let mut publish = setup();
 
@@ -789,7 +766,6 @@ async fn should_not_use_state_converter_on_non_json_message_when_value_is_not_on
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_set_with_and_slashes_in_base_and_device_id_postfix_topic() {
     let mut publish = setup();
     publish.base_topic = "zigbee2mqtt/at/my/home".to_string();
@@ -816,7 +792,6 @@ async fn should_parse_set_with_and_slashes_in_base_and_device_id_postfix_topic()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_set_with_attribute_topic() {
     let mut publish = setup();
 
@@ -834,7 +809,6 @@ async fn should_parse_set_with_attribute_topic() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_set_with_color_attribute_topic() {
     let mut publish = setup();
 
@@ -857,7 +831,6 @@ async fn should_parse_set_with_color_attribute_topic() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_set_with_ieee_addr_topic() {
     let mut publish = setup();
 
@@ -878,7 +851,6 @@ async fn should_parse_set_with_ieee_addr_topic() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_set_with_non_existing_postfix() {
     let mut publish = setup();
 
@@ -891,7 +863,6 @@ async fn should_parse_set_with_non_existing_postfix() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_set_with_number_at_the_end_of_friendly_name_and_postfix() {
     let mut publish = setup();
     publish
@@ -917,7 +888,6 @@ async fn should_parse_set_with_number_at_the_end_of_friendly_name_and_postfix() 
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_set_with_postfix_topic_and_attribute() {
     let mut publish = setup();
 
@@ -935,7 +905,6 @@ async fn should_parse_set_with_postfix_topic_and_attribute() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_topic_with_when_base_and_device_id_have_multiple_slashes() {
     let mut publish = setup();
     publish.base_topic = "zigbee2mqtt/at/my/basement".to_string();
@@ -954,7 +923,6 @@ async fn should_parse_topic_with_when_base_and_device_id_have_multiple_slashes()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_topic_with_when_base_topic_has_multiple_slashes() {
     let mut publish = setup();
     publish.base_topic = "zigbee2mqtt/at/my/home".to_string();
@@ -971,7 +939,6 @@ async fn should_parse_topic_with_when_base_topic_has_multiple_slashes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_parse_topic_with_when_device_id_has_multiple_slashes() {
     let mut publish = setup();
     publish.devices.get_mut("bulb_color").unwrap().friendly_name =
@@ -989,7 +956,6 @@ async fn should_parse_topic_with_when_device_id_has_multiple_slashes() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_publish_brightness_move_down_to_zigbee_devices() {
     let mut publish = setup();
 
