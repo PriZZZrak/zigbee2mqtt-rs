@@ -140,7 +140,6 @@ fn capabilities_device() -> serde_json::Value {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn checks_if_more_available_to_by_amount() {
     let mut buffalo = BuffaloZdo::new(vec![1, 2, 3, 255]);
     buffalo.set_position(4);
@@ -153,7 +152,6 @@ fn checks_if_more_available_to_by_amount() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn ignores_invalid_tlv_tag_and_reads_next_tlv() {
     let mut buffer = vec![0xff, 5 - 1];
     buffer.extend_from_slice(&MANUFACTURER_ABB.to_le_bytes());
@@ -179,7 +177,6 @@ fn ignores_invalid_tlv_tag_and_reads_next_tlv() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn sets_gets_bytes_without_changing_internal_position() {
     let mut buffalo = BuffaloZdo::new(vec![1, 2, 3, 255]);
     assert_eq!(buffalo.get_byte(0), 1);
@@ -194,7 +191,6 @@ fn sets_gets_bytes_without_changing_internal_position() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn sets_gets_position() {
     let mut buffalo = BuffaloZdo::new(vec![0; 3]);
     assert_eq!(buffalo.get_position(), 0);
@@ -207,7 +203,6 @@ fn sets_gets_position() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_build_bind_request_build_unbind_request_invalid_type() {
     let bind = std::panic::catch_unwind(|| {
         BuffaloZdo::build_request(
@@ -245,7 +240,6 @@ fn throws_when_build_bind_request_build_unbind_request_invalid_type() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_building_unknown_cluster_id() {
     let cluster_id = 0x8005u16;
     let result = std::panic::catch_unwind(|| {
@@ -255,7 +249,6 @@ fn throws_when_building_unknown_cluster_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_duplicate_tlv_tag_found_and_not_valid() {
     let mut buffer = vec![GlobalTLV::FRAGMENTATION_PARAMETERS, 5 - 1];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -283,7 +276,6 @@ fn throws_when_duplicate_tlv_tag_found_and_not_valid() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_encapsulated_tlv_tag_found_inside_encapsulated() {
     let buffer = vec![
         GlobalTLV::BEACON_APPENDIX_ENCAPSULATION,
@@ -300,7 +292,6 @@ fn throws_when_encapsulated_tlv_tag_found_inside_encapsulated() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_not_enough_bytes_to_read_in_tlv() {
     let mut buffer = vec![GlobalTLV::MANUFACTURER_SPECIFIC, 6 - 1];
     buffer.extend_from_slice(&MANUFACTURER_ABB.to_le_bytes());
@@ -311,7 +302,6 @@ fn throws_when_not_enough_bytes_to_read_in_tlv() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_reading_unknown_cluster_id() {
     let cluster_id = 0x0005u16;
     let result = std::panic::catch_unwind(|| {
@@ -321,7 +311,6 @@ fn throws_when_reading_unknown_cluster_id() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn throws_when_writing_invalid_tlv_tag() {
     let mut buffalo = BuffaloZdo::new(vec![0; 3]);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -335,7 +324,6 @@ fn throws_when_writing_invalid_tlv_tag() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_active_endpoints_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&NODE_ID1_BYTES);
@@ -350,7 +338,6 @@ fn build_active_endpoints_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_bind_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
@@ -401,7 +388,6 @@ fn build_bind_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_binding_table_request() {
     assert_eq!(
         BuffaloZdo::build_request(true, ClusterId::BINDING_TABLE_REQUEST, &[json!(1)]),
@@ -414,7 +400,6 @@ fn build_binding_table_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_challenge_request() {
     let tlv = json!({"senderEui64": IEEE_ADDRESS2, "challengeValue": vec![0xfeu8; 8]});
     let mut expected = vec![0, 0, 8 + 8 - 1];
@@ -439,7 +424,6 @@ fn build_challenge_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_channel_change_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&(1u32 << 15).to_le_bytes());
@@ -461,7 +445,6 @@ fn build_channel_change_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_clear_all_bindings_request() {
     let eui64_list = [IEEE_ADDRESS1, IEEE_ADDRESS2];
     let mut expected = vec![
@@ -492,7 +475,6 @@ fn build_clear_all_bindings_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_decommission_request() {
     let tlv = json!({"eui64List": [IEEE_ADDRESS1]});
     let mut expected = vec![0, 0, 8 * 1 + 1 - 1, 1];
@@ -519,7 +501,6 @@ fn build_decommission_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_enhanced_channel_change_request() {
     let channel_page = 54394u32;
     let mut expected = vec![0, 1];
@@ -543,7 +524,6 @@ fn build_enhanced_channel_change_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_enhanced_scan_channels_request() {
     let channel_pages = [123u32, 54394, 29344];
     let mut expected = vec![0, channel_pages.len() as u8];
@@ -590,7 +570,6 @@ fn build_enhanced_scan_channels_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_enhanced_set_active_channels_and_nwk_manager_id_request() {
     let channel_pages = [123u32, 54394, 29344];
     let nwk_manager_addr = 0xfe01u16;
@@ -620,7 +599,6 @@ fn build_enhanced_set_active_channels_and_nwk_manager_id_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_get_authentication_level_request() {
     let tlv = json!({"ieee": IEEE_ADDRESS2});
     let mut expected = vec![0, 0, 8 - 1];
@@ -632,7 +610,6 @@ fn build_get_authentication_level_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_get_configuration_request() {
     assert_eq!(
         BuffaloZdo::build_request(true, ClusterId::GET_CONFIGURATION_REQUEST, &[json!([84])]),
@@ -649,7 +626,6 @@ fn build_get_configuration_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_ieee_address_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&NODE_ID1_BYTES);
@@ -677,7 +653,6 @@ fn build_ieee_address_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_leave_request() {
     let without_rejoin = {
         let mut expected = vec![0];
@@ -711,7 +686,6 @@ fn build_leave_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_lqi_table_request() {
     assert_eq!(
         BuffaloZdo::build_request(true, ClusterId::LQI_TABLE_REQUEST, &[json!(1)]),
@@ -724,7 +698,6 @@ fn build_lqi_table_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_match_descriptor_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&NODE_ID1_BYTES);
@@ -769,7 +742,6 @@ fn build_match_descriptor_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_network_address_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
@@ -797,7 +769,6 @@ fn build_network_address_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_network_address_request_without_zdo_message_overhead() {
     let mut expected = IEEE_ADDRESS1_BYTES.to_vec();
     expected.extend_from_slice(&[0, 1]);
@@ -823,7 +794,6 @@ fn build_network_address_request_without_zdo_message_overhead() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_node_descriptor_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&NODE_ID1_BYTES);
@@ -902,7 +872,6 @@ fn build_node_descriptor_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_nwk_beacon_survey_request() {
     let tlv = json!({"scanChannelList": [], "configurationBitmask": 0});
     assert_eq!(
@@ -931,7 +900,6 @@ fn build_nwk_beacon_survey_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_nwk_ieeejoining_list_request() {
     assert_eq!(
         BuffaloZdo::build_request(true, ClusterId::NWK_IEEE_JOINING_LIST_REQUEST, &[json!(3)],),
@@ -940,7 +908,6 @@ fn build_nwk_ieeejoining_list_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_parent_announce() {
     let children = [IEEE_ADDRESS1, IEEE_ADDRESS2];
     let mut expected = vec![0, children.len() as u8];
@@ -953,7 +920,6 @@ fn build_parent_announce() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_permit_joining() {
     assert_eq!(
         BuffaloZdo::build_request(
@@ -990,7 +956,6 @@ fn build_permit_joining() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_power_descriptor_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&NODE_ID1_BYTES);
@@ -1005,7 +970,6 @@ fn build_power_descriptor_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_retrieve_authentication_token_request() {
     let tlv = json!({"tlvTypeTagId": 0});
     assert_eq!(
@@ -1029,7 +993,6 @@ fn build_retrieve_authentication_token_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_routing_table_request() {
     assert_eq!(
         BuffaloZdo::build_request(true, ClusterId::ROUTING_TABLE_REQUEST, &[json!(1)]),
@@ -1042,7 +1005,6 @@ fn build_routing_table_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_scan_channels_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&ALL_802_15_4_CHANNELS_MASK.to_le_bytes());
@@ -1082,7 +1044,6 @@ fn build_scan_channels_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_set_active_channels_and_nwk_manager_id_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&PREFERRED_802_15_4_CHANNELS_MASK.to_le_bytes());
@@ -1105,7 +1066,6 @@ fn build_set_active_channels_and_nwk_manager_id_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_simple_descriptor_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&NODE_ID1_BYTES);
@@ -1121,7 +1081,6 @@ fn build_simple_descriptor_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_start_key_negotiation_request() {
     let tlv = json!({"eui64": IEEE_ADDRESS1, "publicPoint": vec![0xcdu8; 32]});
     let mut expected = vec![0, 0, 8 + 32 - 1];
@@ -1143,7 +1102,6 @@ fn build_start_key_negotiation_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_start_key_update_request() {
     let method = json!({
         "protocol": SPEKE_CURVE25519_SHA256,
@@ -1175,7 +1133,6 @@ fn build_start_key_update_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_system_service_discovery_request() {
     let mask0 = json!({
         "primaryTrustCenter": 1,
@@ -1214,7 +1171,6 @@ fn build_system_service_discovery_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn build_unbind_request() {
     let mut expected = vec![0];
     expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
@@ -1265,7 +1221,6 @@ fn build_unbind_request() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_active_endpoints_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1285,7 +1240,6 @@ fn read_active_endpoints_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_binding_table_response() {
     let mut buffer = vec![1, 0, 1, 0, 3];
     buffer.extend_from_slice(&IEEE_ADDRESS1_BYTES);
@@ -1340,7 +1294,6 @@ fn read_binding_table_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_challenge_response() {
     let mut buffer = vec![1, 0, 0x00, 32 - 1];
     buffer.extend_from_slice(&IEEE_ADDRESS1_BYTES);
@@ -1372,7 +1325,6 @@ fn read_challenge_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_end_device_announce() {
     let mut buffer = vec![1];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1398,7 +1350,6 @@ fn read_end_device_announce() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_get_authentication_level_response() {
     let mut buffer = vec![1, 0, 0x00, 10 - 1];
     buffer.extend_from_slice(&IEEE_ADDRESS2_BYTES);
@@ -1421,7 +1372,6 @@ fn read_get_authentication_level_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_get_configuration_response() {
     let mut buffer = vec![1, 0, GlobalTLV::FRAGMENTATION_PARAMETERS, 5 - 1];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1449,7 +1399,6 @@ fn read_get_configuration_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_ieeeaddress_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&IEEE_ADDRESS1_BYTES);
@@ -1482,7 +1431,6 @@ fn read_ieeeaddress_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_lqitable_response() {
     let mut buffer = vec![1, 0, 16, 3, 2];
     buffer.extend_from_slice(&EXT_PAN_ID2);
@@ -1540,7 +1488,6 @@ fn read_lqitable_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_match_descriptors_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1560,7 +1507,6 @@ fn read_match_descriptors_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_network_address_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&IEEE_ADDRESS1_BYTES);
@@ -1593,7 +1539,6 @@ fn read_network_address_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_node_descriptor_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1666,7 +1611,6 @@ fn read_node_descriptor_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_nwk_beacon_survey_response() {
     let mut buffer = vec![1, 0, 0x01, 4 - 1, 14, 7, 5, 2, 0x02, 7 - 1];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1708,7 +1652,6 @@ fn read_nwk_beacon_survey_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_nwk_enhanced_update_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&34732495u32.to_le_bytes());
@@ -1727,7 +1670,6 @@ fn read_nwk_enhanced_update_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_nwk_ieeejoining_list_response() {
     let mut buffer = vec![1, 0, 3, JoiningPolicy::IEEELIST_JOIN, 4, 0, 2];
     buffer.extend_from_slice(&IEEE_ADDRESS2_BYTES);
@@ -1760,7 +1702,6 @@ fn read_nwk_ieeejoining_list_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_nwk_unsolicited_enhanced_update_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&9023342u32.to_le_bytes());
@@ -1785,7 +1726,6 @@ fn read_nwk_unsolicited_enhanced_update_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_nwk_update_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&34732495u32.to_le_bytes());
@@ -1804,7 +1744,6 @@ fn read_nwk_update_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_parent_announce_response() {
     let mut buffer = vec![1, 0, 2];
     buffer.extend_from_slice(&IEEE_ADDRESS2_BYTES);
@@ -1821,7 +1760,6 @@ fn read_parent_announce_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_power_descriptor_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1839,7 +1777,6 @@ fn read_power_descriptor_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_retrieve_authentication_token_response() {
     let mut buffer = vec![1, 0, GlobalTLV::FRAGMENTATION_PARAMETERS, 5 - 1];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -1875,7 +1812,6 @@ fn read_retrieve_authentication_token_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_routing_table_response() {
     let mut buffer = vec![1, 0, 4, 3, 1];
     buffer.extend_from_slice(&NODE_ID2_BYTES);
@@ -1909,7 +1845,6 @@ fn read_routing_table_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_set_configuration_response() {
     let buffer = vec![
         1,
@@ -1959,7 +1894,6 @@ fn read_set_configuration_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_simple_descriptor_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&NODE_ID1_BYTES);
@@ -2012,7 +1946,6 @@ fn read_simple_descriptor_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_start_key_negotiation_response() {
     let mut buffer = vec![1, 0, 0x00, 8 + 32 - 1];
     buffer.extend_from_slice(&IEEE_ADDRESS2_BYTES);
@@ -2033,7 +1966,6 @@ fn read_start_key_negotiation_response() {
 }
 
 #[test]
-#[ignore = "not implemented yet"]
 fn read_system_server_discovery_response() {
     let mut buffer = vec![1, 0];
     buffer.extend_from_slice(&server_mask_byte(23).to_le_bytes());
