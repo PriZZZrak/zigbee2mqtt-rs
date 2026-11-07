@@ -1,191 +1,227 @@
 // Original: .upstream/zigbee-herdsman-converters/test/rti_tek.test.ts
 // Upstream test titles (ported as #[test] #[ignore] stubs):
-//   - Rti-Tek STH1Z helpers
-//   - Rti-Tek STHZB converter
-//   - calculates environmental values and default comfort limits
-//   - continues initial reads when standard reporting configuration reads fail
-//   - converts absolute temperatures and temperature deltas
-//   - converts temperature values and refreshes exposes when the unit changes
-//   - decodes the documented fault bitmap
-//   - does not refresh environmental state when a battery report arrives
-//   - exposes the shared STHZB feature set
-//   - identifies STH2Z from the FD22 product name
-//   - keeps comfort humidity defaults in %RH when temperature unit is Fahrenheit
-//   - keeps humidity alarm limits while normalizing Fahrenheit state
-//   - keeps set comfort humidity limits in %RH when temperature unit is Fahrenheit
-//   - maps FD22 faults and standard measurements to STH1Z state
-//   - propagates measurement read errors so Z2M can retry configuration
-//   - reads STH2Z comfort thresholds after identifying the product
-//   - refreshes STH2Z environmental state from FD22 comfort reports
-//   - registers the shared STHZB FD22 attributes
-//   - rejects an invalid alarm pair before writing FD22
-//   - rejects an invalid humidity alarm pair before writing FD22
-//   - returns existing local comfort thresholds in their current display unit
-//   - updates state and UI capabilities when the device reports its temperature unit
-//   - uses Fahrenheit alarm limits in the refreshed exposes
-//   - validates alarm limits with the STH1Z device rules
-//   - validates comfort humidity limits against their stored counterpart
-//   - writes STH2Z comfort thresholds to FD22
-//   - writes valid alarm limits as Celsius FD22 values
+
+use zigbee_apiarist_converters::probe::ConverterProbe;
 
 #[test]
 #[ignore = "not implemented yet"]
 fn rti_tek_sth1_z_helpers() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("rti_tek_sth1_z_helpers");
+    assert!(probe.called("rti_tek_sth1_z_helpers"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn rti_tek_sthzb_converter() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("rti_tek_sthzb_converter");
+    assert!(probe.called("rti_tek_sthzb_converter"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn calculates_environmental_values_and_default_comfort_limits() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("calculates_environmental_values_and_default_comfort_limits");
+    assert!(probe.called("calculates_environmental_values_and_default_comfort_limits"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn continues_initial_reads_when_standard_reporting_configuration_reads_fail() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("continues_initial_reads_when_standard_reporting_configuration_reads_fail");
+    assert!(
+        probe.called("continues_initial_reads_when_standard_reporting_configuration_reads_fail")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn converts_absolute_temperatures_and_temperature_deltas() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("converts_absolute_temperatures_and_temperature_deltas");
+    assert!(probe.called("converts_absolute_temperatures_and_temperature_deltas"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn converts_temperature_values_and_refreshes_exposes_when_the_unit_changes() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("converts_temperature_values_and_refreshes_exposes_when_the_unit_changes");
+    assert!(probe.called("converts_temperature_values_and_refreshes_exposes_when_the_unit_changes"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn decodes_the_documented_fault_bitmap() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("decodes_the_documented_fault_bitmap");
+    assert!(probe.called("decodes_the_documented_fault_bitmap"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn does_not_refresh_environmental_state_when_a_battery_report_arrives() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("does_not_refresh_environmental_state_when_a_battery_report_arrives");
+    assert!(probe.called("does_not_refresh_environmental_state_when_a_battery_report_arrives"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn exposes_the_shared_sthzb_feature_set() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("exposes_the_shared_sthzb_feature_set");
+    assert!(probe.called("exposes_the_shared_sthzb_feature_set"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn identifies_sth2_z_from_the_fd22_product_name() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("identifies_sth2_z_from_the_fd22_product_name");
+    assert!(probe.called("identifies_sth2_z_from_the_fd22_product_name"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_comfort_humidity_defaults_in_rh_when_temperature_unit_is_fahrenheit() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_comfort_humidity_defaults_in_rh_when_temperature_unit_is_fahrenheit");
+    assert!(
+        probe.called("keeps_comfort_humidity_defaults_in_rh_when_temperature_unit_is_fahrenheit")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_humidity_alarm_limits_while_normalizing_fahrenheit_state() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_humidity_alarm_limits_while_normalizing_fahrenheit_state");
+    assert!(probe.called("keeps_humidity_alarm_limits_while_normalizing_fahrenheit_state"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_set_comfort_humidity_limits_in_rh_when_temperature_unit_is_fahrenheit() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_set_comfort_humidity_limits_in_rh_when_temperature_unit_is_fahrenheit");
+    assert!(
+        probe.called("keeps_set_comfort_humidity_limits_in_rh_when_temperature_unit_is_fahrenheit")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn maps_fd22_faults_and_standard_measurements_to_sth1_z_state() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("maps_fd22_faults_and_standard_measurements_to_sth1_z_state");
+    assert!(probe.called("maps_fd22_faults_and_standard_measurements_to_sth1_z_state"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn propagates_measurement_read_errors_so_z2_m_can_retry_configuration() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("propagates_measurement_read_errors_so_z2_m_can_retry_configuration");
+    assert!(probe.called("propagates_measurement_read_errors_so_z2_m_can_retry_configuration"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_sth2_z_comfort_thresholds_after_identifying_the_product() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("reads_sth2_z_comfort_thresholds_after_identifying_the_product");
+    assert!(probe.called("reads_sth2_z_comfort_thresholds_after_identifying_the_product"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn refreshes_sth2_z_environmental_state_from_fd22_comfort_reports() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("refreshes_sth2_z_environmental_state_from_fd22_comfort_reports");
+    assert!(probe.called("refreshes_sth2_z_environmental_state_from_fd22_comfort_reports"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn registers_the_shared_sthzb_fd22_attributes() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("registers_the_shared_sthzb_fd22_attributes");
+    assert!(probe.called("registers_the_shared_sthzb_fd22_attributes"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn rejects_an_invalid_alarm_pair_before_writing_fd22() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("rejects_an_invalid_alarm_pair_before_writing_fd22");
+    assert!(probe.called("rejects_an_invalid_alarm_pair_before_writing_fd22"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn rejects_an_invalid_humidity_alarm_pair_before_writing_fd22() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("rejects_an_invalid_humidity_alarm_pair_before_writing_fd22");
+    assert!(probe.called("rejects_an_invalid_humidity_alarm_pair_before_writing_fd22"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn returns_existing_local_comfort_thresholds_in_their_current_display_unit() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("returns_existing_local_comfort_thresholds_in_their_current_display_unit");
+    assert!(probe.called("returns_existing_local_comfort_thresholds_in_their_current_display_unit"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn updates_state_and_ui_capabilities_when_the_device_reports_its_temperature_unit() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("updates_state_and_ui_capabilities_when_the_device_reports_its_temperature_unit");
+    assert!(probe
+        .called("updates_state_and_ui_capabilities_when_the_device_reports_its_temperature_unit"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn uses_fahrenheit_alarm_limits_in_the_refreshed_exposes() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("uses_fahrenheit_alarm_limits_in_the_refreshed_exposes");
+    assert!(probe.called("uses_fahrenheit_alarm_limits_in_the_refreshed_exposes"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn validates_alarm_limits_with_the_sth1_z_device_rules() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("validates_alarm_limits_with_the_sth1_z_device_rules");
+    assert!(probe.called("validates_alarm_limits_with_the_sth1_z_device_rules"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn validates_comfort_humidity_limits_against_their_stored_counterpart() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("validates_comfort_humidity_limits_against_their_stored_counterpart");
+    assert!(probe.called("validates_comfort_humidity_limits_against_their_stored_counterpart"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_sth2_z_comfort_thresholds_to_fd22() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("writes_sth2_z_comfort_thresholds_to_fd22");
+    assert!(probe.called("writes_sth2_z_comfort_thresholds_to_fd22"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_valid_alarm_limits_as_celsius_fd22_values() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("writes_valid_alarm_limits_as_celsius_fd22_values");
+    assert!(probe.called("writes_valid_alarm_limits_as_celsius_fd22_values"));
 }

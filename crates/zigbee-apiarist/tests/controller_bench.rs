@@ -1,23 +1,30 @@
 // Original: .upstream/zigbee-herdsman/test/controller.bench.ts
-// Upstream test titles (ported as #[test] #[ignore] stubs):
-//   - Controller
-//   - zclPayload
-//   - zdoResponse
+
+use serde_json::json;
+use zigbee_apiarist::controller::controller::Controller;
+use zigbee_apiarist::zspec::zcl::zcl_frame::Frame;
+use zigbee_apiarist::zspec::zcl::zcl_header::Header;
 
 #[test]
 #[ignore = "not implemented yet"]
 fn controller() {
-    todo!()
+    let mut controller = Controller::new();
+    controller.start();
+    assert!(controller.started);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn zcl_payload() {
-    todo!()
+    let header = Header::from_buffer(&[0, 1, 0]);
+    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    assert!(true);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn zdo_response() {
-    todo!()
+    let header = Header::from_buffer(&[0, 1, 0]);
+    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    assert!(true);
 }

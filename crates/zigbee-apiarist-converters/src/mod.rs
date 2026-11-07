@@ -5,3 +5,5 @@ pub mod devices;
 pub mod index;
 pub mod indexer;
 pub mod lib;
+
+pub mod probe;

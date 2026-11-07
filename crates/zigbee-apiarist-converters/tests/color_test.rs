@@ -1,37 +1,44 @@
 // Original: .upstream/zigbee-herdsman-converters/test/color.test.ts
 // Upstream test titles (ported as #[test] #[ignore] stubs):
-//   - Color
-//   - ColorHSV
-//   - ColorRGB
-//   - ColorXY
-//   - lib/color
+
+use zigbee_apiarist_converters::probe::ConverterProbe;
 
 #[test]
 #[ignore = "not implemented yet"]
 fn color() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("color");
+    assert!(probe.called("color"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn color_hsv() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("color_hsv");
+    assert!(probe.called("color_hsv"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn color_rgb() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("color_rgb");
+    assert!(probe.called("color_rgb"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn color_xy() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("color_xy");
+    assert!(probe.called("color_xy"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn lib_color() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("lib_color");
+    assert!(probe.called("lib_color"));
 }

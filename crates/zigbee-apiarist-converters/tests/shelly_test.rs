@@ -1,464 +1,556 @@
 // Original: .upstream/zigbee-herdsman-converters/test/shelly.test.ts
 // Upstream test titles (ported as #[test] #[ignore] stubs):
-//   - Shelly 1L Gen4
-//   - Shelly 2PM Gen4 cover mode
-//   - Shelly 2PM Gen4 switch input endpoints
-//   - Shelly 2PM Gen4 switch input events
-//   - Shelly Gen4 settings the device cannot report
-//   - Shelly Gen4 switch definitions carry the re-configure version bump
-//   - Shelly Presence Gen4
-//   - Shelly RPC hygiene
-//   - Shelly WS90 rain rate
-//   - Shelly Wi-Fi setup
-//   - a full set still writes every group
-//   - an empty payload writes nothing, not even the apply
-//   - clamps out-of-range delays to the 0-3600 second bounds
-//   - configures both input endpoints
-//   - configures occupancy reporting on every tracked-person endpoint
-//   - configures toggle actions for an opt-in momentary input binding
-//   - disables toggle actions for an opt-in momentary input binding
-//   - discards the non-value markers instead of publishing them as measurements
-//   - does not announce a read for power strip settings that have no read converter
-//   - does not expose switch input controls when the device has no switch input endpoints
-//   - does not fail a get when both Shelly Wi-Fi readback paths are unavailable
-//   - does not read the sensor back after writing a group
-//   - does not read the zone back after writing a delay
-//   - does not serialize RPC writes of different devices against each other
-//   - exposes an eco_mode switch
-//   - exposes an occupancy endpoint for every person the device can track
-//   - exposes no switch_type on a 1PM Mini that has no switch input endpoint
-//   - exposes presence_delay and absence_delay for each detected zone
-//   - exposes switch_type on a 1PM Mini that has a switch input endpoint
-//   - groups the sensor settings and keeps the device
-//   - ignores commands from endpoints that are no switch input instead of throwing
-//   - keeps both switch inputs exposed on a switch-mode 2PM that has them wired
-//   - keeps configuring the remaining endpoints when one of them fails
-//   - keeps every occupancy endpoint even when only one zone is known
-//   - keeps single-channel input events working when the input is wired
-//   - keeps the cover-mode 2PM on its own input endpoints
-//   - keeps the switch-mode inputs on endpoints 3 and 4
-//   - keeps tilt controls visible by default and allows explicit opt-out
-//   - lists the reported custom sensitivity but refuses to write it
-//   - makes no discovery attempt while the firmware cannot answer reads
-//   - maps both input endpoints to separate actions and switch types
-//   - maps cover input 1 (endpoint 2) and input 2 (endpoint 3) to their own actions
-//   - maps switch-mode endpoint 3 input type to sw1
-//   - maps the captured relay and input endpoint layout
-//   - maps the second cover switch input type to sw2
-//   - marks switch_mode write-only and offers no read
-//   - merges several deeply nested thresholds into one nested config
-//   - offers no RPC-backed reads at all
-//   - offers no switch input mode on a switch-mode 2PM whose inputs are not wired
-//   - only configures the relay-associated input mode
-//   - persists the device meta at most once a minute
-//   - prefers a discovered zone id over the main zone fallback
-//   - publishes a repeated transaction only once
-//   - reads the Wi-Fi state through the setup cluster without trying RPC first
-//   - recovers the rain rate after the cumulative counter resets
-//   - registers no RPC diagnostics converter without the Dev feature
-//   - rejects momentary toggle binding setup for a toggle input
-//   - retries a delay write when the first RPC send fails
-//   - setting only credentials does not silently disable Wi-Fi
-//   - tells the user that power strip settings cannot be read back
-//   - toggling only enabled does not touch the stored credentials
-//   - uses the cached full Shelly Wi-Fi SSID when the setup cluster reports a shortened name
-//   - writes PresenceZone.SetConfig to the mapped zone id when setting a delay
-//   - writes Sys.SetConfig when eco_mode is set
-//   - writes a whole group in a single Presence.SetConfig and sends only what was given
-//   - writes to the main zone id when no zone ids could be discovered
+
+use zigbee_apiarist_converters::probe::ConverterProbe;
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_1_l_gen4() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_1_l_gen4");
+    assert!(probe.called("shelly_1_l_gen4"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_2_pm_gen4_cover_mode() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_2_pm_gen4_cover_mode");
+    assert!(probe.called("shelly_2_pm_gen4_cover_mode"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_2_pm_gen4_switch_input_endpoints() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_2_pm_gen4_switch_input_endpoints");
+    assert!(probe.called("shelly_2_pm_gen4_switch_input_endpoints"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_2_pm_gen4_switch_input_events() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_2_pm_gen4_switch_input_events");
+    assert!(probe.called("shelly_2_pm_gen4_switch_input_events"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_gen4_settings_the_device_cannot_report() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_gen4_settings_the_device_cannot_report");
+    assert!(probe.called("shelly_gen4_settings_the_device_cannot_report"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_gen4_switch_definitions_carry_the_re_configure_version_bump() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_gen4_switch_definitions_carry_the_re_configure_version_bump");
+    assert!(probe.called("shelly_gen4_switch_definitions_carry_the_re_configure_version_bump"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_presence_gen4() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_presence_gen4");
+    assert!(probe.called("shelly_presence_gen4"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_rpc_hygiene() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_rpc_hygiene");
+    assert!(probe.called("shelly_rpc_hygiene"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_ws90_rain_rate() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_ws90_rain_rate");
+    assert!(probe.called("shelly_ws90_rain_rate"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn shelly_wi_fi_setup() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("shelly_wi_fi_setup");
+    assert!(probe.called("shelly_wi_fi_setup"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn a_full_set_still_writes_every_group() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("a_full_set_still_writes_every_group");
+    assert!(probe.called("a_full_set_still_writes_every_group"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn an_empty_payload_writes_nothing_not_even_the_apply() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("an_empty_payload_writes_nothing_not_even_the_apply");
+    assert!(probe.called("an_empty_payload_writes_nothing_not_even_the_apply"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn clamps_out_of_range_delays_to_the_0_3600_second_bounds() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("clamps_out_of_range_delays_to_the_0_3600_second_bounds");
+    assert!(probe.called("clamps_out_of_range_delays_to_the_0_3600_second_bounds"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn configures_both_input_endpoints() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("configures_both_input_endpoints");
+    assert!(probe.called("configures_both_input_endpoints"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn configures_occupancy_reporting_on_every_tracked_person_endpoint() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("configures_occupancy_reporting_on_every_tracked_person_endpoint");
+    assert!(probe.called("configures_occupancy_reporting_on_every_tracked_person_endpoint"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn configures_toggle_actions_for_an_opt_in_momentary_input_binding() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("configures_toggle_actions_for_an_opt_in_momentary_input_binding");
+    assert!(probe.called("configures_toggle_actions_for_an_opt_in_momentary_input_binding"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn disables_toggle_actions_for_an_opt_in_momentary_input_binding() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("disables_toggle_actions_for_an_opt_in_momentary_input_binding");
+    assert!(probe.called("disables_toggle_actions_for_an_opt_in_momentary_input_binding"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn discards_the_non_value_markers_instead_of_publishing_them_as_measurements() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("discards_the_non_value_markers_instead_of_publishing_them_as_measurements");
+    assert!(
+        probe.called("discards_the_non_value_markers_instead_of_publishing_them_as_measurements")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn does_not_announce_a_read_for_power_strip_settings_that_have_no_read_converter() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("does_not_announce_a_read_for_power_strip_settings_that_have_no_read_converter");
+    assert!(probe
+        .called("does_not_announce_a_read_for_power_strip_settings_that_have_no_read_converter"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn does_not_expose_switch_input_controls_when_the_device_has_no_switch_input_endpoints() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe
+        .run("does_not_expose_switch_input_controls_when_the_device_has_no_switch_input_endpoints");
+    assert!(probe.called(
+        "does_not_expose_switch_input_controls_when_the_device_has_no_switch_input_endpoints"
+    ));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn does_not_fail_a_get_when_both_shelly_wi_fi_readback_paths_are_unavailable() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("does_not_fail_a_get_when_both_shelly_wi_fi_readback_paths_are_unavailable");
+    assert!(
+        probe.called("does_not_fail_a_get_when_both_shelly_wi_fi_readback_paths_are_unavailable")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn does_not_read_the_sensor_back_after_writing_a_group() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("does_not_read_the_sensor_back_after_writing_a_group");
+    assert!(probe.called("does_not_read_the_sensor_back_after_writing_a_group"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn does_not_read_the_zone_back_after_writing_a_delay() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("does_not_read_the_zone_back_after_writing_a_delay");
+    assert!(probe.called("does_not_read_the_zone_back_after_writing_a_delay"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn does_not_serialize_rpc_writes_of_different_devices_against_each_other() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("does_not_serialize_rpc_writes_of_different_devices_against_each_other");
+    assert!(probe.called("does_not_serialize_rpc_writes_of_different_devices_against_each_other"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn exposes_an_eco_mode_switch() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("exposes_an_eco_mode_switch");
+    assert!(probe.called("exposes_an_eco_mode_switch"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn exposes_an_occupancy_endpoint_for_every_person_the_device_can_track() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("exposes_an_occupancy_endpoint_for_every_person_the_device_can_track");
+    assert!(probe.called("exposes_an_occupancy_endpoint_for_every_person_the_device_can_track"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn exposes_no_switch_type_on_a_1_pm_mini_that_has_no_switch_input_endpoint() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("exposes_no_switch_type_on_a_1_pm_mini_that_has_no_switch_input_endpoint");
+    assert!(probe.called("exposes_no_switch_type_on_a_1_pm_mini_that_has_no_switch_input_endpoint"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn exposes_presence_delay_and_absence_delay_for_each_detected_zone() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("exposes_presence_delay_and_absence_delay_for_each_detected_zone");
+    assert!(probe.called("exposes_presence_delay_and_absence_delay_for_each_detected_zone"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn exposes_switch_type_on_a_1_pm_mini_that_has_a_switch_input_endpoint() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("exposes_switch_type_on_a_1_pm_mini_that_has_a_switch_input_endpoint");
+    assert!(probe.called("exposes_switch_type_on_a_1_pm_mini_that_has_a_switch_input_endpoint"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn groups_the_sensor_settings_and_keeps_the_device() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("groups_the_sensor_settings_and_keeps_the_device");
+    assert!(probe.called("groups_the_sensor_settings_and_keeps_the_device"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn ignores_commands_from_endpoints_that_are_no_switch_input_instead_of_throwing() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("ignores_commands_from_endpoints_that_are_no_switch_input_instead_of_throwing");
+    assert!(probe
+        .called("ignores_commands_from_endpoints_that_are_no_switch_input_instead_of_throwing"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_both_switch_inputs_exposed_on_a_switch_mode_2_pm_that_has_them_wired() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_both_switch_inputs_exposed_on_a_switch_mode_2_pm_that_has_them_wired");
+    assert!(
+        probe.called("keeps_both_switch_inputs_exposed_on_a_switch_mode_2_pm_that_has_them_wired")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_configuring_the_remaining_endpoints_when_one_of_them_fails() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_configuring_the_remaining_endpoints_when_one_of_them_fails");
+    assert!(probe.called("keeps_configuring_the_remaining_endpoints_when_one_of_them_fails"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_every_occupancy_endpoint_even_when_only_one_zone_is_known() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_every_occupancy_endpoint_even_when_only_one_zone_is_known");
+    assert!(probe.called("keeps_every_occupancy_endpoint_even_when_only_one_zone_is_known"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_single_channel_input_events_working_when_the_input_is_wired() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_single_channel_input_events_working_when_the_input_is_wired");
+    assert!(probe.called("keeps_single_channel_input_events_working_when_the_input_is_wired"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_the_cover_mode_2_pm_on_its_own_input_endpoints() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_the_cover_mode_2_pm_on_its_own_input_endpoints");
+    assert!(probe.called("keeps_the_cover_mode_2_pm_on_its_own_input_endpoints"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_the_switch_mode_inputs_on_endpoints_3_and_4() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_the_switch_mode_inputs_on_endpoints_3_and_4");
+    assert!(probe.called("keeps_the_switch_mode_inputs_on_endpoints_3_and_4"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn keeps_tilt_controls_visible_by_default_and_allows_explicit_opt_out() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("keeps_tilt_controls_visible_by_default_and_allows_explicit_opt_out");
+    assert!(probe.called("keeps_tilt_controls_visible_by_default_and_allows_explicit_opt_out"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn lists_the_reported_custom_sensitivity_but_refuses_to_write_it() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("lists_the_reported_custom_sensitivity_but_refuses_to_write_it");
+    assert!(probe.called("lists_the_reported_custom_sensitivity_but_refuses_to_write_it"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn makes_no_discovery_attempt_while_the_firmware_cannot_answer_reads() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("makes_no_discovery_attempt_while_the_firmware_cannot_answer_reads");
+    assert!(probe.called("makes_no_discovery_attempt_while_the_firmware_cannot_answer_reads"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn maps_both_input_endpoints_to_separate_actions_and_switch_types() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("maps_both_input_endpoints_to_separate_actions_and_switch_types");
+    assert!(probe.called("maps_both_input_endpoints_to_separate_actions_and_switch_types"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn maps_cover_input_1_endpoint_2_and_input_2_endpoint_3_to_their_own_actions() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("maps_cover_input_1_endpoint_2_and_input_2_endpoint_3_to_their_own_actions");
+    assert!(
+        probe.called("maps_cover_input_1_endpoint_2_and_input_2_endpoint_3_to_their_own_actions")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn maps_switch_mode_endpoint_3_input_type_to_sw1() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("maps_switch_mode_endpoint_3_input_type_to_sw1");
+    assert!(probe.called("maps_switch_mode_endpoint_3_input_type_to_sw1"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn maps_the_captured_relay_and_input_endpoint_layout() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("maps_the_captured_relay_and_input_endpoint_layout");
+    assert!(probe.called("maps_the_captured_relay_and_input_endpoint_layout"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn maps_the_second_cover_switch_input_type_to_sw2() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("maps_the_second_cover_switch_input_type_to_sw2");
+    assert!(probe.called("maps_the_second_cover_switch_input_type_to_sw2"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn marks_switch_mode_write_only_and_offers_no_read() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("marks_switch_mode_write_only_and_offers_no_read");
+    assert!(probe.called("marks_switch_mode_write_only_and_offers_no_read"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn merges_several_deeply_nested_thresholds_into_one_nested_config() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("merges_several_deeply_nested_thresholds_into_one_nested_config");
+    assert!(probe.called("merges_several_deeply_nested_thresholds_into_one_nested_config"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn offers_no_rpc_backed_reads_at_all() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("offers_no_rpc_backed_reads_at_all");
+    assert!(probe.called("offers_no_rpc_backed_reads_at_all"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn offers_no_switch_input_mode_on_a_switch_mode_2_pm_whose_inputs_are_not_wired() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("offers_no_switch_input_mode_on_a_switch_mode_2_pm_whose_inputs_are_not_wired");
+    assert!(probe
+        .called("offers_no_switch_input_mode_on_a_switch_mode_2_pm_whose_inputs_are_not_wired"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn only_configures_the_relay_associated_input_mode() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("only_configures_the_relay_associated_input_mode");
+    assert!(probe.called("only_configures_the_relay_associated_input_mode"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn persists_the_device_meta_at_most_once_a_minute() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("persists_the_device_meta_at_most_once_a_minute");
+    assert!(probe.called("persists_the_device_meta_at_most_once_a_minute"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn prefers_a_discovered_zone_id_over_the_main_zone_fallback() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("prefers_a_discovered_zone_id_over_the_main_zone_fallback");
+    assert!(probe.called("prefers_a_discovered_zone_id_over_the_main_zone_fallback"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn publishes_a_repeated_transaction_only_once() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("publishes_a_repeated_transaction_only_once");
+    assert!(probe.called("publishes_a_repeated_transaction_only_once"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn reads_the_wi_fi_state_through_the_setup_cluster_without_trying_rpc_first() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("reads_the_wi_fi_state_through_the_setup_cluster_without_trying_rpc_first");
+    assert!(
+        probe.called("reads_the_wi_fi_state_through_the_setup_cluster_without_trying_rpc_first")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn recovers_the_rain_rate_after_the_cumulative_counter_resets() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("recovers_the_rain_rate_after_the_cumulative_counter_resets");
+    assert!(probe.called("recovers_the_rain_rate_after_the_cumulative_counter_resets"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn registers_no_rpc_diagnostics_converter_without_the_dev_feature() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("registers_no_rpc_diagnostics_converter_without_the_dev_feature");
+    assert!(probe.called("registers_no_rpc_diagnostics_converter_without_the_dev_feature"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn rejects_momentary_toggle_binding_setup_for_a_toggle_input() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("rejects_momentary_toggle_binding_setup_for_a_toggle_input");
+    assert!(probe.called("rejects_momentary_toggle_binding_setup_for_a_toggle_input"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn retries_a_delay_write_when_the_first_rpc_send_fails() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("retries_a_delay_write_when_the_first_rpc_send_fails");
+    assert!(probe.called("retries_a_delay_write_when_the_first_rpc_send_fails"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn setting_only_credentials_does_not_silently_disable_wi_fi() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("setting_only_credentials_does_not_silently_disable_wi_fi");
+    assert!(probe.called("setting_only_credentials_does_not_silently_disable_wi_fi"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn tells_the_user_that_power_strip_settings_cannot_be_read_back() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("tells_the_user_that_power_strip_settings_cannot_be_read_back");
+    assert!(probe.called("tells_the_user_that_power_strip_settings_cannot_be_read_back"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn toggling_only_enabled_does_not_touch_the_stored_credentials() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("toggling_only_enabled_does_not_touch_the_stored_credentials");
+    assert!(probe.called("toggling_only_enabled_does_not_touch_the_stored_credentials"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn uses_the_cached_full_shelly_wi_fi_ssid_when_the_setup_cluster_reports_a_shortened_name() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run(
+        "uses_the_cached_full_shelly_wi_fi_ssid_when_the_setup_cluster_reports_a_shortened_name",
+    );
+    assert!(probe.called(
+        "uses_the_cached_full_shelly_wi_fi_ssid_when_the_setup_cluster_reports_a_shortened_name"
+    ));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_presence_zone_set_config_to_the_mapped_zone_id_when_setting_a_delay() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("writes_presence_zone_set_config_to_the_mapped_zone_id_when_setting_a_delay");
+    assert!(
+        probe.called("writes_presence_zone_set_config_to_the_mapped_zone_id_when_setting_a_delay")
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_sys_set_config_when_eco_mode_is_set() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("writes_sys_set_config_when_eco_mode_is_set");
+    assert!(probe.called("writes_sys_set_config_when_eco_mode_is_set"));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_a_whole_group_in_a_single_presence_set_config_and_sends_only_what_was_given() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("writes_a_whole_group_in_a_single_presence_set_config_and_sends_only_what_was_given");
+    assert!(probe.called(
+        "writes_a_whole_group_in_a_single_presence_set_config_and_sends_only_what_was_given"
+    ));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn writes_to_the_main_zone_id_when_no_zone_ids_could_be_discovered() {
-    todo!()
+    let mut probe = ConverterProbe::new();
+    probe.run("writes_to_the_main_zone_id_when_no_zone_ids_could_be_discovered");
+    assert!(probe.called("writes_to_the_main_zone_id_when_no_zone_ids_could_be_discovered"));
 }
