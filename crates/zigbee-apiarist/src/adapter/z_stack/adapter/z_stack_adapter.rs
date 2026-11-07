@@ -142,6 +142,7 @@ pub struct ZStackAdapter {
     pub disconnected: usize,
     pub route_disc_calls: Vec<serde_json::Value>,
     pub led_firmware: bool,
+    pub data_confirm_code: u8,
 }
 
 impl ZStackAdapter {
@@ -190,6 +191,7 @@ impl ZStackAdapter {
             disconnected: 0,
             route_disc_calls: Vec::new(),
             led_firmware: false,
+            data_confirm_code: 0,
         }
     }
 
@@ -237,6 +239,31 @@ impl ZStackAdapter {
 
     /// Upstream: `adapter.addInstallCode(ieee, key, hashed)`.
     pub async fn add_install_code(&mut self, _ieee_address: &str, _key: &[u8], _hashed: bool) {
+        todo!()
+    }
+
+    /// Upstream: `adapter.sendZclFrameToEndpoint` recording the request frame.
+    pub async fn send_zcl_frame_to_endpoint_data(
+        &mut self,
+        _ieee_address: &str,
+        _network_address: u16,
+        _endpoint: u8,
+        _data: Vec<u8>,
+        _options: u8,
+        _transaction_id: u8,
+    ) {
+        todo!()
+    }
+
+    /// Upstream: `adapter.sendZclFrameToGroup(groupID, frame, sourceEndpoint)`.
+    pub async fn send_zcl_frame_to_group(
+        &mut self,
+        _group_id: u16,
+        _data: Vec<u8>,
+        _source_endpoint: u8,
+        _options: u8,
+        _transaction_id: u8,
+    ) {
         todo!()
     }
 

@@ -772,10 +772,37 @@ async fn restore_interpan_channel() {
     assert_eq!(adapter.interpan_calls, vec![(0u8, Vec::<u8>::new())]);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_group() {
-    todo!()
+async fn send_zcl_frame_group() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_group(25, vec![0x18, 100, 0, 0, 0], 1, 0, 1)
+        .await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0, 0, 0],
+                "destendpoint": 255,
+                "dstaddr": "0x0000000000000019",
+                "len": 5,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+                "dstaddrmode": 1,
+                "dstpanid": 0,
+            }),
+        }]
+    );
 }
 
 #[test]
@@ -784,10 +811,39 @@ fn send_zcl_frame_group_data_confirm_fails() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_group_retry_on_mac_channel_access_failure() {
-    todo!()
+async fn send_zcl_frame_group_retry_on_mac_channel_access_failure() {
+    let mut adapter = adapter();
+    adapter.data_confirm_code = 225;
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_group(25, vec![0x18, 100, 5, 0, 0, 0], 1, 0, 1)
+        .await;
+
+    assert_eq!(adapter.znp_calls.len(), 2);
+    assert_eq!(
+        adapter.znp_calls[0],
+        ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequestExt".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 5, 0, 0, 0],
+                "destendpoint": 255,
+                "dstaddr": "0x0000000000000019",
+                "len": 6,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+                "dstaddrmode": 1,
+                "dstpanid": 0,
+            }),
+        }
+    );
 }
 
 #[test]
@@ -814,10 +870,43 @@ fn send_zcl_frame_interpan_with_response() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_network_address() {
-    todo!()
+async fn send_zcl_frame_network_address() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_endpoint_data(
+            "0x02",
+            2,
+            20,
+            vec![0x18, 100, 0x05, 0x00, 0x00, 0x00],
+            0,
+            1,
+        )
+        .await;
+
+    assert_eq!(adapter.send_zcl_calls, 1);
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequest".to_string(),
+            payload: json!({
+                "clusterid": 0,
+                "data": [0x18, 100, 0x05, 0x00, 0x00, 0x00],
+                "destendpoint": 20,
+                "dstaddr": 2,
+                "len": 6,
+                "options": 0,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+            }),
+        }]
+    );
 }
 
 #[test]
@@ -1032,10 +1121,42 @@ async fn send_zcl_frame_to_all_sleepy() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn send_zcl_frame_with_aps_encryption() {
-    todo!()
+async fn send_zcl_frame_with_aps_encryption() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter
+        .send_zcl_frame_to_endpoint_data(
+            "0x1122334455667788",
+            1234,
+            232,
+            vec![0x18, 3, 0x00, 0x00, 0x00],
+            64,
+            1,
+        )
+        .await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "AF".to_string(),
+            command: "dataRequest".to_string(),
+            payload: json!({
+                "clusterid": 61,
+                "data": [0x18, 3, 0x00, 0x00, 0x00],
+                "destendpoint": 232,
+                "dstaddr": 1234,
+                "len": 5,
+                "options": 64,
+                "radius": 30,
+                "srcendpoint": 1,
+                "transid": 1,
+            }),
+        }]
+    );
 }
 
 #[tokio::test]
