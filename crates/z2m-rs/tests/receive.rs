@@ -32,10 +32,29 @@
 //   - Should throttle multiple messages from spamming devices
 //   - Shouldnt republish old state
 
-#[test]
-#[ignore = "not implemented yet"]
-fn extension_receive() {
-    todo!()
+use serde_json::json;
+use z2m_rs::extension::receive::Receive;
+
+fn setup() -> Receive {
+    let mut receive = Receive::new();
+    receive.add_device("button", 0, false);
+    receive.add_device("button_double_key", 0, false);
+    receive.add_device("weather_sensor", 1, false);
+    receive.add_device("J1_cover", 0, false);
+    receive.add_device("occupancy_sensor", 0, false);
+    receive.add_device("power_plug", 0, false);
+    receive.add_device("bulb", 0, false);
+    receive
+}
+
+fn opts(qos: u8, retain: bool) -> serde_json::Value {
+    json!({"retain": retain, "qos": qos})
+}
+
+fn has(receive: &Receive, topic: &str, payload: serde_json::Value, qos: u8, retain: bool) -> bool {
+    receive
+        .published
+        .contains(&(topic.to_string(), payload, opts(qos, retain)))
 }
 
 #[test]
@@ -56,10 +75,46 @@ fn should_allow_to_disable_the_legacy_integration() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_allow_to_invert_cover() {
-    todo!()
+async fn should_allow_to_invert_cover() {
+    let mut receive = setup();
+
+    // Non-inverted (open = 100, close = 0)
+    receive.on_message(
+        "J1_cover",
+        "1",
+        "closuresWindowCovering",
+        &json!({"currentPositionLiftPercentage": 90, "currentPositionTiltPercentage": 80}),
+        10,
+    );
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/J1_cover",
+        json!({"position": 10, "tilt": 20, "state": "OPEN"}),
+        0,
+        false
+    ));
+
+    // Inverted
+    receive.published.clear();
+    receive.device_mut("J1_cover").invert_cover = true;
+    receive.on_message(
+        "J1_cover",
+        "1",
+        "closuresWindowCovering",
+        &json!({"currentPositionLiftPercentage": 90, "currentPositionTiltPercentage": 80}),
+        10,
+    );
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/J1_cover",
+        json!({"position": 90, "tilt": 80, "state": "OPEN"}),
+        0,
+        false
+    ));
 }
 
 #[test]
@@ -92,64 +147,235 @@ fn should_handle_a_command() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message() {
-    todo!()
+async fn should_handle_a_zigbee_message() {
+    let mut receive = setup();
+    receive.device_mut("button").legacy = true;
+
+    receive.on_message("button", "1", "genOnOff", &json!({"onOff": 1}), 10);
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/button",
+        json!({"action": "single", "linkquality": 10}),
+        0,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_which_uses_ep_left() {
-    todo!()
+async fn should_handle_a_zigbee_message_which_uses_ep_left() {
+    let mut receive = setup();
+
+    receive.on_message(
+        "button_double_key",
+        "1",
+        "genOnOff",
+        &json!({"onOff": 1}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/button_double_key",
+        json!({"action": "single_left"}),
+        0,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_which_uses_ep_right() {
-    todo!()
+async fn should_handle_a_zigbee_message_which_uses_ep_right() {
+    let mut receive = setup();
+
+    receive.on_message(
+        "button_double_key",
+        "2",
+        "genOnOff",
+        &json!({"onOff": 1}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/button_double_key",
+        json!({"action": "single_right"}),
+        0,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_with_0_precision() {
-    todo!()
+async fn should_handle_a_zigbee_message_with_0_precision() {
+    let mut receive = setup();
+    receive.device_mut("weather_sensor").precision = Some(0);
+
+    receive.on_message(
+        "weather_sensor",
+        "1",
+        "msTemperatureMeasurement",
+        &json!({"measuredValue": -85}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/weather_sensor",
+        json!({"temperature": -1}),
+        1,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_with_1_precision() {
-    todo!()
+async fn should_handle_a_zigbee_message_with_1_precision() {
+    let mut receive = setup();
+    receive.device_mut("weather_sensor").precision = Some(1);
+
+    receive.on_message(
+        "weather_sensor",
+        "1",
+        "msTemperatureMeasurement",
+        &json!({"measuredValue": -85}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/weather_sensor",
+        json!({"temperature": -0.8}),
+        1,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_with_1_precision_when_set_via_device_options() {
-    todo!()
+async fn should_handle_a_zigbee_message_with_1_precision_when_set_via_device_options() {
+    let mut receive = setup();
+    receive.device_mut("weather_sensor").precision = Some(1);
+
+    receive.on_message(
+        "weather_sensor",
+        "1",
+        "msTemperatureMeasurement",
+        &json!({"measuredValue": -85}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/weather_sensor",
+        json!({"temperature": -0.8}),
+        1,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_with_2_precision_when_overrides_device_options() {
-    todo!()
+async fn should_handle_a_zigbee_message_with_2_precision_when_overrides_device_options() {
+    let mut receive = setup();
+    receive.device_mut("weather_sensor").precision = Some(0);
+
+    receive.on_message(
+        "weather_sensor",
+        "1",
+        "msTemperatureMeasurement",
+        &json!({"measuredValue": -85}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/weather_sensor",
+        json!({"temperature": -1}),
+        1,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_with_default_precision() {
-    todo!()
+async fn should_handle_a_zigbee_message_with_default_precision() {
+    let mut receive = setup();
+
+    receive.on_message(
+        "weather_sensor",
+        "1",
+        "msTemperatureMeasurement",
+        &json!({"measuredValue": -85}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/weather_sensor",
+        json!({"temperature": -0.85}),
+        1,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_a_zigbee_message_with_voltage_2990() {
-    todo!()
+async fn should_handle_a_zigbee_message_with_voltage_2990() {
+    let mut receive = setup();
+
+    receive.on_message(
+        "button_double_key",
+        "1",
+        "genBasic",
+        &json!({"65281": {"1": 2990}}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/button_double_key",
+        json!({"battery": 93, "voltage": 2990}),
+        0,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_handle_messages_from_xiaomi_router_devices() {
-    todo!()
+async fn should_handle_messages_from_xiaomi_router_devices() {
+    let mut receive = setup();
+    receive.device_mut("power_plug").linked_group = Some("switch_group".to_string());
+
+    receive.on_message("power_plug", "1", "genOnOff", &json!({"onOff": 1}), 20);
+
+    assert_eq!(receive.published.len(), 2);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/power_plug",
+        json!({"state": "ON"}),
+        0,
+        false
+    ));
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/switch_group",
+        json!({"state": "ON"}),
+        0,
+        false
+    ));
 }
 
 #[test]
@@ -164,40 +390,117 @@ fn should_not_bypass_the_debounce_when_a_message_produces_no_payload() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_not_handle_messages_from_coordinator() {
-    todo!()
+async fn should_not_handle_messages_from_coordinator() {
+    let mut receive = setup();
+    receive.add_device("coordinator", 0, false);
+    receive.device_mut("coordinator").is_coordinator = true;
+
+    receive.on_message("coordinator", "1", "genOnOff", &json!({"onOff": 1}), 10);
+
+    assert_eq!(receive.published.len(), 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_not_handle_messages_from_still_interviewing_devices_with_unknown_definition() {
-    todo!()
+async fn should_not_handle_messages_from_still_interviewing_devices_with_unknown_definition() {
+    let mut receive = setup();
+    receive.device_mut("bulb").interviewing = true;
+    receive.device_mut("bulb").has_converters = false;
+
+    receive.on_message("bulb", "1", "genOnOff", &json!({"onOff": 1}), 10);
+
+    assert_eq!(receive.published.len(), 0);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_1_message_when_converted_twice() {
-    todo!()
+async fn should_publish_1_message_when_converted_twice() {
+    let mut receive = setup();
+
+    receive.on_message(
+        "occupancy_sensor",
+        "1",
+        "genBasic",
+        &json!({"65281": {"1": 3045, "3": 19, "5": 35, "6": [0, 3], "11": 381, "100": 0}}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert!(has(
+        &receive,
+        "zigbee2mqtt/occupancy_sensor",
+        json!({
+            "battery": 100,
+            "illuminance": 381,
+            "voltage": 3045,
+            "device_temperature": 19,
+            "power_outage_count": 34,
+        }),
+        0,
+        false
+    ));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_last_seen_iso_8601() {
-    todo!()
+async fn should_publish_last_seen_iso_8601() {
+    let mut receive = setup();
+    receive.last_seen = Some("ISO_8601".to_string());
+
+    receive.on_message(
+        "button_double_key",
+        "1",
+        "genOnOff",
+        &json!({"onOff": 1}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert_eq!(receive.published[0].0, "zigbee2mqtt/button_double_key");
+    assert!(receive.published[0].1["last_seen"].is_string());
+    assert_eq!(receive.published[0].2, opts(0, false));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_last_seen_iso_8601_local() {
-    todo!()
+async fn should_publish_last_seen_iso_8601_local() {
+    let mut receive = setup();
+    receive.last_seen = Some("ISO_8601_local".to_string());
+
+    receive.on_message(
+        "button_double_key",
+        "1",
+        "genOnOff",
+        &json!({"onOff": 1}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert_eq!(receive.published[0].0, "zigbee2mqtt/button_double_key");
+    assert!(receive.published[0].1["last_seen"].is_string());
+    assert_eq!(receive.published[0].2, opts(0, false));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn should_publish_last_seen_epoch() {
-    todo!()
+async fn should_publish_last_seen_epoch() {
+    let mut receive = setup();
+    receive.last_seen = Some("epoch".to_string());
+
+    receive.on_message(
+        "button_double_key",
+        "1",
+        "genOnOff",
+        &json!({"onOff": 1}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 1);
+    assert_eq!(receive.published[0].0, "zigbee2mqtt/button_double_key");
+    assert!(receive.published[0].1["last_seen"].is_number());
+    assert_eq!(receive.published[0].2, opts(0, false));
 }
 
 #[test]
@@ -216,4 +519,21 @@ fn should_throttle_multiple_messages_from_spamming_devices() {
 #[ignore = "not implemented yet"]
 fn shouldnt_republish_old_state() {
     todo!()
+}
+
+// Upstream has a second test with the same title `Should publish 1 message when converted twice`.
+#[tokio::test]
+#[ignore = "not implemented yet"]
+async fn should_publish_1_message_when_converted_twice_2() {
+    let mut receive = setup();
+
+    receive.on_message(
+        "occupancy_sensor",
+        "1",
+        "genBasic",
+        &json!({"9999": {"1": 3045}}),
+        10,
+    );
+
+    assert_eq!(receive.published.len(), 0);
 }
