@@ -18,6 +18,7 @@ pub struct BindEndpoint {
     pub configure_reporting: Vec<(String, Value)>,
     /// Existing binds: `(cluster, target)`.
     pub binds: Vec<(String, String)>,
+    pub configured_reportings: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -45,6 +46,10 @@ pub struct Bind {
     pub next_group_id: u32,
     /// When true, bind calls throw `failed`.
     pub bind_error: bool,
+    /// Upstream `mockDebounce` call count.
+    pub debounce_calls: usize,
+    /// Poll reads triggered by bound remotes: `(device, cluster, attributes)`.
+    pub poll_reads: Vec<(String, String, Vec<String>)>,
 }
 
 impl Bind {
@@ -101,6 +106,18 @@ impl Bind {
 
     /// Upstream `bridge/request/device/{bind,unbind,binds/clear}`.
     pub fn on_message(&mut self, topic: &str, payload: &Value) {
+        todo!()
+    }
+
+    /// Upstream `zhe.message` handling for bound remotes (Hue/TRADFRI polling).
+    pub fn on_zigbee_message(
+        &mut self,
+        _device: &str,
+        _endpoint: &str,
+        _cluster: &str,
+        _data: &Value,
+        _group_id: u64,
+    ) {
         todo!()
     }
 }
