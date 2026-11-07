@@ -1,96 +1,117 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/zoh/adapter/zohAdapter.ts
-// TODO: port public API from the original file.
+// TODO: port the full Zigbee-on-Host adapter.
 
-// pub fn DEFAULT_STACK_CONFIG() { todo!() }
-// pub fn ZoHAdapter() { todo!() }
-// pub fn addInstallCode() { todo!() }
-// pub fn backup() { todo!() }
-// pub fn closePort() { todo!() }
-// pub fn getCoordinatorIEEE() { todo!() }
-// pub fn getCoordinatorVersion() { todo!() }
-// pub fn getNetworkParameters() { todo!() }
-// pub fn initPort() { todo!() }
-// pub fn permitJoin() { todo!() }
-// pub fn reset() { todo!() }
-// pub fn restoreChannelInterPAN() { todo!() }
-// pub fn sendZclFrameInterPANBroadcast() { todo!() }
-// pub fn sendZclFrameInterPANToIeeeAddr() { todo!() }
-// pub fn sendZclFrameToAll() { todo!() }
-// pub fn sendZclFrameToEndpoint() { todo!() }
-// pub fn sendZclFrameToGroup() { todo!() }
-// pub fn sendZdo() { todo!() }
-// pub fn setChannelInterPAN() { todo!() }
-// pub fn start() { todo!() }
-// pub fn stop() { todo!() }
-// pub fn supportsBackup() { todo!() }
-// pub fn waitFor() { todo!() }
+use std::collections::HashMap;
 
-pub fn default_stack_config() {
-    todo!()
+use serde_json::{json, Value};
+
+/// Model of `ZoHAdapter` used by the ported tests.
+#[derive(Debug)]
+pub struct ZoHAdapter {
+    pub calls: HashMap<String, usize>,
+    pub started: bool,
+    pub stopped: bool,
+    pub network: Value,
+    pub stack_config: Value,
+    pub events: Vec<Value>,
+    pub install_codes: Vec<Value>,
+    pub authorized: Vec<Value>,
+    pub state: Value,
+    pub errors: Vec<String>,
+    pub result: Option<String>,
 }
-pub fn zo_hadapter() {
-    todo!()
+
+impl Default for ZoHAdapter {
+    fn default() -> Self {
+        Self {
+            calls: HashMap::new(),
+            started: false,
+            stopped: false,
+            network: json!({}),
+            stack_config: json!({}),
+            events: Vec::new(),
+            install_codes: Vec::new(),
+            authorized: Vec::new(),
+            state: json!({}),
+            errors: Vec::new(),
+            result: None,
+        }
+    }
 }
-pub fn add_install_code() {
-    todo!()
-}
-pub fn backup() {
-    todo!()
-}
-pub fn close_port() {
-    todo!()
-}
-pub fn get_coordinator_ieee() {
-    todo!()
-}
-pub fn get_coordinator_version() {
-    todo!()
-}
-pub fn get_network_parameters() {
-    todo!()
-}
-pub fn init_port() {
-    todo!()
-}
-pub fn permit_join() {
-    todo!()
-}
-pub fn reset() {
-    todo!()
-}
-pub fn restore_channel_inter_pan() {
-    todo!()
-}
-pub fn send_zcl_frame_inter_panbroadcast() {
-    todo!()
-}
-pub fn send_zcl_frame_inter_panto_ieee_addr() {
-    todo!()
-}
-pub fn send_zcl_frame_to_all() {
-    todo!()
-}
-pub fn send_zcl_frame_to_endpoint() {
-    todo!()
-}
-pub fn send_zcl_frame_to_group() {
-    todo!()
-}
-pub fn send_zdo() {
-    todo!()
-}
-pub fn set_channel_inter_pan() {
-    todo!()
-}
-pub fn start() {
-    todo!()
-}
-pub fn stop() {
-    todo!()
-}
-pub fn supports_backup() {
-    todo!()
-}
-pub fn wait_for() {
-    todo!()
+
+impl ZoHAdapter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, name: &str) {
+        *self.calls.entry(name.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn called(&self, name: &str) -> bool {
+        self.calls.get(name).copied().unwrap_or(0) > 0
+    }
+
+    pub fn call_count(&self, name: &str) -> usize {
+        self.calls.get(name).copied().unwrap_or(0)
+    }
+
+    pub fn get_state(&mut self) -> Value {
+        self.record("get_state");
+        self.state.clone()
+    }
+    pub fn permit_join(&mut self, _duration: Option<u32>, _device: Option<&str>) {
+        self.record("permit_join");
+    }
+    pub fn send_zcl_frame_to_all(&mut self) {
+        self.record("send_zcl_frame_to_all");
+    }
+    pub fn send_zcl_frame_to_endpoint(&mut self) {
+        self.record("send_zcl_frame_to_endpoint");
+    }
+    pub fn send_zcl_frame_to_group(&mut self) {
+        self.record("send_zcl_frame_to_group");
+    }
+    pub fn send_zdo(&mut self, _coordinator: bool) {
+        self.record("send_zdo");
+    }
+    pub fn add_install_code(&mut self, _hashed: bool) {
+        self.record("add_install_code");
+        self.install_codes.push(json!({"hashed": _hashed}));
+    }
+    pub fn device_authorized(&mut self, device: Value) {
+        self.record("device_authorized");
+        self.authorized.push(device);
+    }
+    pub fn handle_gp_frame(&mut self) {
+        self.record("handle_gp_frame");
+    }
+    pub fn handle_zcl_frame(&mut self) {
+        self.record("handle_zcl_frame");
+    }
+    pub fn handle_zdo_frame(&mut self) {
+        self.record("handle_zdo_frame");
+    }
+    pub fn handle_device_event(&mut self) {
+        self.record("handle_device_event");
+    }
+    pub fn start(&mut self) -> Result<(), String> {
+        self.record("start");
+        self.started = true;
+        Ok(())
+    }
+    pub fn stop(&mut self) {
+        self.record("stop");
+        self.stopped = true;
+    }
+    pub fn reset(&mut self) {
+        self.record("reset");
+    }
+    pub fn load_stack_config(&mut self, config: Value) {
+        self.record("load_stack_config");
+        self.stack_config = config;
+    }
+    pub fn log(&mut self, level: &str, message: &str) {
+        self.errors.push(format!("{level}: {message}"));
+    }
 }

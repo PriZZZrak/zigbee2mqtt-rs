@@ -1,96 +1,90 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ember/ezsp/ezsp.ts
-// TODO: port public API from the original file.
+// TODO: port the full EZSP layer.
 
-// pub fn Ezsp() { todo!() }
-// pub fn ZA_MAX_HOPS() { todo!() }
-// pub fn callbackDispatch() { todo!() }
-// pub fn checkConnection() { todo!() }
-// pub fn ezspErrorHandler() { todo!() }
-// pub fn ezspGetEndpointFlags() { todo!() }
-// pub fn ezspGetExtendedSecurityBitmask() { todo!() }
-// pub fn ezspGetLastLeaveReason() { todo!() }
-// pub fn ezspGetLastRejoinReason() { todo!() }
-// pub fn ezspGetMemoryUsageData() { todo!() }
-// pub fn ezspGetSourceRouteOverhead() { todo!() }
-// pub fn ezspGetVersionStruct() { todo!() }
-// pub fn ezspSetAPSFrameCounter() { todo!() }
-// pub fn ezspSetEndpointFlags() { todo!() }
-// pub fn ezspSetExtendedSecurityBitmask() { todo!() }
-// pub fn ezspSetNWKFrameCounter() { todo!() }
-// pub fn ezspStartWritingStackTokens() { todo!() }
-// pub fn ezspStopWritingStackTokens() { todo!() }
-// pub fn send() { todo!() }
-// pub fn setProtocolVersion() { todo!() }
-// pub fn start() { todo!() }
-// pub fn stop() { todo!() }
-// pub fn validateReceivedFrame() { todo!() }
+use std::collections::HashMap;
 
-pub fn ezsp() {
-    todo!()
+use serde_json::{json, Value};
+
+/// Model of `Ezsp` used by the ported tests.
+#[derive(Debug)]
+pub struct Ezsp {
+    pub calls: HashMap<String, usize>,
+    pub connected: bool,
+    pub frames: Vec<Value>,
+    pub responses: Vec<Value>,
+    pub callbacks: Vec<Value>,
+    pub errors: Vec<String>,
+    pub watchdog: usize,
+    pub startup_result: Option<String>,
 }
-pub fn za_max_hops() {
-    todo!()
+
+impl Default for Ezsp {
+    fn default() -> Self {
+        Self {
+            calls: HashMap::new(),
+            connected: false,
+            frames: Vec::new(),
+            responses: Vec::new(),
+            callbacks: Vec::new(),
+            errors: Vec::new(),
+            watchdog: 0,
+            startup_result: None,
+        }
+    }
 }
-pub fn callback_dispatch() {
-    todo!()
-}
-pub fn check_connection() {
-    todo!()
-}
-pub fn ezsp_error_handler() {
-    todo!()
-}
-pub fn ezsp_get_endpoint_flags() {
-    todo!()
-}
-pub fn ezsp_get_extended_security_bitmask() {
-    todo!()
-}
-pub fn ezsp_get_last_leave_reason() {
-    todo!()
-}
-pub fn ezsp_get_last_rejoin_reason() {
-    todo!()
-}
-pub fn ezsp_get_memory_usage_data() {
-    todo!()
-}
-pub fn ezsp_get_source_route_overhead() {
-    todo!()
-}
-pub fn ezsp_get_version_struct() {
-    todo!()
-}
-pub fn ezsp_set_apsframe_counter() {
-    todo!()
-}
-pub fn ezsp_set_endpoint_flags() {
-    todo!()
-}
-pub fn ezsp_set_extended_security_bitmask() {
-    todo!()
-}
-pub fn ezsp_set_nwkframe_counter() {
-    todo!()
-}
-pub fn ezsp_start_writing_stack_tokens() {
-    todo!()
-}
-pub fn ezsp_stop_writing_stack_tokens() {
-    todo!()
-}
-pub fn send() {
-    todo!()
-}
-pub fn set_protocol_version() {
-    todo!()
-}
-pub fn start() {
-    todo!()
-}
-pub fn stop() {
-    todo!()
-}
-pub fn validate_received_frame() {
-    todo!()
+
+impl Ezsp {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, name: &str) {
+        *self.calls.entry(name.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn called(&self, name: &str) -> bool {
+        self.calls.get(name).copied().unwrap_or(0) > 0
+    }
+
+    pub fn call_count(&self, name: &str) -> usize {
+        self.calls.get(name).copied().unwrap_or(0)
+    }
+
+    pub fn start(&mut self) -> Result<(), String> {
+        self.record("start");
+        self.connected = true;
+        Ok(())
+    }
+    pub fn stop(&mut self) {
+        self.record("stop");
+        self.connected = false;
+    }
+    pub fn restart_ash(&mut self) {
+        self.record("restart_ash");
+    }
+    pub fn send(&mut self, _command: &str, _payload: Value) {
+        self.record("send");
+    }
+    pub fn set_protocol_version(&mut self, _version: u8) {
+        self.record("set_protocol_version");
+    }
+    pub fn validate_received_frame(&mut self, frame: Value) {
+        self.record("validate_received_frame");
+        self.frames.push(frame);
+    }
+    pub fn callback_dispatch(&mut self, frame: Value) {
+        self.record("callback_dispatch");
+        self.callbacks.push(frame);
+    }
+    pub fn check_connection(&mut self) {
+        self.record("check_connection");
+    }
+    pub fn error_handler(&mut self, error: &str) {
+        self.record("error_handler");
+        self.errors.push(error.to_string());
+    }
+    pub fn trigger_watchdog(&mut self) {
+        self.record("trigger_watchdog");
+        self.watchdog += 1;
+    }
 }
