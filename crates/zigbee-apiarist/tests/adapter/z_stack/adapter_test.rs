@@ -128,6 +128,23 @@
 //   - should start with runInconsistent option with 3.0.x adapter - commissioned, config-adapter mismatch
 //   - zstack-adapter
 
+use serde_json::json;
+use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::{ZStackAdapter, ZnpCall};
+use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+
+fn adapter() -> ZStackAdapter {
+    ZStackAdapter::new(
+        json!({}),
+        json!({"path": "dummy", "baudRate": 800, "rtscts": false}),
+        "backup.json",
+        json!({"concurrent": 3}),
+    )
+}
+
+fn opts() -> serde_json::Value {
+    json!({})
+}
+
 #[test]
 #[ignore = "not implemented yet"]
 fn adapter_disconnected() {
@@ -152,16 +169,22 @@ fn add_install_code_key_derived_from_install_code() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn call_znp_constructor() {
-    todo!()
+async fn call_znp_constructor() {
+    let adapter = adapter();
+    assert_eq!(adapter.path, "dummy");
+    assert_eq!(adapter.baud_rate, 800);
+    assert!(!adapter.rtscts);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn close_adapter() {
-    todo!()
+async fn close_adapter() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.stop().await;
+    assert_eq!(adapter.close_calls, 1);
 }
 
 #[test]
@@ -206,28 +229,64 @@ fn do_nothing_wiht_non_areq_event() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn get_coordinator_ieee() {
-    todo!()
+async fn get_coordinator_ieee() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    assert_eq!(adapter.get_coordinator_ieee().await, "0x00124b0009d80ba7");
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn get_coordinator_version() {
-    todo!()
+async fn get_coordinator_version() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    assert_eq!(
+        adapter.get_coordinator_version().await,
+        json!({"type": "ZStack3x0", "meta": {"revision": 20210430, "product": 1}})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn get_network_parameters() {
-    todo!()
+async fn get_network_parameters() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+    let result = adapter.get_network_parameters().await;
+
+    assert_eq!(
+        adapter.znp_calls.last(),
+        Some(&ZnpCall {
+            subsystem: "ZDO".to_string(),
+            command: "extNwkInfo".to_string(),
+            payload: json!({}),
+        })
+    );
+    assert_eq!(
+        result,
+        json!({"channel": 21, "extendedPanID": "0x00124b0009d69f77", "panID": 123, "nwkUpdateID": 0})
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn hard_reset() {
-    todo!()
+async fn hard_reset() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter.reset("hard").await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "SYS".to_string(),
+            command: "resetReq".to_string(),
+            payload: json!({"type": 0}),
+        }]
+    );
 }
 
 #[test]
@@ -278,22 +337,85 @@ fn node_descriptor_request_should_discover_route_to_fix_potential_fails() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn permit_join_all() {
-    todo!()
+async fn permit_join_all() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+    adapter.zdo_calls.clear();
+
+    adapter.permit_join(100, None).await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "UTIL".to_string(),
+            command: "ledControl".to_string(),
+            payload: json!({"ledid": 3, "mode": 1}),
+        }]
+    );
+    assert_eq!(
+        adapter.zdo_calls,
+        vec![(
+            ClusterId::PERMIT_JOINING_REQUEST,
+            vec![0x0f, 0xfc, 0xff, 100, 1],
+            None
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn permit_join_coordinator_only() {
-    todo!()
+async fn permit_join_coordinator_only() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.zdo_calls.clear();
+
+    adapter.permit_join(254, Some(0)).await;
+
+    assert_eq!(
+        adapter.zdo_calls,
+        vec![(
+            ClusterId::PERMIT_JOINING_REQUEST,
+            vec![0x02, 0x00, 0x00, 254, 1],
+            None
+        )]
+    );
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn permit_join_specific_network_address() {
-    todo!()
+async fn permit_join_specific_network_address() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+    adapter.zdo_calls.clear();
+
+    adapter.permit_join(102, Some(42102)).await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "UTIL".to_string(),
+            command: "ledControl".to_string(),
+            payload: json!({"ledid": 3, "mode": 1}),
+        }]
+    );
+    assert_eq!(
+        adapter.zdo_calls,
+        vec![(
+            ClusterId::PERMIT_JOINING_REQUEST,
+            vec![
+                0x02,
+                (42102u32 & 0xff) as u8,
+                ((42102u32 >> 8) & 0xff) as u8,
+                102,
+                1
+            ],
+            None
+        )]
+    );
 }
 
 #[test]
@@ -559,10 +681,23 @@ fn should_throw_error_when_register_endpoints_fails() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn soft_reset() {
-    todo!()
+async fn soft_reset() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter.reset("soft").await;
+
+    assert_eq!(
+        adapter.znp_calls,
+        vec![ZnpCall {
+            subsystem: "SYS".to_string(),
+            command: "resetReq".to_string(),
+            payload: json!({"type": 1}),
+        }]
+    );
 }
 
 #[test]
@@ -571,16 +706,45 @@ fn source_endpoint_is_selected_based_on_profile_id() {
     todo!()
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn start_with_transmit_power_set() {
-    todo!()
+async fn start_with_transmit_power_set() {
+    let mut adapter = ZStackAdapter::new(
+        json!({}),
+        json!({"path": "dummy", "baudRate": 800, "rtscts": false}),
+        "backup.json",
+        json!({"transmitPower": 2, "disableLED": false}),
+    );
+    adapter.start().await;
+    assert!(adapter.znp_calls.contains(&ZnpCall {
+        subsystem: "SYS".to_string(),
+        command: "stackTune".to_string(),
+        payload: json!({"operation": 0, "value": 2}),
+    }));
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "not implemented yet"]
-fn support_led_should_go_to_false_when_led_request_fails() {
-    todo!()
+async fn support_led_should_go_to_false_when_led_request_fails() {
+    let mut adapter = adapter();
+    adapter.start().await;
+    adapter.znp_calls.clear();
+
+    adapter.permit_join(0, Some(0)).await;
+    assert!(adapter.znp_calls.contains(&ZnpCall {
+        subsystem: "UTIL".to_string(),
+        command: "ledControl".to_string(),
+        payload: json!({"ledid": 3, "mode": 0}),
+    }));
+
+    adapter.led_supported = false;
+    adapter.znp_calls.clear();
+    adapter.permit_join(0, Some(0)).await;
+    assert!(!adapter.znp_calls.iter().any(|call| {
+        call.subsystem == "UTIL"
+            && call.command == "ledControl"
+            && call.payload == json!({"ledid": 3, "mode": 0})
+    }));
 }
 
 #[test]
