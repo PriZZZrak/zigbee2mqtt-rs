@@ -79,100 +79,225 @@
 //   - znp waitFor with target as network address
 //   - znp waitFor with transid
 
+use serde_json::json;
+use zigbee_apiarist::adapter::z_stack::znp::buffalo_znp::BuffaloZnp;
+use zigbee_apiarist::adapter::z_stack::znp::parameter_type::ParameterType;
+
+const IEEE_ADDR1: &str = "0xae440112004b1200";
+const IEEE_ADDR1_HEX: [u8; 8] = [0x00, 0x12, 0x4b, 0x00, 0x12, 0x01, 0x44, 0xae];
+const IEEE_ADDR2: &str = "0xaf440112005b1200";
+const IEEE_ADDR2_HEX: [u8; 8] = [0x00, 0x12, 0x5b, 0x00, 0x12, 0x01, 0x44, 0xaf];
+
+fn duplicate_array<T: Clone>(times: usize, item: &[T]) -> Vec<T> {
+    let mut out = Vec::with_capacity(times * item.len());
+    for _ in 0..times {
+        out.extend_from_slice(item);
+    }
+    out
+}
+
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer_read() {
-    todo!()
+    let buffer = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
+    let mut buffalo = BuffaloZnp::new(buffer.clone(), 2);
+    let value = buffalo.read(ParameterType::BUFFER as u32, &json!({"length": 1}));
+    assert_eq!(buffalo.get_position(), 3);
+    assert_eq!(value, json!([buffer[2]]));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 9], 1);
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    buffalo.write(ParameterType::BUFFER as u32, &json!(payload), &json!({}));
+    assert_eq!(buffalo.get_position(), 9);
+    assert_eq!(
+        buffalo.get_buffer(),
+        vec![0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer100_read() {
-    todo!()
+    let payload = duplicate_array(20, &[0x00, 0x01, 0x02, 0x03, 0x04]);
+    let mut buffer = vec![0x00];
+    buffer.extend_from_slice(&payload);
+    let mut buffalo = BuffaloZnp::new(buffer, 1);
+    let value = buffalo.read(ParameterType::BUFFER100 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 101);
+    assert_eq!(value, json!(payload));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer100_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 100], 0);
+    let payload = duplicate_array(20, &[0x00, 0x01, 0x02, 0x03, 0x04]);
+    buffalo.write(ParameterType::BUFFER100 as u32, &json!(payload), &json!({}));
+    assert_eq!(buffalo.get_position(), 100);
+    assert_eq!(buffalo.get_buffer(), payload);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer16_read() {
-    todo!()
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut buffer = vec![0x00];
+    buffer.extend_from_slice(&payload);
+    buffer.extend_from_slice(&payload);
+    let mut buffalo = BuffaloZnp::new(buffer, 1);
+    let value = buffalo.read(ParameterType::BUFFER16 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 17);
+    let mut expected = payload.clone();
+    expected.extend_from_slice(&payload);
+    assert_eq!(value, json!(expected));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer16_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 20], 1);
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut full = payload.clone();
+    full.extend_from_slice(&payload);
+    buffalo.write(ParameterType::BUFFER16 as u32, &json!(full), &json!({}));
+    assert_eq!(buffalo.get_position(), 17);
+    let mut expected = vec![0x00];
+    expected.extend_from_slice(&full);
+    expected.extend_from_slice(&[0x00, 0x00, 0x00]);
+    assert_eq!(buffalo.get_buffer(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer18_read() {
-    todo!()
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+    let mut buffer = vec![0x00];
+    buffer.extend_from_slice(&payload);
+    buffer.extend_from_slice(&payload);
+    let mut buffalo = BuffaloZnp::new(buffer, 1);
+    let value = buffalo.read(ParameterType::BUFFER18 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 19);
+    let mut expected = payload.clone();
+    expected.extend_from_slice(&payload);
+    assert_eq!(value, json!(expected));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer18_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 20], 1);
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+    let mut full = payload.clone();
+    full.extend_from_slice(&payload);
+    buffalo.write(ParameterType::BUFFER18 as u32, &json!(full), &json!({}));
+    assert_eq!(buffalo.get_position(), 19);
+    let mut expected = vec![0x00];
+    expected.extend_from_slice(&full);
+    expected.push(0x00);
+    assert_eq!(buffalo.get_buffer(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer32_read() {
-    todo!()
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let full = duplicate_array(4, &payload);
+    let mut buffer = vec![0x00];
+    buffer.extend_from_slice(&full);
+    let mut buffalo = BuffaloZnp::new(buffer, 1);
+    let value = buffalo.read(ParameterType::BUFFER32 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 33);
+    assert_eq!(value, json!(full));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer32_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 34], 1);
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let full = duplicate_array(4, &payload);
+    buffalo.write(ParameterType::BUFFER32 as u32, &json!(full), &json!({}));
+    assert_eq!(buffalo.get_position(), 33);
+    let mut expected = vec![0x00];
+    expected.extend_from_slice(&full);
+    expected.push(0x00);
+    assert_eq!(buffalo.get_buffer(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer42_read() {
-    todo!()
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut full = duplicate_array(5, &payload);
+    full.extend_from_slice(&[0x08, 0x09]);
+    let mut buffer = vec![0x00];
+    buffer.extend_from_slice(&full);
+    let mut buffalo = BuffaloZnp::new(buffer, 1);
+    let value = buffalo.read(ParameterType::BUFFER42 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 43);
+    assert_eq!(value, json!(full));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer42_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 44], 1);
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut full = duplicate_array(5, &payload);
+    full.extend_from_slice(&[0x01, 0xff]);
+    buffalo.write(ParameterType::BUFFER42 as u32, &json!(full), &json!({}));
+    assert_eq!(buffalo.get_position(), 43);
+    let mut expected = vec![0x00];
+    expected.extend_from_slice(&full);
+    expected.push(0x00);
+    assert_eq!(buffalo.get_buffer(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer8_read() {
-    todo!()
+    let buffer = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
+    let mut buffalo = BuffaloZnp::new(buffer.clone(), 2);
+    let value = buffalo.read(ParameterType::BUFFER8 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 10);
+    assert_eq!(value, json!(&buffer[2..]));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer8_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 9], 1);
+    let payload = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    buffalo.write(ParameterType::BUFFER8 as u32, &json!(payload), &json!({}));
+    assert_eq!(buffalo.get_position(), 9);
+    let mut expected = vec![0x00];
+    expected.extend_from_slice(&payload);
+    assert_eq!(buffalo.get_buffer(), expected);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn buffer8_write_length_consistent() {
-    todo!()
+    let result = std::panic::catch_unwind(|| {
+        let mut buffalo = BuffaloZnp::new(vec![0; 9], 0);
+        let payload: Vec<u8> = (0..=8).collect();
+        buffalo.write(ParameterType::BUFFER8 as u32, &json!(payload), &json!({}));
+    });
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn cant_read_unsupported_type() {
-    todo!()
+    let result = std::panic::catch_unwind(|| {
+        let mut buffalo = BuffaloZnp::new(vec![0; 0], 0);
+        buffalo.read(9999, &json!({}));
+    });
+    assert!(result.is_err());
 }
 
 #[test]
@@ -190,61 +315,131 @@ fn coverage_logger() {
 #[test]
 #[ignore = "not implemented yet"]
 fn ieeeaddr_read() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(IEEE_ADDR2_HEX.to_vec(), 0);
+    let value = buffalo.read(ParameterType::IEEEADDR as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 8);
+    assert_eq!(value, json!(IEEE_ADDR2));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn ieeeaddr_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 8], 0);
+    buffalo.write(
+        ParameterType::IEEEADDR as u32,
+        &json!(IEEE_ADDR1),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_position(), 8);
+    assert_eq!(buffalo.get_buffer(), IEEE_ADDR1_HEX.to_vec());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn int8_read() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0x00, 0xf0, 0x00, 0x00], 1);
+    let value = buffalo.read(ParameterType::INT8 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 2);
+    assert_eq!(value, json!(-16));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn int8_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 3], 1);
+    buffalo.write(ParameterType::INT8 as u32, &json!(127), &json!({}));
+    assert_eq!(buffalo.get_position(), 2);
+    assert_eq!(buffalo.get_buffer(), vec![0x00, 0x7f, 0x00]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_network_read() {
-    todo!()
+    let buffer = vec![
+        0x05, 0x10, 0x10, 0x09, 0x31, 0x13, 0x01, 0x10, 0x10, 0x09, 0x31, 0x13, 0x00, 0x01,
+    ];
+    let mut buffalo = BuffaloZnp::new(buffer, 1);
+    let value = buffalo.read(ParameterType::LIST_NETWORK as u32, &json!({"length": 2}));
+    assert_eq!(buffalo.get_position(), 13);
+    assert_eq!(
+        value,
+        json!([
+            {
+                "beaconOrder": 3,
+                "logicalChannel": 9,
+                "neightborPanId": 4112,
+                "permitJoin": 1,
+                "stackProfile": 1,
+                "superFrameOrder": 1,
+                "zigbeeVersion": 3,
+            },
+            {
+                "beaconOrder": 3,
+                "logicalChannel": 9,
+                "neightborPanId": 4112,
+                "permitJoin": 0,
+                "stackProfile": 1,
+                "superFrameOrder": 1,
+                "zigbeeVersion": 3,
+            },
+        ])
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_network_write() {
-    todo!()
+    let result = std::panic::catch_unwind(|| {
+        let mut buffalo = BuffaloZnp::new(vec![0; 10], 0);
+        buffalo.write(ParameterType::LIST_NETWORK as u32, &json!([]), &json!({}));
+    });
+    assert!(result.is_err());
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint16_read() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0x00, 0x00, 0x04, 0x00, 0x08], 1);
+    let value = buffalo.read(ParameterType::LIST_UINT16 as u32, &json!({"length": 2}));
+    assert_eq!(buffalo.get_position(), 5);
+    assert_eq!(value, json!([1024, 2048]));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint16_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 5], 1);
+    let payload = vec![1024, 2048];
+    buffalo.write(
+        ParameterType::LIST_UINT16 as u32,
+        &json!(payload),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_position(), 5);
+    assert_eq!(buffalo.get_buffer(), vec![0x00, 0x00, 0x04, 0x00, 0x08]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint8_read() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0x00, 0x00, 0x04, 0x08], 2);
+    let value = buffalo.read(ParameterType::LIST_UINT8 as u32, &json!({"length": 2}));
+    assert_eq!(buffalo.get_position(), 4);
+    assert_eq!(value, json!([4, 8]));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn list_uint8_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 4], 1);
+    let payload = vec![200, 100];
+    buffalo.write(
+        ParameterType::LIST_UINT8 as u32,
+        &json!(payload),
+        &json!({}),
+    );
+    assert_eq!(buffalo.get_position(), 3);
+    assert_eq!(buffalo.get_buffer(), vec![0x00, 0xc8, 0x64, 0x00]);
 }
 
 #[test]
@@ -316,37 +511,58 @@ fn serialport_error_do_nothing() {
 #[test]
 #[ignore = "not implemented yet"]
 fn uint16_read() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0x00, 0x03, 0xff, 0x00], 1);
+    let value = buffalo.read(ParameterType::UINT16 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 3);
+    assert_eq!(value, json!(65283));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn uint16_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 3], 1);
+    buffalo.write(ParameterType::UINT16 as u32, &json!(1020), &json!({}));
+    assert_eq!(buffalo.get_position(), 3);
+    assert_eq!(buffalo.get_buffer(), vec![0x00, 0xfc, 0x03]);
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn uint32_read() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0x01, 0x03, 0xff, 0xff], 0);
+    let value = buffalo.read(ParameterType::UINT32 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 4);
+    assert_eq!(value, json!(4294902529u64));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn uint32_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 6], 2);
+    buffalo.write(ParameterType::UINT32 as u32, &json!(1065283), &json!({}));
+    assert_eq!(buffalo.get_position(), 6);
+    assert_eq!(
+        buffalo.get_buffer(),
+        vec![0x00, 0x00, 0x43, 0x41, 0x10, 0x00]
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn uint8_read() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0x00, 0x03, 0x00, 0x00], 1);
+    let value = buffalo.read(ParameterType::UINT8 as u32, &json!({}));
+    assert_eq!(buffalo.get_position(), 2);
+    assert_eq!(value, json!(3));
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn uint8_write() {
-    todo!()
+    let mut buffalo = BuffaloZnp::new(vec![0; 3], 1);
+    buffalo.write(ParameterType::UINT8 as u32, &json!(240), &json!({}));
+    assert_eq!(buffalo.get_position(), 2);
+    assert_eq!(buffalo.get_buffer(), vec![0x00, 0xf0, 0x00]);
 }
 
 #[test]
