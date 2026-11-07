@@ -300,7 +300,26 @@ fn build_binding_table_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_challenge_request() {
-    todo!()
+    let tlv = json!({"senderEui64": IEEE_ADDRESS2, "challengeValue": vec![0xfeu8; 8]});
+    let mut expected = vec![0, 0, 8 + 8 - 1];
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    expected.extend_from_slice(&[0xfeu8; 8]);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::CHALLENGE_REQUEST, &[tlv]),
+        expected
+    );
+
+    let tlv2 = json!({
+        "senderEui64": IEEE_ADDRESS1,
+        "challengeValue": [0xfe, 0xac, 0x12, 0x23, 0x85, 0x8c, 0x7c, 0xa3],
+    });
+    let mut expected = vec![0, 0, 8 + 8 - 1];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    expected.extend_from_slice(&[0xfe, 0xac, 0x12, 0x23, 0x85, 0x8c, 0x7c, 0xa3]);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::CHALLENGE_REQUEST, &[tlv2]),
+        expected
+    );
 }
 
 #[test]
@@ -359,7 +378,28 @@ fn build_clear_all_bindings_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_decommission_request() {
-    todo!()
+    let tlv = json!({"eui64List": [IEEE_ADDRESS1]});
+    let mut expected = vec![0, 0, 8 * 1 + 1 - 1, 1];
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::DECOMMISSION_REQUEST, &[tlv]),
+        expected
+    );
+
+    let tlv2 = json!({"eui64List": [IEEE_ADDRESS2, IEEE_ADDRESS1]});
+    let mut expected = vec![0, 0, 8 * 2 + 1 - 1, 2];
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    expected.extend_from_slice(&IEEE_ADDRESS1_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::DECOMMISSION_REQUEST, &[tlv2]),
+        expected
+    );
+
+    let tlv3 = json!({"eui64List": []});
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::DECOMMISSION_REQUEST, &[tlv3]),
+        vec![0, 0, 8 * 0 + 1 - 1, 0]
+    );
 }
 
 #[test]
@@ -466,13 +506,30 @@ fn build_enhanced_set_active_channels_and_nwk_manager_id_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_get_authentication_level_request() {
-    todo!()
+    let tlv = json!({"ieee": IEEE_ADDRESS2});
+    let mut expected = vec![0, 0, 8 - 1];
+    expected.extend_from_slice(&IEEE_ADDRESS2_BYTES);
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::GET_AUTHENTICATION_LEVEL_REQUEST, &[tlv],),
+        expected
+    );
 }
 
 #[test]
 #[ignore = "not implemented yet"]
 fn build_get_configuration_request() {
-    todo!()
+    assert_eq!(
+        BuffaloZdo::build_request(true, ClusterId::GET_CONFIGURATION_REQUEST, &[json!([84])]),
+        vec![0, 1, 84]
+    );
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::GET_CONFIGURATION_REQUEST,
+            &[json!([67, 71])],
+        ),
+        vec![0, 2, 67, 71]
+    );
 }
 
 #[test]
@@ -730,7 +787,25 @@ fn build_power_descriptor_request() {
 #[test]
 #[ignore = "not implemented yet"]
 fn build_retrieve_authentication_token_request() {
-    todo!()
+    let tlv = json!({"tlvTypeTagId": 0});
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::RETRIEVE_AUTHENTICATION_TOKEN_REQUEST,
+            &[tlv],
+        ),
+        vec![0, 0, 0, 0]
+    );
+
+    let tlv2 = json!({"tlvTypeTagId": 31});
+    assert_eq!(
+        BuffaloZdo::build_request(
+            true,
+            ClusterId::RETRIEVE_AUTHENTICATION_TOKEN_REQUEST,
+            &[tlv2],
+        ),
+        vec![0, 0, 0, 31]
+    );
 }
 
 #[test]
