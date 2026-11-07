@@ -147,7 +147,6 @@ fn opts() -> serde_json::Value {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn adapter_disconnected() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -158,7 +157,6 @@ async fn adapter_disconnected() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn adapter_disconnected_dont_emit_when_closing() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -170,7 +168,6 @@ async fn adapter_disconnected_dont_emit_when_closing() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn add_install_code_install_code_crc() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -199,7 +196,6 @@ async fn add_install_code_install_code_crc() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn add_install_code_key_derived_from_install_code() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -228,7 +224,6 @@ async fn add_install_code_key_derived_from_install_code() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn call_znp_constructor() {
     let adapter = adapter();
     assert_eq!(adapter.path, "dummy");
@@ -237,7 +232,6 @@ async fn call_znp_constructor() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn close_adapter() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -246,7 +240,6 @@ async fn close_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn command_should_fail_when_in_interpan() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -272,7 +265,6 @@ async fn command_should_fail_when_in_interpan() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn concentrator_callback_indication() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -297,7 +289,6 @@ async fn concentrator_callback_indication() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn device_announce() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -328,7 +319,6 @@ async fn device_announce() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn device_announce_should_discover_route_to_end_devices() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -362,7 +352,6 @@ async fn device_announce_should_discover_route_to_end_devices() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn device_joined() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -381,7 +370,6 @@ async fn device_joined() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn device_leave() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -400,7 +388,6 @@ async fn device_leave() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn do_nothing_wiht_non_areq_event() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -416,7 +403,6 @@ async fn do_nothing_wiht_non_areq_event() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn get_coordinator_ieee() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -424,7 +410,6 @@ async fn get_coordinator_ieee() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn get_coordinator_version() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -435,7 +420,6 @@ async fn get_coordinator_version() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn get_network_parameters() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -457,7 +441,6 @@ async fn get_network_parameters() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn hard_reset() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -476,7 +459,6 @@ async fn hard_reset() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn ignore_device_leave_with_rejoin() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -492,7 +474,6 @@ async fn ignore_device_leave_with_rejoin() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn incoming_message_raw_not_zcl() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -521,7 +502,6 @@ async fn incoming_message_raw_not_zcl() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn led_behaviour_disable_led_false_firmware_handling_leds() {
     let mut adapter = ZStackAdapter::new(
         json!({}),
@@ -551,7 +531,6 @@ async fn led_behaviour_disable_led_false_firmware_handling_leds() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn led_behaviour_disable_led_false_firmware_not_handling_leds() {
     let mut adapter = ZStackAdapter::new(
         json!({}),
@@ -581,7 +560,6 @@ async fn led_behaviour_disable_led_false_firmware_not_handling_leds() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn led_behaviour_disable_led_true_firmware_handling_leds() {
     let mut adapter = ZStackAdapter::new(
         json!({}),
@@ -610,7 +588,6 @@ async fn led_behaviour_disable_led_true_firmware_handling_leds() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn led_behaviour_disable_led_true_firmware_not_handling_leds() {
     let mut adapter = ZStackAdapter::new(
         json!({}),
@@ -640,7 +617,6 @@ async fn led_behaviour_disable_led_true_firmware_not_handling_leds() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn network_address_response() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -668,7 +644,6 @@ async fn network_address_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn node_descriptor_request_should_discover_route_to_fix_potential_fails() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -684,7 +659,7 @@ async fn node_descriptor_request_should_discover_route_to_fix_potential_fails() 
         .await
         .unwrap();
 
-    let mut expected = vec![0x23, 0x01];
+    let mut expected = vec![(1234u32 & 0xff) as u8, ((1234u32 >> 8) & 0xff) as u8];
     expected.extend_from_slice(&zdo_payload);
     assert_eq!(adapter.zdo_calls.len(), 2);
     assert_eq!(adapter.zdo_calls[0].0, cluster_id);
@@ -697,7 +672,6 @@ async fn node_descriptor_request_should_discover_route_to_fix_potential_fails() 
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn permit_join_all() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -725,7 +699,6 @@ async fn permit_join_all() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn permit_join_coordinator_only() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -744,7 +717,6 @@ async fn permit_join_coordinator_only() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn permit_join_specific_network_address() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -778,7 +750,6 @@ async fn permit_join_specific_network_address() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn refuse_to_start_when_ping_fails() {
     let mut adapter = adapter();
     adapter.ping_error = Some("Couldnt lock port".to_string());
@@ -792,7 +763,6 @@ async fn refuse_to_start_when_ping_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn restore_interpan_channel() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -804,7 +774,6 @@ async fn restore_interpan_channel() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_group() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -837,7 +806,6 @@ async fn send_zcl_frame_group() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_group_data_confirm_fails() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 184;
@@ -877,7 +845,6 @@ async fn send_zcl_frame_group_data_confirm_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_group_retry_on_mac_channel_access_failure() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 225;
@@ -912,7 +879,6 @@ async fn send_zcl_frame_group_retry_on_mac_channel_access_failure() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_interpan() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -949,7 +915,6 @@ async fn send_zcl_frame_interpan() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_interpan_throw_exception_data_request_fails() {
     let mut adapter = adapter();
     adapter.data_request_ext_code = 99;
@@ -965,7 +930,6 @@ async fn send_zcl_frame_interpan_throw_exception_data_request_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_interpan_throw_exception_when_command_has_no_response() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -983,7 +947,6 @@ async fn send_zcl_frame_interpan_throw_exception_when_command_has_no_response() 
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_interpan_with_response() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1019,7 +982,6 @@ async fn send_zcl_frame_interpan_with_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1058,7 +1020,6 @@ async fn send_zcl_frame_network_address() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_data_confirm_fails_with_default_response() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 201;
@@ -1085,7 +1046,6 @@ async fn send_zcl_frame_network_address_data_confirm_fails_with_default_response
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_data_confirm_fails_without_default_response() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 201;
@@ -1112,7 +1072,6 @@ async fn send_zcl_frame_network_address_data_confirm_fails_without_default_respo
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_data_confirm_fails() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 201;
@@ -1140,7 +1099,6 @@ async fn send_zcl_frame_network_address_data_confirm_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_should_retry(
 ) {
     let mut adapter = adapter();
@@ -1187,7 +1145,6 @@ async fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_ad
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_address_change_without_recovery(
 ) {
     let mut adapter = adapter();
@@ -1206,7 +1163,6 @@ async fn send_zcl_frame_network_address_fails_because_mac_no_ack_with_network_ad
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_fails_because_mac_no_ack_should_retry() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 233;
@@ -1248,7 +1204,6 @@ async fn send_zcl_frame_network_address_fails_because_mac_no_ack_should_retry() 
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_when_not_being_a_parent_should_retry(
 ) {
     let mut adapter = adapter();
@@ -1299,7 +1254,6 @@ async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_whe
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_should_retry() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 240;
@@ -1353,7 +1307,6 @@ async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_sho
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_fails_because_requested_profile_id_is_not_configured() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1376,7 +1329,6 @@ async fn send_zcl_frame_network_address_fails_because_requested_profile_id_is_no
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_matches_by_tsn() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1414,9 +1366,9 @@ async fn send_zcl_frame_network_address_matches_by_tsn() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_matches_on_default_response() {
     let mut adapter = adapter();
+    adapter.default_response_result = true;
     adapter.start().await;
     adapter.znp_calls.clear();
 
@@ -1434,7 +1386,6 @@ async fn send_zcl_frame_network_address_matches_on_default_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_retry_on_mac_channel_access_failure() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 225;
@@ -1457,7 +1408,6 @@ async fn send_zcl_frame_network_address_retry_on_mac_channel_access_failure() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_should_retry_on_dataconfirm_timeout() {
     let mut adapter = adapter();
     adapter.data_confirm_code = 9999;
@@ -1483,7 +1433,6 @@ async fn send_zcl_frame_network_address_should_retry_on_dataconfirm_timeout() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_timeout_should_discover_route_and_retry() {
     let mut adapter = adapter();
     adapter.assoc_get_with_address_node_relation = 2;
@@ -1519,7 +1468,6 @@ async fn send_zcl_frame_network_address_timeout_should_discover_route_and_retry(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_timeout_should_discover_route_rewrite_child_entry_and_retry_for_sleepy_end_device(
 ) {
     let mut adapter = adapter();
@@ -1560,7 +1508,6 @@ async fn send_zcl_frame_network_address_timeout_should_discover_route_rewrite_ch
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_transaction_number_shouldnt_go_higher_than_255() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1605,7 +1552,6 @@ async fn send_zcl_frame_network_address_transaction_number_shouldnt_go_higher_th
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_with_default_response() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1647,7 +1593,6 @@ async fn send_zcl_frame_network_address_with_default_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_care_because_command_has_response(
 ) {
     let mut adapter = adapter();
@@ -1673,7 +1618,6 @@ async fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_c
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_to_all_default() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1706,7 +1650,6 @@ async fn send_zcl_frame_to_all_default() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_to_all_rx_on_when_idle() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1739,7 +1682,6 @@ async fn send_zcl_frame_to_all_rx_on_when_idle() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_to_all_sleepy() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1772,7 +1714,6 @@ async fn send_zcl_frame_to_all_sleepy() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn send_zcl_frame_with_aps_encryption() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1810,7 +1751,6 @@ async fn send_zcl_frame_with_aps_encryption() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_multicast() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1840,14 +1780,13 @@ async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_multic
         )
         .await;
 
-    let mut expected = vec![0x23, 0x01];
+    let mut expected = vec![(1234u32 & 0xff) as u8, ((1234u32 >> 8) & 0xff) as u8];
     expected.extend_from_slice(&zdo_payload);
     expected.extend_from_slice(&[0; 7]);
     assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_unicast() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1877,13 +1816,12 @@ async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_unicas
         )
         .await;
 
-    let mut expected = vec![0x23, 0x01];
+    let mut expected = vec![(1234u32 & 0xff) as u8, ((1234u32 >> 8) & 0xff) as u8];
     expected.extend_from_slice(&zdo_payload);
     assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_network_address_request() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1909,7 +1847,6 @@ async fn sends_proper_zdo_request_payload_for_network_address_request() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_nwk_update_request_broadcast() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1944,7 +1881,6 @@ async fn sends_proper_zdo_request_payload_for_nwk_update_request_broadcast() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_nwk_update_request_unicast() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -1979,7 +1915,6 @@ async fn sends_proper_zdo_request_payload_for_nwk_update_request_unicast() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_permit_joining_request_broadcast() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2004,7 +1939,6 @@ async fn sends_proper_zdo_request_payload_for_permit_joining_request_broadcast()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_permit_joining_request_to_target() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2029,7 +1963,6 @@ async fn sends_proper_zdo_request_payload_for_permit_joining_request_to_target()
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn sends_proper_zdo_request_payload_for_generic_logic_request() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2047,13 +1980,12 @@ async fn sends_proper_zdo_request_payload_for_generic_logic_request() {
         )
         .await;
 
-    let mut expected = vec![0x23, 0x01];
+    let mut expected = vec![(1234u32 & 0xff) as u8, ((1234u32 >> 8) & 0xff) as u8];
     expected.extend_from_slice(&zdo_payload);
     assert_eq!(adapter.zdo_calls, vec![(cluster_id, expected, None)]);
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn set_interpan_channel() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2071,7 +2003,6 @@ async fn set_interpan_channel() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_throw_error_when_zdo_call_fails() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2089,7 +2020,6 @@ async fn should_throw_error_when_zdo_call_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_throw_error_when_register_endpoints_fails() {
     let mut adapter = adapter();
     adapter.register_endpoints_fail = true;
@@ -2100,7 +2030,6 @@ async fn should_throw_error_when_register_endpoints_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn soft_reset() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2119,7 +2048,6 @@ async fn soft_reset() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn source_endpoint_is_selected_based_on_profile_id() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2160,7 +2088,6 @@ async fn source_endpoint_is_selected_based_on_profile_id() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn start_with_transmit_power_set() {
     let mut adapter = ZStackAdapter::new(
         json!({}),
@@ -2177,7 +2104,6 @@ async fn start_with_transmit_power_set() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn support_led_should_go_to_false_when_led_request_fails() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2201,7 +2127,6 @@ async fn support_led_should_go_to_false_when_led_request_fails() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn supports_backup() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2209,7 +2134,6 @@ async fn supports_backup() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn wait_for_resolves_on_cmd() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2229,7 +2153,6 @@ async fn wait_for_resolves_on_cmd() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn wait_for_resolves_on_specified_default_response() {
     let mut adapter = adapter();
     adapter.start().await;
@@ -2245,7 +2168,6 @@ async fn wait_for_resolves_on_specified_default_response() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_recommission_restore_unified_backup_with_1_2_adapter_and_create_backup_empty() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2259,7 +2181,6 @@ async fn should_recommission_restore_unified_backup_with_1_2_adapter_and_create_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_1_2_adapter() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2270,7 +2191,6 @@ async fn should_commission_network_with_1_2_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_1_2_adapter_default_extended_pan_id() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2281,7 +2201,6 @@ async fn should_commission_network_with_1_2_adapter_default_extended_pan_id() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_1_2_adapter_old_adapter_without_version_reporting() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2292,7 +2211,6 @@ async fn should_commission_network_with_1_2_adapter_old_adapter_without_version_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_3_0_x_adapter() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2303,7 +2221,6 @@ async fn should_commission_network_with_3_0_x_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_3_0_x_adapter_auto_concurrency() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2314,7 +2231,6 @@ async fn should_commission_network_with_3_0_x_adapter_auto_concurrency() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_3_0_x_adapter_default_extended_pan_id() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2325,7 +2241,6 @@ async fn should_commission_network_with_3_0_x_adapter_default_extended_pan_id() 
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_3_0_x_adapter_unaligned_8_bit() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2336,7 +2251,6 @@ async fn should_commission_network_with_3_0_x_adapter_unaligned_8_bit() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_network_with_3_x_0_adapter_auto_concurrency() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2347,7 +2261,6 @@ async fn should_commission_network_with_3_x_0_adapter_auto_concurrency() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_with_3_0_x_adapter_commissioned_mismatched_adapter_config_backup() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2358,7 +2271,6 @@ async fn should_commission_with_3_0_x_adapter_commissioned_mismatched_adapter_co
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_commission_with_3_0_x_adapter_empty_mismatched_config_backup() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2369,7 +2281,6 @@ async fn should_commission_with_3_0_x_adapter_empty_mismatched_config_backup() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_create_backup_with_1_2_adapter() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2382,7 +2293,6 @@ async fn should_create_backup_with_1_2_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_create_backup_with_3_0_x_adapter_default_security_material_table_entry() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2395,7 +2305,6 @@ async fn should_create_backup_with_3_0_x_adapter_default_security_material_table
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_create_backup_with_3_0_x_adapter_emnpty_security_material_table() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2408,7 +2317,6 @@ async fn should_create_backup_with_3_0_x_adapter_emnpty_security_material_table(
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_create_backup_with_3_0_x_adapter_security_material_table_with_generic_record() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2421,7 +2329,6 @@ async fn should_create_backup_with_3_0_x_adapter_security_material_table_with_ge
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_commission_network_with_3_0_x_adapter_when_bdb_commissioning_times_out() {
     let mut adapter = adapter();
     adapter.start_error = Some("network commissioning timed out - most likely network with the same panId or extendedPanId already exists nearby".to_string());
@@ -2432,7 +2339,6 @@ async fn should_fail_to_commission_network_with_3_0_x_adapter_when_bdb_commissio
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_fails_to_settle() {
     let mut adapter = adapter();
     adapter.start_error =
@@ -2447,7 +2353,6 @@ async fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_fails_to_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_reports_different_pan_id() {
     let mut adapter = adapter();
     adapter.start_error = Some(
@@ -2464,7 +2369,6 @@ async fn should_fail_to_commission_network_with_3_0_x_adapter_when_nib_reports_d
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_commission_network_with_3_0_x_adapter_with_invalid_pan_id_65535() {
     let mut adapter = adapter();
     adapter.start_error =
@@ -2479,7 +2383,6 @@ async fn should_fail_to_commission_network_with_3_0_x_adapter_with_invalid_pan_i
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_create_backup_with_3_0_x_adapter_adapter_not_commissioned_missing_nib() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2492,7 +2395,6 @@ async fn should_fail_to_create_backup_with_3_0_x_adapter_adapter_not_commissione
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_create_backup_with_3_0_x_adapter_missing_active_key_info() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2505,7 +2407,6 @@ async fn should_fail_to_create_backup_with_3_0_x_adapter_missing_active_key_info
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_create_backup_with_3_0_x_adapter_unable_to_read_ieee_address() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2518,7 +2419,6 @@ async fn should_fail_to_create_backup_with_3_0_x_adapter_unable_to_read_ieee_add
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_unsupported_backup_format() {
     let mut adapter = adapter();
     adapter.start_error = Some("Unknown backup format".to_string());
@@ -2529,7 +2429,6 @@ async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_unsupported_ba
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_nib() {
     let mut adapter = adapter();
     adapter.start_error = Some("Backup corrupted - missing NIB".to_string());
@@ -2540,7 +2439,6 @@ async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_nib() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_active_key_info() {
     let mut adapter = adapter();
     adapter.start_error = Some("Backup corrupted - missing active key info".to_string());
@@ -2551,7 +2449,6 @@ async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_active_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_adapter_ieee_address() {
     let mut adapter = adapter();
     adapter.start_error =
@@ -2566,7 +2463,6 @@ async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_adapter
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_pre_configured_key_enabled(
 ) {
     let mut adapter = adapter();
@@ -2582,7 +2478,6 @@ async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_missing_pre_con
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_pre_configured_key_enabled() {
     let mut adapter = adapter();
     adapter.start_error =
@@ -2597,7 +2492,6 @@ async fn should_fail_to_restore_legacy_backup_with_3_0_x_adapter_pre_configured_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_unified_backup_with_1_2_adapter_backup_from_newer_adapter() {
     let mut adapter = adapter();
     adapter.start_error = Some("your backup is from newer platform version (Z-Stack 3.0.x+) and cannot be restored onto Z-Stack 1.2 adapter - please remove backup before proceeding".to_string());
@@ -2608,7 +2502,6 @@ async fn should_fail_to_restore_unified_backup_with_1_2_adapter_backup_from_newe
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_aps_link_key_data_table_size(
 ) {
     let mut adapter = adapter();
@@ -2624,7 +2517,6 @@ async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_a
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_security_manager_table_size(
 ) {
     let mut adapter = adapter();
@@ -2640,7 +2532,6 @@ async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_s
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_tclk_table_size() {
     let mut adapter = adapter();
     adapter.start_error = Some("target adapter tclk table size insufficient (size=1)".to_string());
@@ -2654,7 +2545,6 @@ async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_insufficient_t
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_invalid_open_coordinator_backup_version(
 ) {
     let mut adapter = adapter();
@@ -2670,7 +2560,6 @@ async fn should_fail_to_restore_unified_backup_with_3_0_x_adapter_invalid_open_c
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_to_start_with_3_0_x_adapter_commissioned_config_adapter_mismatch() {
     let mut adapter = adapter();
     adapter.start_error = Some(
@@ -2687,7 +2576,6 @@ async fn should_fail_to_start_with_3_0_x_adapter_commissioned_config_adapter_mis
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_fail_when_backup_file_is_corrupted_coordinator_backup_is_corrupted() {
     let mut adapter = adapter();
     adapter.start_error = Some("Coordinator backup is corrupted".to_string());
@@ -2698,7 +2586,6 @@ async fn should_fail_when_backup_file_is_corrupted_coordinator_backup_is_corrupt
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_keep_missing_devices_in_backup() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2724,7 +2611,6 @@ async fn should_keep_missing_devices_in_backup() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_reset_network_with_1_2_adapter_config_mismtach() {
     let mut adapter = adapter();
     adapter.start_result = "reset".to_string();
@@ -2735,7 +2621,6 @@ async fn should_reset_network_with_1_2_adapter_config_mismtach() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_restore_legacy_backup_with_3_0_x_adapter_empty() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2746,7 +2631,6 @@ async fn should_restore_legacy_backup_with_3_0_x_adapter_empty() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_restore_unified_backup_with_3_0_x_adapter_commissioned_mismatched_adapter_config_matching_config_backup(
 ) {
     let mut adapter = adapter();
@@ -2758,7 +2642,6 @@ async fn should_restore_unified_backup_with_3_0_x_adapter_commissioned_mismatche
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_empty() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2770,7 +2653,6 @@ async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_empt
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_no_tclk_seed() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2782,7 +2664,6 @@ async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_no_t
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_restore_unified_backup_with_3_x_0_adapter_and_create_backup_empty() {
     let mut adapter = adapter();
     adapter.start_result = "restored".to_string();
@@ -2794,7 +2675,6 @@ async fn should_restore_unified_backup_with_3_x_0_adapter_and_create_backup_empt
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_start_network_with_3_0_x_adapter() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2805,7 +2685,6 @@ async fn should_start_network_with_3_0_x_adapter() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2816,7 +2695,6 @@ async fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode_ext_group_find_failed()
 {
     let mut adapter = adapter();
@@ -2828,7 +2706,6 @@ async fn should_start_network_with_3_0_x_adapter_resume_in_coordinator_mode_ext_
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_start_with_3_0_x_adapter_backward_compat_reversed_extended_pan_id() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2848,7 +2725,6 @@ async fn should_start_with_3_0_x_adapter_backward_compat_reversed_extended_pan_i
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_start_with_3_x_0_adapter_warn_when_preconfigured_key_doesn() {
     let mut adapter = adapter();
     adapter.start_result = "resumed".to_string();
@@ -2867,7 +2743,6 @@ async fn should_start_with_3_x_0_adapter_warn_when_preconfigured_key_doesn() {
 }
 
 #[tokio::test]
-#[ignore = "not implemented yet"]
 async fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commissioned_config_adapter_mismatch(
 ) {
     let mut adapter = adapter();
@@ -2910,7 +2785,7 @@ async fn should_start_with_run_inconsistent_option_with_3_0_x_adapter_commission
     );
     assert!(adapter.logs[6]
         .1
-        .contains("Please remove coordinator backup at backup.json"));
+        .contains("please remove coordinator backup at backup.json"));
     assert_eq!(
         adapter.logs[7].1,
         "Re-commissioning your network will require re-pairing of all devices!"
