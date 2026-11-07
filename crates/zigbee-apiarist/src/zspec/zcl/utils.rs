@@ -387,7 +387,12 @@ impl Utils {
                 ClusterKey::Id(id) => cluster.ID == *id,
                 ClusterKey::Name(name) => &cluster.name == name,
             };
-            if matched {
+            if matched
+                && (!cluster.attributes.is_empty()
+                    || !cluster.commands.is_empty()
+                    || !cluster.commandsResponse.is_empty()
+                    || builtin_cluster_by_name(&cluster.name).is_none())
+            {
                 return cluster.clone();
             }
         }
@@ -732,11 +737,9 @@ fn builtin_name(id: u32) -> String {
 fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
     match name {
         "genBasic" => Some(
-            Cluster::new("genBasic", 0x0000).with_attribute(Attribute::new(
-                "zclVersion",
-                0x0000,
-                DataType::UINT8,
-            )),
+            Cluster::new("genBasic", 0x0000)
+                .with_attribute(Attribute::new("zclVersion", 0x0000, DataType::UINT8))
+                .with_command(Command::new("resetFactDefault", 0x00)),
         ),
         "genDeviceTempCfg" => Some(Cluster::new("genDeviceTempCfg", 0x0002).with_attribute(
             Attribute {

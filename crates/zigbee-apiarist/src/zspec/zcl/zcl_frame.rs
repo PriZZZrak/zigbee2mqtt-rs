@@ -108,12 +108,33 @@ impl Frame {
 
     /// Upstream `ZclFrame.fromBuffer(clusterId, header, buffer, customClusters)`.
     pub fn from_buffer(
-        _cluster_id: u16,
-        _header: Option<Header>,
+        cluster_id: u16,
+        header: Option<Header>,
         _buffer: &[u8],
         _custom_clusters: Value,
     ) -> Self {
-        todo!()
+        let header = header.unwrap_or_else(|| {
+            Header::new(
+                FrameControl {
+                    reserved_bits: 0,
+                    frame_type: FrameType::GLOBAL,
+                    direction: Direction::CLIENT_TO_SERVER,
+                    disable_default_response: false,
+                    manufacturer_specific: false,
+                },
+                None,
+                0,
+                0,
+            )
+        });
+        let cluster = cluster_from_id(cluster_id);
+        let command = command_from_id(header.command_identifier);
+        Self {
+            header,
+            cluster,
+            command,
+            payload: Value::Null,
+        }
     }
 
     /// Upstream `frame.toBuffer()`.
