@@ -1,8 +1,8 @@
 // Original: .upstream/zigbee-herdsman/src/utils/wait.ts
-// TODO: port public API from the original file.
 
-// pub fn wait() { todo!() }
+use std::time::Duration;
 
-pub fn wait() {
-    todo!()
+/// Upstream `wait(milliseconds)`.
+pub async fn wait(milliseconds: u64) {
+    tokio::time::sleep(Duration::from_millis(milliseconds)).await;
 }
