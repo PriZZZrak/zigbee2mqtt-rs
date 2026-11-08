@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/definition/status.ts
-// TODO: port the full Status enum.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]

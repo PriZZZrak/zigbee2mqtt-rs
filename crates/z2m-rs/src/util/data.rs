@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/data.ts
-// TODO: port the full data directory resolution.
 
 use std::path::PathBuf;
 

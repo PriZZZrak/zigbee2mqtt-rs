@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/buffalo/buffalo.ts
-// TODO: port remaining helpers and bounds diagnostics.
 
 #[allow(non_snake_case)]
 pub struct Buffalo {

@@ -68,6 +68,7 @@ fn maps_ember_status_ezsp_status_to_slstatus() {
 }
 
 #[test]
+#[allow(clippy::erasing_op)]
 fn writes_read_at_position_without_altering_internal_position_tracker() {
     let mut buffalo = EzspBuffalo::new(vec![0; EZSP_MAX_FRAME_LENGTH]);
     buffalo.set_position(EZSP_PARAMETERS_INDEX);

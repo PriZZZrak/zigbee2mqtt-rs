@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ember/enums.ts
-// TODO: port public API from the original file.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]

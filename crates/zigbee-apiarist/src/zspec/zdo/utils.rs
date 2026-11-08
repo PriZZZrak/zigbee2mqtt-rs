@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zdo/utils.ts
-// TODO: port ZDO utils.
 
 /// Upstream `getMacCapFlags` result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

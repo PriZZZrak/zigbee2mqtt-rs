@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/index.ts
-// TODO: port public API from the original file.
 
 pub mod buffalo_zcl;
 pub mod definition;

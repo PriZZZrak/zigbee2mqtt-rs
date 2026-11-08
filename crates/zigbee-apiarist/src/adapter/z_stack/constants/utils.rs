@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/constants/utils.ts
-// TODO: port remaining helpers.
 
 pub fn get_channel_mask(channels: &[u8]) -> Vec<u8> {
     let value = channels

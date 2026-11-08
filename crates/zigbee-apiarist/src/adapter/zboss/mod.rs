@@ -1,11 +1,1 @@
-pub mod adapter;
-pub mod commands;
-pub mod consts;
-pub mod driver;
-pub mod enums;
 pub mod frame;
-pub mod reader;
-pub mod types;
-pub mod uart;
-pub mod utils;
-pub mod writer;

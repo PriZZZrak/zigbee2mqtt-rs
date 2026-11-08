@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/utils.ts
-// TODO: port remaining adapter helpers.
 
 /// Upstream `parseTcpPath()` result.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,8 +40,4 @@ pub fn try_parse_tcp_path(path: &str) -> Result<TcpPath, ()> {
         host: host.to_string(),
         port,
     })
-}
-
-pub fn read_backup() {
-    todo!()
 }

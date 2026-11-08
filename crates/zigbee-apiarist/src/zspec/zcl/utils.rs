@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/utils.ts
-// TODO: port the full cluster catalog and helpers.
 //
 // The types below mirror upstream names from
 // `definition/tstype.ts` (`Cluster`, `Attribute`, `Parameter`,

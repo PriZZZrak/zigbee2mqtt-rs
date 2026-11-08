@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/utils/utils.ts
-// TODO: port remaining helpers.
 
 use serde_json::Value;
 

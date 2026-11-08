@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/unpi/parser.ts
-// TODO: port remaining Parser API.
 
 use super::constants::{Type, MIN_MESSAGE_LENGTH, SOF};
 use super::frame::Frame;

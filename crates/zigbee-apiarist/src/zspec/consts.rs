@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/consts.ts
-// TODO: port the full constants file.
 
 pub const BROADCAST_MIN: u16 = 0xfff8;
 

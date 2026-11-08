@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/zclHeader.ts
-// TODO: port header encoding/decoding.
 
 /// Upstream `FrameType`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

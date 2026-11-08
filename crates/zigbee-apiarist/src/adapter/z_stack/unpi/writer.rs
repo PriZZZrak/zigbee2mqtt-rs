@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/unpi/writer.ts
-// TODO: port the stream writer.
 
 use super::frame::Frame;
 

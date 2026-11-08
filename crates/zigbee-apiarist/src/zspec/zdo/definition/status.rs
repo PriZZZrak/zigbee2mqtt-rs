@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zdo/definition/status.ts
-// TODO: port the full ZDO Status enum.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {

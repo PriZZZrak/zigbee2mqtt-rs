@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/definition/manufacturerCode.ts
-// TODO: port the full ManufacturerCode enum.
 
 /// Upstream `ManufacturerCode` values used by the ported tests.
 #[allow(non_camel_case_types)]

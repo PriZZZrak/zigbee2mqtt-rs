@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ember/utils/math.ts
-// TODO: port remaining helpers.
 
 pub fn inc8(n: u8) -> u8 {
     n.wrapping_add(1) & 7

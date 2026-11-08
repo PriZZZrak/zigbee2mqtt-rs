@@ -1,8 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/controller/helpers/installCodes.ts
-// TODO: port public API from the original file.
-
-// pub fn checkInstallCode() { todo!() }
-// pub fn parseInstallCode() { todo!() }
 
 pub fn check_install_code(code: &[u8], adjust: bool) -> (Vec<u8>, Option<String>) {
     const INSTALL_CODE_SIZES: [usize; 4] = [18, 8, 10, 14];

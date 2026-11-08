@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/objectAssignDeep.ts
-// TODO: port remaining non-JSON cases (undefined, functions, symbols).
 
 use serde_json::{Map, Value};
 

@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/logger.ts
-// TODO: port real winston transports (currently modelled in-memory).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

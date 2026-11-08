@@ -1,13 +1,9 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/znp.ts
-// TODO: port the async queue/mutex and the CC2530/CC2531 skip-bootloader
-// handshake for the live transport.
 //
-// The tests mock SerialPort/parser/writer; the Rust port records those calls on
-// `MockSerialPort`. A live `serial2-tokio` transport can be attached with
-// `open_serial_transport`/`attach_port`: frames flow through the same
-// `receive_frame`/`request` path as the scripted model.
+// Live `serial2-tokio` transport. Frames flow through `run_transport` into
+// `receive_frame`/`request`, mirroring upstream's UNPI parser + writer.
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::BTreeMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Duration;
 
@@ -19,91 +15,25 @@ use super::super::unpi::transport::{run_transport, PortEvent};
 use super::definition;
 use super::zpi_object::{ParameterDef, ZpiObject};
 
-#[derive(Debug, Clone, Default)]
-pub struct MockSerialPort {
-    /// `new SerialPort({path, autoOpen, baudRate, rtscts})` calls.
-    pub constructor_calls: Vec<(String, u32, bool)>,
-    pub pipe_calls: usize,
-    pub async_open_calls: usize,
-    pub once_calls: usize,
-    pub write_buffer_calls: usize,
-    pub flush_and_close_calls: usize,
-    pub close_calls: usize,
-    pub is_open: bool,
-    pub socket_connect_calls: usize,
-    pub socket_connect: Option<(u16, String)>,
-    pub socket_destroy_calls: usize,
-}
-
-/// Upstream test mock: `mockUnpiWriterWriteFrame.mockImplementationOnce`.
-#[derive(Debug, Clone)]
-pub enum MockReply {
-    /// Deliver this frame to the parser when the request is written.
-    Frame(Frame),
-    /// Never reply; the request waits until its timeout expires.
-    NoReply,
-}
-
-/// Upstream `waitress.waitFor(...)` matcher + resolved promise.
-pub struct Waiter {
-    pub id: u64,
-    pub r#type: Type,
-    pub subsystem: Subsystem,
-    pub command: String,
-    pub target: Option<Value>,
-    pub transid: Option<u8>,
-    pub state: Option<u8>,
-    result: Result<ZpiObject, String>,
-}
-
-pub struct WaiterStart {
-    pub promise:
-        std::pin::Pin<Box<dyn std::future::Future<Output = Result<ZpiObject, String>> + Send>>,
-}
-
-impl Waiter {
-    /// Upstream: `waiter.start().promise`.
-    pub fn start(&self) -> WaiterStart {
-        WaiterStart {
-            promise: Box::pin(std::future::ready(self.result.clone())),
-        }
-    }
-}
-
 const SREQ_TIMEOUT: u64 = 6000;
 const RESET_TIMEOUT: u64 = 30000;
-const DEFAULT_TIMEOUT: u64 = 10000;
 const LONG_TIMEOUT: u64 = 40000;
 
 pub struct Znp {
     pub path: String,
     pub baud_rate: u32,
     pub rtscts: bool,
-    pub serial: MockSerialPort,
     pub initialized: bool,
-    pub close_calls: usize,
     pub is_tcp: bool,
 
-    // Test hooks mirroring the mocks in znp.test.ts.
-    pub async_open_error: Option<String>,
-    pub flush_and_close_error: Option<String>,
-    pub socket_connect_error: bool,
-    pub request_error: Option<String>,
-    /// Scripted replies consumed by `request`/`request_zdo`.
-    pub replies: VecDeque<MockReply>,
-    /// Force the next `nwkAddrRsp` waiter to fail (ZDO status without payload).
-    pub next_zdo_status: Option<u8>,
-
     pub received: Vec<ZpiObject>,
-    pub tcp_params: std::collections::BTreeMap<String, String>,
+    pub tcp_params: BTreeMap<String, String>,
     /// Frames passed to the UNPI writer.
     pub written_frames: Vec<Frame>,
-    /// Real serial transport (absent in the scripted test model).
+    /// Live serial transport.
     pub transport: Option<PortTransport>,
     /// Upstream `AsyncMutex`: serializes requests on the wire.
     pub queue: std::sync::Arc<tokio::sync::Mutex<()>>,
-    waiters: BTreeSet<u64>,
-    next_waiter_id: u64,
 }
 
 /// A live serial port plus its transport actor.
@@ -119,23 +49,13 @@ impl Znp {
             path: path.to_string(),
             baud_rate: baud_rate.unwrap_or(115200),
             rtscts: rtscts.unwrap_or(false),
-            serial: MockSerialPort::default(),
             initialized: false,
-            close_calls: 0,
             is_tcp: path.starts_with("tcp://") || path.starts_with("socket://"),
-            async_open_error: None,
-            flush_and_close_error: None,
-            socket_connect_error: false,
-            request_error: None,
-            replies: VecDeque::new(),
-            next_zdo_status: None,
             received: Vec::new(),
-            tcp_params: std::collections::BTreeMap::new(),
+            tcp_params: BTreeMap::new(),
             written_frames: Vec::new(),
             transport: None,
             queue: std::sync::Arc::new(tokio::sync::Mutex::new(())),
-            waiters: BTreeSet::new(),
-            next_waiter_id: 1,
         }
     }
 
@@ -143,17 +63,7 @@ impl Znp {
         self.initialized
     }
 
-    /// Queue a scripted parser callback (upstream `mockUnpiWriterWriteFrame`).
-    pub fn mock_reply(&mut self, frame: Frame) {
-        self.replies.push_back(MockReply::Frame(frame));
-    }
-
-    /// Queue a request that never receives a response.
-    pub fn mock_no_reply(&mut self) {
-        self.replies.push_back(MockReply::NoReply);
-    }
-
-    /// Upstream: `znp.on("close", cb)` / port close event hook.
+    /// Upstream: `znp.on("close", cb)`.
     pub fn on_close(&mut self) {
         self.initialized = false;
     }
@@ -161,100 +71,38 @@ impl Znp {
     /// Upstream: `znp.open()`.
     pub async fn open(&mut self) -> Result<(), String> {
         if self.is_tcp {
-            self.open_socket_port().await
-        } else {
-            self.open_serial_port().await
+            let info = crate::adapter::utils::parse_tcp_path(&self.path);
+            self.tcp_params.insert("host".to_string(), info.host);
+            self.tcp_params
+                .insert("port".to_string(), info.port.to_string());
+            return Err("TCP socket transport is not supported by serial2-tokio".to_string());
         }
-    }
-
-    async fn open_serial_port(&mut self) -> Result<(), String> {
-        self.serial
-            .constructor_calls
-            .push((self.path.clone(), self.baud_rate, self.rtscts));
-        self.serial.pipe_calls += 1;
-        self.serial.async_open_calls += 1;
-
-        if let Some(error) = self.async_open_error.clone() {
-            self.initialized = false;
-            if self.serial.is_open {
-                self.serial.close_calls += 1;
-            }
-            return Err(error);
-        }
-
-        self.serial.once_calls += 2;
-        self.initialized = true;
-        self.skip_bootloader();
-        Ok(())
-    }
-
-    async fn open_socket_port(&mut self) -> Result<(), String> {
-        let info = crate::adapter::utils::parse_tcp_path(&self.path);
-        self.tcp_params
-            .insert("host".to_string(), info.host.clone());
-        self.tcp_params
-            .insert("port".to_string(), info.port.to_string());
-        self.serial.socket_connect_calls += 1;
-        self.serial.socket_connect = Some((info.port, info.host));
-        if self.socket_connect_error {
-            self.initialized = false;
-            return Err("Error while opening socket".to_string());
-        }
-        // Upstream writes the bootloader-skip payload on socket adapters.
-        self.serial.write_buffer_calls += 1;
-        self.initialized = true;
-        Ok(())
-    }
-
-    fn skip_bootloader(&mut self) {
-        if self.request_error.is_some() {
-            // CC2530/CC2531 magic byte 0xef.
-            self.serial.write_buffer_calls += 1;
-        }
+        self.open_serial_transport(Duration::from_millis(10)).await
     }
 
     /// Upstream: `znp.close()`.
     pub async fn close(&mut self) -> Result<(), String> {
-        self.waiters.clear();
         if let Some(mut transport) = self.transport.take() {
             let _ = tokio::io::AsyncWriteExt::shutdown(&mut transport.writer).await;
             transport.task.abort();
         }
-
-        if self.initialized {
-            self.initialized = false;
-
-            if self.is_tcp {
-                self.serial.socket_destroy_calls += 1;
-            } else {
-                self.serial.flush_and_close_calls += 1;
-                if let Some(error) = self.flush_and_close_error.clone() {
-                    self.close_calls += 1;
-                    return Err(error);
-                }
-            }
-        }
-
-        self.close_calls += 1;
+        self.initialized = false;
         Ok(())
     }
 
     /// Upstream: `znp.on("received", cb)` fed by the UNPI parser.
     pub fn receive_frame(&mut self, frame: &Frame) {
         let parsed = catch_unwind(AssertUnwindSafe(|| ZpiObject::from_unpi_frame(frame)));
-        if let Ok(object) = parsed {
-            self.received.push(object);
+        match parsed {
+            Ok(object) => self.received.push(object),
+            Err(_) => eprintln!("Error while parsing to ZpiObject"),
         }
     }
 
     /// Upstream serial port `close` event.
     pub fn emit_serial_close(&mut self) {
         self.initialized = false;
-        self.close_calls += 1;
     }
-
-    /// Upstream serial port `error` event (no-op).
-    pub fn emit_serial_error(&mut self) {}
 
     fn timeout_message(r#type: Type, subsystem: Subsystem, command: &str, timeout: u64) -> String {
         format!(
@@ -266,186 +114,11 @@ impl Znp {
         )
     }
 
-    /// Upstream: `znp.waitFor(type, subsystem, command, target?, transid?, state?)`.
-    pub fn wait_for(
-        &mut self,
-        r#type: Type,
-        subsystem: Subsystem,
-        command: &str,
-        target: Option<Value>,
-        transid: Option<u8>,
-        state: Option<u8>,
-    ) -> Waiter {
-        let id = self.next_waiter_id;
-        self.next_waiter_id += 1;
-        self.waiters.insert(id);
-
-        let result = self.resolve_waiter(r#type, subsystem, command, &target, transid, state);
-        Waiter {
-            id,
-            r#type,
-            subsystem,
-            command: command.to_string(),
-            target,
-            transid,
-            state,
-            result,
-        }
-    }
-
-    fn object_for(r#type: Type, subsystem: Subsystem, command: &str, payload: Value) -> ZpiObject {
-        let definition = definition::find_by_name(subsystem, command).unwrap_or_else(|| {
-            panic!(
-                "Command '{command}' from subsystem '{:?}' not found",
-                subsystem
-            )
-        });
-        let mut object = ZpiObject::new(r#type, subsystem, command, 0, payload, Vec::new());
-        object.command.id = u16::from(definition.id);
-        object
-    }
-
-    fn resolve_waiter(
-        &mut self,
-        r#type: Type,
-        subsystem: Subsystem,
-        command: &str,
-        target: &Option<Value>,
-        transid: Option<u8>,
-        state: Option<u8>,
-    ) -> Result<ZpiObject, String> {
-        let timeout = DEFAULT_TIMEOUT;
-
-        match (r#type, subsystem, command) {
-            (Type::SRSP, Subsystem::SYS, "osalNvRead") => {
-                // `osalNvRead` payload has neither `srcaddr` nor `zdo`, so any
-                // target matcher can never match.
-                if target.is_some() {
-                    return Err(Self::timeout_message(r#type, subsystem, command, timeout));
-                }
-                Ok(Self::object_for(
-                    Type::SRSP,
-                    Subsystem::SYS,
-                    "osalNvRead",
-                    json!({"status": 0, "len": 2, "value": [1, 2]}),
-                ))
-            }
-            (Type::AREQ, Subsystem::ZDO, "stateChangeInd") => Ok(Self::object_for(
-                Type::AREQ,
-                Subsystem::ZDO,
-                "stateChangeInd",
-                json!({"state": state.unwrap_or(0)}),
-            )),
-            (Type::AREQ, Subsystem::ZDO, "nwkAddrRsp") => {
-                let matches = target
-                    .as_ref()
-                    .and_then(Value::as_str)
-                    .is_some_and(|target| target == "0x0807060504030201");
-                if self.next_zdo_status.take().is_some() || !matches {
-                    return Err(Self::timeout_message(r#type, subsystem, command, timeout));
-                }
-                Ok(Self::object_for(
-                    Type::AREQ,
-                    Subsystem::ZDO,
-                    "nwkAddrRsp",
-                    json!({
-                        "zdo": [0, {
-                            "assocDevList": [4112, 4369],
-                            "eui64": "0x0807060504030201",
-                            "nwkAddress": 257,
-                            "startIndex": 0,
-                        }],
-                    }),
-                ))
-            }
-            (Type::AREQ, Subsystem::ZDO, "activeEpRsp") => {
-                let nwk_address = target.as_ref().and_then(Value::as_u64).unwrap_or(0x1234) as u16;
-                Ok(Self::object_for(
-                    Type::AREQ,
-                    Subsystem::ZDO,
-                    "activeEpRsp",
-                    json!({
-                        "srcaddr": nwk_address,
-                        "zdo": [0, {"nwkAddress": nwk_address, "endpointList": []}],
-                    }),
-                ))
-            }
-            (Type::AREQ, Subsystem::AF, "dataConfirm") => Ok(Self::object_for(
-                Type::AREQ,
-                Subsystem::AF,
-                "dataConfirm",
-                json!({
-                    "status": 0,
-                    "endpoint": 1,
-                    "transid": transid.unwrap_or(0),
-                }),
-            )),
-            (Type::SRSP, Subsystem::ZDO, _) => Ok(Self::object_for(
-                Type::SRSP,
-                Subsystem::ZDO,
-                command,
-                json!({"status": 0}),
-            )),
-            _ => Ok(Self::object_for(r#type, subsystem, command, json!({}))),
-        }
-    }
-
-    /// Upstream `waitress.waiters.size`.
-    pub fn waiters_size(&self) -> usize {
-        self.waiters.len()
-    }
-
-    fn remove_waiter(&mut self, id: u64) {
-        self.waiters.remove(&id);
-    }
-
-    fn take_reply(
-        &mut self,
-        subsystem: Subsystem,
-        command_id: u8,
-        timeout: u64,
-        command: &str,
-    ) -> Result<Option<Frame>, String> {
-        loop {
-            let Some(scripted) = self.replies.pop_front() else {
-                return Ok(None);
-            };
-            match scripted {
-                MockReply::NoReply => {
-                    return Err(Self::timeout_message(
-                        Type::SRSP,
-                        subsystem,
-                        command,
-                        timeout,
-                    ))
-                }
-                MockReply::Frame(frame) => {
-                    if frame.subsystem == subsystem
-                        && frame.commandID == command_id
-                        && frame.r#type == Type::SRSP
-                    {
-                        return Ok(Some(frame));
-                    }
-                    // Mimic the parser delivering a non-matching frame.
-                    self.receive_frame(&frame);
-                }
-            }
-        }
-    }
-
     /// Open a real serial port and start the UNPI transport actor
     /// (upstream `openSerialPort`).
     pub async fn open_serial_transport(&mut self, poll_interval: Duration) -> Result<(), String> {
         let port = serial2_tokio::SerialPort::open(&self.path, self.baud_rate)
             .map_err(|error| error.to_string())?;
-        self.serial
-            .constructor_calls
-            .push((self.path.clone(), self.baud_rate, self.rtscts));
-        self.serial.pipe_calls += 1;
-        self.serial.async_open_calls += 1;
-        self.serial.once_calls += 2;
-        self.serial.is_open = true;
-
         self.attach_port(port, poll_interval)?;
         self.skip_bootloader_transport().await;
         Ok(())
@@ -503,7 +176,6 @@ impl Znp {
     async fn ping_transport(&mut self, timeout_ms: u64) -> Result<(), String> {
         let frame = Frame::new(Type::SREQ, Subsystem::SYS, 1, Vec::new(), 0, 0);
         self.written_frames.push(frame.clone());
-        self.serial.write_buffer_calls += 1;
         self.write_transport(&frame).await?;
         self.wait_for_transport_frame(Type::SRSP, Subsystem::SYS, 1, timeout_ms)
             .await
@@ -511,7 +183,7 @@ impl Znp {
     }
 
     /// Receive and handle one transport actor event. Frames are fed through the
-    /// same `receive_frame` path as the scripted parser.
+    /// same `receive_frame` path as the live parser.
     pub async fn process_port_event(&mut self) -> Option<PortEvent> {
         let event = {
             let transport = self.transport.as_mut()?;
@@ -538,7 +210,7 @@ impl Znp {
 
     async fn write_transport(&mut self, frame: &Frame) -> Result<(), String> {
         let Some(transport) = self.transport.as_mut() else {
-            return Ok(());
+            return Err("Transport is not open".to_string());
         };
         super::super::unpi::transport::write_frame(&mut transport.writer, frame)
             .await
@@ -614,7 +286,7 @@ impl Znp {
         if !self.initialized {
             return Err("Cannot request when znp has not been initialized yet".to_string());
         }
-        // Upstream wraps the write+wait in `queue.run(...)`.
+
         let queue = self.queue.clone();
         let _queue_guard = queue.lock().await;
 
@@ -652,46 +324,9 @@ impl Znp {
         let data = object.create_payload_buffer();
         let frame = Frame::new(definition.r#type, subsystem_enum, definition.id, data, 0, 0);
         self.written_frames.push(frame.clone());
-        self.serial.write_buffer_calls += 1;
-        self.write_transport(&frame).await?;
-
-        if self.transport.is_some() {
-            if definition.r#type == Type::SREQ {
-                let timeout = if definition.name == "bdbStartCommissioning"
-                    || definition.name == "startupFromApp"
-                {
-                    LONG_TIMEOUT
-                } else {
-                    SREQ_TIMEOUT
-                };
-                let reply = self
-                    .wait_for_transport_frame(Type::SRSP, subsystem_enum, definition.id, timeout)
-                    .await?;
-                let result = ZpiObject::from_unpi_frame(&reply);
-                if let Some(status) = result.payload.get("status").and_then(Value::as_u64) {
-                    if status != 0 {
-                        return Err(format!(
-                            "--> '{}' failed with status '{}' (expected '{}')",
-                            object.to_string(),
-                            crate::adapter::z_stack::constants::utils::status_description(
-                                status as u8
-                            ),
-                            crate::adapter::z_stack::constants::utils::status_description(0),
-                        ));
-                    }
-                }
-                return Ok(Some(result));
-            }
-            if object.is_reset_command() {
-                let reply = self
-                    .wait_for_transport_frame(Type::AREQ, Subsystem::SYS, 0x80, RESET_TIMEOUT)
-                    .await?;
-                return Ok(Some(ZpiObject::from_unpi_frame(&reply)));
-            }
-            return Ok(None);
-        }
 
         if definition.r#type == Type::SREQ {
+            self.write_transport(&frame).await?;
             let timeout = if definition.name == "bdbStartCommissioning"
                 || definition.name == "startupFromApp"
             {
@@ -699,22 +334,13 @@ impl Znp {
             } else {
                 SREQ_TIMEOUT
             };
-            let reply = self.take_reply(subsystem_enum, definition.id, timeout, definition.name)?;
-            let result = match reply {
-                Some(frame) => ZpiObject::from_unpi_frame(&frame),
-                None => Self::object_for(
-                    Type::SRSP,
-                    subsystem_enum,
-                    definition.name,
-                    json!({"status": 0}),
-                ),
-            };
-
+            let reply = self
+                .wait_for_transport_frame(Type::SRSP, subsystem_enum, definition.id, timeout)
+                .await?;
+            let result = ZpiObject::from_unpi_frame(&reply);
             if let Some(status) = result.payload.get("status").and_then(Value::as_u64) {
                 if status != 0 {
-                    if let Some(id) = waiter_id {
-                        self.remove_waiter(id);
-                    }
+                    let _ = waiter_id;
                     return Err(format!(
                         "--> '{}' failed with status '{}' (expected '{}')",
                         object.to_string(),
@@ -723,30 +349,23 @@ impl Znp {
                     ));
                 }
             }
-
             return Ok(Some(result));
         }
 
         if object.is_reset_command() {
-            self.waiters.clear();
-            let reset_ind = Self::object_for(
-                Type::AREQ,
-                Subsystem::SYS,
-                "resetInd",
-                json!({
-                    "reason": 1,
-                    "transportrev": 2,
-                    "productid": 3,
-                    "majorrel": 4,
-                    "minorrel": 5,
-                    "hwrev": 6,
-                }),
-            );
-            let _ = RESET_TIMEOUT;
-            return Ok(Some(reset_ind));
+            self.write_transport(&frame).await?;
+            let reply = self
+                .wait_for_transport_frame(Type::AREQ, Subsystem::SYS, 0x80, RESET_TIMEOUT)
+                .await?;
+            return Ok(Some(ZpiObject::from_unpi_frame(&reply)));
         }
 
-        Ok(None)
+        if definition.r#type == Type::AREQ {
+            self.write_transport(&frame).await?;
+            return Ok(None);
+        }
+
+        Err(format!("Unknown type '{:?}'", definition.r#type))
     }
 
     /// Upstream: `znp.requestWithReply(...)`.
@@ -785,27 +404,21 @@ impl Znp {
             0,
             0,
         );
-        self.written_frames.push(frame);
-        self.serial.write_buffer_calls += 1;
+        self.written_frames.push(frame.clone());
+        self.write_transport(&frame).await?;
 
-        let reply =
-            self.take_reply(Subsystem::ZDO, definition.id, SREQ_TIMEOUT, definition.name)?;
-        let status = match reply {
-            Some(frame) => {
-                let object = ZpiObject::from_unpi_frame(&frame);
-                object
-                    .payload
-                    .get("status")
-                    .and_then(Value::as_u64)
-                    .unwrap_or(0)
-            }
-            None => 0,
-        };
+        let reply = self
+            .wait_for_transport_frame(Type::SRSP, Subsystem::ZDO, definition.id, SREQ_TIMEOUT)
+            .await?;
+        let object = ZpiObject::from_unpi_frame(&reply);
+        let status = object
+            .payload
+            .get("status")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
 
         if status != 0 {
-            if let Some(id) = waiter_id {
-                self.remove_waiter(id);
-            }
+            let _ = waiter_id;
             return Err(format!(
                 "--> 'SREQ: ZDO - {} - {}' failed with status '{}'",
                 zdo_cluster_name(cluster_id),

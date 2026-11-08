@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zdo/buffaloZdo.ts
-// TODO: port remaining TLV types and request/response variants.
 
 use serde_json::{json, Value};
 

@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/parameterType.ts
-// TODO: port the full ParameterType enum.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]

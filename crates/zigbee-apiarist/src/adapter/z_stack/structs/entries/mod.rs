@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/structs/entries/index.ts
-// TODO: port public API from the original file.
 
 pub mod address_manager_entry;
 pub mod address_manager_table;

@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ember/ezspError.ts
-// TODO: port EzspError.
 
 use crate::adapter::ezsp::driver::types::basic::EzspStatus;
 

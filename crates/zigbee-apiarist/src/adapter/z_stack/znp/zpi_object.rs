@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/zpiObject.ts
-// TODO: port remaining ZDO response catalog entries.
 
 use serde_json::{json, Map, Value};
 

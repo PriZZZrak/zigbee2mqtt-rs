@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/utils.ts
-// TODO: port remaining helpers.
 
 pub fn channels_to_uint32_mask(channels: &[u8]) -> u32 {
     channels.iter().fold(0u32, |mask, channel| {

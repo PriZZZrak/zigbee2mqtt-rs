@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/utils/logger.ts
-// TODO: port public API from the original file.
 
 /// Upstream console logger used for coverage (`consoleLogger.warning/error`).
 #[derive(Debug, Default, Clone, Copy)]

@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/sd-notify.ts
-// TODO: port the real unix-dgram sender (currently modelled in-memory).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};

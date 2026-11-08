@@ -1,8 +1,7 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/definition/cluster.ts
-// TODO: port the full cluster/command/parameter catalog.
 //
-// Only the clusters/commands/parameters referenced by the ported frame tests
-// are modelled here. Public names mirror upstream (`genAlarms`, `commands`,
+// Only the clusters/commands/parameters referenced by the current codecs
+// are defined here. Public names mirror upstream (`genAlarms`, `commands`,
 // `commandsResponse`, `ID`, `name`, `type`, `conditions`, `max`).
 
 use crate::zspec::zcl::definition::enums::DataType;

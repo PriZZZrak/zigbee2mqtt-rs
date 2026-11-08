@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/utils.ts
-// TODO: port the full utils surface; these are the helpers covered by tests.
 
 use std::path::Path;
 

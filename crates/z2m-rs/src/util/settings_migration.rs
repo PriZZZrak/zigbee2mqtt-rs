@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/settingsMigration.ts
-// TODO: port remaining historical migrations and backup file writes.
 
 use serde_json::{Map, Value};
 

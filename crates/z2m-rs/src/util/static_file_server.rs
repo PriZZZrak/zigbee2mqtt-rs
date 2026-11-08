@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/staticFileServer.ts
-// TODO: port range/HEAD handling and conditional headers beyond ETag.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

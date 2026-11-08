@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/zclFrame.ts
-// TODO: port frame creation/parsing/serialization.
 
 use serde_json::{json, Value};
 

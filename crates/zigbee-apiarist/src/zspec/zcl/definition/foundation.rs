@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/definition/foundation.ts
-// TODO: port the full Foundation command catalog.
 
 use crate::zspec::zcl::definition::cluster::Command;
 

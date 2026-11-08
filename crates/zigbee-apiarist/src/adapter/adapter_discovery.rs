@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/adapterDiscovery.ts
-// TODO: port remaining discovery quirks.
 
 use crate::adapter::adapter::AdapterKind;
 use crate::adapter::serial_port::SerialPortInfo;
@@ -15,7 +14,7 @@ pub struct DiscoveredAdapter {
     pub rtscts: Option<bool>,
 }
 
-/// One mocked mDNS service (upstream `bonjour-service` `Service`).
+/// One mDNS service (upstream `bonjour-service` `Service`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MdnsService {
     pub name: Option<String>,
@@ -26,19 +25,7 @@ pub struct MdnsService {
     pub addresses: Vec<String>,
 }
 
-impl MdnsService {
-    pub fn new(radio_type: &str) -> Self {
-        Self {
-            name: Some("Mock Adapter".to_string()),
-            radio_type: Some(radio_type.to_string()),
-            host: "mock_adapter.local".to_string(),
-            port: "1122".to_string(),
-            addresses: vec!["192.168.1.123".to_string()],
-        }
-    }
-}
-
-/// Test/dev injection point for `SerialPort.list()` + `bonjour-service`.
+/// Inputs for `findAllDevices()`: `SerialPort.list()` and the mDNS browser.
 #[derive(Debug, Clone)]
 pub struct DiscoveryContext {
     /// Upstream `node:os.platform()`.
@@ -49,22 +36,15 @@ pub struct DiscoveryContext {
     pub mdns_services: Vec<MdnsService>,
     /// Upstream `new Bonjour(options, errorCb)` error callback.
     pub mdns_start_error: Option<String>,
-    /// Upstream `mockBonjourDestroy` call count.
-    pub bonjour_destroyed: usize,
 }
 
 impl Default for DiscoveryContext {
     fn default() -> Self {
         Self {
-            platform: "linux".to_string(),
+            platform: std::env::consts::OS.to_string(),
             serial_ports: Ok(Vec::new()),
-            mdns_services: vec![
-                MdnsService::new("zstack"),
-                MdnsService::new("ezsp"), // expected as `ember` Adapter
-                MdnsService::new("znp"),  // expected as `zstack` Adapter
-            ],
+            mdns_services: Vec::new(),
             mdns_start_error: None,
-            bonjour_destroyed: 0,
         }
     }
 }
@@ -175,7 +155,7 @@ pub(crate) fn kind_from_name(name: &str) -> Option<AdapterKind> {
 }
 
 /// Upstream `findAllDevices()`.
-pub fn find_all_devices(context: &mut DiscoveryContext) -> Vec<DiscoveredAdapter> {
+pub fn find_all_devices(context: &DiscoveryContext) -> Vec<DiscoveredAdapter> {
     if context.mdns_start_error.is_some() {
         return Vec::new();
     }
@@ -253,7 +233,6 @@ pub fn find_all_devices(context: &mut DiscoveryContext) -> Vec<DiscoveredAdapter
         });
     }
 
-    context.bonjour_destroyed = 1;
     discovered
 }
 
@@ -287,7 +266,7 @@ pub fn discover_live_adapters() -> Result<Vec<DiscoveredAdapter>, String> {
         mdns_services: Vec::new(),
         ..DiscoveryContext::default()
     };
-    Ok(find_all_devices(&mut context))
+    Ok(find_all_devices(&context))
 }
 
 #[cfg(target_os = "linux")]
@@ -351,28 +330,6 @@ fn read_attr(dir: &std::path::Path, name: &str) -> Option<String> {
 
 #[cfg(not(target_os = "linux"))]
 fn enrich_from_sysfs(_info: &mut SerialPortInfo, _device_path: &std::path::Path) {}
-
-pub fn discover_adapter() {
-    todo!()
-}
-pub fn find_all_devices_deprecated() {
-    todo!()
-}
-pub fn find_mdns_adapter() {
-    todo!()
-}
-pub fn find_tcp_adapter() {
-    todo!()
-}
-pub fn find_usb_adapter() {
-    todo!()
-}
-pub fn find_usb_adapter_best_match() {
-    todo!()
-}
-pub fn match_usb_adapter() {
-    todo!()
-}
 
 #[cfg(test)]
 mod live_tests {

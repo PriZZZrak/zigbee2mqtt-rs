@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/utils/timeService.ts
-// TODO: port DST rules for timezones outside the fixtures.
 
 /// Upstream `timeClusterAttributes`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

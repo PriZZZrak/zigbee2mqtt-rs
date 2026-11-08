@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/serialPort.ts
-// TODO: port public API from the original file.
 
 /// Upstream `SerialPort.list()` entry.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -27,26 +26,4 @@ impl SerialPortInfo {
             ..Self::default()
         }
     }
-}
-
-pub fn serial_port() {
-    todo!()
-}
-pub fn async_close() {
-    todo!()
-}
-pub fn async_flush() {
-    todo!()
-}
-pub fn async_flush_and_close() {
-    todo!()
-}
-pub fn async_get() {
-    todo!()
-}
-pub fn async_open() {
-    todo!()
-}
-pub fn async_set() {
-    todo!()
 }

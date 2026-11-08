@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/buffaloZnp.ts
-// TODO: port BuffaloZnp.
 
 pub struct BuffaloZnp {
     pub position: usize,

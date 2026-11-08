@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/ember/ezsp/buffalo.ts
-// TODO: port EzspBuffalo.
 
 use crate::adapter::ember::enums::SLStatus;
 

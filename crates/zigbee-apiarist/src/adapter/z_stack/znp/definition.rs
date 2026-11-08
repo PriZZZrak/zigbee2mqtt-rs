@@ -1,7 +1,6 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/definition.ts
-// TODO: port the remaining MT command catalog entries.
 //
-// Only the commands exercised by the ported tests are modelled here. Names,
+// The commands below are the subset ported so far. Names,
 // IDs, types and parameter lists mirror upstream.
 
 use crate::adapter::z_stack::unpi::constants::{Subsystem, Type};

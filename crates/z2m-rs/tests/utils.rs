@@ -1,7 +1,6 @@
 // Port of .upstream/zigbee2mqtt/test/utils.test.ts
 //
 // Functions under test: z2m_rs::util::utils and z2m_rs::util::stringify
-// (stubbed with todo!() until implemented).
 
 use serde_json::json;
 use z2m_rs::util::stringify;

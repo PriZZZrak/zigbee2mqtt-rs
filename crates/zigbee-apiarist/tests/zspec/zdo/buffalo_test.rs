@@ -475,6 +475,7 @@ fn build_clear_all_bindings_request() {
 }
 
 #[test]
+#[allow(clippy::erasing_op)]
 fn build_decommission_request() {
     let tlv = json!({"eui64List": [IEEE_ADDRESS1]});
     let mut expected = vec![0, 0, 8 * 1 + 1 - 1, 1];

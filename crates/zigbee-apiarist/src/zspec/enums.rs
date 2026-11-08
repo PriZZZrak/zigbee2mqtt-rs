@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/enums.ts
-// TODO: port public API from the original file.
 
 /// Upstream `BroadcastAddress`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/buffaloZcl.ts
-// TODO: port remaining GPD/extension-field edge cases.
 
 use serde_json::{json, Value};
 

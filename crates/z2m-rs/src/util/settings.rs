@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee2mqtt/lib/util/settings.ts
-// TODO: port the complete schema, YAML layer and environment docs.
 
 use std::collections::BTreeMap;
 

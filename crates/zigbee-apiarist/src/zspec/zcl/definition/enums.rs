@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zcl/definition/enums.ts
-// TODO: port the full DataType/BuffaloZclDataType enums.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]

@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/adapter.ts
-// TODO: port the adapter factory.
 
 use serde_json::{json, Map, Value};
 
@@ -34,16 +33,6 @@ pub struct AdapterInstance {
 pub struct Adapter;
 
 impl Adapter {
-    /// Upstream `Adapter.create(networkOptions, serialPortOptions, backupPath, options)`.
-    pub async fn create(
-        _network_options: Value,
-        _serial_port_options: Value,
-        _backup_path: &str,
-        _options: Value,
-    ) -> Result<AdapterInstance, String> {
-        todo!()
-    }
-
     /// Test/dev variant with an injected `SerialPort.list()` / mDNS context.
     pub async fn create_with_context(
         context: &DiscoveryContext,

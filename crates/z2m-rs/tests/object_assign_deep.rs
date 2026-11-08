@@ -1,7 +1,6 @@
 // Port of .upstream/zigbee2mqtt/test/objectAssignDeep.test.ts
 //
 // Function under test: z2m_rs::util::object_assign_deep::object_assign_deep
-// (stubbed with todo!() until implemented).
 
 use serde_json::json;
 use z2m_rs::util::object_assign_deep::object_assign_deep;

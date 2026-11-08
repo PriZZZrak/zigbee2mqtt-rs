@@ -1,5 +1,4 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zdo/definition/clusters.ts
-// TODO: port the full ClusterId enum and request/response maps.
 
 pub struct ClusterId;
 
