@@ -117,6 +117,60 @@ const RESET_INDICATION: [MtParameter; 6] = [
     param("hwrev", ParameterType::UINT8),
 ];
 const PING_RESPONSE: [MtParameter; 1] = [param("capabilities", ParameterType::UINT16)];
+const STATUS_RESPONSE: [MtParameter; 1] = [param("status", ParameterType::UINT8)];
+const OSAL_NV_INIT_REQUEST: [MtParameter; 4] = [
+    param("id", ParameterType::UINT16),
+    param("len", ParameterType::UINT16),
+    param("initlen", ParameterType::UINT8),
+    param("initvalue", ParameterType::BUFFER),
+];
+const OSAL_NV_DELETE_REQUEST: [MtParameter; 2] = [
+    param("id", ParameterType::UINT16),
+    param("len", ParameterType::UINT16),
+];
+const OSAL_NV_LENGTH_REQUEST: [MtParameter; 1] = [param("id", ParameterType::UINT16)];
+const OSAL_NV_LENGTH_RESPONSE: [MtParameter; 1] = [param("length", ParameterType::UINT16)];
+const OSAL_NV_READ_EXT_REQUEST: [MtParameter; 2] = [
+    param("id", ParameterType::UINT16),
+    param("offset", ParameterType::UINT16),
+];
+const OSAL_NV_READ_EXT_RESPONSE: [MtParameter; 3] = [
+    param("status", ParameterType::UINT8),
+    param("len", ParameterType::UINT8),
+    param("value", ParameterType::BUFFER),
+];
+const OSAL_NV_WRITE_EXT_REQUEST: [MtParameter; 4] = [
+    param("id", ParameterType::UINT16),
+    param("offset", ParameterType::UINT16),
+    param("len", ParameterType::UINT16),
+    param("value", ParameterType::BUFFER),
+];
+const NV_LENGTH_REQUEST: [MtParameter; 3] = [
+    param("sysid", ParameterType::UINT8),
+    param("itemid", ParameterType::UINT16),
+    param("subid", ParameterType::UINT16),
+];
+const NV_LENGTH_RESPONSE: [MtParameter; 1] = [param("len", ParameterType::UINT8)];
+const NV_READ_REQUEST: [MtParameter; 5] = [
+    param("sysid", ParameterType::UINT8),
+    param("itemid", ParameterType::UINT16),
+    param("subid", ParameterType::UINT16),
+    param("offset", ParameterType::UINT16),
+    param("len", ParameterType::UINT8),
+];
+const NV_READ_RESPONSE: [MtParameter; 3] = [
+    param("status", ParameterType::UINT8),
+    param("len", ParameterType::UINT8),
+    param("value", ParameterType::BUFFER),
+];
+const NV_WRITE_REQUEST: [MtParameter; 6] = [
+    param("sysid", ParameterType::UINT8),
+    param("itemid", ParameterType::UINT16),
+    param("subid", ParameterType::UINT16),
+    param("offset", ParameterType::UINT16),
+    param("len", ParameterType::UINT8),
+    param("value", ParameterType::BUFFER),
+];
 
 pub const SYS: &[MtCmd] = &[
     MtCmd::areq("resetReq", 0, &RESET_REQUEST),
@@ -144,7 +198,6 @@ const REGISTER_REQUEST: [MtParameter; 9] = [
     param("appnumoutclusters", ParameterType::UINT8),
     param("appoutclusterlist", ParameterType::LIST_UINT16),
 ];
-const STATUS_RESPONSE: [MtParameter; 1] = [param("status", ParameterType::UINT8)];
 const DATA_CONFIRM: [MtParameter; 3] = [
     param("status", ParameterType::UINT8),
     param("endpoint", ParameterType::UINT8),
