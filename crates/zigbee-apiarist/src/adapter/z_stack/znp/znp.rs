@@ -1,17 +1,21 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/znp.ts
-// TODO: port the async queue/mutex and real UNPI writer/parser wiring.
+// TODO: port the async queue/mutex and the CC2530/CC2531 skip-bootloader
+// handshake for the live transport.
 //
-// The tests mock SerialPort/parser/writer; the Rust port records those calls
-// on `MockSerialPort`, exposes event hooks instead of node streams, and uses a
-// scripted reply queue in place of `mockUnpiWriterWriteFrame`.
+// The tests mock SerialPort/parser/writer; the Rust port records those calls on
+// `MockSerialPort`. A live `serial2-tokio` transport can be attached with
+// `open_serial_transport`/`attach_port`: frames flow through the same
+// `receive_frame`/`request` path as the scripted model.
 
 use std::collections::{BTreeSet, VecDeque};
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::time::Duration;
 
 use serde_json::{json, Value};
 
 use super::super::unpi::constants::{Subsystem, Type};
 use super::super::unpi::frame::Frame;
+use super::super::unpi::transport::{run_transport, PortEvent};
 use super::definition;
 use super::zpi_object::{ParameterDef, ZpiObject};
 
@@ -94,8 +98,17 @@ pub struct Znp {
     pub tcp_params: std::collections::BTreeMap<String, String>,
     /// Frames passed to the UNPI writer.
     pub written_frames: Vec<Frame>,
+    /// Real serial transport (absent in the scripted test model).
+    pub transport: Option<PortTransport>,
     waiters: BTreeSet<u64>,
     next_waiter_id: u64,
+}
+
+/// A live serial port plus its transport actor.
+pub struct PortTransport {
+    pub events: tokio::sync::mpsc::Receiver<PortEvent>,
+    pub writer: serial2_tokio::SerialPort,
+    pub task: tokio::task::JoinHandle<std::io::Result<()>>,
 }
 
 impl Znp {
@@ -117,6 +130,7 @@ impl Znp {
             received: Vec::new(),
             tcp_params: std::collections::BTreeMap::new(),
             written_frames: Vec::new(),
+            transport: None,
             waiters: BTreeSet::new(),
             next_waiter_id: 1,
         }
@@ -199,6 +213,10 @@ impl Znp {
     /// Upstream: `znp.close()`.
     pub async fn close(&mut self) -> Result<(), String> {
         self.waiters.clear();
+        if let Some(mut transport) = self.transport.take() {
+            let _ = tokio::io::AsyncWriteExt::shutdown(&mut transport.writer).await;
+            transport.task.abort();
+        }
 
         if self.initialized {
             self.initialized = false;
@@ -412,6 +430,133 @@ impl Znp {
         }
     }
 
+    /// Open a real serial port and start the UNPI transport actor
+    /// (upstream `openSerialPort`).
+    pub async fn open_serial_transport(&mut self, poll_interval: Duration) -> Result<(), String> {
+        let port = serial2_tokio::SerialPort::open(&self.path, self.baud_rate)
+            .map_err(|error| error.to_string())?;
+        self.serial
+            .constructor_calls
+            .push((self.path.clone(), self.baud_rate, self.rtscts));
+        self.serial.pipe_calls += 1;
+        self.serial.async_open_calls += 1;
+        self.serial.once_calls += 2;
+        self.serial.is_open = true;
+
+        self.attach_port(port, poll_interval)
+    }
+
+    /// Attach an already opened port (also used by tests with `SerialPort::pair`).
+    pub fn attach_port(
+        &mut self,
+        port: serial2_tokio::SerialPort,
+        poll_interval: Duration,
+    ) -> Result<(), String> {
+        let writer = port.try_clone().map_err(|error| error.to_string())?;
+        let (tx, events) = tokio::sync::mpsc::channel(32);
+        let task = tokio::spawn(run_transport(port, poll_interval, tx));
+        self.transport = Some(PortTransport {
+            events,
+            writer,
+            task,
+        });
+        self.initialized = true;
+        Ok(())
+    }
+
+    /// Receive and handle one transport actor event. Frames are fed through the
+    /// same `receive_frame` path as the scripted parser.
+    pub async fn process_port_event(&mut self) -> Option<PortEvent> {
+        let event = {
+            let transport = self.transport.as_mut()?;
+            transport.events.recv().await?
+        };
+        match &event {
+            PortEvent::Frames(frames) => {
+                for frame in frames {
+                    self.receive_frame(frame);
+                }
+            }
+            PortEvent::Closed => {
+                self.emit_serial_close();
+            }
+            PortEvent::Error { stops_actor, .. } => {
+                if *stops_actor {
+                    self.initialized = false;
+                }
+            }
+            PortEvent::Idle => {}
+        }
+        Some(event)
+    }
+
+    async fn write_transport(&mut self, frame: &Frame) -> Result<(), String> {
+        let Some(transport) = self.transport.as_mut() else {
+            return Ok(());
+        };
+        super::super::unpi::transport::write_frame(&mut transport.writer, frame)
+            .await
+            .map_err(|error| format!("Failed to write UNPI frame: {error}"))
+    }
+
+    async fn wait_for_transport_frame(
+        &mut self,
+        r#type: Type,
+        subsystem: Subsystem,
+        command_id: u8,
+        timeout_ms: u64,
+    ) -> Result<Frame, String> {
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(timeout_ms);
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                return Err(Self::timeout_message(
+                    r#type,
+                    subsystem,
+                    &format!("command {command_id}"),
+                    timeout_ms,
+                ));
+            }
+            let event = {
+                let Some(transport) = self.transport.as_mut() else {
+                    return Err("Transport is not open".to_string());
+                };
+                tokio::time::timeout(remaining, transport.events.recv()).await
+            };
+            match event {
+                Ok(Some(PortEvent::Frames(frames))) => {
+                    for frame in frames {
+                        self.receive_frame(&frame);
+                        if frame.r#type == r#type
+                            && frame.subsystem == subsystem
+                            && frame.commandID == command_id
+                        {
+                            return Ok(frame);
+                        }
+                    }
+                }
+                Ok(Some(PortEvent::Closed)) => {
+                    return Err("Serial port closed".to_string());
+                }
+                Ok(Some(PortEvent::Error { error, stops_actor })) => {
+                    if stops_actor {
+                        return Err(format!("Serial port error: {error}"));
+                    }
+                }
+                Ok(Some(PortEvent::Idle)) => {}
+                Ok(None) => return Err("Transport channel closed".to_string()),
+                Err(_) => {
+                    return Err(Self::timeout_message(
+                        r#type,
+                        subsystem,
+                        &format!("command {command_id}"),
+                        timeout_ms,
+                    ))
+                }
+            }
+        }
+    }
+
     /// Upstream: `znp.request(...)`. SREQ returns the reply, AREQ returns `None`.
     pub async fn request(
         &mut self,
@@ -459,6 +604,43 @@ impl Znp {
         let frame = Frame::new(definition.r#type, subsystem_enum, definition.id, data, 0, 0);
         self.written_frames.push(frame.clone());
         self.serial.write_buffer_calls += 1;
+        self.write_transport(&frame).await?;
+
+        if self.transport.is_some() {
+            if definition.r#type == Type::SREQ {
+                let timeout = if definition.name == "bdbStartCommissioning"
+                    || definition.name == "startupFromApp"
+                {
+                    LONG_TIMEOUT
+                } else {
+                    SREQ_TIMEOUT
+                };
+                let reply = self
+                    .wait_for_transport_frame(Type::SRSP, subsystem_enum, definition.id, timeout)
+                    .await?;
+                let result = ZpiObject::from_unpi_frame(&reply);
+                if let Some(status) = result.payload.get("status").and_then(Value::as_u64) {
+                    if status != 0 {
+                        return Err(format!(
+                            "--> '{}' failed with status '{}' (expected '{}')",
+                            object.to_string(),
+                            crate::adapter::z_stack::constants::utils::status_description(
+                                status as u8
+                            ),
+                            crate::adapter::z_stack::constants::utils::status_description(0),
+                        ));
+                    }
+                }
+                return Ok(Some(result));
+            }
+            if object.is_reset_command() {
+                let reply = self
+                    .wait_for_transport_frame(Type::AREQ, Subsystem::SYS, 0x80, RESET_TIMEOUT)
+                    .await?;
+                return Ok(Some(ZpiObject::from_unpi_frame(&reply)));
+            }
+            return Ok(None);
+        }
 
         if definition.r#type == Type::SREQ {
             let timeout = if definition.name == "bdbStartCommissioning"
@@ -599,5 +781,86 @@ fn zdo_cluster_name(cluster_id: u16) -> &'static str {
         ClusterId::ACTIVE_ENDPOINTS_REQUEST => "ACTIVE_ENDPOINTS_REQUEST",
         ClusterId::MATCH_DESCRIPTORS_REQUEST => "MATCH_DESCRIPTORS_REQUEST",
         _ => "UNKNOWN",
+    }
+}
+
+#[cfg(test)]
+mod transport_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn live_transport_feeds_receive_frame() {
+        let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
+        let mut znp = Znp::new("/dev/null", Some(115200), Some(false));
+        znp.attach_port(reader, Duration::from_millis(10))
+            .expect("attach");
+
+        let frame = Frame::new(
+            Type::SRSP,
+            Subsystem::SYS,
+            0x02,
+            vec![2, 1, 3, 4, 5, 1, 1, 1, 1],
+            0,
+            0,
+        );
+        tokio::io::AsyncWriteExt::write_all(&mut peer, &frame.to_buffer())
+            .await
+            .expect("write");
+
+        let mut got = false;
+        for _ in 0..10 {
+            match tokio::time::timeout(Duration::from_millis(500), znp.process_port_event()).await {
+                Ok(Some(PortEvent::Frames(_))) => {
+                    got = true;
+                    break;
+                }
+                Ok(Some(_)) => continue,
+                _ => break,
+            }
+        }
+        assert!(got);
+        assert_eq!(znp.received.len(), 1);
+        assert_eq!(znp.received[0].command.id, 0x02);
+        assert_eq!(znp.received[0].payload["product"], json!(1));
+    }
+
+    #[tokio::test]
+    async fn live_request_writes_and_resolves_reply() {
+        let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
+        let mut znp = Znp::new("/dev/null", Some(115200), Some(false));
+        znp.attach_port(reader, Duration::from_millis(10))
+            .expect("attach");
+
+        let responder = tokio::spawn(async move {
+            let mut buffer = [0u8; 64];
+            let read = tokio::io::AsyncReadExt::read(&mut peer, &mut buffer)
+                .await
+                .expect("read request");
+            assert!(read > 0);
+            let reply = Frame::new(
+                Type::SRSP,
+                Subsystem::SYS,
+                0x08,
+                vec![0x00, 0x01, 0x42],
+                0,
+                0,
+            );
+            tokio::io::AsyncWriteExt::write_all(&mut peer, &reply.to_buffer())
+                .await
+                .expect("write reply");
+        });
+
+        let result = znp
+            .request_with_reply(
+                Subsystem::SYS as u16,
+                "osalNvRead",
+                json!({"id": 1, "offset": 2}),
+            )
+            .await
+            .expect("reply");
+        assert_eq!(result.command.name, "osalNvRead");
+        assert_eq!(result.payload["value"], json!([0x42]));
+        let _ = responder.await;
     }
 }
