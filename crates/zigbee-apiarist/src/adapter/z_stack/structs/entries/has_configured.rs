@@ -1,8 +1,13 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/structs/entries/has-configured.ts
-// TODO: port public API from the original file.
 
-// pub fn hasConfigured() { todo!() }
+use crate::adapter::z_stack::structs::r#struct::{MemberType, Struct};
 
-pub fn has_configured() {
-    todo!()
+pub fn has_configured(data: Option<&[u8]>) -> Struct {
+    Struct::new()
+        .member(MemberType::Uint8, "hasConfigured")
+        .build(data, None)
+}
+
+pub fn is_configured(entry: &Struct) -> bool {
+    entry.get_u8("hasConfigured") == Some(0x55)
 }

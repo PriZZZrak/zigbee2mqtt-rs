@@ -1,8 +1,59 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/structs/entries/nib.ts
-// TODO: port public API from the original file.
 
-// pub fn nib() { todo!() }
+use crate::adapter::z_stack::structs::r#struct::{MemberType, Struct};
 
-pub fn nib() {
-    todo!()
+use super::nwk_key_descriptor::nwk_key_descriptor;
+
+pub fn nib(data: Option<&[u8]>) -> Struct {
+    Struct::new()
+        .member(MemberType::Uint8, "SequenceNum")
+        .member(MemberType::Uint8, "PassiveAckTimeout")
+        .member(MemberType::Uint8, "MaxBroadcastRetries")
+        .member(MemberType::Uint8, "MaxChildren")
+        .member(MemberType::Uint8, "MaxDepth")
+        .member(MemberType::Uint8, "MaxRouters")
+        .member(MemberType::Uint8, "dummyNeighborTable")
+        .member(MemberType::Uint8, "BroadcastDeliveryTime")
+        .member(MemberType::Uint8, "ReportConstantCost")
+        .member(MemberType::Uint8, "RouteDiscRetries")
+        .member(MemberType::Uint8, "dummyRoutingTable")
+        .member(MemberType::Uint8, "SecureAllFrames")
+        .member(MemberType::Uint8, "SecurityLevel")
+        .member(MemberType::Uint8, "SymLink")
+        .member(MemberType::Uint8, "CapabilityFlags")
+        .member(MemberType::Uint16, "TransactionPersistenceTime")
+        .member(MemberType::Uint8, "nwkProtocolVersion")
+        .member(MemberType::Uint8, "RouteDiscoveryTime")
+        .member(MemberType::Uint8, "RouteExpiryTime")
+        .member(MemberType::Uint16, "nwkDevAddress")
+        .member(MemberType::Uint8, "nwkLogicalChannel")
+        .member(MemberType::Uint16, "nwkCoordAddress")
+        .member(MemberType::Uint8ArrayReversed(8), "nwkCoordExtAddress")
+        .member(MemberType::Uint16, "nwkPanId")
+        .member(MemberType::Uint8, "nwkState")
+        .member(MemberType::Uint32, "channelList")
+        .member(MemberType::Uint8, "beaconOrder")
+        .member(MemberType::Uint8, "superFrameOrder")
+        .member(MemberType::Uint8, "scanDuration")
+        .member(MemberType::Uint8, "battLifeExt")
+        .member(MemberType::Uint32, "allocatedRouterAddresses")
+        .member(MemberType::Uint32, "allocatedEndDeviceAddresses")
+        .member(MemberType::Uint8, "nodeDepth")
+        .member(MemberType::Uint8ArrayReversed(8), "extendedPANID")
+        .member(MemberType::Uint8, "nwkKeyLoaded")
+        .child("spare1", nwk_key_descriptor(None))
+        .child("spare2", nwk_key_descriptor(None))
+        .member(MemberType::Uint8, "spare3")
+        .member(MemberType::Uint8, "spare4")
+        .member(MemberType::Uint8, "nwkLinkStatusPeriod")
+        .member(MemberType::Uint8, "nwkRouterAgeLimit")
+        .member(MemberType::Uint8, "nwkUseMultiCast")
+        .member(MemberType::Uint8, "nwkIsConcentrator")
+        .member(MemberType::Uint8, "nwkConcentratorDiscoveryTime")
+        .member(MemberType::Uint8, "nwkConcentratorRadius")
+        .member(MemberType::Uint8, "nwkAllFresh")
+        .member(MemberType::Uint16, "nwkManagerAddr")
+        .member(MemberType::Uint16, "nwkTotalTransmissions")
+        .member(MemberType::Uint8, "nwkUpdateId")
+        .build(data, None)
 }
