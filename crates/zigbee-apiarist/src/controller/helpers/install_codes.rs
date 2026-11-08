@@ -47,5 +47,100 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 pub fn parse_install_code(install_code: &str) -> (String, String) {
-    todo!()
+    fn alnum_len(input: &str) -> usize {
+        input
+            .chars()
+            .take_while(|character| character.is_ascii_alphanumeric())
+            .count()
+    }
+
+    fn ieee(value: &str) -> String {
+        format!("0x{}", value.to_lowercase())
+    }
+
+    // `Z:<ieee16>$I:<key>`
+    if let Some((_, rest)) = install_code.split_once("Z:") {
+        let length = alnum_len(rest);
+        if length == 16 {
+            if let Some((ieee_part, key)) = rest[16..].split_once("$I:") {
+                let key_length = alnum_len(key);
+                if ieee_part.is_empty() && key_length > 0 {
+                    return (ieee(&rest[..16]), key[..key_length].to_string());
+                }
+            }
+        }
+    }
+
+    // `|ieee16|key|`
+    let piped = install_code.trim_matches('|');
+    if let Some((ieee_part, key)) = piped.split_once('|') {
+        if ieee_part.len() == 16
+            && ieee_part
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric())
+            && !key.is_empty()
+            && key
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric())
+        {
+            return (ieee(ieee_part), key.to_string());
+        }
+    }
+
+    // `G$M:...$A:<ieee16>$I:<key>`
+    if let Some((_, rest)) = install_code.split_once("$A:") {
+        if rest.len() > 16 && rest.is_char_boundary(16) {
+            let ieee_part = &rest[..16];
+            if let Some(key) = rest[16..].strip_prefix("$I:") {
+                if ieee_part
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())
+                    && !key.is_empty()
+                    && key
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric())
+                {
+                    return (ieee(ieee_part), key.to_string());
+                }
+            }
+        }
+    }
+
+    // `HUE:Z:<key> M:<ieee16>`
+    if let Some(rest) = install_code.strip_prefix("HUE:Z:") {
+        if let Some((key, model)) = rest.split_once(" M:") {
+            if model.len() == 16
+                && model
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())
+                && !key.is_empty()
+                && key
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())
+            {
+                return (ieee(model), key.to_string());
+            }
+        }
+    }
+
+    // Long QR payloads.
+    if install_code.len() == 95 || install_code.len() == 91 {
+        let key_start = install_code.len() - if install_code.len() == 95 { 36 } else { 32 };
+        let ieee_part = &install_code[key_start - 19..key_start - 3];
+        let key = &install_code[key_start..];
+        if ieee_part
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
+            && key
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric())
+        {
+            return (ieee(ieee_part), key.to_string());
+        }
+    }
+
+    panic!(
+        "Unsupported install code, got {} chars, expected 95 or 91 chars, or known format",
+        install_code.len()
+    )
 }
