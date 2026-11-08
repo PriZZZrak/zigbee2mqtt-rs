@@ -132,7 +132,13 @@ pub async fn run_transport(
     }
 }
 
-/// Upstream `serialPort.writeBuffer`: write a full frame and flush it.
+/// Upstream `serialPort.writeBuffer`: hand the full frame to the OS driver.
+///
+/// `write_all` only guarantees the bytes were accepted by the driver, not that
+/// the UART shift register has drained. That matches upstream ZNP usage: no
+/// hardware TX-drain wait is needed. `flush` is intentionally kept as the
+/// AsyncWrite contract point (serial2-tokio implements it as a no-op); do not
+/// add a `tcdrain`-style wait without a concrete protocol requirement.
 pub async fn write_frame(port: &mut serial2_tokio::SerialPort, frame: &Frame) -> io::Result<()> {
     port.write_all(&frame.to_buffer()).await?;
     port.flush().await
