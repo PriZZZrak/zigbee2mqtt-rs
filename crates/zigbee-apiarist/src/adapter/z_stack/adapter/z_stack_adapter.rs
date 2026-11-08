@@ -6,9 +6,11 @@
 // tests.
 
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use serde_json::{json, Value};
 
+use crate::adapter::z_stack::znp::znp::Znp;
 use crate::zspec::zdo::buffalo_zdo::BuffaloZdo;
 use crate::zspec::zdo::definition::clusters::ClusterId;
 
@@ -94,6 +96,8 @@ pub struct ZStackAdapter {
     pub data_confirm_reset: bool,
     /// Upstream default-response mock: resolve with a default response frame.
     pub default_response_result: bool,
+    /// Live ZNP connection (absent for the scripted test model).
+    pub znp: Option<Znp>,
     /// Devices for which route discovery was already triggered.
     announced_devices: BTreeSet<u16>,
     /// Next automatic transaction sequence number (1..=255, wrapping).
@@ -162,6 +166,7 @@ impl ZStackAdapter {
             assoc_get_with_address_node_relation: 1,
             data_confirm_reset: false,
             default_response_result: false,
+            znp: None,
             announced_devices: BTreeSet::new(),
             transaction_counter: 0,
         }
@@ -192,6 +197,12 @@ impl ZStackAdapter {
 
     /// Upstream: `adapter.start()` rejecting on failed initialization.
     pub async fn start_checked(&mut self) -> Result<String, String> {
+        if self.path != "dummy" && !self.path.is_empty() {
+            let mut znp = Znp::new(&self.path, Some(self.baud_rate), Some(self.rtscts));
+            znp.open_serial_transport(Duration::from_millis(100))
+                .await?;
+            self.znp = Some(znp);
+        }
         if let Some(error) = self.ping_error.clone() {
             return Err(format!("Failed to connect to the adapter (Error: {error})"));
         }
