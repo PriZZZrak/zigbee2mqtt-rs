@@ -1,32 +1,14 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/zdo/definition/consts.ts
-// TODO: port public API from the original file.
 
-// pub fn CHALLENGE_VALUE_SIZE() { todo!() }
-// pub fn CURVE_PUBLIC_POINT_SIZE() { todo!() }
-// pub fn MULTICAST_BINDING() { todo!() }
-// pub fn UNICAST_BINDING() { todo!() }
-// pub fn ZDO_ENDPOINT() { todo!() }
-// pub fn ZDO_MESSAGE_OVERHEAD() { todo!() }
-// pub fn ZDO_PROFILE_ID() { todo!() }
-
-pub fn challenge_value_size() {
-    todo!()
-}
-pub fn curve_public_point_size() {
-    todo!()
-}
-pub fn multicast_binding() {
-    todo!()
-}
-pub fn unicast_binding() {
-    todo!()
-}
-pub fn zdo_endpoint() {
-    todo!()
-}
-pub fn zdo_message_overhead() {
-    todo!()
-}
-pub fn zdo_profile_id() {
-    todo!()
-}
+/// The endpoint where the Zigbee Device Object (ZDO) resides.
+pub const ZDO_ENDPOINT: u8 = 0;
+/// The profile ID used by the Zigbee Device Object (ZDO).
+pub const ZDO_PROFILE_ID: u16 = 0x0000;
+/// ZDO messages start with a sequence number.
+pub const ZDO_MESSAGE_OVERHEAD: usize = 1;
+pub const MULTICAST_BINDING: u8 = 0x01;
+pub const UNICAST_BINDING: u8 = 0x03;
+/// 64-bit challenge value used by CHALLENGE_REQUEST/CHALLENGE_RESPONSE clusters.
+pub const CHALLENGE_VALUE_SIZE: usize = 8;
+/// The 256-bit Curve 25519 public point.
+pub const CURVE_PUBLIC_POINT_SIZE: usize = 32;
