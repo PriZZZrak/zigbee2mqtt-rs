@@ -257,6 +257,101 @@ pub fn find_all_devices(context: &mut DiscoveryContext) -> Vec<DiscoveredAdapter
     discovered
 }
 
+/// Enumerate real serial ports (upstream `SerialPort.list()`).
+///
+/// `serial2` exposes device paths only; on Linux we enrich them from sysfs and
+/// prefer stable `/dev/serial/by-id/...` paths when available.
+pub fn live_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
+    let paths = serial2_tokio::SerialPort::available_ports().map_err(|error| error.to_string())?;
+    let by_id = by_id_paths();
+    let mut ports = Vec::new();
+    for path in paths {
+        let canonical = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+        let chosen = by_id
+            .iter()
+            .find(|(target, _)| target == &canonical || target == &path)
+            .map(|(_, name)| name.clone())
+            .unwrap_or_else(|| path.to_string_lossy().to_string());
+        let mut info = SerialPortInfo::new(&chosen);
+        enrich_from_sysfs(&mut info, &path);
+        ports.push(info);
+    }
+    Ok(ports)
+}
+
+/// Discover adapters from real serial ports. mDNS discovery is left to the
+/// caller/context so this stays deterministic and hardware-independent.
+pub fn discover_live_adapters() -> Result<Vec<DiscoveredAdapter>, String> {
+    let mut context = DiscoveryContext {
+        serial_ports: live_serial_ports(),
+        mdns_services: Vec::new(),
+        ..DiscoveryContext::default()
+    };
+    Ok(find_all_devices(&mut context))
+}
+
+#[cfg(target_os = "linux")]
+fn by_id_paths() -> Vec<(std::path::PathBuf, String)> {
+    let mut entries = Vec::new();
+    let Ok(dir) = std::fs::read_dir("/dev/serial/by-id") else {
+        return entries;
+    };
+    for entry in dir.flatten() {
+        let path = entry.path();
+        let target = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+        entries.push((target, path.to_string_lossy().to_string()));
+    }
+    entries
+}
+
+#[cfg(not(target_os = "linux"))]
+fn by_id_paths() -> Vec<(std::path::PathBuf, String)> {
+    Vec::new()
+}
+
+#[cfg(target_os = "linux")]
+fn enrich_from_sysfs(info: &mut SerialPortInfo, device_path: &std::path::Path) {
+    let Some(name) = device_path.file_name().and_then(|name| name.to_str()) else {
+        return;
+    };
+    let link = format!("/sys/class/tty/{name}/device");
+    let Ok(mut current) = std::fs::canonicalize(&link) else {
+        return;
+    };
+    for _ in 0..4 {
+        if current.join("idVendor").exists() {
+            info.vendor_id = read_attr(&current, "idVendor");
+            info.product_id = read_attr(&current, "idProduct");
+            info.manufacturer = read_attr(&current, "manufacturer");
+            info.serial_number = read_attr(&current, "serial");
+            if info.friendly_name.is_none() {
+                info.friendly_name = read_attr(&current, "product");
+            }
+            info.pnp_id = info
+                .vendor_id
+                .as_ref()
+                .zip(info.product_id.as_ref())
+                .map(|(vendor, product)| format!("USB VID_{vendor}&PID_{product}"));
+            return;
+        }
+        let Some(parent) = current.parent() else {
+            return;
+        };
+        current = parent.to_path_buf();
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn read_attr(dir: &std::path::Path, name: &str) -> Option<String> {
+    std::fs::read_to_string(dir.join(name))
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn enrich_from_sysfs(_info: &mut SerialPortInfo, _device_path: &std::path::Path) {}
+
 pub fn discover_adapter() {
     todo!()
 }
@@ -277,4 +372,15 @@ pub fn find_usb_adapter_best_match() {
 }
 pub fn match_usb_adapter() {
     todo!()
+}
+
+#[cfg(test)]
+mod live_tests {
+    use super::*;
+
+    #[test]
+    fn live_enumerators_do_not_panic_without_hardware() {
+        let _ = live_serial_ports();
+        let _ = discover_live_adapters();
+    }
 }
