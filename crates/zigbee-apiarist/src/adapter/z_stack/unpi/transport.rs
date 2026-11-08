@@ -22,16 +22,22 @@ pub enum PortEvent {
     Frames(Vec<Frame>),
     /// The port reached EOF (upstream `onPortClose`).
     Closed,
-    /// An I/O error occurred. `fatal` tells the event loop whether the actor
-    /// stopped afterwards.
-    Error(io::Error, bool),
+    /// An I/O error occurred. `stops_actor` only means this transport actor
+    /// terminated; the supervisor/event loop may reopen the port later (USB
+    /// devices can disappear and re-appear).
+    Error { error: io::Error, stops_actor: bool },
     /// No data arrived within the poll interval (not an error).
     Idle,
 }
 
 /// Upstream `serialPort.on("close")` / `on("error")` classification.
 /// EOF is handled separately as [`PortEvent::Closed`].
-pub fn is_fatal(error: &io::Error) -> bool {
+/// Upstream `serialPort.on("error")` classification.
+///
+/// Returns `true` only when the current transport actor cannot continue. It is
+/// not a decision to stop the application: the supervisor may reopen the port
+/// (e.g. an USB adapter disappearing and re-appearing).
+pub fn stops_actor(error: &io::Error) -> bool {
     matches!(
         error.kind(),
         io::ErrorKind::BrokenPipe
@@ -41,6 +47,14 @@ pub fn is_fatal(error: &io::Error) -> bool {
             | io::ErrorKind::NotFound
             | io::ErrorKind::PermissionDenied
             | io::ErrorKind::UnexpectedEof
+    )
+}
+
+/// Errors that only mean "no data right now" and must not stop the actor.
+pub fn is_transient(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
     )
 }
 
@@ -66,7 +80,16 @@ pub async fn run_transport(
     let mut buffer = [0u8; 256];
 
     loop {
-        match tokio::time::timeout(poll_interval, port.read(&mut buffer)).await {
+        // `select!` makes the actor stop promptly when the bridge event loop
+        // drops the receiver, even if `read` is currently pending. `read` is
+        // cancel-safe for tokio's AsyncRead contract.
+        let read_result = tokio::select! {
+            biased;
+            _ = tx.closed() => return Ok(()),
+            result = tokio::time::timeout(poll_interval, port.read(&mut buffer)) => result,
+        };
+
+        match read_result {
             Ok(Ok(0)) => {
                 let _ = tx.send(PortEvent::Closed).await;
                 return Ok(());
@@ -78,23 +101,33 @@ pub async fn run_transport(
                 }
             }
             Ok(Err(error)) => {
-                let fatal = is_fatal(&error);
-                if fatal {
+                if is_transient(&error) {
+                    // WouldBlock is normally handled by tokio readiness, but if
+                    // it surfaces treat it like an idle poll.
+                    let _ = tx.send(PortEvent::Idle).await;
+                } else if stops_actor(&error) {
                     let kind = error.kind();
                     let message = error.to_string();
-                    let _ = tx.send(PortEvent::Error(error, true)).await;
+                    let _ = tx
+                        .send(PortEvent::Error {
+                            error,
+                            stops_actor: true,
+                        })
+                        .await;
                     return Err(io::Error::new(kind, message));
+                } else {
+                    let _ = tx
+                        .send(PortEvent::Error {
+                            error,
+                            stops_actor: false,
+                        })
+                        .await;
                 }
-                let _ = tx.send(PortEvent::Error(error, false)).await;
             }
             Err(_) => {
                 // Poll interval elapsed without data: normal idle condition.
                 let _ = tx.send(PortEvent::Idle).await;
             }
-        }
-
-        if tx.is_closed() {
-            return Ok(());
         }
     }
 }
@@ -111,11 +144,17 @@ mod tests {
     use crate::adapter::z_stack::unpi::constants::{Subsystem, Type};
 
     #[test]
-    fn classifies_fatal_errors() {
-        assert!(is_fatal(&io::Error::from(io::ErrorKind::BrokenPipe)));
-        assert!(is_fatal(&io::Error::from(io::ErrorKind::PermissionDenied)));
-        assert!(!is_fatal(&io::Error::from(io::ErrorKind::TimedOut)));
-        assert!(!is_fatal(&io::Error::from(io::ErrorKind::WouldBlock)));
+    fn classifies_transport_errors() {
+        assert!(stops_actor(&io::Error::from(io::ErrorKind::BrokenPipe)));
+        assert!(stops_actor(&io::Error::from(
+            io::ErrorKind::PermissionDenied
+        )));
+        assert!(stops_actor(&io::Error::from(io::ErrorKind::NotFound)));
+        assert!(!stops_actor(&io::Error::from(io::ErrorKind::TimedOut)));
+        assert!(!stops_actor(&io::Error::from(io::ErrorKind::WouldBlock)));
+        assert!(is_transient(&io::Error::from(io::ErrorKind::TimedOut)));
+        assert!(is_transient(&io::Error::from(io::ErrorKind::WouldBlock)));
+        assert!(!is_transient(&io::Error::from(io::ErrorKind::NotFound)));
     }
 
     #[tokio::test]
@@ -156,6 +195,19 @@ mod tests {
         let result = tokio::time::timeout(Duration::from_millis(500), task)
             .await
             .expect("actor did not stop")
+            .expect("join");
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn stops_while_read_pending_when_receiver_drops() {
+        let (reader, _writer) = serial2_tokio::SerialPort::pair().expect("pair");
+        let (tx, rx) = mpsc::channel(1);
+        let task = tokio::spawn(run_transport(reader, Duration::from_secs(60), tx));
+        drop(rx);
+        let result = tokio::time::timeout(Duration::from_millis(500), task)
+            .await
+            .expect("actor did not stop while read was pending")
             .expect("join");
         assert!(result.is_ok());
     }
