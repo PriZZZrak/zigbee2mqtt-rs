@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
+use crate::adapter::z_stack::unpi::transport::PortEvent;
 use crate::adapter::z_stack::znp::znp::Znp;
 use crate::zspec::zdo::buffalo_zdo::BuffaloZdo;
 use crate::zspec::zdo::definition::clusters::ClusterId;
@@ -233,6 +234,52 @@ impl ZStackAdapter {
     pub async fn stop(&mut self) {
         self.stopped = true;
         self.close_calls += 1;
+        if let Some(mut znp) = self.znp.take() {
+            let _ = znp.close().await;
+        }
+    }
+
+    /// Poll one event from the live transport (no-op for the scripted model).
+    pub async fn poll_transport_event(&mut self) -> Option<PortEvent> {
+        let znp = self.znp.as_mut()?;
+        znp.process_port_event().await
+    }
+
+    /// Reopen the serial port after a close/fatal transport error.
+    pub async fn reconnect(&mut self) -> Result<(), String> {
+        if let Some(mut znp) = self.znp.take() {
+            let _ = znp.close().await;
+        }
+        let mut znp = Znp::new(&self.path, Some(self.baud_rate), Some(self.rtscts));
+        znp.open_serial_transport(Duration::from_millis(100))
+            .await?;
+        self.znp = Some(znp);
+        self.disconnected += 1;
+        Ok(())
+    }
+
+    /// Upstream watchdog: keep reconnecting on transport loss, bounded by
+    /// `max_retries`. Returns `Ok(())` when there is no live transport.
+    pub async fn watch_transport(&mut self, max_retries: usize) -> Result<(), String> {
+        let mut retries = 0;
+        loop {
+            match self.poll_transport_event().await {
+                None => return Ok(()),
+                Some(PortEvent::Closed)
+                | Some(PortEvent::Error {
+                    stops_actor: true, ..
+                }) => {
+                    if retries >= max_retries {
+                        return Err(format!(
+                            "serial transport lost after {retries} reconnect attempt(s)"
+                        ));
+                    }
+                    retries += 1;
+                    self.reconnect().await?;
+                }
+                Some(_) => {}
+            }
+        }
     }
 
     pub async fn get_coordinator_ieee(&self) -> String {
