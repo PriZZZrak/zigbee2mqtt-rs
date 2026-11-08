@@ -942,11 +942,18 @@ impl BuffaloZcl {
         value: &serde_json::Value,
         options: &serde_json::Value,
     ) {
-        todo!()
+        self.write(
+            crate::zspec::zcl::definition::enums::BuffaloZclDataType::STRUCTURED_SELECTOR as u32,
+            value,
+            options,
+        );
     }
 
     pub fn read_structured_selector(&mut self, options: &serde_json::Value) -> serde_json::Value {
-        todo!()
+        self.read(
+            crate::zspec::zcl::definition::enums::BuffaloZclDataType::STRUCTURED_SELECTOR as u32,
+            options,
+        )
     }
 }
 

@@ -235,7 +235,3 @@ fn mix_columns(state: &mut [u8; 16]) {
         state[i + 3] = (xtime(a[0]) ^ a[0]) ^ a[1] ^ a[2] ^ xtime(a[3]);
     }
 }
-
-pub fn get_cluster() {
-    todo!()
-}

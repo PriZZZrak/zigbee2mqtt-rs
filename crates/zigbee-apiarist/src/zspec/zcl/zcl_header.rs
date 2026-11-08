@@ -137,10 +137,3 @@ impl Header {
         self.frame_control.frame_type == FrameType::SPECIFIC
     }
 }
-
-pub fn zcl_header() {
-    todo!()
-}
-pub fn write() {
-    todo!()
-}

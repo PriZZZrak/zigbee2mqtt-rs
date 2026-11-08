@@ -239,22 +239,6 @@ impl Frame {
     }
 }
 
-pub fn zcl_frame() {
-    todo!()
-}
-pub fn is_cluster() {
-    todo!()
-}
-pub fn is_command() {
-    todo!()
-}
-pub fn to_buffer() {
-    todo!()
-}
-pub fn to_string() {
-    todo!()
-}
-
 pub fn cluster_from_id(id: u16) -> Cluster {
     let name = match id {
         0x0000 => "genBasic",
