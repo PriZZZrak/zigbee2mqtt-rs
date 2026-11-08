@@ -5,6 +5,13 @@ edition = "2021"
 
 [dependencies]
 serde_json = "1"
+tokio = { version = "1", features = ["rt", "sync", "time", "io-util"] }
+
+[target.'cfg(unix)'.dependencies]
+serial2-tokio = { version = "0.1", features = ["unix"] }
+
+[target.'cfg(windows)'.dependencies]
+serial2-tokio = { version = "0.1", features = ["windows"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "sync", "time", "io-util"] }

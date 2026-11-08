@@ -4,4 +4,5 @@
 pub mod constants;
 pub mod frame;
 pub mod parser;
+pub mod transport;
 pub mod writer;
