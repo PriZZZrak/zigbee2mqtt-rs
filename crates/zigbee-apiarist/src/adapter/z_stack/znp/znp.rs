@@ -100,6 +100,8 @@ pub struct Znp {
     pub written_frames: Vec<Frame>,
     /// Real serial transport (absent in the scripted test model).
     pub transport: Option<PortTransport>,
+    /// Upstream `AsyncMutex`: serializes requests on the wire.
+    pub queue: std::sync::Arc<tokio::sync::Mutex<()>>,
     waiters: BTreeSet<u64>,
     next_waiter_id: u64,
 }
@@ -131,6 +133,7 @@ impl Znp {
             tcp_params: std::collections::BTreeMap::new(),
             written_frames: Vec::new(),
             transport: None,
+            queue: std::sync::Arc::new(tokio::sync::Mutex::new(())),
             waiters: BTreeSet::new(),
             next_waiter_id: 1,
         }
@@ -611,6 +614,9 @@ impl Znp {
         if !self.initialized {
             return Err("Cannot request when znp has not been initialized yet".to_string());
         }
+        // Upstream wraps the write+wait in `queue.run(...)`.
+        let queue = self.queue.clone();
+        let _queue_guard = queue.lock().await;
 
         let Some(subsystem_enum) = Subsystem::from_u8(subsystem as u8) else {
             return Err(format!("Subsystem '{subsystem}' does not exist"));
@@ -763,6 +769,8 @@ impl Znp {
         payload: Vec<u8>,
         waiter_id: Option<u64>,
     ) -> Result<(), String> {
+        let queue = self.queue.clone();
+        let _queue_guard = queue.lock().await;
         let Some(definition) = definition::find_zdo_request(Subsystem::ZDO, cluster_id) else {
             return Err(format!(
                 "Command for ZDO cluster ID '{cluster_id}' not supported."
