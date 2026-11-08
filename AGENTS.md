@@ -57,6 +57,12 @@ catalog parity.
 8. **A stub that hangs is worse than an explicit unsupported path.**
 9. **No parity claim without evidence.** Upstream source, tests and hardware
    evidence are required.
+10. **No stubs, models or placeholders — ever.** It is STRICTLY FORBIDDEN to
+    create stub functions, function models, `todo!()`, `unimplemented!()` or
+    comments such as `// logic here`. Every function must be fully implemented
+    and must reproduce the original TypeScript logic byte-for-byte. If a
+    function is too large to port in one pass, stop and ask the user to split
+    it into smaller functions before writing any code.
 
 ## 4. R1 scope
 
