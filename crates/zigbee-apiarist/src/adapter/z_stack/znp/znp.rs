@@ -443,7 +443,9 @@ impl Znp {
         self.serial.once_calls += 2;
         self.serial.is_open = true;
 
-        self.attach_port(port, poll_interval)
+        self.attach_port(port, poll_interval)?;
+        self.skip_bootloader_transport().await;
+        Ok(())
     }
 
     /// Attach an already opened port (also used by tests with `SerialPort::pair`).
@@ -462,6 +464,47 @@ impl Znp {
         });
         self.initialized = true;
         Ok(())
+    }
+
+    /// Upstream `skipBootloader()` for a live transport.
+    ///
+    /// CC2530/CC2531 may be in the bootloader instead of running ZNP. The
+    /// sequence mirrors upstream: short ping, magic byte `0xef`, then DTR/RTS
+    /// toggles for CC2652/CC1352 devices such as zzh-p.
+    pub async fn skip_bootloader_transport(&mut self) {
+        if self.ping_transport(250).await.is_ok() {
+            return;
+        }
+
+        if let Some(transport) = self.transport.as_mut() {
+            let _ = tokio::io::AsyncWriteExt::write_all(&mut transport.writer, &[0xef]).await;
+            let _ = tokio::io::AsyncWriteExt::flush(&mut transport.writer).await;
+        }
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        if self.ping_transport(250).await.is_ok() {
+            return;
+        }
+
+        let Some(transport) = self.transport.as_mut() else {
+            return;
+        };
+        let _ = transport.writer.set_dtr(false);
+        let _ = transport.writer.set_rts(false);
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let _ = transport.writer.set_rts(true);
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let _ = transport.writer.set_rts(false);
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    }
+
+    async fn ping_transport(&mut self, timeout_ms: u64) -> Result<(), String> {
+        let frame = Frame::new(Type::SREQ, Subsystem::SYS, 1, Vec::new(), 0, 0);
+        self.written_frames.push(frame.clone());
+        self.serial.write_buffer_calls += 1;
+        self.write_transport(&frame).await?;
+        self.wait_for_transport_frame(Type::SRSP, Subsystem::SYS, 1, timeout_ms)
+            .await
+            .map(|_| ())
     }
 
     /// Receive and handle one transport actor event. Frames are fed through the
@@ -862,5 +905,35 @@ mod transport_tests {
         assert_eq!(result.command.name, "osalNvRead");
         assert_eq!(result.payload["value"], json!([0x42]));
         let _ = responder.await;
+    }
+}
+
+#[cfg(test)]
+mod bootloader_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn skip_bootloader_succeeds_on_first_ping() {
+        let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
+        let mut znp = Znp::new("/dev/null", Some(115200), Some(false));
+        znp.attach_port(reader, Duration::from_millis(10))
+            .expect("attach");
+
+        let responder = tokio::spawn(async move {
+            let mut buffer = [0u8; 64];
+            let read = tokio::io::AsyncReadExt::read(&mut peer, &mut buffer)
+                .await
+                .expect("read ping");
+            assert!(read > 0);
+            let reply = Frame::new(Type::SRSP, Subsystem::SYS, 1, vec![0x01, 0x00], 0, 0);
+            tokio::io::AsyncWriteExt::write_all(&mut peer, &reply.to_buffer())
+                .await
+                .expect("reply");
+        });
+
+        znp.skip_bootloader_transport().await;
+        let _ = responder.await;
+        assert!(znp.written_frames.iter().any(|frame| frame.commandID == 1));
     }
 }
