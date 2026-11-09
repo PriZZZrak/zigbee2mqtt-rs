@@ -314,3 +314,47 @@ async fn hil_zstack_adapter_start_stop() {
 
     adapter.stop().await.expect("adapter stop");
 }
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_zstack_adapter_send_zcl_broadcast() {
+    use serde_json::json;
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
+    use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
+    use zigbee_apiarist::zspec::zcl::zcl_frame::Frame;
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut adapter = ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        format!("{hil_dir}/router-node/coordinator_backup.json"),
+        AdapterOptions::default(),
+    );
+    adapter.start().await.expect("adapter start");
+
+    let frame = Frame::create(0, 0, true, None, 1, "read", 0, json!([]), json!({}), 0);
+    adapter
+        .send_zcl_frame_to_all(1, &frame, 1, 0xfffc, Some(0x0104))
+        .await
+        .expect("broadcast ZCL");
+    eprintln!("broadcast ZCL read sent");
+    adapter.stop().await.expect("adapter stop");
+}

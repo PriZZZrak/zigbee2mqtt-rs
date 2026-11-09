@@ -53,6 +53,7 @@ pub struct Znp {
     pub waitress: Arc<Waitress<ZpiObject, ZnpWaiterMatcher>>,
     /// Upstream `received` event payloads (drained by the adapter/controller).
     pub received: Arc<tokio::sync::Mutex<Vec<ZpiObject>>>,
+    event_tx: tokio::sync::broadcast::Sender<ZpiObject>,
     dispatcher: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -77,6 +78,7 @@ impl Znp {
             queue: Arc::new(AsyncMutex::new()),
             waitress,
             received: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+            event_tx: tokio::sync::broadcast::channel(64).0,
             dispatcher: None,
         }
     }
@@ -99,6 +101,7 @@ impl Znp {
         chunk: &[u8],
         waitress: &Waitress<ZpiObject, ZnpWaiterMatcher>,
         received: &tokio::sync::Mutex<Vec<ZpiObject>>,
+        event_tx: &tokio::sync::broadcast::Sender<ZpiObject>,
     ) {
         input.extend_from_slice(chunk);
 
@@ -124,6 +127,7 @@ impl Znp {
                 fcs_position,
                 waitress,
                 received,
+                event_tx,
             )
             .await;
 
@@ -145,6 +149,7 @@ impl Znp {
         fcs_position: usize,
         waitress: &Waitress<ZpiObject, ZnpWaiterMatcher>,
         received: &tokio::sync::Mutex<Vec<ZpiObject>>,
+        event_tx: &tokio::sync::broadcast::Sender<ZpiObject>,
     ) {
         let Some(frame) = Frame::from_buffer(data_length, fcs_position, buffer) else {
             logger().debug("--> error Invalid checksum", NS);
@@ -154,6 +159,7 @@ impl Znp {
         match catch_unwind(AssertUnwindSafe(|| ZpiObject::from_unpi_frame(&frame))) {
             Ok(object) => {
                 waitress.resolve(&object).await;
+                let _ = event_tx.send(object.clone());
                 received.lock().await.push(object);
             }
             Err(_) => logger().error("Error while parsing to ZpiObject", NS),
@@ -167,6 +173,7 @@ impl Znp {
             .ok_or_else(|| "Transport did not provide an event stream".to_string())?;
         let waitress = self.waitress.clone();
         let received = self.received.clone();
+        let event_tx = self.event_tx.clone();
 
         self.dispatcher = Some(tokio::spawn(async move {
             let mut input_buffer = Vec::new();
@@ -174,8 +181,14 @@ impl Znp {
             while let Some(event) = events.recv().await {
                 match event {
                     TransportEvent::Data(chunk) => {
-                        Self::on_transport_data(&mut input_buffer, &chunk, &waitress, &received)
-                            .await;
+                        Self::on_transport_data(
+                            &mut input_buffer,
+                            &chunk,
+                            &waitress,
+                            &received,
+                            &event_tx,
+                        )
+                        .await;
                     }
                     TransportEvent::Close(error) => {
                         if let Some(error) = error {
@@ -546,6 +559,11 @@ impl Znp {
     /// Drain the objects emitted through the upstream `received` event.
     pub async fn drain_received(&self) -> Vec<ZpiObject> {
         std::mem::take(&mut *self.received.lock().await)
+    }
+
+    /// Subscribe to the upstream `received` event stream.
+    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<ZpiObject> {
+        self.event_tx.subscribe()
     }
 }
 

@@ -143,7 +143,12 @@ async fn main() {
     }
 
     let previous_alignment = nv.memory_alignment;
-    nv.znp.lock().await.close().await.expect("close coordinator");
+    nv.znp
+        .lock()
+        .await
+        .close()
+        .await
+        .expect("close coordinator");
 
     println!(
         "{}",

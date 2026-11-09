@@ -45,5 +45,10 @@ async fn main() {
         .await
         .expect("read STARTUP_OPTION");
     eprintln!("STARTUP_OPTION: {restored:?}");
-    nv.znp.lock().await.close().await.expect("close coordinator");
+    nv.znp
+        .lock()
+        .await
+        .close()
+        .await
+        .expect("close coordinator");
 }
