@@ -34,9 +34,9 @@ pub struct Backup {
     pub security_level: u8,
     pub network_update_id: u8,
     pub devices: Vec<BackupDevice>,
-    pub znp_version: Option<String>,
+    pub znp_version: Option<u16>,
     pub trust_center_link_key_seed: Option<Vec<u8>>,
-    pub ezsp_version: Option<String>,
+    pub ezsp_version: Option<u16>,
     pub hashed_tclk: Option<Vec<u8>>,
 }
 

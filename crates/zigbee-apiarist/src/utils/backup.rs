@@ -162,16 +162,16 @@ pub fn from_unified_backup(backup: &UnifiedBackupStorage) -> Result<Backup, Stri
         devices,
         znp_version: backup
             .pointer("/metadata/internal/znpVersion")
-            .and_then(Value::as_str)
-            .map(str::to_string),
+            .and_then(Value::as_u64)
+            .map(|value| value as u16),
         trust_center_link_key_seed: backup
             .pointer("/stack_specific/zstack/tclk_seed")
             .and_then(Value::as_str)
             .map(from_hex),
         ezsp_version: backup
             .pointer("/metadata/internal/ezspVersion")
-            .and_then(Value::as_str)
-            .map(str::to_string),
+            .and_then(Value::as_u64)
+            .map(|value| value as u16),
         hashed_tclk: backup
             .pointer("/stack_specific/ezsp/hashed_tclk")
             .and_then(Value::as_str)
