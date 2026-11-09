@@ -290,7 +290,28 @@ transcript. Cover:
 ### 7.3 HIL
 
 Hardware rows stay `HARDWARE_PENDING` until executed on the actual router +
-Dongle-P. Record:
+Dongle-P. A coordinator passed through to the dev container is enough for the
+ZNP smoke probe (not for final R1 acceptance):
+
+```yaml
+# docker-compose example
+devices:
+  - "/dev/ttyACM0:/dev/ttyACM0"
+group_add:
+  - "dialout"
+```
+
+Hotplug is not propagated by Docker; restart the container after connecting.
+Then run:
+
+```bash
+dmesg | tail -20
+ls -l /dev/ttyACM0
+Z2M_SERIAL_PORT=/dev/ttyACM0 cargo test -p zigbee-apiarist \
+    --test hil_znp -- --ignored --nocapture
+```
+
+Record:
 
 - hardware and firmware;
 - binary hash;
