@@ -5,7 +5,7 @@ pub mod adapter_discovery;
 pub use adapter::{Adapter, AdapterInstance, AdapterKind};
 pub use adapter_discovery::{find_all_devices, DiscoveredAdapter, DiscoveryContext, MdnsService};
 pub use serial_port::SerialPortInfo;
-pub use transport::{AdapterTransport, ModemBits, TransportEvent, TransportOptions};
+pub use transport::{AdapterTransport, ModemBits, PortStatus, TransportEvent, TransportOptions};
 pub use utils::{parse_tcp_path, TcpPath};
 pub mod ember;
 pub mod ezsp;

@@ -134,8 +134,7 @@ Remaining gaps (tracked, do not hide):
 - syslog transport, JSON-schema validation, WebSocket, gzip, semver and
   humanize-duration are not implemented yet.
 - mDNS discovery is still injected rather than live.
-- `serial2-tokio` has no `get()` modem-status API used by upstream
-  `AdapterTransport`; documented as omitted in `transport.rs`.
+- `AdapterTransport::get()` is ported via serial2 modem-line reads and verified on hardware.
 
 ## 5. Dependency update procedure
 

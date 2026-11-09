@@ -47,3 +47,13 @@ test result: ok. 2 passed; 0 failed; 0 ignored
 - Routerich AX3000 + OpenWrt service/restart/reboot evidence still pending.
 - Start/resume, permit join, backup/restore and manager paths still need HIL
   after the manager/adapter ports land.
+
+## Modem status (`AdapterTransport::get`)
+
+```text
+modem status: PortStatus { cts: false, dsr: false, dcd: false, ri: false }
+test hil_transport_get ... ok
+```
+
+`get()` is implemented with serial2 `read_cts`/`read_dsr`/`read_cd`/`read_ri`
+and verified on the same coordinator.

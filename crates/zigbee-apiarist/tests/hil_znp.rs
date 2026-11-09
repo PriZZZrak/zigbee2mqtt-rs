@@ -76,3 +76,26 @@ async fn hil_nv_memory_init() {
 
     nv.znp.close().await.expect("close coordinator");
 }
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT and a real Z-Stack coordinator"]
+async fn hil_transport_get() {
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT")
+        .expect("set Z2M_SERIAL_PORT to the coordinator serial device");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut znp = Znp::new(transport);
+    znp.open().await.expect("open coordinator");
+    let status = znp.transport.get().await.expect("get modem status");
+    eprintln!("modem status: {status:?}");
+    znp.close().await.expect("close coordinator");
+}

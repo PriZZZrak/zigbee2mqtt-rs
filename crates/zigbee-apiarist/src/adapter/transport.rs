@@ -2,8 +2,8 @@
 // Upstream revision: zigbee-herdsman v11.2.0 (c1a54e3d).
 //
 // Node-only members are not ported: `serialPortBinding` / `serialPortInstance` /
-// `socketInstance` (test hooks), `node26SerialWorkaround` (Node runtime bug) and
-// `get()` (unused modem-status query; `set()` is ported for the bootloader flow).
+// `socketInstance` (test hooks) and `node26SerialWorkaround` (Node runtime bug).
+// `set()` and `get()` are ported (`get()` uses serial2 read_cts/read_dsr/read_cd/read_ri).
 //
 // A raw serial or TCP connection shared by an adapter's protocol stack.
 // Upstream exposes a Node EventEmitter (`data` / `close`); here the reader task
@@ -58,6 +58,15 @@ pub enum TransportEvent {
 pub struct ModemBits {
     pub dtr: Option<bool>,
     pub rts: Option<bool>,
+}
+
+/// Upstream `PortStatus` returned by `get()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PortStatus {
+    pub cts: bool,
+    pub dsr: bool,
+    pub dcd: bool,
+    pub ri: bool,
 }
 
 enum TransportWriter {
@@ -221,6 +230,22 @@ impl AdapterTransport {
             port.set_rts(rts).map_err(|error| error.to_string())?;
         }
         Ok(())
+    }
+
+    /// Upstream `get()`.
+    pub async fn get(&self) -> Result<PortStatus, String> {
+        if !self.is_open() {
+            return Err("Cannot get while serial transport is closed".to_string());
+        }
+        let Some(TransportWriter::Serial(port)) = self.writer.as_ref() else {
+            return Err("Cannot get while serial transport is closed".to_string());
+        };
+        Ok(PortStatus {
+            cts: port.read_cts().map_err(|error| error.to_string())?,
+            dsr: port.read_dsr().map_err(|error| error.to_string())?,
+            dcd: port.read_cd().map_err(|error| error.to_string())?,
+            ri: port.read_ri().map_err(|error| error.to_string())?,
+        })
     }
 
     /// Attach an already opened serial port. Used for PTY pairs in tests and by
