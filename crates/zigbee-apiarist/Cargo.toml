@@ -15,4 +15,5 @@ serial2-tokio = { version = "0.1", features = ["unix"] }
 serial2-tokio = { version = "0.1", features = ["windows"] }
 
 [dev-dependencies]
+serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["rt", "macros", "sync", "time", "io-util"] }

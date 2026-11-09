@@ -8,7 +8,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 
 | Surface | Upstream | Status | Evidence / gap |
 |---|---|---|---|
-| UNPI frame encode/decode + FCS | `adapter/z-stack/unpi/frame.ts` | PARTIAL | unit tests; differential fixtures missing |
+| UNPI frame encode/decode + FCS | `adapter/z-stack/unpi/frame.ts` | PORTED | unit tests + `differential_frame` fixtures |
 | Adapter transport (serial/TCP) | `adapter/transport.ts` | PARTIAL | PTY unit tests; TCP/HIL and transcript replay missing |
 | ZNP framing + request/waitress | `adapter/z-stack/znp/znp.ts` | PARTIAL | PTY request tests; no full upstream znp transcript |
 | ZNP bootloader skip | `znp.ts:117` | PARTIAL | code path only; HIL pending |
@@ -18,7 +18,8 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Z-Stack structs | `adapter/z-stack/structs/*` | PARTIAL | byte fixtures for NIB/tables; full catalog missing |
 | Z-Stack constants | `adapter/z-stack/constants/*` | PARTIAL | only used subset |
 | ZNP MT command catalog | `znp/definition.ts` | PARTIAL | only used commands |
-| ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PARTIAL | many unit ports; cluster catalog subset |
+| Buffalo primitives | `buffalo/buffalo.ts` | PORTED | unit tests + `differential_buffalo` fixtures |
+| ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PARTIAL | `differential_zcl` fixtures for lookup/header; cluster catalog subset |
 | ZDO codecs | `zspec/zdo/*` | PARTIAL | many unit ports; response catalog subset |
 | Controller / Device / Endpoint / Group | `controller/*` | BLOCKED | not ported |
 | Green Power | `controller/greenPower.ts` | BLOCKED | not ported |

@@ -1,0 +1,158 @@
+[
+  {
+    "id": "write-uint8",
+    "op": "write",
+    "type": "uint8",
+    "value": 255,
+    "expected": "ff",
+    "position": 1
+  },
+  {
+    "id": "write-uint16",
+    "op": "write",
+    "type": "uint16",
+    "value": 1234,
+    "expected": "d204",
+    "position": 2
+  },
+  {
+    "id": "write-uint24",
+    "op": "write",
+    "type": "uint24",
+    "value": 1193046,
+    "expected": "563412",
+    "position": 3
+  },
+  {
+    "id": "write-uint32",
+    "op": "write",
+    "type": "uint32",
+    "value": 305419896,
+    "expected": "78563412",
+    "position": 4
+  },
+  {
+    "id": "write-int8",
+    "op": "write",
+    "type": "int8",
+    "value": -1,
+    "expected": "ff",
+    "position": 1
+  },
+  {
+    "id": "write-int16",
+    "op": "write",
+    "type": "int16",
+    "value": -2,
+    "expected": "feff",
+    "position": 2
+  },
+  {
+    "id": "write-int24",
+    "op": "write",
+    "type": "int24",
+    "value": -2,
+    "expected": "feffff",
+    "position": 3
+  },
+  {
+    "id": "write-int32",
+    "op": "write",
+    "type": "int32",
+    "value": -123456,
+    "expected": "c01dfeff",
+    "position": 4
+  },
+  {
+    "id": "write-floatle",
+    "op": "write",
+    "type": "floatle",
+    "value": 1.5,
+    "expected": "0000c03f",
+    "position": 4
+  },
+  {
+    "id": "write-doublele",
+    "op": "write",
+    "type": "doublele",
+    "value": -0.25,
+    "expected": "000000000000d0bf",
+    "position": 8
+  },
+  {
+    "id": "write-ieeeaddr",
+    "op": "write",
+    "type": "ieeeaddr",
+    "value": "0x00124b0000000001",
+    "expected": "01000000004b1200",
+    "position": 8
+  },
+  {
+    "id": "write-buffer",
+    "op": "write",
+    "type": "buffer",
+    "value": "010203",
+    "length": 3,
+    "expected": "010203",
+    "position": 3
+  },
+  {
+    "id": "read-uint16",
+    "op": "read",
+    "type": "uint16",
+    "buffer": "d204",
+    "expected": 1234,
+    "position": 2
+  },
+  {
+    "id": "read-int24",
+    "op": "read",
+    "type": "int24",
+    "buffer": "feffff",
+    "expected": -2,
+    "position": 3
+  },
+  {
+    "id": "read-floatle",
+    "op": "read",
+    "type": "floatle",
+    "buffer": "0000c03f",
+    "expected": 1.5,
+    "position": 4
+  },
+  {
+    "id": "read-doublele",
+    "op": "read",
+    "type": "doublele",
+    "buffer": "000000000000d0bf",
+    "expected": -0.25,
+    "position": 8
+  },
+  {
+    "id": "read-ieeeaddr",
+    "op": "read",
+    "type": "ieeeaddr",
+    "buffer": "010000004b120000",
+    "expected": "0x0000124b00000001",
+    "position": 8
+  },
+  {
+    "id": "read-uint64",
+    "op": "read",
+    "type": "uint64",
+    "buffer": "ffffffffffffffff",
+    "expected": {
+      "bigint": "18446744073709551615"
+    },
+    "position": 8
+  },
+  {
+    "id": "read-buffer",
+    "op": "read",
+    "type": "buffer",
+    "buffer": "01020304",
+    "length": 3,
+    "expected": "010203",
+    "position": 3
+  }
+]

@@ -153,6 +153,9 @@ measurements and the non-device core are allowed.
 - Single bridge event loop; static cluster handlers; ZNP transport actor with
   request matching and timeouts.
 - No `zigbee-herdsman-converters`, Boa or other JS runtime.
+- Local parity toolchain (do not re-download): Node v24.22.2 and global `tsx`
+  live under `/config/.local/node-v24.22.2-linux-x64`, exposed via
+  `/config/.local/bin/{node,npm,npx,tsx}`. See `tools/oracle/README.md`.
 - Do not commit user-owned files (`scripts/mqtt_log.sh`, `.opencode/bugs/`,
   `.opencode/issue/`, etc.).
 

@@ -1,0 +1,54 @@
+[
+  {
+    "id": "to-buffer-srsp",
+    "op": "to_buffer",
+    "type": "SRSP",
+    "subsystem": "SYS",
+    "commandId": 3,
+    "data": "0601",
+    "expected": "fe026103060167"
+  },
+  {
+    "id": "to-buffer-version",
+    "op": "to_buffer",
+    "type": "SRSP",
+    "subsystem": "SYS",
+    "commandId": 2,
+    "data": "010203040501010101",
+    "expected": "fe0961020102030405010101016b"
+  },
+  {
+    "id": "to-buffer-zdo-areq",
+    "op": "to_buffer",
+    "type": "AREQ",
+    "subsystem": "ZDO",
+    "commandId": 196,
+    "data": "d41700",
+    "expected": "fe0345c4d4170041"
+  },
+  {
+    "id": "to-buffer-empty",
+    "op": "to_buffer",
+    "type": "SREQ",
+    "subsystem": "AF",
+    "commandId": 0,
+    "data": "",
+    "expected": "fe00240024"
+  },
+  {
+    "id": "from-buffer-zdo-areq",
+    "op": "from_buffer",
+    "length": 3,
+    "fcsPosition": 7,
+    "buffer": "fe0345c4d4170041",
+    "expected": "fe0345c4d4170041"
+  },
+  {
+    "id": "from-buffer-bad-fcs",
+    "op": "from_buffer",
+    "length": 3,
+    "fcsPosition": 7,
+    "buffer": "fe0345c4d4170040",
+    "error": "Invalid checksum"
+  }
+]

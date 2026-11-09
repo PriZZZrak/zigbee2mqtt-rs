@@ -101,19 +101,40 @@ A module is not "done" with only the first layer.
 
 ## 6. Differential harness
 
-### 6.1 Layout (create if absent)
+### 6.1 Layout
 
 ```
 tools/oracle/                      # Node harness, committed
   run.mjs                          # reads NDJSON jobs, calls upstream, prints NDJSON
+  generate.mjs                     # regenerates the committed fixtures
   packages/<module>.mjs            # one adapter per ported module
+  package.json / package-lock.json
 crates/<crate>/tests/fixtures/     # compact committed fixtures
-  <module>/<function>.json
+  <module>.json
 crates/<crate>/tests/differential_<module>.rs
 ```
 
 Fixtures are committed. `.upstream/` is ignored and must never be a build-time
-dependency of `cargo test`.
+dependency of `cargo test`. Node is required only to regenerate fixtures or run
+the live oracle; the Rust gate replays the committed JSON.
+
+Initial modules: `frame`, `buffalo`, `zcl` (see
+`crates/zigbee-apiarist/tests/differential_*.rs`).
+
+Regenerate:
+
+```bash
+tsx tools/oracle/generate.mjs
+# or, with local tooling:
+cd tools/oracle && npm install && npm run generate
+```
+
+Run the live oracle on NDJSON jobs:
+
+```bash
+cd tools/oracle
+npm run oracle < jobs.ndjson
+```
 
 ### 6.2 Fixture schema
 
@@ -324,9 +345,12 @@ CI gates:
 ## 11. Environment notes
 
 - `.upstream/` is gitignored; fixtures and harnesses must live in the repo.
-- If Node is missing, install a local static Node matching `engines` in `/tmp`
-  for verification only; do not add it to the repo or to `cargo test`.
-- `pnpm install` inside `.upstream/zigbee-herdsman` is required for the oracle;
-  the vendored checkout alone is not enough.
+- Node is installed persistently at `/config/.local/node-v24.22.2-linux-x64`
+  (symlinked as `/config/.local/bin/node`), with global `tsx`. Do not download
+  a fresh copy per session.
+- `node --version` must satisfy upstream `engines`; the current pin is v24.22.2.
+- For pure modules the oracle imports the vendored `.ts` sources via `tsx`; a
+  full `pnpm install` is only needed when the imported module pulls runtime
+  packages.
 - The current environment has no `cc`; use a working linker for Rust
   verification, but never bake that workaround into project files.

@@ -1,0 +1,13 @@
+{
+  "name": "z2m-rs-parity-oracle",
+  "private": true,
+  "type": "module",
+  "description": "Node oracle for differential tests against the pinned zigbee-herdsman checkout",
+  "scripts": {
+    "oracle": "tsx run.mjs",
+    "generate": "tsx generate.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}

@@ -722,6 +722,7 @@ fn builtin_name(id: u32) -> String {
         0x0002 => "genDeviceTempCfg",
         0x0003 => "genIdentify",
         0x0005 => "genScenes",
+        0x0006 => "genOnOff",
         0x0008 => "genLevelCtrl",
         0x0009 => "genAlarms",
         0x000b => "genRssiLocation",
@@ -760,6 +761,13 @@ fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
                 Command::new("identifyQueryRsp", 0x00)
                     .with_parameters(vec![Parameter::new("timeout", DataType::UINT16)]),
             ),
+        ),
+        "genOnOff" => Some(
+            Cluster::new("genOnOff", 0x0006)
+                .with_attribute(Attribute::new("onOff", 0x0000, DataType::BOOLEAN))
+                .with_command(Command::new("off", 0x00))
+                .with_command(Command::new("on", 0x01))
+                .with_command(Command::new("toggle", 0x02)),
         ),
         "genScenes" => Some(
             Cluster::new("genScenes", 0x0005)

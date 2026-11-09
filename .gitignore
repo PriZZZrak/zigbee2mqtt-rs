@@ -3,6 +3,7 @@ openwrt/
 ref/
 .upstream
 .opencode/
+tools/oracle/node_modules/
 
 # Rust build artifacts
 /target/

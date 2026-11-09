@@ -1,0 +1,72 @@
+[
+  {
+    "id": "get-cluster-name",
+    "op": "get_cluster",
+    "key": "genBasic",
+    "expected": {
+      "ID": 0,
+      "name": "genBasic"
+    }
+  },
+  {
+    "id": "get-cluster-id",
+    "op": "get_cluster",
+    "key": 6,
+    "expected": {
+      "ID": 6,
+      "name": "genOnOff"
+    }
+  },
+  {
+    "id": "get-global-command",
+    "op": "get_global_command",
+    "key": "read",
+    "expected": {
+      "ID": 0,
+      "name": "read"
+    }
+  },
+  {
+    "id": "get-foundation-command",
+    "op": "get_foundation_command",
+    "key": 0,
+    "expected": {
+      "ID": 0,
+      "name": "read"
+    }
+  },
+  {
+    "id": "get-cluster-command",
+    "op": "get_cluster_command",
+    "cluster": "genOnOff",
+    "key": "off",
+    "expected": {
+      "ID": 0,
+      "name": "off"
+    }
+  },
+  {
+    "id": "get-cluster-command-toggle",
+    "op": "get_cluster_command",
+    "cluster": "genOnOff",
+    "key": "toggle",
+    "expected": {
+      "ID": 2,
+      "name": "toggle"
+    }
+  },
+  {
+    "id": "frame-to-buffer-global-read",
+    "op": "frame_to_buffer",
+    "frameType": 0,
+    "direction": 0,
+    "disableDefaultResponse": true,
+    "manufacturerCode": null,
+    "transactionSequenceNumber": 1,
+    "command": "read",
+    "cluster": "genBasic",
+    "payload": [],
+    "reservedBits": 0,
+    "expected": "100100"
+  }
+]
