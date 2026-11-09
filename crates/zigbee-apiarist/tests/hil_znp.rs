@@ -12,7 +12,7 @@ use std::sync::Mutex;
 /// HIL tests share one physical coordinator; serialize them.
 static HIL_LOCK: Mutex<()> = Mutex::new(());
 use zigbee_apiarist::adapter::transport::{AdapterTransport, TransportOptions};
-use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
+use zigbee_apiarist::adapter::z_stack::unpi::constants::{Subsystem, Type};
 use zigbee_apiarist::adapter::z_stack::znp::znp::Znp;
 
 #[tokio::test]
@@ -183,6 +183,100 @@ async fn hil_create_backup_matches_router() {
     );
 
     adapter_backup
+        .nv
+        .znp
+        .close()
+        .await
+        .expect("close coordinator");
+}
+
+struct DirectZdoAdapter;
+
+impl zigbee_apiarist::adapter::z_stack::adapter::manager::ZdoAdapter for DirectZdoAdapter {
+    fn has_zdo_message_overhead(&self) -> bool {
+        false
+    }
+
+    fn send_zdo<'a>(
+        &'a mut self,
+        znp: &'a mut Znp,
+        _ieee_address: &'a str,
+        network_address: u16,
+        cluster_id: u16,
+        payload: &'a [u8],
+        _disable_response: bool,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value, String>> + 'a>>
+    {
+        Box::pin(async move {
+            let (waiter_id, receiver) = znp
+                .wait_for(
+                    Type::AREQ,
+                    Subsystem::ZDO,
+                    "activeEpRsp",
+                    Some(serde_json::json!(network_address)),
+                    None,
+                    None,
+                    Some(10000),
+                )
+                .await;
+            znp.request_zdo(cluster_id, payload.to_vec(), Some(waiter_id))
+                .await?;
+            let response = receiver.await.map_err(|_| "Waiter dropped".to_string())??;
+            Ok(response
+                .payload
+                .get("zdo")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null))
+        })
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_manager_start_resumes_network() {
+    use zigbee_apiarist::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
+    use zigbee_apiarist::adapter::z_stack::adapter::manager::{StartResult, ZnpAdapterManager};
+    use zigbee_apiarist::adapter::z_stack::adapter::tstype::ZnpVersion;
+    use zigbee_apiarist::models::startup_options::{
+        AdapterOptions, ConfigNetworkOptions, StartupOptions,
+    };
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut znp = Znp::new(transport);
+    znp.open().await.expect("open coordinator");
+    let nv = AdapterNvMemory::new(znp);
+
+    let options = StartupOptions {
+        version: ZnpVersion::ZStack3x0,
+        network_options: ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        green_power_group: 242,
+        backup_path: format!("{hil_dir}/router-node/coordinator_backup.json"),
+        adapter_options: AdapterOptions::default(),
+    };
+    let mut manager = ZnpAdapterManager::new(DirectZdoAdapter, nv, options);
+    let result = manager.start().await.expect("manager start");
+    eprintln!("manager start result: {result:?}");
+    assert_eq!(result, StartResult::Resumed);
+    manager
+        .backup
         .nv
         .znp
         .close()

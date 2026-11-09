@@ -1,92 +1,959 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/adapter/manager.ts
+// Upstream revision: zigbee-herdsman v11.2.0 (c1a54e3d).
 
-use serde_json::Value;
+use std::future::Future;
+use std::pin::Pin;
 
-use super::adapter_backup::AdapterBackup;
-use super::adapter_nv_memory::AdapterNvMemory;
-use crate::adapter::transport::{AdapterTransport, TransportOptions};
+use serde_json::{json, Value};
+
+use crate::adapter::z_stack::adapter::adapter_backup::AdapterBackup;
+use crate::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
+use crate::adapter::z_stack::adapter::endpoints::endpoints;
+use crate::adapter::z_stack::adapter::tstype::ZnpVersion;
+use crate::adapter::z_stack::constants::common::{DevStates, NvItemsIds, ZnpCommandStatus};
+use crate::adapter::z_stack::constants::{self as ZnpConstants, sys, zdo};
+use crate::adapter::z_stack::structs::entries::channel_list::channel_list;
+use crate::adapter::z_stack::structs::entries::has_configured::is_configured;
+use crate::adapter::z_stack::structs::entries::nib::nib;
+use crate::adapter::z_stack::structs::entries::nwk_key::nwk_key;
+use crate::adapter::z_stack::structs::entries::nwk_key_descriptor::nwk_key_descriptor;
+use crate::adapter::z_stack::structs::entries::nwk_pan_id::nwk_pan_id;
+use crate::adapter::z_stack::structs::r#struct::Struct;
+use crate::adapter::z_stack::structs::serializable_memory_object::SerializableMemoryObject;
+use crate::adapter::z_stack::unpi::constants::{Subsystem, Type};
+use crate::adapter::z_stack::utils::channel_list::{compare_channel_lists, pack_channel_list};
+use crate::adapter::z_stack::utils::network_options::compare_network_options;
 use crate::adapter::z_stack::znp::znp::Znp;
 use crate::models::network_options::NetworkOptions;
+use crate::models::startup_options::{AdapterOptions, ConfigNetworkOptions, StartupOptions};
+use crate::utils::logger::logger;
+use crate::utils::wait::wait;
+use crate::zspec::zdo::buffalo_zdo::BuffaloZdo;
+use crate::zspec::zdo::definition::clusters::ClusterId;
+
+const NS: &str = "zh:adapter:zstack:manager";
+const BLANK_EUI64: &str = "0x0000000000000000";
+const COORDINATOR_ADDRESS: u16 = 0;
+const NULL_NODE_ID: u16 = 0xffff;
+const GREEN_POWER_ENDPOINT: u8 = 242;
+
+/// Upstream `TsType.StartResult`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartResult {
+    Resumed,
+    Restored,
+    Reset,
+}
 
 /// Upstream `StartupStrategy`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StartupStrategy {
+enum StartupStrategy {
     Startup,
     RestoreBackup,
     StartCommissioning,
 }
 
-/// Upstream `StartupOptions` (subset needed by the manager).
-#[derive(Debug, Clone, Default)]
-pub struct StartupOptions {
-    pub backup_path: String,
-    pub network_options: Option<NetworkOptions>,
-    /// `"startup"`, `"restore"` or `"commission"`.
-    pub strategy: String,
+/// Adapter surface used by the manager (`sendZdo` + overhead flag).
+pub trait ZdoAdapter {
+    fn has_zdo_message_overhead(&self) -> bool;
+    fn send_zdo<'a>(
+        &'a mut self,
+        znp: &'a mut Znp,
+        ieee_address: &'a str,
+        network_address: u16,
+        cluster_id: u16,
+        payload: &'a [u8],
+        disable_response: bool,
+    ) -> Pin<Box<dyn Future<Output = Result<Value, String>> + 'a>>;
 }
 
 /// Upstream `ZnpAdapterManager`.
-pub struct ZnpAdapterManager {
-    pub nv: AdapterNvMemory,
+pub struct ZnpAdapterManager<A: ZdoAdapter> {
     pub backup: AdapterBackup,
+    pub adapter: A,
     pub options: StartupOptions,
+    nwk_options: Option<NetworkOptions>,
 }
 
-impl ZnpAdapterManager {
-    pub fn new(znp: Znp, options: StartupOptions) -> Self {
-        let nv = AdapterNvMemory::new(znp);
-        let backup = AdapterBackup::new(
-            AdapterNvMemory::new(Znp::new(AdapterTransport::new(TransportOptions::default()))),
-            options.backup_path.clone(),
-        );
+impl<A: ZdoAdapter> ZnpAdapterManager<A> {
+    pub fn new(adapter: A, nv: AdapterNvMemory, options: StartupOptions) -> Self {
+        let backup = AdapterBackup::new(nv, options.backup_path.clone());
         Self {
-            nv,
             backup,
+            adapter,
             options,
+            nwk_options: None,
         }
     }
 
-    /// Upstream `determineStrategy()`.
-    pub fn determine_strategy(&self) -> StartupStrategy {
-        match self.options.strategy.as_str() {
-            "restore" => StartupStrategy::RestoreBackup,
-            "commission" => StartupStrategy::StartCommissioning,
-            _ => StartupStrategy::Startup,
-        }
-    }
+    /// Upstream `start()`.
+    pub async fn start(&mut self) -> Result<StartResult, String> {
+        logger().debug("beginning znp startup", NS);
+        self.nwk_options = Some(self.parse_config_network_options().await?);
+        self.backup.nv.init().await?;
 
-    /// Upstream `start()`: initialize NV and perform the configured strategy.
-    pub async fn start(&mut self) -> Result<String, String> {
-        self.nv.init().await?;
-        match self.determine_strategy() {
-            StartupStrategy::Startup => Ok("resumed".to_string()),
-            StartupStrategy::RestoreBackup => {
-                let Some(stored) = self.backup.get_stored_backup()? else {
-                    return Err("Backup corrupted - missing backup".to_string());
-                };
-                // Restoring NV requires the same ZNP instance; the public
-                // adapter wires that up. Here we validate and report the result.
-                if stored.network_options.network_key.is_empty() {
-                    return Err("Backup corrupted".to_string());
-                }
-                Ok("restored".to_string())
+        let strategy = self.determine_strategy().await?;
+        logger().debug(&format!("determined startup strategy: {strategy:?}"), NS);
+
+        let result = match strategy {
+            StartupStrategy::Startup => {
+                self.begin_startup().await?;
+                StartResult::Resumed
             }
-            StartupStrategy::StartCommissioning => Ok("reset".to_string()),
+            StartupStrategy::RestoreBackup => {
+                if self.options.version == ZnpVersion::ZStack12 {
+                    logger().debug(
+                        "performing recommissioning instead of restore for z-stack 1.2",
+                        NS,
+                    );
+                    let nwk = self.nwk_options.clone().expect("network options");
+                    self.begin_commissioning(nwk, true, true).await?;
+                    self.begin_startup().await?;
+                } else {
+                    self.begin_restore().await?;
+                }
+                StartResult::Restored
+            }
+            StartupStrategy::StartCommissioning => {
+                if self.options.version == ZnpVersion::ZStack12 {
+                    let has_configured = self
+                        .backup
+                        .nv
+                        .read_item_struct(
+                            NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK1,
+                            0,
+                            super::super::structs::entries::has_configured::has_configured,
+                        )
+                        .await?;
+                    let nwk = self.nwk_options.clone().expect("network options");
+                    self.begin_commissioning(nwk, true, true).await?;
+                    self.begin_startup().await?;
+                    if has_configured.as_ref().is_some_and(is_configured) {
+                        StartResult::Reset
+                    } else {
+                        StartResult::Restored
+                    }
+                } else {
+                    let nwk = self.nwk_options.clone().expect("network options");
+                    self.begin_commissioning(nwk, true, true).await?;
+                    StartResult::Reset
+                }
+            }
+        };
+
+        self.register_endpoints().await?;
+        self.add_to_group(GREEN_POWER_ENDPOINT, self.options.green_power_group)
+            .await?;
+        Ok(result)
+    }
+
+    async fn determine_strategy(&mut self) -> Result<StartupStrategy, String> {
+        logger().debug("determining znp startup strategy", NS);
+        let nwk_options = self.nwk_options.clone().expect("network options");
+        let version = self.options.version;
+
+        let has_configured_id = if version == ZnpVersion::ZStack12 {
+            NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK1
+        } else {
+            NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK3
+        };
+        let has_configured = self
+            .backup
+            .nv
+            .read_item_struct(
+                has_configured_id,
+                0,
+                super::super::structs::entries::has_configured::has_configured,
+            )
+            .await?;
+        let nib_value = self
+            .backup
+            .nv
+            .read_item_struct(NvItemsIds::NIB, 0, nib)
+            .await?;
+
+        let preconfigured_key = if version == ZnpVersion::ZStack12 {
+            let response = self
+                .backup
+                .nv
+                .znp
+                .request_with_reply(
+                    Subsystem::SAPI,
+                    "readConfiguration",
+                    json!({"configid": NvItemsIds::PRECFGKEY}),
+                )
+                .await?;
+            let key_bytes = response
+                .payload
+                .get("value")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(Value::as_u64)
+                        .map(|value| value as u8)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            nwk_key(Some(&key_bytes))
+        } else {
+            self.backup
+                .nv
+                .read_item_struct(NvItemsIds::PRECFGKEY, 0, nwk_key)
+                .await?
+                .ok_or_else(|| "Cannot read preconfigured key".to_string())?
+        };
+
+        let mut active_key_info = self
+            .backup
+            .nv
+            .read_item_struct(NvItemsIds::NWK_ACTIVE_KEY_INFO, 0, nwk_key_descriptor)
+            .await?;
+        let mut alternate_key_info = self
+            .backup
+            .nv
+            .read_item_struct(NvItemsIds::NWK_ALTERN_KEY_INFO, 0, nwk_key_descriptor)
+            .await?;
+
+        if version == ZnpVersion::ZStack12 {
+            let key = preconfigured_key.get_bytes("key").unwrap_or_default();
+            let mut active = nwk_key_descriptor(None);
+            active.set_bytes("key", &key);
+            let mut alternate = nwk_key_descriptor(None);
+            alternate.set_bytes("key", &key);
+            active_key_info = Some(active);
+            alternate_key_info = Some(alternate);
         }
+
+        let backup = self.backup.get_stored_backup()?;
+        let nib_value = nib_value;
+        let is_extended_pan_id_reversed = nib_value.as_ref().is_some_and(|nib| {
+            let mut reversed = nib.get_bytes("extendedPANID").unwrap_or_default();
+            reversed.reverse();
+            reversed == nwk_options.extended_pan_id
+        });
+
+        let config_matches_adapter = nib_value.as_ref().is_some_and(|nib| {
+            let active = active_key_info
+                .as_ref()
+                .and_then(|key| key.get_bytes("key"))
+                .unwrap_or_default();
+            let alternate = alternate_key_info
+                .as_ref()
+                .and_then(|key| key.get_bytes("key"))
+                .unwrap_or_default();
+            nwk_options.pan_id == nib.get_u16("nwkPanId").unwrap_or(0)
+                && (nwk_options.extended_pan_id
+                    == nib.get_bytes("extendedPANID").unwrap_or_default()
+                    || is_extended_pan_id_reversed
+                    || nwk_options.has_default_extended_pan_id)
+                && (version != ZnpVersion::ZStack12
+                    || nwk_options.network_key
+                        == preconfigured_key.get_bytes("key").unwrap_or_default())
+                && nwk_options.network_key == active
+                && nwk_options.network_key == alternate
+        });
+
+        let backup_matches_adapter = backup.as_ref().is_some_and(|backup| {
+            nib_value.as_ref().is_some_and(|nib| {
+                backup.network_options.pan_id == nib.get_u16("nwkPanId").unwrap_or(0)
+                    && backup.network_options.extended_pan_id
+                        == nib.get_bytes("extendedPANID").unwrap_or_default()
+                    && compare_channel_lists(
+                        &backup.network_options.channel_list,
+                        &crate::adapter::z_stack::utils::channel_list::unpack_channel_list(
+                            nib.get_u32("channelList").unwrap_or(0),
+                        ),
+                    )
+                    && active_key_info.as_ref().is_some_and(|key| {
+                        backup.network_options.network_key
+                            == key.get_bytes("key").unwrap_or_default()
+                    })
+            })
+        });
+
+        let config_matches_backup = backup.as_ref().is_some_and(|backup| {
+            compare_network_options(&nwk_options, &backup.network_options, true)
+        });
+
+        let check_restore_version_compatibility = |backup: &Option<
+            crate::models::backup::Backup,
+        >| {
+            if version == ZnpVersion::ZStack12 {
+                if let Some(backup) = backup {
+                    if backup.znp_version.is_some()
+                        && backup.znp_version != Some(ZnpVersion::ZStack12 as u16)
+                    {
+                        return Err("your backup is from newer platform version (Z-Stack 3.0.x+) and cannot be restored onto Z-Stack 1.2 adapter - please remove backup before proceeding".to_string());
+                    }
+                }
+            }
+            Ok(())
+        };
+
+        if !has_configured.as_ref().is_some_and(is_configured) || nib_value.is_none() {
+            logger().debug("(stage-1) adapter is not configured / not commissioned", NS);
+            if config_matches_backup {
+                logger().debug("(stage-2) configuration matches backup", NS);
+                check_restore_version_compatibility(&backup)?;
+                return Ok(StartupStrategy::RestoreBackup);
+            }
+            if backup.is_none() {
+                logger().debug("(stage-2) adapter backup does not exist", NS);
+            } else {
+                logger().debug("(stage-2) configuration does not match backup", NS);
+            }
+            return Ok(StartupStrategy::StartCommissioning);
+        }
+        logger().debug("(stage-1) adapter is configured", NS);
+        let nib_value = nib_value.expect("nib");
+
+        if config_matches_adapter {
+            if version != ZnpVersion::ZStack12
+                && nwk_options.network_key != preconfigured_key.get_bytes("key").unwrap_or_default()
+            {
+                logger().warning(
+                    &format!(
+                        "Adapter preconfigured (transport) key does not match configured network key (preconfigured={}, configured={}). This is typically harmless on Z-Stack 3.x adapters where only the active key matters.",
+                        hex(&preconfigured_key.get_bytes("key").unwrap_or_default()),
+                        hex(&nwk_options.network_key)
+                    ),
+                    NS,
+                );
+            }
+            if is_extended_pan_id_reversed {
+                logger().debug("(stage-2) extended pan id is reversed", NS);
+                logger().warning(
+                    &format!(
+                        "Extended PAN ID is reversed (expected={}, actual={})",
+                        hex(&nwk_options.extended_pan_id),
+                        hex(&nib_value.get_bytes("extendedPANID").unwrap_or_default())
+                    ),
+                    NS,
+                );
+            }
+            logger().debug("(stage-2) adapter state matches configuration", NS);
+            return Ok(StartupStrategy::Startup);
+        }
+
+        logger().debug("(stage-2) adapter state does not match configuration", NS);
+        if let Some(backup) = backup {
+            logger().debug("(stage-3) got adapter backup", NS);
+            if backup_matches_adapter {
+                logger().debug("(stage-4) adapter state matches backup", NS);
+                logger().error(
+                    "Configuration is not consistent with adapter state/backup!",
+                    NS,
+                );
+                logger().error(
+                    &format!(
+                        "- PAN ID: configured={}, adapter={}",
+                        nwk_options.pan_id,
+                        nib_value.get_u16("nwkPanId").unwrap_or(0)
+                    ),
+                    NS,
+                );
+                logger().error(
+                    &format!(
+                        "- Extended PAN ID: configured={}, adapter={}",
+                        hex(&nwk_options.extended_pan_id),
+                        hex(&nib_value.get_bytes("extendedPANID").unwrap_or_default())
+                    ),
+                    NS,
+                );
+                logger().error(
+                    &format!(
+                        "- Network Key: configured={}, adapter:active={} adapter:preconfigured={}, adapter:alternate={}",
+                        hex(&nwk_options.network_key),
+                        hex(&active_key_info.as_ref().and_then(|key| key.get_bytes("key")).unwrap_or_default()),
+                        hex(&preconfigured_key.get_bytes("key").unwrap_or_default()),
+                        hex(&alternate_key_info.as_ref().and_then(|key| key.get_bytes("key")).unwrap_or_default())
+                    ),
+                    NS,
+                );
+                logger().error(
+                    &format!(
+                        "- Channel List: configured={:?}, adapter={:?}",
+                        nwk_options.channel_list,
+                        crate::adapter::z_stack::utils::channel_list::unpack_channel_list(
+                            nib_value.get_u32("channelList").unwrap_or(0)
+                        )
+                    ),
+                    NS,
+                );
+                logger().error("Please update configuration to prevent further issues.", NS);
+                logger().error(
+                    &format!(
+                        "If you wish to re-commission your network, please remove coordinator backup at {}.",
+                        self.options.backup_path
+                    ),
+                    NS,
+                );
+                logger().error(
+                    "Re-commissioning your network will require re-pairing of all devices!",
+                    NS,
+                );
+                if self
+                    .options
+                    .adapter_options
+                    .force_start_with_inconsistent_adapter_configuration
+                {
+                    logger().error(
+                        "Running despite adapter configuration mismatch as configured. Please update the adapter to compatible firmware and recreate your network as soon as possible.",
+                        NS,
+                    );
+                    return Ok(StartupStrategy::Startup);
+                }
+                return Err("startup failed - configuration-adapter mismatch - see logs above for more information".to_string());
+            }
+            logger().debug("(stage-4) adapter state does not match backup", NS);
+            if config_matches_backup {
+                logger().debug("(stage-5) adapter backup matches configuration", NS);
+                check_restore_version_compatibility(&Some(backup))?;
+                return Ok(StartupStrategy::RestoreBackup);
+            }
+            logger().debug("(stage-5) adapter backup does not match configuration", NS);
+            return Ok(StartupStrategy::StartCommissioning);
+        }
+        logger().debug("(stage-3) configuration-adapter mismatch (no backup)", NS);
+        Ok(StartupStrategy::StartCommissioning)
     }
 
-    /// Upstream `parseConfigNetworkOptions(options)`.
-    pub fn parse_config_network_options(&self) -> Result<NetworkOptions, String> {
-        self.options
+    async fn begin_startup(&mut self) -> Result<(), String> {
+        let device_info = self
+            .backup
+            .nv
+            .znp
+            .request_with_reply(Subsystem::UTIL, "getDeviceInfo", json!({}))
+            .await?;
+        if device_info
+            .payload
+            .get("devicestate")
+            .and_then(Value::as_u64)
+            != Some(DevStates::ZB_COORD as u64)
+        {
+            logger().debug("starting adapter as coordinator", NS);
+            let (_, receiver) = self
+                .backup
+                .nv
+                .znp
+                .wait_for(
+                    Type::AREQ,
+                    Subsystem::ZDO,
+                    "stateChangeInd",
+                    None,
+                    None,
+                    Some(9),
+                    Some(60000),
+                )
+                .await;
+            self.backup
+                .nv
+                .znp
+                .request(
+                    Subsystem::ZDO,
+                    "startupFromApp",
+                    json!({"startdelay": 100}),
+                    None,
+                    None,
+                    &[
+                        ZnpCommandStatus::SUCCESS as u8,
+                        ZnpCommandStatus::FAILURE as u8,
+                    ],
+                )
+                .await?;
+            receiver.await.map_err(|_| "Waiter dropped".to_string())??;
+            logger().debug("adapter successfully started in coordinator mode", NS);
+        } else {
+            logger().debug("adapter is already running in coordinator mode", NS);
+        }
+        Ok(())
+    }
+
+    async fn begin_restore(&mut self) -> Result<(), String> {
+        let backup = self
+            .backup
+            .get_stored_backup()?
+            .ok_or_else(|| "Cannot restore backup - none is available".to_string())?;
+        let provisioning = NetworkOptions {
+            pan_id: 1 + (random_u16() % 65532),
+            extended_pan_id: random_bytes(8),
+            channel_list: vec![11 + (random_u8() % 16)],
+            network_key: random_bytes(16),
+            network_key_distribute: false,
+            has_default_extended_pan_id: false,
+        };
+        logger().debug("commissioning random provisioning network:", NS);
+        logger().debug(&format!(" - panId: {}", provisioning.pan_id), NS);
+        logger().debug(
+            &format!(" - extendedPanId: {}", hex(&provisioning.extended_pan_id)),
+            NS,
+        );
+        logger().debug(
+            &format!(" - channelList: {:?}", provisioning.channel_list),
+            NS,
+        );
+        logger().debug(
+            &format!(" - networkKey: {}", hex(&provisioning.network_key)),
+            NS,
+        );
+        self.begin_commissioning(provisioning, false, false).await?;
+        self.backup.restore_backup(&backup).await?;
+        let nwk = self.nwk_options.clone().expect("network options");
+        self.update_commissioning_nv_items(&nwk).await?;
+        logger().debug("giving adapter some time to settle", NS);
+        wait(1000).await;
+        self.reset_adapter().await?;
+        self.begin_startup().await?;
+        self.write_configuration_flag().await?;
+        Ok(())
+    }
+
+    async fn begin_commissioning(
+        &mut self,
+        nwk_options: NetworkOptions,
+        fail_on_collision: bool,
+        write_configured_flag: bool,
+    ) -> Result<(), String> {
+        if nwk_options.pan_id == 65535 {
+            return Err("network commissioning failed - cannot use pan id 65535".to_string());
+        }
+        self.backup.nv.delete_item(NvItemsIds::NIB).await?;
+        self.clear_adapter().await?;
+        self.update_commissioning_nv_items(&nwk_options).await?;
+        logger().debug("beginning network commissioning", NS);
+        if matches!(
+            self.options.version,
+            ZnpVersion::ZStack30x | ZnpVersion::ZStack3x0
+        ) {
+            let packed = pack_channel_list(&nwk_options.channel_list)?;
+            self.backup
+                .nv
+                .znp
+                .request(
+                    Subsystem::APP_CNF,
+                    "bdbSetChannel",
+                    json!({"isPrimary": 1, "channel": packed}),
+                    None,
+                    None,
+                    &[0],
+                )
+                .await?;
+            self.backup
+                .nv
+                .znp
+                .request(
+                    Subsystem::APP_CNF,
+                    "bdbSetChannel",
+                    json!({"isPrimary": 0, "channel": 0}),
+                    None,
+                    None,
+                    &[0],
+                )
+                .await?;
+            let (_, receiver) = self
+                .backup
+                .nv
+                .znp
+                .wait_for(
+                    Type::AREQ,
+                    Subsystem::ZDO,
+                    "stateChangeInd",
+                    None,
+                    None,
+                    Some(9),
+                    Some(100000),
+                )
+                .await;
+            self.backup
+                .nv
+                .znp
+                .request(
+                    Subsystem::APP_CNF,
+                    "bdbStartCommissioning",
+                    json!({"mode": 0x04}),
+                    None,
+                    None,
+                    &[0],
+                )
+                .await?;
+            if receiver
+                .await
+                .map_err(|_| "Waiter dropped".to_string())?
+                .is_err()
+            {
+                return Err("network commissioning timed out - most likely network with the same panId or extendedPanId already exists nearby".to_string());
+            }
+        } else {
+            self.begin_startup().await?;
+        }
+
+        logger().debug("waiting for NIB to settle", NS);
+        let mut reads = 0;
+        let mut nib_value = None;
+        loop {
+            wait(3000).await;
+            nib_value = self
+                .backup
+                .nv
+                .read_item_struct(NvItemsIds::NIB, 0, nib)
+                .await?;
+            reads += 1;
+            let settled = nib_value.as_ref().is_some_and(|nib| {
+                nib.get_u16("nwkPanId") != Some(65535) && nib.get_u8("nwkLogicalChannel") != Some(0)
+            });
+            if settled || reads >= 10 {
+                break;
+            }
+        }
+        if !nib_value.as_ref().is_some_and(|nib| {
+            nib.get_u16("nwkPanId") != Some(65535) && nib.get_u8("nwkLogicalChannel") != Some(0)
+        }) {
+            return Err(
+                "network commissioning failed - timed out waiting for nib to settle".to_string(),
+            );
+        }
+
+        let ext_nwk_info = self
+            .backup
+            .nv
+            .znp
+            .request_with_reply(Subsystem::ZDO, "extNwkInfo", json!({}))
+            .await?;
+        let panid = ext_nwk_info.payload.get("panid").and_then(Value::as_u64);
+        if panid != Some(nwk_options.pan_id as u64) && fail_on_collision {
+            return Err(format!(
+                "network commissioning failed - panId collision detected (expected={}, actual={})",
+                nwk_options.pan_id,
+                panid.unwrap_or(0)
+            ));
+        }
+        logger().debug("network commissioned", NS);
+        if write_configured_flag {
+            self.write_configuration_flag().await?;
+        }
+        Ok(())
+    }
+
+    async fn update_commissioning_nv_items(
+        &mut self,
+        options: &NetworkOptions,
+    ) -> Result<(), String> {
+        let mut pan = nwk_pan_id(None);
+        pan.set_u16("panId", options.pan_id);
+        let mut channels = channel_list(None);
+        channels.set_u32("channelList", pack_channel_list(&options.channel_list)?);
+        let mut extended_pan_id_reversed = options.extended_pan_id.clone();
+        extended_pan_id_reversed.reverse();
+
+        self.backup
+            .nv
+            .update_item(NvItemsIds::STARTUP_OPTION, &[0x00], true)
+            .await?;
+        self.backup
+            .nv
+            .update_item(
+                NvItemsIds::LOGICAL_TYPE,
+                &[zdo::device_logical_type::COORDINATOR as u8],
+                true,
+            )
+            .await?;
+        self.backup
+            .nv
+            .update_item(NvItemsIds::ZDO_DIRECT_CB, &[0x01], true)
+            .await?;
+        self.backup
+            .nv
+            .update_item(
+                NvItemsIds::CHANLIST,
+                &channels
+                    .serialize_memory(self.backup.nv.memory_alignment.expect("memory alignment")),
+                true,
+            )
+            .await?;
+        self.backup
+            .nv
+            .update_item(
+                NvItemsIds::PANID,
+                &pan.serialize_memory(self.backup.nv.memory_alignment.expect("memory alignment")),
+                true,
+            )
+            .await?;
+        self.backup
+            .nv
+            .update_item(NvItemsIds::EXTENDED_PAN_ID, &extended_pan_id_reversed, true)
+            .await?;
+        self.backup
+            .nv
+            .update_item(
+                NvItemsIds::APS_USE_EXT_PANID,
+                &extended_pan_id_reversed,
+                true,
+            )
+            .await?;
+        self.backup
+            .nv
+            .update_item(
+                NvItemsIds::PRECFGKEYS_ENABLE,
+                &[if options.network_key_distribute { 1 } else { 0 }],
+                true,
+            )
+            .await?;
+
+        if matches!(
+            self.options.version,
+            ZnpVersion::ZStack30x | ZnpVersion::ZStack3x0
+        ) {
+            self.backup
+                .nv
+                .update_item(NvItemsIds::PRECFGKEY, &options.network_key, true)
+                .await?;
+        } else {
+            self.backup
+                .nv
+                .znp
+                .request(
+                    Subsystem::SAPI,
+                    "writeConfiguration",
+                    json!({"configid": NvItemsIds::PRECFGKEY, "len": options.network_key.len(), "value": options.network_key}),
+                    None,
+                    None,
+                    &[0],
+                )
+                .await?;
+            self.backup
+                .nv
+                .write_item(
+                    NvItemsIds::LEGACY_TCLK_TABLE_START_12,
+                    &[
+                        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x5a, 0x69, 0x67, 0x42,
+                        0x65, 0x65, 0x41, 0x6c, 0x6c, 0x69, 0x61, 0x6e, 0x63, 0x65, 0x30, 0x39,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    ],
+                    0,
+                    true,
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn register_endpoints(&mut self) -> Result<(), String> {
+        let cluster_id = ClusterId::ACTIVE_ENDPOINTS_REQUEST;
+        let payload = BuffaloZdo::build_request(
+            self.adapter.has_zdo_message_overhead(),
+            cluster_id,
+            &[json!(COORDINATOR_ADDRESS)],
+        );
+        let response = self
+            .adapter
+            .send_zdo(
+                &mut self.backup.nv.znp,
+                BLANK_EUI64,
+                COORDINATOR_ADDRESS,
+                cluster_id,
+                &payload,
+                false,
+            )
+            .await?;
+        let status = response.get(0).and_then(Value::as_u64).unwrap_or(1);
+        if status != 0 {
+            return Err(format!("ZDO status error: {status}"));
+        }
+        let active_endpoints = response
+            .get(1)
+            .and_then(|payload| payload.get("endpointList"))
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        for endpoint in endpoints() {
+            if active_endpoints
+                .iter()
+                .any(|value| value.as_u64() == Some(endpoint.endpoint as u64))
+            {
+                logger().debug(
+                    &format!("endpoint '{}' already registered", endpoint.endpoint),
+                    NS,
+                );
+            } else {
+                logger().debug(&format!("registering endpoint '{}'", endpoint.endpoint), NS);
+                self.backup
+                    .nv
+                    .znp
+                    .request(
+                        Subsystem::AF,
+                        "register",
+                        json!({
+                            "endpoint": endpoint.endpoint,
+                            "appprofid": endpoint.appprofid,
+                            "appdeviceid": endpoint.appdeviceid,
+                            "appdevver": endpoint.appdevver,
+                            "latencyreq": endpoint.latencyreq,
+                            "appnuminclusters": endpoint.appnuminclusters,
+                            "appinclusterlist": endpoint.appinclusterlist,
+                            "appnumoutclusters": endpoint.appnumoutclusters,
+                            "appoutclusterlist": endpoint.appoutclusterlist,
+                        }),
+                        None,
+                        None,
+                        &[0],
+                    )
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn add_to_group(&mut self, endpoint: u8, group: u16) -> Result<(), String> {
+        let result = self
+            .backup
+            .nv
+            .znp
+            .request(
+                Subsystem::ZDO,
+                "extFindGroup",
+                json!({"endpoint": endpoint, "groupid": group}),
+                None,
+                None,
+                &[
+                    ZnpCommandStatus::SUCCESS as u8,
+                    ZnpCommandStatus::FAILURE as u8,
+                ],
+            )
+            .await?
+            .ok_or_else(|| "extFindGroup has no reply".to_string())?;
+        if result.payload.get("status").and_then(Value::as_u64)
+            == Some(ZnpCommandStatus::FAILURE as u64)
+        {
+            self.backup
+                .nv
+                .znp
+                .request(
+                    Subsystem::ZDO,
+                    "extAddGroup",
+                    json!({"endpoint": endpoint, "groupid": group, "namelen": 0, "groupname": []}),
+                    None,
+                    None,
+                    &[0],
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn reset_adapter(&mut self) -> Result<(), String> {
+        logger().debug("adapter reset requested", NS);
+        self.backup
+            .nv
+            .znp
+            .request(
+                Subsystem::SYS,
+                "resetReq",
+                json!({"type": sys::reset_type::SOFT}),
+                None,
+                None,
+                &[0],
+            )
+            .await?;
+        logger().debug("adapter reset successful", NS);
+        Ok(())
+    }
+
+    async fn clear_adapter(&mut self) -> Result<(), String> {
+        logger().debug("clearing adapter using startup option 3", NS);
+        self.backup
+            .nv
+            .write_item(NvItemsIds::STARTUP_OPTION, &[0x03], 0, true)
+            .await?;
+        self.reset_adapter().await?;
+        self.backup
+            .nv
+            .write_item(NvItemsIds::STARTUP_OPTION, &[0x00], 0, true)
+            .await?;
+        Ok(())
+    }
+
+    async fn parse_config_network_options(&mut self) -> Result<NetworkOptions, String> {
+        let mut channel_list = self.options.network_options.channel_list.clone();
+        channel_list.sort_unstable();
+        let extended_pan_id = self
+            .options
             .network_options
+            .extended_pan_id
             .clone()
-            .ok_or_else(|| "Missing network options".to_string())
+            .ok_or_else(|| "Missing extendedPanID".to_string())?;
+        let network_key = self
+            .options
+            .network_options
+            .network_key
+            .clone()
+            .ok_or_else(|| "Missing networkKey".to_string())?;
+        let mut parsed = NetworkOptions {
+            channel_list,
+            pan_id: self.options.network_options.pan_id,
+            extended_pan_id,
+            network_key,
+            network_key_distribute: self
+                .options
+                .network_options
+                .network_key_distribute
+                .unwrap_or(false),
+            has_default_extended_pan_id: false,
+        };
+        if parsed.extended_pan_id == [0xdd; 8] {
+            let response = self
+                .backup
+                .nv
+                .znp
+                .request_with_reply(Subsystem::SYS, "getExtAddr", json!({}))
+                .await?;
+            let extaddress = response
+                .payload
+                .get("extaddress")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            parsed.extended_pan_id = hex_to_bytes(extaddress.split("0x").nth(1).unwrap_or(""));
+            parsed.has_default_extended_pan_id = true;
+        }
+        Ok(parsed)
     }
 
-    pub fn options_json(&self) -> Value {
-        serde_json::json!({
-            "backupPath": self.options.backup_path,
-            "strategy": self.options.strategy,
-        })
+    async fn write_configuration_flag(&mut self) -> Result<(), String> {
+        logger().debug("writing configuration flag to adapter NV memory", NS);
+        let id = if self.options.version == ZnpVersion::ZStack12 {
+            NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK1
+        } else {
+            NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK3
+        };
+        self.backup.nv.write_item(id, &[0x55], 0, true).await
     }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn hex_to_bytes(value: &str) -> Vec<u8> {
+    (0..value.len())
+        .step_by(2)
+        .filter_map(|index| u8::from_str_radix(value.get(index..index + 2)?, 16).ok())
+        .collect()
+}
+
+fn random_bytes(length: usize) -> Vec<u8> {
+    use std::io::Read;
+    let mut bytes = vec![0u8; length];
+    if let Ok(mut file) = std::fs::File::open("/dev/urandom") {
+        let _ = file.read_exact(&mut bytes);
+    }
+    bytes
+}
+
+fn random_u8() -> u8 {
+    random_bytes(1)[0]
+}
+
+fn random_u16() -> u16 {
+    let bytes = random_bytes(2);
+    u16::from_le_bytes([bytes[0], bytes[1]])
 }
