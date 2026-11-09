@@ -690,8 +690,9 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
             .nv
             .update_item(
                 NvItemsIds::CHANLIST,
-                &channels
-                    .serialize_memory(self.backup.nv.memory_alignment.expect("memory alignment")),
+                &channels.serialize_memory(
+                    crate::adapter::z_stack::structs::r#struct::Alignment::Unaligned,
+                ),
                 true,
             )
             .await?;
@@ -699,7 +700,9 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
             .nv
             .update_item(
                 NvItemsIds::PANID,
-                &pan.serialize_memory(self.backup.nv.memory_alignment.expect("memory alignment")),
+                &pan.serialize_memory(
+                    crate::adapter::z_stack::structs::r#struct::Alignment::Unaligned,
+                ),
                 true,
             )
             .await?;

@@ -13,7 +13,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | ZNP framing + request/waitress | `adapter/z-stack/znp/znp.ts` | PARTIAL | PTY request tests; no full upstream znp transcript |
 | ZNP bootloader skip | `znp.ts:117` | PARTIAL | code path only; HIL pending |
 | `zStackAdapter` | `adapter/z-stack/adapter/zStackAdapter.ts` | PORTED | start/stop/queue/ZDO/events/ZCL endpoint+group+broadcast/interPAN/network-params/backup/endDeviceAnnce debounce; HIL 11 tests |
-| Adapter manager | `adapter/z-stack/adapter/manager.ts` | PARTIAL | full port; startup path HIL `Resumed`, restore/commissioning paths pending |
+| Adapter manager | `adapter/z-stack/adapter/manager.ts` | PORTED | startup HIL `Resumed`; restore and commissioning HIL (gated `Z2M_HIL_DESTRUCTIVE=1`) |
 | Adapter NV memory | `adapter-nv-memory.ts` | PORTED | wire transcript + HIL `init` |
 | Adapter backup | `adapter-backup.ts` | PARTIAL | `createBackup` HIL matched router backup; `restoreBackup` not HIL yet |
 | Z-Stack structs | `adapter/z-stack/structs/*` | PORTED | buffer-backed Struct/Table + `differential_structs` fixtures |

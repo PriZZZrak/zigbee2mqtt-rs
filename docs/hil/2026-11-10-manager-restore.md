@@ -1,45 +1,82 @@
 # Manager restore/commissioning HIL (2026-11-10)
 
-## What was implemented
+Both destructive manager paths were executed on the real Dongle Plus.
 
-`ZnpAdapterManager` restore and commissioning paths are exercised by new HIL
-tests in `crates/zigbee-apiarist/tests/hil_znp.rs`:
+> **Warning:** these tests delete/recreate the coordinator network and
+> re-commission a random provisioning network. Live devices stop answering
+> while the network is reprovisioned and may need to rejoin/re-pair afterwards.
+> They are gated behind `Z2M_HIL_DESTRUCTIVE=1`.
 
-- `hil_manager_restore_backup_recovers_network`:
-  - reads the current backup from the adapter;
-  - clears `ZNP_HAS_CONFIGURED_ZSTACK3` to simulate a fresh adapter;
-  - `manager.start()` must select `RestoreBackup`, commission a random
-    provisioning network, restore the backup, rewrite commissioning NV items,
-    reset and start up;
-  - the restored network (PAN/channel/key/IEEE/devices) is compared with the
-    original backup.
+## Restore backup
 
-## Run log up to the interruption
+`hil_manager_restore_backup_recovers_network` clears
+`ZNP_HAS_CONFIGURED_ZSTACK3`, selects `RestoreBackup`, commissions a random
+provisioning network, restores `router-node/coordinator_backup.json`, resets,
+starts up and compares the result with the stored backup.
 
 ```text
-original: pan=1a62 channel=11 devices=9
-zh:adapter:zstack:manager: determining znp startup strategy
-zh:adapter:zstack:manager: (stage-1) adapter is not configured / not commissioned
-zh:adapter:zstack:manager: (stage-2) configuration matches backup
-zh:adapter:zstack:manager: determined startup strategy: RestoreBackup
-zh:adapter:zstack:manager: commissioning random provisioning network:
-zh:adapter:zstack:manager: beginning network commissioning
-zh:adapter:zstack:manager: network commissioned
+expected: pan=1a62 channel=11 devices=9
+(stage-1) adapter is not configured / not commissioned
+(stage-2) configuration matches backup
+determined startup strategy: RestoreBackup
+beginning network commissioning
+network commissioned
+restore startup result: Restored
+restored network: panId=Some(6754) channel=Some(11)
+test hil_manager_restore_backup_recovers_network ... ok
 ```
 
-The run then failed inside `manager.start()` after commissioning. The repeat
-run could not open the coordinator:
+Verified after restore: PAN `0x1a62`, channel `11`, extended PAN ID,
+network key, security level, key sequence number, coordinator IEEE and the
+9 address-manager devices.
+
+## Commissioning
+
+`hil_manager_commissioning_then_restore` commissions a new network
+(`pan=0x1b63`, channel `15`, no backup), then recovers the router network.
 
 ```text
-open coordinator: "Permission denied (os error 13)"
+(stage-2) adapter state does not match configuration
+(stage-3) configuration-adapter mismatch (no backup)
+determined startup strategy: StartCommissioning
+commissioning startup result: Reset
+commissioned network: panId=Some(Number(7011)) channel=Some(Number(15))
+(stage-5) adapter backup matches configuration
+determined startup strategy: RestoreBackup
+recovery startup result: Restored
+recovered network: panId=Some(Number(6754)) channel=Some(Number(11))
+test hil_manager_commissioning_then_restore ... ok
 ```
 
-`/dev/ttyUSB0` is now `crw-rw---- root:dialout` while the build user is
-`uid=99(abc)` without the `dialout` group, so the HIL test suite cannot run
-until the device permissions are restored.
+## Bug found by the HIL
 
-## Status
+The first run failed with:
 
-`HARDWARE_PENDING` for restore/commissioning. The next run of the test restores
-the router network from `router-node/coordinator_backup.json` regardless of the
-adapter's current state, so the test is self-recovering.
+```text
+SREQ: SYS - osalNvWriteExt - {"id":58,...,"value":[...,18 bytes]} failed with
+status '(0x02: INVALID_PARAM)'
+```
+
+`AdapterBackup::restoreBackup` and `updateCommissioningNvItems` serialized
+`nwkKeyDescriptor` / `channelList` / `nwkPanId` with the adapter memory
+alignment (18 bytes for the key descriptor). Upstream calls `.serialize()`
+without arguments there, i.e. **unaligned** (17 bytes). Fixed; the NV item
+lengths now match and restore succeeds.
+
+## Device state after the destructive run
+
+After re-commissioning, the restored coordinator reports the correct PAN,
+channel and key, and the NV items match the pre-destructive adapter dump
+(NIB identical except `SequenceNum`). However, live devices stopped answering
+ZDO requests (`nwkAddrRsp`/`ieeeAddrRsp` timeouts, MAC confirmations still
+succeed). This is a consequence of re-commissioning on a live network, not of
+the restore logic; devices may need a power cycle / re-pair.
+
+## How to run
+
+```bash
+Z2M_HIL_DESTRUCTIVE=1 \
+Z2M_SERIAL_PORT=/dev/ttyUSB0 \
+Z2M_HIL_DIR=/config/workspace/zigbee2mqtt-rs/ref/hil-2026-11-09 \
+  cargo test -p zigbee-apiarist --test hil_znp -- --ignored --nocapture
+```

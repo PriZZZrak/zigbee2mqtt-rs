@@ -18,7 +18,9 @@ use zigbee_apiarist::adapter::z_stack::znp::znp::Znp;
 #[tokio::test]
 #[ignore = "requires Z2M_SERIAL_PORT and a real Z-Stack coordinator"]
 async fn hil_version_request() {
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT")
         .expect("set Z2M_SERIAL_PORT to the coordinator serial device");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -51,7 +53,9 @@ async fn hil_version_request() {
 #[tokio::test]
 #[ignore = "requires Z2M_SERIAL_PORT and a real Z-Stack coordinator"]
 async fn hil_nv_memory_init() {
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     use zigbee_apiarist::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
 
     let path = std::env::var("Z2M_SERIAL_PORT")
@@ -85,7 +89,9 @@ async fn hil_nv_memory_init() {
 #[tokio::test]
 #[ignore = "requires Z2M_SERIAL_PORT and a real Z-Stack coordinator"]
 async fn hil_transport_get() {
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT")
         .expect("set Z2M_SERIAL_PORT to the coordinator serial device");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -112,7 +118,9 @@ async fn hil_create_backup_matches_router() {
     use zigbee_apiarist::controller::database::Database;
     use zigbee_apiarist::utils::backup::from_unified_backup;
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -207,7 +215,9 @@ async fn hil_manager_start_resumes_network() {
         AdapterOptions, ConfigNetworkOptions, StartupOptions,
     };
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -264,7 +274,9 @@ async fn hil_zstack_adapter_start_stop() {
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
     use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -323,7 +335,9 @@ async fn hil_zstack_adapter_send_zcl_broadcast() {
     use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
     use zigbee_apiarist::zspec::zcl::zcl_frame::Frame;
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -367,7 +381,9 @@ async fn hil_zstack_adapter_zcl_read_roundtrip() {
     use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
     use zigbee_apiarist::zspec::zcl::zcl_frame::Frame;
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -453,7 +469,9 @@ async fn hil_zstack_network_parameters_and_backup() {
     use zigbee_apiarist::controller::database::Database;
     use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -519,7 +537,9 @@ async fn hil_zstack_interpan_set_restore() {
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
     use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -568,7 +588,9 @@ async fn hil_zstack_active_endpoints_match_upstream() {
     use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
     use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -626,6 +648,7 @@ async fn hil_zstack_active_endpoints_match_upstream() {
 #[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
 async fn hil_manager_restore_backup_recovers_network() {
     use serde_json::json;
+    use zigbee_apiarist::adapter::z_stack::adapter::adapter_backup::AdapterBackup;
     use zigbee_apiarist::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
     use zigbee_apiarist::adapter::z_stack::adapter::manager::{StartResult, ZnpAdapterManager};
     use zigbee_apiarist::adapter::z_stack::adapter::tstype::ZnpVersion;
@@ -634,8 +657,15 @@ async fn hil_manager_restore_backup_recovers_network() {
     use zigbee_apiarist::models::startup_options::{
         AdapterOptions, ConfigNetworkOptions, StartupOptions,
     };
+    use zigbee_apiarist::utils::backup::from_unified_backup;
 
-    let _guard = HIL_LOCK.lock().unwrap();
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if std::env::var("Z2M_HIL_DESTRUCTIVE").ok().as_deref() != Some("1") {
+        eprintln!("skipping destructive HIL test (set Z2M_HIL_DESTRUCTIVE=1)");
+        return;
+    }
     let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
     let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
     let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
@@ -643,6 +673,19 @@ async fn hil_manager_restore_backup_recovers_network() {
         .and_then(|value| value.parse().ok())
         .unwrap_or(115200);
     let backup_path = format!("{hil_dir}/router-node/coordinator_backup.json");
+
+    let expected = {
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&backup_path).expect("router backup"))
+                .expect("router backup json");
+        from_unified_backup(&value).expect("parse router backup")
+    };
+    eprintln!(
+        "expected: pan={:04x} channel={} devices={}",
+        expected.network_options.pan_id,
+        expected.logical_channel,
+        expected.devices.len()
+    );
 
     let transport = AdapterTransport::new(TransportOptions {
         path,
@@ -654,20 +697,6 @@ async fn hil_manager_restore_backup_recovers_network() {
     let mut nv = AdapterNvMemory::new(znp);
     nv.init().await.expect("NV init");
 
-    let original = {
-        use zigbee_apiarist::adapter::z_stack::adapter::adapter_backup::AdapterBackup;
-        let mut backup_nv = AdapterNvMemory::from_shared(nv.znp.clone());
-        backup_nv.init().await.expect("backup NV init");
-        let mut backup = AdapterBackup::new(backup_nv, backup_path.clone());
-        backup.create_backup(&[]).await.expect("create backup")
-    };
-    eprintln!(
-        "original: pan={:04x} channel={} devices={}",
-        original.network_options.pan_id,
-        original.logical_channel,
-        original.devices.len()
-    );
-
     // Simulate a fresh adapter: the has-configured flag is not 0x55.
     nv.write_item(NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK3, &[0x00], 0, true)
         .await
@@ -676,11 +705,11 @@ async fn hil_manager_restore_backup_recovers_network() {
     let options = StartupOptions {
         version: ZnpVersion::ZStack3x0,
         network_options: ConfigNetworkOptions {
-            pan_id: original.network_options.pan_id,
-            extended_pan_id: Some(original.network_options.extended_pan_id.clone()),
-            network_key: Some(original.network_options.network_key.clone()),
-            channel_list: original.network_options.channel_list.clone(),
-            network_key_distribute: Some(false),
+            pan_id: expected.network_options.pan_id,
+            extended_pan_id: Some(expected.network_options.extended_pan_id.clone()),
+            network_key: Some(expected.network_options.network_key.clone()),
+            channel_list: expected.network_options.channel_list.clone(),
+            network_key_distribute: Some(expected.network_options.network_key_distribute),
         },
         green_power_group: 242,
         backup_path: backup_path.clone(),
@@ -709,10 +738,10 @@ async fn hil_manager_restore_backup_recovers_network() {
         .get("channel")
         .and_then(serde_json::Value::as_u64);
     eprintln!("restored network: panId={pan_id:?} channel={channel:?}");
-    assert_eq!(pan_id, Some(original.network_options.pan_id as u64));
+    assert_eq!(pan_id, Some(expected.network_options.pan_id as u64));
     assert_eq!(
         channel,
-        original
+        expected
             .network_options
             .channel_list
             .first()
@@ -720,9 +749,8 @@ async fn hil_manager_restore_backup_recovers_network() {
             .map(u64::from)
     );
 
-    // The restored backup must match the original backup.
+    // The restored backup must match the stored router backup.
     let restored = {
-        use zigbee_apiarist::adapter::z_stack::adapter::adapter_backup::AdapterBackup;
         let mut backup_nv = AdapterNvMemory::from_shared(manager.backup.nv.znp.clone());
         backup_nv.init().await.expect("restored NV init");
         let mut backup = AdapterBackup::new(backup_nv, backup_path.clone());
@@ -730,22 +758,22 @@ async fn hil_manager_restore_backup_recovers_network() {
     };
     assert_eq!(
         restored.network_options.pan_id,
-        original.network_options.pan_id
+        expected.network_options.pan_id
     );
     assert_eq!(
         restored.network_options.extended_pan_id,
-        original.network_options.extended_pan_id
+        expected.network_options.extended_pan_id
     );
     assert_eq!(
         restored.network_options.network_key,
-        original.network_options.network_key
+        expected.network_options.network_key
     );
-    assert_eq!(restored.logical_channel, original.logical_channel);
+    assert_eq!(restored.logical_channel, expected.logical_channel);
     assert_eq!(
         restored.coordinator_ieee_address,
-        original.coordinator_ieee_address
+        expected.coordinator_ieee_address
     );
-    let original_devices = original
+    let expected_devices = expected
         .devices
         .iter()
         .map(|device| device.ieee_address.clone())
@@ -756,8 +784,169 @@ async fn hil_manager_restore_backup_recovers_network() {
         .map(|device| device.ieee_address.clone())
         .collect::<std::collections::BTreeSet<_>>();
     assert!(
-        original_devices.is_subset(&restored_devices),
+        expected_devices.is_subset(&restored_devices),
         "restored backup lost devices"
+    );
+
+    manager
+        .backup
+        .nv
+        .znp
+        .lock()
+        .await
+        .close()
+        .await
+        .expect("close coordinator");
+}
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_manager_commissioning_then_restore() {
+    use serde_json::json;
+    use zigbee_apiarist::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
+    use zigbee_apiarist::adapter::z_stack::adapter::manager::{StartResult, ZnpAdapterManager};
+    use zigbee_apiarist::adapter::z_stack::adapter::tstype::ZnpVersion;
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackZdo;
+    use zigbee_apiarist::models::startup_options::{
+        AdapterOptions, ConfigNetworkOptions, StartupOptions,
+    };
+    use zigbee_apiarist::utils::backup::from_unified_backup;
+
+    let _guard = HIL_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if std::env::var("Z2M_HIL_DESTRUCTIVE").ok().as_deref() != Some("1") {
+        eprintln!("skipping destructive HIL test (set Z2M_HIL_DESTRUCTIVE=1)");
+        return;
+    }
+
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+    let backup_path = format!("{hil_dir}/router-node/coordinator_backup.json");
+
+    let expected = {
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&backup_path).expect("router backup"))
+                .expect("router backup json");
+        from_unified_backup(&value).expect("parse router backup")
+    };
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut znp = Znp::new(transport);
+    znp.open().await.expect("open coordinator");
+    let mut nv = AdapterNvMemory::new(znp);
+    nv.init().await.expect("NV init");
+
+    // Commissioning against a fresh, non-matching network and no backup.
+    let commissioned = StartupOptions {
+        version: ZnpVersion::ZStack3x0,
+        network_options: ConfigNetworkOptions {
+            pan_id: 0x1b63,
+            extended_pan_id: Some(vec![0xaa; 8]),
+            network_key: Some(vec![
+                0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee,
+                0xff, 0x00,
+            ]),
+            channel_list: vec![15],
+            network_key_distribute: Some(false),
+        },
+        green_power_group: 242,
+        backup_path: "/tmp/opencode/hil-commissioning-no-backup.json".to_string(),
+        adapter_options: AdapterOptions::default(),
+    };
+    let mut manager = ZnpAdapterManager::new(ZStackZdo::default(), nv, commissioned);
+    let result = manager.start().await.expect("commissioning startup");
+    eprintln!("commissioning startup result: {result:?}");
+    assert_eq!(result, StartResult::Reset);
+
+    let params = manager
+        .backup
+        .nv
+        .znp
+        .lock()
+        .await
+        .request_with_reply(Subsystem::ZDO, "extNwkInfo", json!({}))
+        .await
+        .expect("commissioned network parameters");
+    eprintln!(
+        "commissioned network: panId={:?} channel={:?}",
+        params.payload.get("panid"),
+        params.payload.get("channel")
+    );
+    assert_eq!(
+        params
+            .payload
+            .get("panid")
+            .and_then(serde_json::Value::as_u64),
+        Some(0x1b63)
+    );
+    assert_eq!(
+        params
+            .payload
+            .get("channel")
+            .and_then(serde_json::Value::as_u64),
+        Some(15)
+    );
+
+    // Recover the router network from the stored backup.
+    let restore = StartupOptions {
+        version: ZnpVersion::ZStack3x0,
+        network_options: ConfigNetworkOptions {
+            pan_id: expected.network_options.pan_id,
+            extended_pan_id: Some(expected.network_options.extended_pan_id.clone()),
+            network_key: Some(expected.network_options.network_key.clone()),
+            channel_list: expected.network_options.channel_list.clone(),
+            network_key_distribute: Some(expected.network_options.network_key_distribute),
+        },
+        green_power_group: 242,
+        backup_path: backup_path.clone(),
+        adapter_options: AdapterOptions::default(),
+    };
+    let mut manager = ZnpAdapterManager::new(ZStackZdo::default(), manager.backup.nv, restore);
+    let result = manager.start().await.expect("recovery startup");
+    eprintln!("recovery startup result: {result:?}");
+    assert_eq!(result, StartResult::Restored);
+
+    let params = manager
+        .backup
+        .nv
+        .znp
+        .lock()
+        .await
+        .request_with_reply(Subsystem::ZDO, "extNwkInfo", json!({}))
+        .await
+        .expect("recovered network parameters");
+    eprintln!(
+        "recovered network: panId={:?} channel={:?}",
+        params.payload.get("panid"),
+        params.payload.get("channel")
+    );
+    assert_eq!(
+        params
+            .payload
+            .get("panid")
+            .and_then(serde_json::Value::as_u64),
+        Some(expected.network_options.pan_id as u64)
+    );
+    assert_eq!(
+        params
+            .payload
+            .get("channel")
+            .and_then(serde_json::Value::as_u64),
+        expected
+            .network_options
+            .channel_list
+            .first()
+            .copied()
+            .map(u64::from)
     );
 
     manager

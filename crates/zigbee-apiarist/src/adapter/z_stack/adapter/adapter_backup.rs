@@ -474,8 +474,10 @@ impl AdapterBackup {
         self.nv
             .write_item_object(NvItemsIds::NIB, &nib, 0, true)
             .await?;
-        let key_bytes =
-            key_descriptor.serialize_memory(self.nv.memory_alignment.expect("memory alignment"));
+        // Upstream calls `keyDescriptor.serialize()` (unaligned) here, not the
+        // adapter memory alignment.
+        let key_bytes = key_descriptor
+            .serialize_memory(crate::adapter::z_stack::structs::r#struct::Alignment::Unaligned);
         self.nv
             .update_item(NvItemsIds::NWK_ACTIVE_KEY_INFO, &key_bytes, true)
             .await?;
