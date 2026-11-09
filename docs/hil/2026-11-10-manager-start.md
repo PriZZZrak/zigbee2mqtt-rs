@@ -41,7 +41,8 @@ test result: ok. 5 passed; 0 failed; 0 ignored
 - `parseConfigNetworkOptions`: default EPID replaced with adapter IEEE.
 - `determineStrategy`: configured adapter + matching config → `startup`.
 - `beginStartup`: coordinator already running as `ZB_COORD`, no reset.
-- `registerEndpoints`: active endpoint list fetched over ZDO and matched
+- `registerEndpoints`: active endpoint list fetched over ZDO through the ported
+  `ZStackZdo::send_zdo` (`sendZdoInternal`) and matched
   against upstream `Endpoints`.
 - `addToGroup`: `extFindGroup` accepts `FAILURE` as expected status.
 - `start` returned `resumed`.

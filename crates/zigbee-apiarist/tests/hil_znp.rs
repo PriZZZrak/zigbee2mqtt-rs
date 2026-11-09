@@ -190,47 +190,6 @@ async fn hil_create_backup_matches_router() {
         .expect("close coordinator");
 }
 
-struct DirectZdoAdapter;
-
-impl zigbee_apiarist::adapter::z_stack::adapter::manager::ZdoAdapter for DirectZdoAdapter {
-    fn has_zdo_message_overhead(&self) -> bool {
-        false
-    }
-
-    fn send_zdo<'a>(
-        &'a mut self,
-        znp: &'a mut Znp,
-        _ieee_address: &'a str,
-        network_address: u16,
-        cluster_id: u16,
-        payload: &'a [u8],
-        _disable_response: bool,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value, String>> + 'a>>
-    {
-        Box::pin(async move {
-            let (waiter_id, receiver) = znp
-                .wait_for(
-                    Type::AREQ,
-                    Subsystem::ZDO,
-                    "activeEpRsp",
-                    Some(serde_json::json!(network_address)),
-                    None,
-                    None,
-                    Some(10000),
-                )
-                .await;
-            znp.request_zdo(cluster_id, payload.to_vec(), Some(waiter_id))
-                .await?;
-            let response = receiver.await.map_err(|_| "Waiter dropped".to_string())??;
-            Ok(response
-                .payload
-                .get("zdo")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null))
-        })
-    }
-}
-
 #[tokio::test]
 #[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
 async fn hil_manager_start_resumes_network() {
@@ -271,7 +230,11 @@ async fn hil_manager_start_resumes_network() {
         backup_path: format!("{hil_dir}/router-node/coordinator_backup.json"),
         adapter_options: AdapterOptions::default(),
     };
-    let mut manager = ZnpAdapterManager::new(DirectZdoAdapter, nv, options);
+    let mut manager = ZnpAdapterManager::new(
+        zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackZdo::default(),
+        nv,
+        options,
+    );
     let result = manager.start().await.expect("manager start");
     eprintln!("manager start result: {result:?}");
     assert_eq!(result, StartResult::Resumed);

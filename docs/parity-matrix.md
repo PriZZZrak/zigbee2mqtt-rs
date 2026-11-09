@@ -12,7 +12,8 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Adapter transport (serial/TCP) | `adapter/transport.ts` | PARTIAL | PTY unit tests; TCP/HIL and transcript replay missing |
 | ZNP framing + request/waitress | `adapter/z-stack/znp/znp.ts` | PARTIAL | PTY request tests; no full upstream znp transcript |
 | ZNP bootloader skip | `znp.ts:117` | PARTIAL | code path only; HIL pending |
-| `zStackAdapter` (start/resume, permit join, NV) | `adapter/z-stack/adapter/zStackAdapter.ts` | BLOCKED | file not ported |
+| `zStackAdapter` (ZDO send path) | `adapter/z-stack/adapter/zStackAdapter.ts` | PARTIAL | `sendZdoInternal` + `ZStackZdo` ported and used by manager HIL; ZCL/queue/start surfaces pending |
+| `zStackAdapter` (ZCL/queue/start) | `zStackAdapter.ts` | BLOCKED | not ported yet |
 | Adapter manager | `adapter/z-stack/adapter/manager.ts` | PARTIAL | full port; startup path HIL `Resumed`, restore/commissioning paths pending |
 | Adapter NV memory | `adapter-nv-memory.ts` | PORTED | wire transcript + HIL `init` |
 | Adapter backup | `adapter-backup.ts` | PARTIAL | `createBackup` HIL matched router backup; `restoreBackup` not HIL yet |

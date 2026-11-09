@@ -80,3 +80,10 @@ pub fn is_mt_cmd_areq_zdo(command: &MtCmd) -> bool {
 pub fn is_mt_cmd_sreq_zdo(command: &MtCmd) -> bool {
     command.r#type == Type::SREQ && command.zdo_cluster_id.is_some()
 }
+
+/// Upstream `Definition[Subsystem.ZDO].find((c) => isMtCmdAreqZdo(c) && c.zdoClusterId === id)`.
+pub fn find_zdo_response(subsystem: Subsystem, cluster_id: u16) -> Option<&'static MtCmd> {
+    for_subsystem(subsystem)
+        .iter()
+        .find(|command| is_mt_cmd_areq_zdo(command) && command.zdo_cluster_id == Some(cluster_id))
+}
