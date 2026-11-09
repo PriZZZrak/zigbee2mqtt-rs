@@ -163,6 +163,9 @@ measurements and the non-device core are allowed.
 - Every ported file must start with the upstream path and pinned revision, and
   each ported function/type must carry an upstream name plus a `file.ts:line`
   anchor so the next upstream bump can be diffed mechanically.
+- The normative porting and parity procedure is `docs/porting-parity.md`.
+  Read it before porting any function; a module without differential/transcript
+  evidence is not `PORTED`.
 - Preserve observable MQTT/HA/storage contracts; do not “clean up” quirks
   without evidence.
 - Prefer golden fixtures and differential tests against the pinned Node
@@ -183,8 +186,10 @@ measurements and the non-device core are allowed.
 3. Answer §5 questions with the user before coding affected areas.
 4. Write a short design/measurement note; measure on hardware when performance
    is part of the decision.
-5. Implement in small slices with positive/negative, restart and error tests.
-6. Run `cargo fmt`, `cargo test`, `cargo clippy` and relevant Python/parity
+5. Implement in small slices. For every ported function add the upstream unit
+   test, a differential fixture or transcript, and a parity-matrix row as
+   required by `docs/porting-parity.md`.
+6. Run `cargo fmt`, `cargo test`, `cargo clippy` and the parity/differential
    checks. Never claim hardware results without a real run.
 7. Commit with a clear message; do not rewrite published history or force-push
    `main` without explicit approval.
