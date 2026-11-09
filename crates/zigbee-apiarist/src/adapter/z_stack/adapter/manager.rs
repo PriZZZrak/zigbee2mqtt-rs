@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use super::adapter_backup::AdapterBackup;
 use super::adapter_nv_memory::AdapterNvMemory;
+use crate::adapter::transport::{AdapterTransport, TransportOptions};
 use crate::adapter::z_stack::znp::znp::Znp;
 use crate::models::network_options::NetworkOptions;
 
@@ -35,7 +36,7 @@ impl ZnpAdapterManager {
     pub fn new(znp: Znp, options: StartupOptions) -> Self {
         let nv = AdapterNvMemory::new(znp);
         let backup = AdapterBackup::new(
-            AdapterNvMemory::new(Znp::new("/dev/null", None, None)),
+            AdapterNvMemory::new(Znp::new(AdapterTransport::new(TransportOptions::default()))),
             options.backup_path.clone(),
         );
         Self {

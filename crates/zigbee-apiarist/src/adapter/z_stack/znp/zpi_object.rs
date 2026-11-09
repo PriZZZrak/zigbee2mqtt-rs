@@ -190,6 +190,18 @@ impl ZpiObject {
         result
     }
 
+    /// Upstream `ZpiObject.unpiFrame` getter.
+    pub fn to_unpi_frame(&self) -> Frame {
+        Frame::new(
+            self.r#type,
+            self.subsystem,
+            self.command.id as u8,
+            self.create_payload_buffer(),
+            0,
+            0,
+        )
+    }
+
     /// Upstream: `obj.createPayloadBuffer()`.
     pub fn create_payload_buffer(&self) -> Vec<u8> {
         let mut buffalo = BuffaloZnp::new(vec![0; 250], 0);

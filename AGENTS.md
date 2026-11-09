@@ -160,6 +160,9 @@ measurements and the non-device core are allowed.
 - `zigbee-herdsman-converters` is **reference only** for understanding what the missing device layer would do; it is not executed or copied into R1.
 - Read the relevant upstream code, callers, tests and dependency versions before
   implementing. Record the source revision.
+- Every ported file must start with the upstream path and pinned revision, and
+  each ported function/type must carry an upstream name plus a `file.ts:line`
+  anchor so the next upstream bump can be diffed mechanically.
 - Preserve observable MQTT/HA/storage contracts; do not “clean up” quirks
   without evidence.
 - Prefer golden fixtures and differential tests against the pinned Node

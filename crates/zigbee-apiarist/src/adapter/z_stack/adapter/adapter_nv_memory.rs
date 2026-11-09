@@ -33,7 +33,7 @@ impl AdapterNvMemory {
         for _ in 0..RETRIES {
             match self
                 .znp
-                .request_with_reply(Subsystem::SYS as u16, command, payload.clone())
+                .request_with_reply(Subsystem::SYS, command, payload.clone())
                 .await
             {
                 Ok(object) => return Ok(object),
