@@ -1,4 +1,5 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/zpiObject.ts
+// Upstream revision: zigbee-herdsman v11.2.0 (c1a54e3d).
 
 use serde_json::{json, Map, Value};
 
@@ -49,6 +50,43 @@ fn is_buffer_and_list_type(parameter_type: u32) -> bool {
 }
 
 impl ZpiObject {
+    /// Upstream `ZpiObject.createRequest(subsystem, command, payload)`.
+    pub fn create_request(subsystem: Subsystem, command: &str, payload: Value) -> Self {
+        let Some(definition) = definition::find_by_name(subsystem, command) else {
+            panic!(
+                "Command request '{command}' from subsystem '{}' not found",
+                subsystem.name()
+            );
+        };
+        if definition::is_mt_cmd_areq_zdo(definition) || definition::is_mt_cmd_sreq_zdo(definition)
+        {
+            panic!(
+                "Command request '{command}' from subsystem '{}' not found",
+                subsystem.name()
+            );
+        }
+
+        let parameters = definition
+            .request
+            .iter()
+            .map(|parameter| ParameterDef {
+                name: parameter.name.to_string(),
+                parameter_type: parameter.parameter_type,
+            })
+            .collect::<Vec<_>>();
+
+        let mut object = Self::new(
+            definition.r#type,
+            subsystem,
+            definition.name,
+            0,
+            payload,
+            parameters,
+        );
+        object.command.id = u16::from(definition.id);
+        object
+    }
+
     pub fn new(
         r#type: Type,
         subsystem: Subsystem,
@@ -133,7 +171,7 @@ impl ZpiObject {
         } else if definition::is_mt_cmd_sreq_zdo(command) {
             payload.insert(
                 "status".to_string(),
-                json!(*frame.data.first().unwrap_or(&0)),
+                json!(*frame.data.first().expect("Not enough bytes to read status")),
             );
         } else {
             let parameters = if frame.r#type == Type::SRSP && command.r#type != Type::AREQ {
@@ -141,17 +179,6 @@ impl ZpiObject {
             } else {
                 command.request
             };
-            assert!(
-                !parameters.is_empty(),
-                "CommandID '{}' from subsystem '{}' cannot be a {}",
-                frame.commandID,
-                frame.subsystem.name(),
-                if frame.r#type == Type::SRSP {
-                    "response"
-                } else {
-                    "request"
-                }
-            );
             payload = Self::read_parameters(&frame.data, parameters);
         }
 
@@ -206,24 +233,14 @@ impl ZpiObject {
     pub fn create_payload_buffer(&self) -> Vec<u8> {
         let mut buffalo = BuffaloZnp::new(vec![0; 250], 0);
 
-        for (index, parameter) in self.parameters.iter().enumerate() {
+        for parameter in &self.parameters {
             let value = self
                 .payload
                 .get(&parameter.name)
                 .cloned()
                 .unwrap_or(Value::Null);
-            let mut options = Map::new();
-            if is_buffer_and_list_type(parameter.parameter_type) && index > 0 {
-                let length_parameter = &self.parameters[index - 1];
-                if let Some(length) = self
-                    .payload
-                    .get(&length_parameter.name)
-                    .and_then(Value::as_u64)
-                {
-                    options.insert("length".to_string(), json!(length));
-                }
-            }
-            buffalo.write(parameter.parameter_type, &value, &Value::Object(options));
+            // Upstream `createRequest` passes `{}` to every `buffalo.write`.
+            buffalo.write(parameter.parameter_type, &value, &Value::Object(Map::new()));
         }
 
         buffalo.get_written()

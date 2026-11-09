@@ -118,8 +118,8 @@ Fixtures are committed. `.upstream/` is ignored and must never be a build-time
 dependency of `cargo test`. Node is required only to regenerate fixtures or run
 the live oracle; the Rust gate replays the committed JSON.
 
-Initial modules: `frame`, `buffalo`, `zcl` (see
-`crates/zigbee-apiarist/tests/differential_*.rs`).
+Initial modules: `frame`, `buffalo`, `buffalo_znp`, `zpi_object`, `zcl`,
+`constants`, `definition` (see `crates/zigbee-apiarist/tests/differential_*.rs`).
 
 Regenerate:
 

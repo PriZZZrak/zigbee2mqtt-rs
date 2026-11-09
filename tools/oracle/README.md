@@ -31,8 +31,16 @@ Writes:
 ```
 crates/zigbee-apiarist/tests/fixtures/frame.json
 crates/zigbee-apiarist/tests/fixtures/buffalo.json
+crates/zigbee-apiarist/tests/fixtures/buffalo_znp.json
+crates/zigbee-apiarist/tests/fixtures/zpi_object.json
 crates/zigbee-apiarist/tests/fixtures/zcl.json
+crates/zigbee-apiarist/tests/fixtures/constants.json
+crates/zigbee-apiarist/tests/fixtures/definition.json
 ```
+
+The ZNP command catalog and constants modules are generated directly into
+`src/` by `gen-definition.mjs` / `gen-constants-rust.mjs` (also invoked by
+`npm run generate`).
 
 ## Run the live oracle
 

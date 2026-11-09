@@ -1,0 +1,53 @@
+[
+  {
+    "id": "create-version",
+    "op": "create_request",
+    "subsystem": "SYS",
+    "command": "version",
+    "payload": {},
+    "expected": "fe00210223"
+  },
+  {
+    "id": "create-osal-nv-read",
+    "op": "create_request",
+    "subsystem": "SYS",
+    "command": "osalNvRead",
+    "payload": {
+      "id": 1,
+      "offset": 2
+    },
+    "expected": "fe03210801000229"
+  },
+  {
+    "id": "from-version",
+    "op": "from_frame",
+    "frameType": "SRSP",
+    "subsystem": "SYS",
+    "commandId": 2,
+    "data": "010203040501010101",
+    "expected": {
+      "transportrev": 1,
+      "product": 2,
+      "majorrel": 3,
+      "minorrel": 4,
+      "maintrel": 5,
+      "revision": 16843009
+    }
+  },
+  {
+    "id": "from-osal-nv-read",
+    "op": "from_frame",
+    "frameType": "SRSP",
+    "subsystem": "SYS",
+    "commandId": 8,
+    "data": "00020102",
+    "expected": {
+      "status": 0,
+      "len": 2,
+      "value": [
+        1,
+        2
+      ]
+    }
+  }
+]

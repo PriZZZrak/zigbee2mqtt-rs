@@ -7,9 +7,12 @@
 import {createInterface} from "node:readline";
 import {handle as frame} from "./packages/frame.mjs";
 import {handle as buffalo} from "./packages/buffalo.mjs";
+import {handle as buffalo_znp} from "./packages/buffalo_znp.mjs";
+import {handle as constants} from "./packages/constants.mjs";
 import {handle as zcl} from "./packages/zcl.mjs";
+import {handle as zpi_object} from "./packages/zpi_object.mjs";
 
-const HANDLERS = {frame, buffalo, zcl};
+const HANDLERS = {frame, buffalo, buffalo_znp, zcl, zpi_object, constants};
 
 const rl = createInterface({input: process.stdin, crlfDelay: Infinity});
 for await (const line of rl) {

@@ -1,0 +1,1596 @@
+[
+  {
+    "id": "status-0",
+    "op": "status_description",
+    "code": 0,
+    "expected": "(0x00: SUCCESS)"
+  },
+  {
+    "id": "status-1",
+    "op": "status_description",
+    "code": 1,
+    "expected": "(0x01: FAILURE)"
+  },
+  {
+    "id": "status-2",
+    "op": "status_description",
+    "code": 2,
+    "expected": "(0x02: INVALID_PARAM)"
+  },
+  {
+    "id": "status-3",
+    "op": "status_description",
+    "code": 3,
+    "expected": "(0x03: UNKNOWN)"
+  },
+  {
+    "id": "status-4",
+    "op": "status_description",
+    "code": 4,
+    "expected": "(0x04: UNKNOWN)"
+  },
+  {
+    "id": "status-5",
+    "op": "status_description",
+    "code": 5,
+    "expected": "(0x05: UNKNOWN)"
+  },
+  {
+    "id": "status-6",
+    "op": "status_description",
+    "code": 6,
+    "expected": "(0x06: UNKNOWN)"
+  },
+  {
+    "id": "status-7",
+    "op": "status_description",
+    "code": 7,
+    "expected": "(0x07: UNKNOWN)"
+  },
+  {
+    "id": "status-8",
+    "op": "status_description",
+    "code": 8,
+    "expected": "(0x08: UNKNOWN)"
+  },
+  {
+    "id": "status-9",
+    "op": "status_description",
+    "code": 9,
+    "expected": "(0x09: NV_ITEM_INITIALIZED)"
+  },
+  {
+    "id": "status-10",
+    "op": "status_description",
+    "code": 10,
+    "expected": "(0x0a: NV_OPER_FAILED)"
+  },
+  {
+    "id": "status-11",
+    "op": "status_description",
+    "code": 11,
+    "expected": "(0x0b: UNKNOWN)"
+  },
+  {
+    "id": "status-12",
+    "op": "status_description",
+    "code": 12,
+    "expected": "(0x0c: NV_BAD_ITEM_LEN)"
+  },
+  {
+    "id": "status-13",
+    "op": "status_description",
+    "code": 13,
+    "expected": "(0x0d: UNKNOWN)"
+  },
+  {
+    "id": "status-14",
+    "op": "status_description",
+    "code": 14,
+    "expected": "(0x0e: UNKNOWN)"
+  },
+  {
+    "id": "status-15",
+    "op": "status_description",
+    "code": 15,
+    "expected": "(0x0f: UNKNOWN)"
+  },
+  {
+    "id": "status-16",
+    "op": "status_description",
+    "code": 16,
+    "expected": "(0x10: MEM_ERROR)"
+  },
+  {
+    "id": "status-17",
+    "op": "status_description",
+    "code": 17,
+    "expected": "(0x11: BUFFER_FULL)"
+  },
+  {
+    "id": "status-18",
+    "op": "status_description",
+    "code": 18,
+    "expected": "(0x12: UNSUPPORTED_MODE)"
+  },
+  {
+    "id": "status-19",
+    "op": "status_description",
+    "code": 19,
+    "expected": "(0x13: MAC_MEM_ERROR)"
+  },
+  {
+    "id": "status-20",
+    "op": "status_description",
+    "code": 20,
+    "expected": "(0x14: UNKNOWN)"
+  },
+  {
+    "id": "status-21",
+    "op": "status_description",
+    "code": 21,
+    "expected": "(0x15: UNKNOWN)"
+  },
+  {
+    "id": "status-22",
+    "op": "status_description",
+    "code": 22,
+    "expected": "(0x16: UNKNOWN)"
+  },
+  {
+    "id": "status-23",
+    "op": "status_description",
+    "code": 23,
+    "expected": "(0x17: UNKNOWN)"
+  },
+  {
+    "id": "status-24",
+    "op": "status_description",
+    "code": 24,
+    "expected": "(0x18: MAC_UNSUPPORTED_NOT_SPOORT)"
+  },
+  {
+    "id": "status-25",
+    "op": "status_description",
+    "code": 25,
+    "expected": "(0x19: MAC_BAD_STATE)"
+  },
+  {
+    "id": "status-26",
+    "op": "status_description",
+    "code": 26,
+    "expected": "(0x1a: MAC_NO_RESOURCES)"
+  },
+  {
+    "id": "status-27",
+    "op": "status_description",
+    "code": 27,
+    "expected": "(0x1b: MAC_ACK_PENDING)"
+  },
+  {
+    "id": "status-28",
+    "op": "status_description",
+    "code": 28,
+    "expected": "(0x1c: MAC_NO_TIME)"
+  },
+  {
+    "id": "status-29",
+    "op": "status_description",
+    "code": 29,
+    "expected": "(0x1d: MAC_TX_ABORTED)"
+  },
+  {
+    "id": "status-30",
+    "op": "status_description",
+    "code": 30,
+    "expected": "(0x1e: UNKNOWN)"
+  },
+  {
+    "id": "status-31",
+    "op": "status_description",
+    "code": 31,
+    "expected": "(0x1f: UNKNOWN)"
+  },
+  {
+    "id": "status-32",
+    "op": "status_description",
+    "code": 32,
+    "expected": "(0x20: SAPI_IN_PROGRESS)"
+  },
+  {
+    "id": "status-33",
+    "op": "status_description",
+    "code": 33,
+    "expected": "(0x21: SAPI_TIMEOUT)"
+  },
+  {
+    "id": "status-34",
+    "op": "status_description",
+    "code": 34,
+    "expected": "(0x22: SAPI_INIT)"
+  },
+  {
+    "id": "status-35",
+    "op": "status_description",
+    "code": 35,
+    "expected": "(0x23: UNKNOWN)"
+  },
+  {
+    "id": "status-36",
+    "op": "status_description",
+    "code": 36,
+    "expected": "(0x24: UNKNOWN)"
+  },
+  {
+    "id": "status-37",
+    "op": "status_description",
+    "code": 37,
+    "expected": "(0x25: UNKNOWN)"
+  },
+  {
+    "id": "status-38",
+    "op": "status_description",
+    "code": 38,
+    "expected": "(0x26: UNKNOWN)"
+  },
+  {
+    "id": "status-39",
+    "op": "status_description",
+    "code": 39,
+    "expected": "(0x27: UNKNOWN)"
+  },
+  {
+    "id": "status-40",
+    "op": "status_description",
+    "code": 40,
+    "expected": "(0x28: UNKNOWN)"
+  },
+  {
+    "id": "status-41",
+    "op": "status_description",
+    "code": 41,
+    "expected": "(0x29: UNKNOWN)"
+  },
+  {
+    "id": "status-42",
+    "op": "status_description",
+    "code": 42,
+    "expected": "(0x2a: UNKNOWN)"
+  },
+  {
+    "id": "status-43",
+    "op": "status_description",
+    "code": 43,
+    "expected": "(0x2b: UNKNOWN)"
+  },
+  {
+    "id": "status-44",
+    "op": "status_description",
+    "code": 44,
+    "expected": "(0x2c: UNKNOWN)"
+  },
+  {
+    "id": "status-45",
+    "op": "status_description",
+    "code": 45,
+    "expected": "(0x2d: UNKNOWN)"
+  },
+  {
+    "id": "status-46",
+    "op": "status_description",
+    "code": 46,
+    "expected": "(0x2e: UNKNOWN)"
+  },
+  {
+    "id": "status-47",
+    "op": "status_description",
+    "code": 47,
+    "expected": "(0x2f: UNKNOWN)"
+  },
+  {
+    "id": "status-48",
+    "op": "status_description",
+    "code": 48,
+    "expected": "(0x30: UNKNOWN)"
+  },
+  {
+    "id": "status-49",
+    "op": "status_description",
+    "code": 49,
+    "expected": "(0x31: UNKNOWN)"
+  },
+  {
+    "id": "status-50",
+    "op": "status_description",
+    "code": 50,
+    "expected": "(0x32: UNKNOWN)"
+  },
+  {
+    "id": "status-51",
+    "op": "status_description",
+    "code": 51,
+    "expected": "(0x33: UNKNOWN)"
+  },
+  {
+    "id": "status-52",
+    "op": "status_description",
+    "code": 52,
+    "expected": "(0x34: UNKNOWN)"
+  },
+  {
+    "id": "status-53",
+    "op": "status_description",
+    "code": 53,
+    "expected": "(0x35: UNKNOWN)"
+  },
+  {
+    "id": "status-54",
+    "op": "status_description",
+    "code": 54,
+    "expected": "(0x36: UNKNOWN)"
+  },
+  {
+    "id": "status-55",
+    "op": "status_description",
+    "code": 55,
+    "expected": "(0x37: UNKNOWN)"
+  },
+  {
+    "id": "status-56",
+    "op": "status_description",
+    "code": 56,
+    "expected": "(0x38: UNKNOWN)"
+  },
+  {
+    "id": "status-57",
+    "op": "status_description",
+    "code": 57,
+    "expected": "(0x39: UNKNOWN)"
+  },
+  {
+    "id": "status-58",
+    "op": "status_description",
+    "code": 58,
+    "expected": "(0x3a: UNKNOWN)"
+  },
+  {
+    "id": "status-59",
+    "op": "status_description",
+    "code": 59,
+    "expected": "(0x3b: UNKNOWN)"
+  },
+  {
+    "id": "status-60",
+    "op": "status_description",
+    "code": 60,
+    "expected": "(0x3c: UNKNOWN)"
+  },
+  {
+    "id": "status-61",
+    "op": "status_description",
+    "code": 61,
+    "expected": "(0x3d: UNKNOWN)"
+  },
+  {
+    "id": "status-62",
+    "op": "status_description",
+    "code": 62,
+    "expected": "(0x3e: UNKNOWN)"
+  },
+  {
+    "id": "status-63",
+    "op": "status_description",
+    "code": 63,
+    "expected": "(0x3f: UNKNOWN)"
+  },
+  {
+    "id": "status-64",
+    "op": "status_description",
+    "code": 64,
+    "expected": "(0x40: UNKNOWN)"
+  },
+  {
+    "id": "status-65",
+    "op": "status_description",
+    "code": 65,
+    "expected": "(0x41: UNKNOWN)"
+  },
+  {
+    "id": "status-66",
+    "op": "status_description",
+    "code": 66,
+    "expected": "(0x42: UNKNOWN)"
+  },
+  {
+    "id": "status-67",
+    "op": "status_description",
+    "code": 67,
+    "expected": "(0x43: UNKNOWN)"
+  },
+  {
+    "id": "status-68",
+    "op": "status_description",
+    "code": 68,
+    "expected": "(0x44: UNKNOWN)"
+  },
+  {
+    "id": "status-69",
+    "op": "status_description",
+    "code": 69,
+    "expected": "(0x45: UNKNOWN)"
+  },
+  {
+    "id": "status-70",
+    "op": "status_description",
+    "code": 70,
+    "expected": "(0x46: UNKNOWN)"
+  },
+  {
+    "id": "status-71",
+    "op": "status_description",
+    "code": 71,
+    "expected": "(0x47: UNKNOWN)"
+  },
+  {
+    "id": "status-72",
+    "op": "status_description",
+    "code": 72,
+    "expected": "(0x48: UNKNOWN)"
+  },
+  {
+    "id": "status-73",
+    "op": "status_description",
+    "code": 73,
+    "expected": "(0x49: UNKNOWN)"
+  },
+  {
+    "id": "status-74",
+    "op": "status_description",
+    "code": 74,
+    "expected": "(0x4a: UNKNOWN)"
+  },
+  {
+    "id": "status-75",
+    "op": "status_description",
+    "code": 75,
+    "expected": "(0x4b: UNKNOWN)"
+  },
+  {
+    "id": "status-76",
+    "op": "status_description",
+    "code": 76,
+    "expected": "(0x4c: UNKNOWN)"
+  },
+  {
+    "id": "status-77",
+    "op": "status_description",
+    "code": 77,
+    "expected": "(0x4d: UNKNOWN)"
+  },
+  {
+    "id": "status-78",
+    "op": "status_description",
+    "code": 78,
+    "expected": "(0x4e: UNKNOWN)"
+  },
+  {
+    "id": "status-79",
+    "op": "status_description",
+    "code": 79,
+    "expected": "(0x4f: UNKNOWN)"
+  },
+  {
+    "id": "status-80",
+    "op": "status_description",
+    "code": 80,
+    "expected": "(0x50: UNKNOWN)"
+  },
+  {
+    "id": "status-81",
+    "op": "status_description",
+    "code": 81,
+    "expected": "(0x51: UNKNOWN)"
+  },
+  {
+    "id": "status-82",
+    "op": "status_description",
+    "code": 82,
+    "expected": "(0x52: UNKNOWN)"
+  },
+  {
+    "id": "status-83",
+    "op": "status_description",
+    "code": 83,
+    "expected": "(0x53: UNKNOWN)"
+  },
+  {
+    "id": "status-84",
+    "op": "status_description",
+    "code": 84,
+    "expected": "(0x54: UNKNOWN)"
+  },
+  {
+    "id": "status-85",
+    "op": "status_description",
+    "code": 85,
+    "expected": "(0x55: UNKNOWN)"
+  },
+  {
+    "id": "status-86",
+    "op": "status_description",
+    "code": 86,
+    "expected": "(0x56: UNKNOWN)"
+  },
+  {
+    "id": "status-87",
+    "op": "status_description",
+    "code": 87,
+    "expected": "(0x57: UNKNOWN)"
+  },
+  {
+    "id": "status-88",
+    "op": "status_description",
+    "code": 88,
+    "expected": "(0x58: UNKNOWN)"
+  },
+  {
+    "id": "status-89",
+    "op": "status_description",
+    "code": 89,
+    "expected": "(0x59: UNKNOWN)"
+  },
+  {
+    "id": "status-90",
+    "op": "status_description",
+    "code": 90,
+    "expected": "(0x5a: UNKNOWN)"
+  },
+  {
+    "id": "status-91",
+    "op": "status_description",
+    "code": 91,
+    "expected": "(0x5b: UNKNOWN)"
+  },
+  {
+    "id": "status-92",
+    "op": "status_description",
+    "code": 92,
+    "expected": "(0x5c: UNKNOWN)"
+  },
+  {
+    "id": "status-93",
+    "op": "status_description",
+    "code": 93,
+    "expected": "(0x5d: UNKNOWN)"
+  },
+  {
+    "id": "status-94",
+    "op": "status_description",
+    "code": 94,
+    "expected": "(0x5e: UNKNOWN)"
+  },
+  {
+    "id": "status-95",
+    "op": "status_description",
+    "code": 95,
+    "expected": "(0x5f: UNKNOWN)"
+  },
+  {
+    "id": "status-96",
+    "op": "status_description",
+    "code": 96,
+    "expected": "(0x60: UNKNOWN)"
+  },
+  {
+    "id": "status-97",
+    "op": "status_description",
+    "code": 97,
+    "expected": "(0x61: UNKNOWN)"
+  },
+  {
+    "id": "status-98",
+    "op": "status_description",
+    "code": 98,
+    "expected": "(0x62: UNKNOWN)"
+  },
+  {
+    "id": "status-99",
+    "op": "status_description",
+    "code": 99,
+    "expected": "(0x63: UNKNOWN)"
+  },
+  {
+    "id": "status-100",
+    "op": "status_description",
+    "code": 100,
+    "expected": "(0x64: UNKNOWN)"
+  },
+  {
+    "id": "status-101",
+    "op": "status_description",
+    "code": 101,
+    "expected": "(0x65: UNKNOWN)"
+  },
+  {
+    "id": "status-102",
+    "op": "status_description",
+    "code": 102,
+    "expected": "(0x66: UNKNOWN)"
+  },
+  {
+    "id": "status-103",
+    "op": "status_description",
+    "code": 103,
+    "expected": "(0x67: UNKNOWN)"
+  },
+  {
+    "id": "status-104",
+    "op": "status_description",
+    "code": 104,
+    "expected": "(0x68: UNKNOWN)"
+  },
+  {
+    "id": "status-105",
+    "op": "status_description",
+    "code": 105,
+    "expected": "(0x69: UNKNOWN)"
+  },
+  {
+    "id": "status-106",
+    "op": "status_description",
+    "code": 106,
+    "expected": "(0x6a: UNKNOWN)"
+  },
+  {
+    "id": "status-107",
+    "op": "status_description",
+    "code": 107,
+    "expected": "(0x6b: UNKNOWN)"
+  },
+  {
+    "id": "status-108",
+    "op": "status_description",
+    "code": 108,
+    "expected": "(0x6c: UNKNOWN)"
+  },
+  {
+    "id": "status-109",
+    "op": "status_description",
+    "code": 109,
+    "expected": "(0x6d: UNKNOWN)"
+  },
+  {
+    "id": "status-110",
+    "op": "status_description",
+    "code": 110,
+    "expected": "(0x6e: UNKNOWN)"
+  },
+  {
+    "id": "status-111",
+    "op": "status_description",
+    "code": 111,
+    "expected": "(0x6f: UNKNOWN)"
+  },
+  {
+    "id": "status-112",
+    "op": "status_description",
+    "code": 112,
+    "expected": "(0x70: UNKNOWN)"
+  },
+  {
+    "id": "status-113",
+    "op": "status_description",
+    "code": 113,
+    "expected": "(0x71: UNKNOWN)"
+  },
+  {
+    "id": "status-114",
+    "op": "status_description",
+    "code": 114,
+    "expected": "(0x72: UNKNOWN)"
+  },
+  {
+    "id": "status-115",
+    "op": "status_description",
+    "code": 115,
+    "expected": "(0x73: UNKNOWN)"
+  },
+  {
+    "id": "status-116",
+    "op": "status_description",
+    "code": 116,
+    "expected": "(0x74: UNKNOWN)"
+  },
+  {
+    "id": "status-117",
+    "op": "status_description",
+    "code": 117,
+    "expected": "(0x75: UNKNOWN)"
+  },
+  {
+    "id": "status-118",
+    "op": "status_description",
+    "code": 118,
+    "expected": "(0x76: UNKNOWN)"
+  },
+  {
+    "id": "status-119",
+    "op": "status_description",
+    "code": 119,
+    "expected": "(0x77: UNKNOWN)"
+  },
+  {
+    "id": "status-120",
+    "op": "status_description",
+    "code": 120,
+    "expected": "(0x78: UNKNOWN)"
+  },
+  {
+    "id": "status-121",
+    "op": "status_description",
+    "code": 121,
+    "expected": "(0x79: UNKNOWN)"
+  },
+  {
+    "id": "status-122",
+    "op": "status_description",
+    "code": 122,
+    "expected": "(0x7a: UNKNOWN)"
+  },
+  {
+    "id": "status-123",
+    "op": "status_description",
+    "code": 123,
+    "expected": "(0x7b: UNKNOWN)"
+  },
+  {
+    "id": "status-124",
+    "op": "status_description",
+    "code": 124,
+    "expected": "(0x7c: UNKNOWN)"
+  },
+  {
+    "id": "status-125",
+    "op": "status_description",
+    "code": 125,
+    "expected": "(0x7d: UNKNOWN)"
+  },
+  {
+    "id": "status-126",
+    "op": "status_description",
+    "code": 126,
+    "expected": "(0x7e: NOT_AUTHORIZED)"
+  },
+  {
+    "id": "status-127",
+    "op": "status_description",
+    "code": 127,
+    "expected": "(0x7f: UNKNOWN)"
+  },
+  {
+    "id": "status-128",
+    "op": "status_description",
+    "code": 128,
+    "expected": "(0x80: MALFORMED_CMD)"
+  },
+  {
+    "id": "status-129",
+    "op": "status_description",
+    "code": 129,
+    "expected": "(0x81: UNSUP_CLUSTER_CMD)"
+  },
+  {
+    "id": "status-130",
+    "op": "status_description",
+    "code": 130,
+    "expected": "(0x82: UNKNOWN)"
+  },
+  {
+    "id": "status-131",
+    "op": "status_description",
+    "code": 131,
+    "expected": "(0x83: UNKNOWN)"
+  },
+  {
+    "id": "status-132",
+    "op": "status_description",
+    "code": 132,
+    "expected": "(0x84: UNKNOWN)"
+  },
+  {
+    "id": "status-133",
+    "op": "status_description",
+    "code": 133,
+    "expected": "(0x85: UNKNOWN)"
+  },
+  {
+    "id": "status-134",
+    "op": "status_description",
+    "code": 134,
+    "expected": "(0x86: UNKNOWN)"
+  },
+  {
+    "id": "status-135",
+    "op": "status_description",
+    "code": 135,
+    "expected": "(0x87: UNKNOWN)"
+  },
+  {
+    "id": "status-136",
+    "op": "status_description",
+    "code": 136,
+    "expected": "(0x88: UNKNOWN)"
+  },
+  {
+    "id": "status-137",
+    "op": "status_description",
+    "code": 137,
+    "expected": "(0x89: UNKNOWN)"
+  },
+  {
+    "id": "status-138",
+    "op": "status_description",
+    "code": 138,
+    "expected": "(0x8a: UNKNOWN)"
+  },
+  {
+    "id": "status-139",
+    "op": "status_description",
+    "code": 139,
+    "expected": "(0x8b: UNKNOWN)"
+  },
+  {
+    "id": "status-140",
+    "op": "status_description",
+    "code": 140,
+    "expected": "(0x8c: UNKNOWN)"
+  },
+  {
+    "id": "status-141",
+    "op": "status_description",
+    "code": 141,
+    "expected": "(0x8d: UNKNOWN)"
+  },
+  {
+    "id": "status-142",
+    "op": "status_description",
+    "code": 142,
+    "expected": "(0x8e: UNKNOWN)"
+  },
+  {
+    "id": "status-143",
+    "op": "status_description",
+    "code": 143,
+    "expected": "(0x8f: UNKNOWN)"
+  },
+  {
+    "id": "status-144",
+    "op": "status_description",
+    "code": 144,
+    "expected": "(0x90: UNKNOWN)"
+  },
+  {
+    "id": "status-145",
+    "op": "status_description",
+    "code": 145,
+    "expected": "(0x91: UNKNOWN)"
+  },
+  {
+    "id": "status-146",
+    "op": "status_description",
+    "code": 146,
+    "expected": "(0x92: UNKNOWN)"
+  },
+  {
+    "id": "status-147",
+    "op": "status_description",
+    "code": 147,
+    "expected": "(0x93: UNKNOWN)"
+  },
+  {
+    "id": "status-148",
+    "op": "status_description",
+    "code": 148,
+    "expected": "(0x94: UNKNOWN)"
+  },
+  {
+    "id": "status-149",
+    "op": "status_description",
+    "code": 149,
+    "expected": "(0x95: OTA_ABORT)"
+  },
+  {
+    "id": "status-150",
+    "op": "status_description",
+    "code": 150,
+    "expected": "(0x96: OTA_IMAGE_INVALID)"
+  },
+  {
+    "id": "status-151",
+    "op": "status_description",
+    "code": 151,
+    "expected": "(0x97: OTA_WAIT_FOR_DATA)"
+  },
+  {
+    "id": "status-152",
+    "op": "status_description",
+    "code": 152,
+    "expected": "(0x98: OTA_NO_IMAGE_AVAILABLE)"
+  },
+  {
+    "id": "status-153",
+    "op": "status_description",
+    "code": 153,
+    "expected": "(0x99: OTA_REQUIRE_MORE_IMAGE)"
+  },
+  {
+    "id": "status-154",
+    "op": "status_description",
+    "code": 154,
+    "expected": "(0x9a: UNKNOWN)"
+  },
+  {
+    "id": "status-155",
+    "op": "status_description",
+    "code": 155,
+    "expected": "(0x9b: UNKNOWN)"
+  },
+  {
+    "id": "status-156",
+    "op": "status_description",
+    "code": 156,
+    "expected": "(0x9c: UNKNOWN)"
+  },
+  {
+    "id": "status-157",
+    "op": "status_description",
+    "code": 157,
+    "expected": "(0x9d: UNKNOWN)"
+  },
+  {
+    "id": "status-158",
+    "op": "status_description",
+    "code": 158,
+    "expected": "(0x9e: UNKNOWN)"
+  },
+  {
+    "id": "status-159",
+    "op": "status_description",
+    "code": 159,
+    "expected": "(0x9f: UNKNOWN)"
+  },
+  {
+    "id": "status-160",
+    "op": "status_description",
+    "code": 160,
+    "expected": "(0xa0: UNKNOWN)"
+  },
+  {
+    "id": "status-161",
+    "op": "status_description",
+    "code": 161,
+    "expected": "(0xa1: SEC_NO_KEY)"
+  },
+  {
+    "id": "status-162",
+    "op": "status_description",
+    "code": 162,
+    "expected": "(0xa2: SEC_OLD_FRM_COUNT)"
+  },
+  {
+    "id": "status-163",
+    "op": "status_description",
+    "code": 163,
+    "expected": "(0xa3: SEC_MAX_FRM_COUNT)"
+  },
+  {
+    "id": "status-164",
+    "op": "status_description",
+    "code": 164,
+    "expected": "(0xa4: SEC_CCM_FAIL)"
+  },
+  {
+    "id": "status-165",
+    "op": "status_description",
+    "code": 165,
+    "expected": "(0xa5: UNKNOWN)"
+  },
+  {
+    "id": "status-166",
+    "op": "status_description",
+    "code": 166,
+    "expected": "(0xa6: UNKNOWN)"
+  },
+  {
+    "id": "status-167",
+    "op": "status_description",
+    "code": 167,
+    "expected": "(0xa7: UNKNOWN)"
+  },
+  {
+    "id": "status-168",
+    "op": "status_description",
+    "code": 168,
+    "expected": "(0xa8: UNKNOWN)"
+  },
+  {
+    "id": "status-169",
+    "op": "status_description",
+    "code": 169,
+    "expected": "(0xa9: UNKNOWN)"
+  },
+  {
+    "id": "status-170",
+    "op": "status_description",
+    "code": 170,
+    "expected": "(0xaa: UNKNOWN)"
+  },
+  {
+    "id": "status-171",
+    "op": "status_description",
+    "code": 171,
+    "expected": "(0xab: UNKNOWN)"
+  },
+  {
+    "id": "status-172",
+    "op": "status_description",
+    "code": 172,
+    "expected": "(0xac: UNKNOWN)"
+  },
+  {
+    "id": "status-173",
+    "op": "status_description",
+    "code": 173,
+    "expected": "(0xad: UNKNOWN)"
+  },
+  {
+    "id": "status-174",
+    "op": "status_description",
+    "code": 174,
+    "expected": "(0xae: UNKNOWN)"
+  },
+  {
+    "id": "status-175",
+    "op": "status_description",
+    "code": 175,
+    "expected": "(0xaf: UNKNOWN)"
+  },
+  {
+    "id": "status-176",
+    "op": "status_description",
+    "code": 176,
+    "expected": "(0xb0: UNKNOWN)"
+  },
+  {
+    "id": "status-177",
+    "op": "status_description",
+    "code": 177,
+    "expected": "(0xb1: APS_FAIL)"
+  },
+  {
+    "id": "status-178",
+    "op": "status_description",
+    "code": 178,
+    "expected": "(0xb2: APS_TABLE_FULL)"
+  },
+  {
+    "id": "status-179",
+    "op": "status_description",
+    "code": 179,
+    "expected": "(0xb3: APS_ILLEGAL_REQUEST)"
+  },
+  {
+    "id": "status-180",
+    "op": "status_description",
+    "code": 180,
+    "expected": "(0xb4: APS_INVALID_BINDING)"
+  },
+  {
+    "id": "status-181",
+    "op": "status_description",
+    "code": 181,
+    "expected": "(0xb5: APS_UNSUPPORTED_ATTRIB)"
+  },
+  {
+    "id": "status-182",
+    "op": "status_description",
+    "code": 182,
+    "expected": "(0xb6: APS_NOT_SUPPORTED)"
+  },
+  {
+    "id": "status-183",
+    "op": "status_description",
+    "code": 183,
+    "expected": "(0xb7: APS_NO_ACK)"
+  },
+  {
+    "id": "status-184",
+    "op": "status_description",
+    "code": 184,
+    "expected": "(0xb8: APS_DUPLICATE_ENTRY)"
+  },
+  {
+    "id": "status-185",
+    "op": "status_description",
+    "code": 185,
+    "expected": "(0xb9: APS_NO_BOUND_DEVICE)"
+  },
+  {
+    "id": "status-186",
+    "op": "status_description",
+    "code": 186,
+    "expected": "(0xba: APS_NOT_ALLOWED)"
+  },
+  {
+    "id": "status-187",
+    "op": "status_description",
+    "code": 187,
+    "expected": "(0xbb: APS_NOT_AUTHENTICATED)"
+  },
+  {
+    "id": "status-188",
+    "op": "status_description",
+    "code": 188,
+    "expected": "(0xbc: UNKNOWN)"
+  },
+  {
+    "id": "status-189",
+    "op": "status_description",
+    "code": 189,
+    "expected": "(0xbd: UNKNOWN)"
+  },
+  {
+    "id": "status-190",
+    "op": "status_description",
+    "code": 190,
+    "expected": "(0xbe: UNKNOWN)"
+  },
+  {
+    "id": "status-191",
+    "op": "status_description",
+    "code": 191,
+    "expected": "(0xbf: UNKNOWN)"
+  },
+  {
+    "id": "status-192",
+    "op": "status_description",
+    "code": 192,
+    "expected": "(0xc0: UNKNOWN)"
+  },
+  {
+    "id": "status-193",
+    "op": "status_description",
+    "code": 193,
+    "expected": "(0xc1: NWK_INVALID_PARAM)"
+  },
+  {
+    "id": "status-194",
+    "op": "status_description",
+    "code": 194,
+    "expected": "(0xc2: NWK_INVALID_REQUEST)"
+  },
+  {
+    "id": "status-195",
+    "op": "status_description",
+    "code": 195,
+    "expected": "(0xc3: NWK_NOT_PERMITTED)"
+  },
+  {
+    "id": "status-196",
+    "op": "status_description",
+    "code": 196,
+    "expected": "(0xc4: NWK_STARTUP_FAILURE)"
+  },
+  {
+    "id": "status-197",
+    "op": "status_description",
+    "code": 197,
+    "expected": "(0xc5: NWK_ALREADY_PRESENT)"
+  },
+  {
+    "id": "status-198",
+    "op": "status_description",
+    "code": 198,
+    "expected": "(0xc6: NWK_SYNC_FAILURE)"
+  },
+  {
+    "id": "status-199",
+    "op": "status_description",
+    "code": 199,
+    "expected": "(0xc7: NWK_TABLE_FULL)"
+  },
+  {
+    "id": "status-200",
+    "op": "status_description",
+    "code": 200,
+    "expected": "(0xc8: NWK_UNKNOWN_DEVICE)"
+  },
+  {
+    "id": "status-201",
+    "op": "status_description",
+    "code": 201,
+    "expected": "(0xc9: NWK_UNSUPPORTED_ATTRIBUTE)"
+  },
+  {
+    "id": "status-202",
+    "op": "status_description",
+    "code": 202,
+    "expected": "(0xca: NWK_NO_NETWORKS)"
+  },
+  {
+    "id": "status-203",
+    "op": "status_description",
+    "code": 203,
+    "expected": "(0xcb: NWK_LEAVE_UNCONFIRMED)"
+  },
+  {
+    "id": "status-204",
+    "op": "status_description",
+    "code": 204,
+    "expected": "(0xcc: NWK_NO_ACK)"
+  },
+  {
+    "id": "status-205",
+    "op": "status_description",
+    "code": 205,
+    "expected": "(0xcd: NWK_NO_ROUTE)"
+  },
+  {
+    "id": "status-206",
+    "op": "status_description",
+    "code": 206,
+    "expected": "(0xce: UNKNOWN)"
+  },
+  {
+    "id": "status-207",
+    "op": "status_description",
+    "code": 207,
+    "expected": "(0xcf: UNKNOWN)"
+  },
+  {
+    "id": "status-208",
+    "op": "status_description",
+    "code": 208,
+    "expected": "(0xd0: UNKNOWN)"
+  },
+  {
+    "id": "status-209",
+    "op": "status_description",
+    "code": 209,
+    "expected": "(0xd1: UNKNOWN)"
+  },
+  {
+    "id": "status-210",
+    "op": "status_description",
+    "code": 210,
+    "expected": "(0xd2: UNKNOWN)"
+  },
+  {
+    "id": "status-211",
+    "op": "status_description",
+    "code": 211,
+    "expected": "(0xd3: UNKNOWN)"
+  },
+  {
+    "id": "status-212",
+    "op": "status_description",
+    "code": 212,
+    "expected": "(0xd4: UNKNOWN)"
+  },
+  {
+    "id": "status-213",
+    "op": "status_description",
+    "code": 213,
+    "expected": "(0xd5: UNKNOWN)"
+  },
+  {
+    "id": "status-214",
+    "op": "status_description",
+    "code": 214,
+    "expected": "(0xd6: UNKNOWN)"
+  },
+  {
+    "id": "status-215",
+    "op": "status_description",
+    "code": 215,
+    "expected": "(0xd7: UNKNOWN)"
+  },
+  {
+    "id": "status-216",
+    "op": "status_description",
+    "code": 216,
+    "expected": "(0xd8: UNKNOWN)"
+  },
+  {
+    "id": "status-217",
+    "op": "status_description",
+    "code": 217,
+    "expected": "(0xd9: UNKNOWN)"
+  },
+  {
+    "id": "status-218",
+    "op": "status_description",
+    "code": 218,
+    "expected": "(0xda: UNKNOWN)"
+  },
+  {
+    "id": "status-219",
+    "op": "status_description",
+    "code": 219,
+    "expected": "(0xdb: UNKNOWN)"
+  },
+  {
+    "id": "status-220",
+    "op": "status_description",
+    "code": 220,
+    "expected": "(0xdc: UNKNOWN)"
+  },
+  {
+    "id": "status-221",
+    "op": "status_description",
+    "code": 221,
+    "expected": "(0xdd: UNKNOWN)"
+  },
+  {
+    "id": "status-222",
+    "op": "status_description",
+    "code": 222,
+    "expected": "(0xde: UNKNOWN)"
+  },
+  {
+    "id": "status-223",
+    "op": "status_description",
+    "code": 223,
+    "expected": "(0xdf: UNKNOWN)"
+  },
+  {
+    "id": "status-224",
+    "op": "status_description",
+    "code": 224,
+    "expected": "(0xe0: MAC_BEACON_LOSS)"
+  },
+  {
+    "id": "status-225",
+    "op": "status_description",
+    "code": 225,
+    "expected": "(0xe1: MAC_CHANNEL_ACCESS_FAILURE)"
+  },
+  {
+    "id": "status-226",
+    "op": "status_description",
+    "code": 226,
+    "expected": "(0xe2: MAC_DENIED)"
+  },
+  {
+    "id": "status-227",
+    "op": "status_description",
+    "code": 227,
+    "expected": "(0xe3: MAC_DISABLE_TRX_FAILURE)"
+  },
+  {
+    "id": "status-228",
+    "op": "status_description",
+    "code": 228,
+    "expected": "(0xe4: MAC_FAILED_SECURITY_CHECK)"
+  },
+  {
+    "id": "status-229",
+    "op": "status_description",
+    "code": 229,
+    "expected": "(0xe5: MAC_FRAME_TOO_LONG)"
+  },
+  {
+    "id": "status-230",
+    "op": "status_description",
+    "code": 230,
+    "expected": "(0xe6: MAC_INVALID_GTS)"
+  },
+  {
+    "id": "status-231",
+    "op": "status_description",
+    "code": 231,
+    "expected": "(0xe7: MAC_INVALID_HANDLE)"
+  },
+  {
+    "id": "status-232",
+    "op": "status_description",
+    "code": 232,
+    "expected": "(0xe8: MAC_INVALID_PARAMETER)"
+  },
+  {
+    "id": "status-233",
+    "op": "status_description",
+    "code": 233,
+    "expected": "(0xe9: MAC_NO_ACK)"
+  },
+  {
+    "id": "status-234",
+    "op": "status_description",
+    "code": 234,
+    "expected": "(0xea: MAC_NO_BEACON)"
+  },
+  {
+    "id": "status-235",
+    "op": "status_description",
+    "code": 235,
+    "expected": "(0xeb: MAC_NO_DATA)"
+  },
+  {
+    "id": "status-236",
+    "op": "status_description",
+    "code": 236,
+    "expected": "(0xec: MAC_NO_SHORT_ADDR)"
+  },
+  {
+    "id": "status-237",
+    "op": "status_description",
+    "code": 237,
+    "expected": "(0xed: MAC_OUT_OF_CAP)"
+  },
+  {
+    "id": "status-238",
+    "op": "status_description",
+    "code": 238,
+    "expected": "(0xee: MAC_PANID_CONFLICT)"
+  },
+  {
+    "id": "status-239",
+    "op": "status_description",
+    "code": 239,
+    "expected": "(0xef: MAC_REALIGNMENT)"
+  },
+  {
+    "id": "status-240",
+    "op": "status_description",
+    "code": 240,
+    "expected": "(0xf0: MAC_TRANSACTION_EXPIRED)"
+  },
+  {
+    "id": "status-241",
+    "op": "status_description",
+    "code": 241,
+    "expected": "(0xf1: MAC_TRANSACTION_OVERFLOW)"
+  },
+  {
+    "id": "status-242",
+    "op": "status_description",
+    "code": 242,
+    "expected": "(0xf2: MAC_TX_ACTIVE)"
+  },
+  {
+    "id": "status-243",
+    "op": "status_description",
+    "code": 243,
+    "expected": "(0xf3: MAC_UNAVAILABLE_KEY)"
+  },
+  {
+    "id": "status-244",
+    "op": "status_description",
+    "code": 244,
+    "expected": "(0xf4: MAC_UNSUPPORTED_ATTRIBUTE)"
+  },
+  {
+    "id": "status-245",
+    "op": "status_description",
+    "code": 245,
+    "expected": "(0xf5: MAC_UNSUPPORTED)"
+  },
+  {
+    "id": "status-246",
+    "op": "status_description",
+    "code": 246,
+    "expected": "(0xf6: MAC_ON_TIME_TOO_LING)"
+  },
+  {
+    "id": "status-247",
+    "op": "status_description",
+    "code": 247,
+    "expected": "(0xf7: MAC_PAST_TIME)"
+  },
+  {
+    "id": "status-248",
+    "op": "status_description",
+    "code": 248,
+    "expected": "(0xf8: MAC_TRACKING_OFF)"
+  },
+  {
+    "id": "status-249",
+    "op": "status_description",
+    "code": 249,
+    "expected": "(0xf9: UNKNOWN)"
+  },
+  {
+    "id": "status-250",
+    "op": "status_description",
+    "code": 250,
+    "expected": "(0xfa: UNKNOWN)"
+  },
+  {
+    "id": "status-251",
+    "op": "status_description",
+    "code": 251,
+    "expected": "(0xfb: UNKNOWN)"
+  },
+  {
+    "id": "status-252",
+    "op": "status_description",
+    "code": 252,
+    "expected": "(0xfc: MAC_SCAN_IN_PROGRESS)"
+  },
+  {
+    "id": "status-253",
+    "op": "status_description",
+    "code": 253,
+    "expected": "(0xfd: UNKNOWN)"
+  },
+  {
+    "id": "status-254",
+    "op": "status_description",
+    "code": 254,
+    "expected": "(0xfe: UNKNOWN)"
+  },
+  {
+    "id": "status-255",
+    "op": "status_description",
+    "code": 255,
+    "expected": "(0xff: MAC_SRC_MATCH_INVALID_INDEX)"
+  },
+  {
+    "id": "channel-mask-11",
+    "op": "channel_mask",
+    "channels": [
+      11
+    ],
+    "expected": [
+      0,
+      8,
+      0,
+      0
+    ]
+  },
+  {
+    "id": "channel-mask-15-20-25",
+    "op": "channel_mask",
+    "channels": [
+      15,
+      20,
+      25
+    ],
+    "expected": [
+      0,
+      128,
+      16,
+      2
+    ]
+  },
+  {
+    "id": "channel-mask-0-26",
+    "op": "channel_mask",
+    "channels": [
+      0,
+      26
+    ],
+    "expected": [
+      1,
+      0,
+      0,
+      4
+    ]
+  },
+  {
+    "id": "channel-mask-11-15-20-25",
+    "op": "channel_mask",
+    "channels": [
+      11,
+      15,
+      20,
+      25
+    ],
+    "expected": [
+      0,
+      136,
+      16,
+      2
+    ]
+  }
+]

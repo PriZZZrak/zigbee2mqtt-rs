@@ -1,0 +1,225 @@
+[
+  {
+    "id": "read-uint16",
+    "op": "read",
+    "type": "UINT16",
+    "buffer": "d204",
+    "expected": 1234,
+    "position": 2
+  },
+  {
+    "id": "read-int8",
+    "op": "read",
+    "type": "INT8",
+    "buffer": "ff",
+    "expected": -1,
+    "position": 1
+  },
+  {
+    "id": "read-ieeeaddr",
+    "op": "read",
+    "type": "IEEEADDR",
+    "buffer": "010000004b120000",
+    "expected": "0x0000124b00000001",
+    "position": 8
+  },
+  {
+    "id": "read-buffer",
+    "op": "read",
+    "type": "BUFFER",
+    "buffer": "01020304",
+    "options": {
+      "length": 3
+    },
+    "expected": [
+      1,
+      2,
+      3
+    ],
+    "position": 3
+  },
+  {
+    "id": "read-buffer8",
+    "op": "read",
+    "type": "BUFFER8",
+    "buffer": "0001020304050607",
+    "expected": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "position": 8
+  },
+  {
+    "id": "read-list-uint8",
+    "op": "read",
+    "type": "LIST_UINT8",
+    "buffer": "010203",
+    "options": {
+      "length": 3
+    },
+    "expected": [
+      1,
+      2,
+      3
+    ],
+    "position": 3
+  },
+  {
+    "id": "read-list-uint16",
+    "op": "read",
+    "type": "LIST_UINT16",
+    "buffer": "010002000300",
+    "options": {
+      "length": 3
+    },
+    "expected": [
+      1,
+      2,
+      3
+    ],
+    "position": 6
+  },
+  {
+    "id": "read-list-network",
+    "op": "read",
+    "type": "LIST_NETWORK",
+    "buffer": "34120f214301",
+    "options": {
+      "length": 1
+    },
+    "expected": [
+      {
+        "neightborPanId": 4660,
+        "logicalChannel": 15,
+        "stackProfile": 1,
+        "zigbeeVersion": 2,
+        "beaconOrder": 3,
+        "superFrameOrder": 4,
+        "permitJoin": 1
+      }
+    ],
+    "position": 6
+  },
+  {
+    "id": "read-buffer-missing-length",
+    "op": "read",
+    "type": "BUFFER",
+    "buffer": "0102",
+    "error": "Cannot read BUFFER without length option specified"
+  },
+  {
+    "id": "write-uint8",
+    "op": "write",
+    "type": "UINT8",
+    "value": 255,
+    "expected": "ff",
+    "position": 1
+  },
+  {
+    "id": "write-uint16",
+    "op": "write",
+    "type": "UINT16",
+    "value": 1234,
+    "expected": "d204",
+    "position": 2
+  },
+  {
+    "id": "write-ieeeaddr",
+    "op": "write",
+    "type": "IEEEADDR",
+    "value": "0x00124b0000000001",
+    "expected": "01000000004b1200",
+    "position": 8
+  },
+  {
+    "id": "write-buffer",
+    "op": "write",
+    "type": "BUFFER",
+    "value": [
+      1,
+      2,
+      3
+    ],
+    "options": {
+      "length": 3
+    },
+    "expected": "010203",
+    "position": 3
+  },
+  {
+    "id": "write-buffer-length-mismatch",
+    "op": "write",
+    "type": "BUFFER",
+    "value": [
+      1,
+      2,
+      3
+    ],
+    "options": {
+      "length": 2
+    },
+    "error": "Length of values: '1,2,3' is not consitent with expected length '2'"
+  },
+  {
+    "id": "write-buffer8",
+    "op": "write",
+    "type": "BUFFER8",
+    "value": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "expected": "0001020304050607",
+    "position": 8
+  },
+  {
+    "id": "write-list-uint8",
+    "op": "write",
+    "type": "LIST_UINT8",
+    "value": [
+      1,
+      2,
+      3
+    ],
+    "expected": "010203",
+    "position": 3
+  },
+  {
+    "id": "write-list-uint16",
+    "op": "write",
+    "type": "LIST_UINT16",
+    "value": [
+      1,
+      2,
+      3
+    ],
+    "expected": "010002000300",
+    "position": 6
+  },
+  {
+    "id": "write-int8",
+    "op": "write",
+    "type": "INT8",
+    "value": -1,
+    "expected": "ff",
+    "position": 1
+  },
+  {
+    "id": "write-list-network",
+    "op": "write",
+    "type": "LIST_NETWORK",
+    "value": [],
+    "error": "Write for '16' not available"
+  }
+]

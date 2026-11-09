@@ -313,39 +313,7 @@ impl Znp {
         command: &str,
         payload: Value,
     ) -> Result<ZpiObject, String> {
-        let Some(definition) = definition::find_by_name(subsystem, command) else {
-            return Err(format!(
-                "Command request '{command}' from subsystem '{}' not found",
-                subsystem.name()
-            ));
-        };
-        if definition::is_mt_cmd_areq_zdo(definition) || definition::is_mt_cmd_sreq_zdo(definition)
-        {
-            return Err(format!(
-                "Command request '{command}' from subsystem '{}' not found",
-                subsystem.name()
-            ));
-        }
-
-        let parameters = definition
-            .request
-            .iter()
-            .map(|parameter| ParameterDef {
-                name: parameter.name.to_string(),
-                parameter_type: parameter.parameter_type,
-            })
-            .collect::<Vec<_>>();
-
-        let mut object = ZpiObject::new(
-            definition.r#type,
-            subsystem,
-            definition.name,
-            0,
-            payload,
-            parameters,
-        );
-        object.command.id = u16::from(definition.id);
-        Ok(object)
+        Ok(ZpiObject::create_request(subsystem, command, payload))
     }
 
     async fn request_locked(

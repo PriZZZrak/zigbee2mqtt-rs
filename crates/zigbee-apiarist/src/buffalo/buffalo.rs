@@ -211,9 +211,22 @@ impl Buffalo {
         format!("0x{hex}")
     }
 
+    /// Upstream `writeBuffer(values, length)`.
     pub fn write_buffer(&mut self, values: &[u8], length: usize) {
-        let take = length.min(values.len());
-        self.write_slice(&values[..take]);
+        if values.len() != length {
+            let values_text = values
+                .iter()
+                .map(u8::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+            panic!(
+                "Length of values: '{values_text}' is not consitent with expected length '{length}'"
+            );
+        }
+        if values.is_empty() {
+            return;
+        }
+        self.write_slice(values);
     }
 
     pub fn read_buffer(&mut self, length: usize) -> Vec<u8> {
