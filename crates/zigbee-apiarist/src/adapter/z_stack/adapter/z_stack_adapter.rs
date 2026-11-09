@@ -670,7 +670,7 @@ impl ZStackAdapter {
 
 async fn dispatch_znp_object(
     object: &crate::adapter::z_stack::znp::zpi_object::ZpiObject,
-    waitress: &crate::utils::waitress::Waitress<ZclPayload, ClusterWaitressMatcher>,
+    waitress: &Arc<crate::utils::waitress::Waitress<ZclPayload, ClusterWaitressMatcher>>,
     events: &tokio::sync::broadcast::Sender<AdapterEvent>,
     znp: Option<&Arc<Mutex<Znp>>>,
     queue: Option<&Queue>,
@@ -798,9 +798,6 @@ async fn dispatch_znp_object(
         )
     {
         let data = bytes(object.payload.get("data"));
-        let Some(header) = crate::zspec::zcl::zcl_header::Header::from_buffer(&data) else {
-            return;
-        };
         let is_eui64 = object.payload.get("srcaddr").is_some_and(Value::is_string);
         let address = if object.command.name == "incomingMsgExt"
             && object.payload.get("srcaddrmode").and_then(Value::as_u64) != Some(0x03)
@@ -826,43 +823,197 @@ async fn dispatch_znp_object(
                 .cloned()
                 .unwrap_or(Value::Null)
         };
-        let payload = ZclPayload {
-            cluster_id: object
+        let cluster_id = object
+            .payload
+            .get("clusterid")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u16;
+        let endpoint = object
+            .payload
+            .get("srcendpoint")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u8;
+        let linkquality = object
+            .payload
+            .get("linkquality")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u8;
+        let group_id = object
+            .payload
+            .get("groupid")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u16;
+        let was_broadcast = object.payload.get("wasbroadcast").and_then(Value::as_u64) == Some(1);
+        let destination_endpoint = object
+            .payload
+            .get("dstendpoint")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u8;
+        let length = object
+            .payload
+            .get("len")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as usize;
+
+        // The ZNP sends `incomingMsgExt` when the data length is > about 223
+        // bytes (or if INTER_PAN is used). In the first case the data is not
+        // included in the payload and has to be retrieved block by block with
+        // `AF_DATA_RETRIEVE`.
+        if object.command.name == "incomingMsgExt" && data.len() < length {
+            let (Some(znp), Some(queue)) = (znp, queue) else {
+                return;
+            };
+            let znp = znp.clone();
+            let waitress = waitress.clone();
+            let events = events.clone();
+            let timestamp = object
                 .payload
-                .get("clusterid")
+                .get("timestamp")
                 .and_then(Value::as_u64)
-                .unwrap_or(0) as u16,
+                .unwrap_or(0);
+            queue
+                .execute(
+                    || async move {
+                        let mut znp = znp.lock().await;
+                        match data_retrieve_all(&mut znp, timestamp, length).await {
+                            Some(data) => {
+                                logger().debug(
+                                    &format!(
+                                        "Retrieved {} bytes from huge data buffer for msg with timestamp {timestamp}",
+                                        data.len()
+                                    ),
+                                    NS,
+                                );
+                                let Some(header) =
+                                    crate::zspec::zcl::zcl_header::Header::from_buffer(&data)
+                                else {
+                                    return;
+                                };
+                                let payload = ZclPayload {
+                                    cluster_id,
+                                    data,
+                                    header,
+                                    address,
+                                    endpoint,
+                                    linkquality,
+                                    group_id,
+                                    was_broadcast,
+                                    destination_endpoint,
+                                };
+                                waitress.resolve(&payload).await;
+                                let _ = events.send(AdapterEvent::ZclPayload(payload));
+                            }
+                            None => logger().error(
+                                "Failed to retrieve chunked payload for incomingMsgExt",
+                                NS,
+                            ),
+                        }
+                    },
+                    None,
+                )
+                .await;
+            return;
+        }
+
+        let Some(header) = crate::zspec::zcl::zcl_header::Header::from_buffer(&data) else {
+            return;
+        };
+        let payload = ZclPayload {
+            cluster_id,
             data,
             header,
             address,
-            endpoint: object
-                .payload
-                .get("srcendpoint")
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as u8,
-            linkquality: object
-                .payload
-                .get("linkquality")
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as u8,
-            group_id: object
-                .payload
-                .get("groupid")
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as u16,
-            was_broadcast: object.payload.get("wasbroadcast").and_then(Value::as_u64) == Some(1),
-            destination_endpoint: object
-                .payload
-                .get("dstendpoint")
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as u8,
+            endpoint,
+            linkquality,
+            group_id,
+            was_broadcast,
+            destination_endpoint,
         };
         waitress.resolve(&payload).await;
         let _ = events.send(AdapterEvent::ZclPayload(payload));
     }
 }
 
+/// Upstream `dataRetrieveAll(timestamp, length)`.
+async fn data_retrieve_all(znp: &mut Znp, timestamp: u64, length: usize) -> Option<Vec<u8>> {
+    let mut buffer = vec![0u8; length];
+    let block_size = 240usize;
+
+    async fn free_ext_message(znp: &mut Znp, timestamp: u64) {
+        // A length of zero is special and triggers the freeing of the
+        // corresponding incoming message.
+        let _ = znp
+            .request_with_reply(
+                Subsystem::AF,
+                "dataRetrieve",
+                json!({"timestamp": timestamp, "index": 0, "length": 0}),
+            )
+            .await;
+    }
+
+    let mut index = 0usize;
+    while index < length {
+        let chunk_size = block_size.min(length - index);
+        let response = match znp
+            .request_with_reply(
+                Subsystem::AF,
+                "dataRetrieve",
+                json!({
+                    "timestamp": timestamp,
+                    "index": index,
+                    "length": chunk_size,
+                }),
+            )
+            .await
+        {
+            Ok(response) => response,
+            Err(error) => {
+                logger().error(&format!("dataRetrieve failed: {error}"), NS);
+                return None;
+            }
+        };
+        // 0x00 = afStatus_SUCCESS
+        let status = response
+            .payload
+            .get("status")
+            .and_then(Value::as_u64)
+            .unwrap_or(u64::MAX);
+        if status != 0 {
+            logger().error(
+                &format!(
+                    "dataRetrieve [timestamp: {timestamp}, index: {index}, chunkSize: {chunk_size}] error status: {status}"
+                ),
+                NS,
+            );
+            free_ext_message(znp, timestamp).await;
+            return None;
+        }
+        let returned = response
+            .payload
+            .get("length")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as usize;
+        if returned != chunk_size {
+            logger().error(
+                &format!(
+                    "dataRetrieve length mismatch [{chunk_size} requested, {returned} returned"
+                ),
+                NS,
+            );
+            free_ext_message(znp, timestamp).await;
+            return None;
+        }
+        let data = bytes(response.payload.get("data"));
+        let copy = chunk_size.min(data.len());
+        buffer[index..index + copy].copy_from_slice(&data[..copy]);
+        index += chunk_size;
+    }
+    free_ext_message(znp, timestamp).await;
+    Some(buffer)
+}
+
 /// Upstream `debounce(..., 60 * 1000, {immediate: true})` for
+
 /// `deviceAnnounceRouteDiscoveryDebouncers`.
 fn route_discovery_due(
     debouncers: &mut std::collections::HashMap<u16, std::time::Instant>,
@@ -1062,6 +1213,78 @@ mod tests {
         );
         dispatch_znp_object(&router, &waitress, &events, None, None, &debouncers).await;
         assert!(!debouncers.lock().unwrap().contains_key(&1234));
+    }
+
+    #[tokio::test]
+    async fn retrieves_chunked_af_payload() {
+        use crate::adapter::transport::{AdapterTransport, TransportOptions};
+        use crate::adapter::z_stack::unpi::frame::Frame as UnpiFrame;
+        use crate::adapter::z_stack::znp::zpi_object::ZpiObject;
+        use tokio::io::AsyncWriteExt;
+
+        let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
+        let mut transport = AdapterTransport::new(TransportOptions::new("/dev/null"));
+        transport.attach_serial(reader).expect("attach");
+        let mut znp = Znp::new(transport);
+
+        let data = (0..500u16)
+            .map(|index| (index % 251) as u8)
+            .collect::<Vec<u8>>();
+        let expected = data.clone();
+
+        let server = tokio::spawn(async move {
+            let mut buffer = [0u8; 256];
+            let mut pending = Vec::new();
+            loop {
+                let read = match peer.read(&mut buffer).await {
+                    Ok(0) => return,
+                    Ok(read) => read,
+                    Err(_) => return,
+                };
+                pending.extend_from_slice(&buffer[..read]);
+                loop {
+                    if pending.len() < 5 {
+                        break;
+                    }
+                    let length = pending[1] as usize;
+                    let frame_length = 4 + length + 1;
+                    if pending.len() < frame_length {
+                        break;
+                    }
+                    let raw = pending[..frame_length].to_vec();
+                    pending.drain(..frame_length);
+                    let frame =
+                        UnpiFrame::from_buffer(length as u8, 4 + length, &raw).expect("frame");
+                    let object = ZpiObject::from_unpi_frame(&frame);
+                    let response = if object.command.name == "ping" {
+                        vec![0x01, 0x00]
+                    } else {
+                        assert_eq!(object.command.name, "dataRetrieve");
+                        let index = object.payload["index"].as_u64().unwrap() as usize;
+                        let requested = object.payload["length"].as_u64().unwrap() as usize;
+                        let chunk = &data[index..(index + requested).min(data.len())];
+                        let mut data = vec![0x00, chunk.len() as u8];
+                        data.extend_from_slice(chunk);
+                        data
+                    };
+                    let response = UnpiFrame::new(
+                        Type::SRSP,
+                        frame.subsystem,
+                        frame.commandID,
+                        response,
+                        0,
+                        0,
+                    );
+                    peer.write_all(&response.to_buffer()).await.expect("write");
+                }
+            }
+        });
+
+        znp.open().await.expect("open");
+        let result = data_retrieve_all(&mut znp, 0x11223344, 500).await;
+        assert_eq!(result, Some(expected));
+        znp.close().await.expect("close");
+        server.abort();
     }
 }
 
@@ -2092,5 +2315,36 @@ impl ZStackAdapter {
                 None,
             )
             .await
+    }
+}
+
+impl ZStackAdapter {
+    /// Upstream `waitFor(networkAddress, endpoint, frameType, direction, ...)`.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn wait_for(
+        &self,
+        network_address: u16,
+        endpoint: u8,
+        _frame_type: crate::zspec::zcl::zcl_header::FrameType,
+        _direction: crate::zspec::zcl::zcl_header::Direction,
+        transaction_sequence_number: Option<u8>,
+        cluster_id: u16,
+        command_id: u8,
+        default_rsp_command_id: Option<u8>,
+        timeout: u64,
+    ) -> (
+        u64,
+        tokio::sync::oneshot::Receiver<Result<ZclPayload, String>>,
+    ) {
+        self.wait_for_internal(
+            Some(network_address),
+            endpoint,
+            transaction_sequence_number,
+            cluster_id,
+            command_id,
+            default_rsp_command_id,
+            timeout,
+        )
+        .await
     }
 }

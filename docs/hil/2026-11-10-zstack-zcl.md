@@ -60,3 +60,16 @@ Full HIL suite: 8 passed, 0 failed.
 A `Frame::create` bug was exposed: `command_from_name("read")` did not set
 `response=1`, so the waiter was never registered. Fixed; the read response is
 now awaited correctly.
+
+## Chunked `incomingMsgExt` and `waitFor`
+
+`dataRetrieveAll` (`AF_DATA_RETRIEVE`, 240-byte blocks, free message with
+`length=0`) and the adapter-level `waitFor` are now ported. A PTY-backed test
+serves the `dataRetrieve` SRSPs:
+
+```text
+retrieves_chunked_af_payload ... ok
+```
+
+The dispatcher now takes the chunked path when
+`incomingMsgExt.payload.data.length < payload.len`, matching upstream.
