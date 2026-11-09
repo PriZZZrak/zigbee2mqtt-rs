@@ -445,3 +445,115 @@ async fn hil_zstack_adapter_zcl_read_roundtrip() {
 
     adapter.stop().await.expect("adapter stop");
 }
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_zstack_network_parameters_and_backup() {
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
+    use zigbee_apiarist::controller::database::Database;
+    use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut adapter = ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        format!("{hil_dir}/router-node/coordinator_backup.json"),
+        AdapterOptions::default(),
+    );
+    adapter.start().await.expect("adapter start");
+
+    let parameters = adapter
+        .get_network_parameters()
+        .await
+        .expect("network parameters");
+    eprintln!("network parameters: {parameters:?}");
+    assert_eq!(parameters.pan_id, 0x1a62);
+    assert_eq!(parameters.channel, 11);
+    assert_eq!(parameters.extended_pan_id, "0x00124b0024c2d400");
+    assert_eq!(parameters.nwk_update_id, 0);
+
+    let database = Database::open(format!("{hil_dir}/router-node/database.db"));
+    let ieee_addresses = database
+        .all_entries()
+        .filter_map(|entry| {
+            entry
+                .get("ieeeAddr")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<Vec<_>>();
+    let backup = adapter.backup(&ieee_addresses).await.expect("backup");
+    eprintln!(
+        "adapter backup: pan={:04x} channel={} devices={}",
+        backup.network_options.pan_id,
+        backup.logical_channel,
+        backup.devices.len()
+    );
+    assert_eq!(backup.network_options.pan_id, 0x1a62);
+    assert_eq!(backup.devices.len(), 9);
+
+    adapter.stop().await.expect("adapter stop");
+}
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_zstack_interpan_set_restore() {
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
+    use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut adapter = ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        format!("{hil_dir}/router-node/coordinator_backup.json"),
+        AdapterOptions::default(),
+    );
+    adapter.start().await.expect("adapter start");
+    adapter
+        .set_channel_inter_pan(11)
+        .await
+        .expect("set interPAN");
+    eprintln!("interPAN channel set");
+    adapter
+        .restore_channel_inter_pan()
+        .await
+        .expect("restore interPAN");
+    eprintln!("interPAN restored");
+    adapter.stop().await.expect("adapter stop");
+}

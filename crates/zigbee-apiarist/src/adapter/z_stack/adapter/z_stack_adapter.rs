@@ -197,6 +197,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::adapter::transport::AdapterTransport;
+use crate::adapter::z_stack::adapter::adapter_backup::AdapterBackup;
 use crate::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
 use crate::adapter::z_stack::adapter::endpoints::endpoints;
 use crate::adapter::z_stack::adapter::manager::{StartResult, ZnpAdapterManager};
@@ -902,8 +903,12 @@ impl ZStackAdapter {
         self.transaction_id
     }
 
-    fn to_address_string(address: u16) -> String {
-        format!("0x{address:016x}")
+    fn to_address_string(address: &Value) -> String {
+        match address {
+            Value::Number(value) => format!("0x{:016x}", value.as_u64().unwrap_or(0)),
+            Value::String(value) => value.clone(),
+            _ => String::new(),
+        }
     }
 
     fn select_source_endpoint(
@@ -1001,7 +1006,7 @@ impl ZStackAdapter {
     async fn data_request_extended(
         &mut self,
         address_mode: AddressMode,
-        destination_address_or_group_id: u16,
+        destination_address_or_group_id: Value,
         destination_endpoint: u8,
         pan_id: u16,
         source_endpoint: u8,
@@ -1035,7 +1040,7 @@ impl ZStackAdapter {
             "dataRequestExt",
             json!({
                 "dstaddrmode": address_mode as u8,
-                "dstaddr": Self::to_address_string(destination_address_or_group_id),
+                "dstaddr": Self::to_address_string(&destination_address_or_group_id),
                 "destendpoint": destination_endpoint,
                 "dstpanid": pan_id,
                 "srcendpoint": source_endpoint,
@@ -1108,7 +1113,7 @@ impl ZStackAdapter {
                 || async move {
                     self.data_request_extended(
                         AddressMode::ADDR_GROUP,
-                        group_id,
+                        json!(group_id),
                         0xff,
                         0,
                         source_endpoint,
@@ -1149,7 +1154,7 @@ impl ZStackAdapter {
                 || async move {
                     self.data_request_extended(
                         AddressMode::ADDR_16BIT,
-                        destination,
+                        json!(destination),
                         endpoint,
                         0,
                         source_endpoint,
@@ -1645,6 +1650,275 @@ impl ZStackAdapter {
                     transaction_sequence_number,
                 },
                 timeout,
+            )
+            .await
+    }
+}
+
+/// Upstream `NetworkParameters`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NetworkParameters {
+    pub pan_id: u16,
+    pub extended_pan_id: String,
+    pub channel: u8,
+    pub nwk_update_id: u8,
+}
+
+impl ZStackAdapter {
+    /// Upstream `getNetworkParameters()`.
+    pub async fn get_network_parameters(&mut self) -> Result<NetworkParameters, String> {
+        let result = self
+            .znp
+            .lock()
+            .await
+            .request_with_reply(Subsystem::ZDO, "extNwkInfo", json!({}))
+            .await?;
+        Ok(NetworkParameters {
+            pan_id: result
+                .payload
+                .get("panid")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u16,
+            extended_pan_id: result
+                .payload
+                .get("extendedpanid")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string(),
+            channel: result
+                .payload
+                .get("channel")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u8,
+            nwk_update_id: 0,
+        })
+    }
+
+    /// Upstream `supportsBackup()`.
+    pub async fn supports_backup(&self) -> bool {
+        true
+    }
+
+    /// Upstream `backup(ieeeAddressesInDatabase)`.
+    pub async fn backup(
+        &mut self,
+        ieee_addresses_in_database: &[String],
+    ) -> Result<crate::models::backup::Backup, String> {
+        let mut nv = AdapterNvMemory::from_shared(self.znp.clone());
+        nv.init().await?;
+        let mut backup = AdapterBackup::new(nv, self.backup_path.clone());
+        backup.create_backup(ieee_addresses_in_database).await
+    }
+
+    /// Upstream `addInstallCode(ieeeAddress, key, hashed)`.
+    pub async fn add_install_code(
+        &mut self,
+        ieee_address: &str,
+        key: &[u8],
+        hashed: bool,
+    ) -> Result<(), String> {
+        let product = self
+            .version
+            .as_ref()
+            .and_then(|version| version.get("product"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        if product == ZnpVersion::ZStack12 as u64 {
+            return Err("Install code is not supported for ZStack 1.2 adapter".to_string());
+        }
+        self.znp
+            .lock()
+            .await
+            .request(
+                Subsystem::APP_CNF,
+                "bdbAddInstallCode",
+                json!({
+                    "installCodeFormat": if hashed { 0x2 } else { 0x1 },
+                    "ieeeaddr": ieee_address,
+                    "installCode": key,
+                }),
+                None,
+                None,
+                &[0],
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Upstream `setChannelInterPAN(channel)`.
+    pub async fn set_channel_inter_pan(&mut self, channel: u8) -> Result<(), String> {
+        let queue = self
+            .queue
+            .clone()
+            .ok_or_else(|| "Adapter not started".to_string())?;
+        queue
+            .execute(
+                || async move {
+                    self.interpan_lock = true;
+                    {
+                        let mut znp = self.znp.lock().await;
+                        znp.request(
+                            Subsystem::AF,
+                            "interPanCtl",
+                            json!({"cmd": 1, "data": [channel]}),
+                            None,
+                            None,
+                            &[0],
+                        )
+                        .await?;
+                    }
+                    if !self.interpan_endpoint_registered {
+                        self.znp
+                            .lock()
+                            .await
+                            .request(
+                                Subsystem::AF,
+                                "interPanCtl",
+                                json!({"cmd": 2, "data": [12]}),
+                                None,
+                                None,
+                                &[0],
+                            )
+                            .await?;
+                        self.interpan_endpoint_registered = true;
+                    }
+                    Ok(())
+                },
+                None,
+            )
+            .await
+    }
+
+    /// Upstream `sendZclFrameInterPANToIeeeAddr(zclFrame, ieeeAddr)`.
+    pub async fn send_zcl_frame_inter_pan_to_ieee_addr(
+        &mut self,
+        zcl_frame: &crate::zspec::zcl::zcl_frame::Frame,
+        ieee_address: &str,
+    ) -> Result<(), String> {
+        let queue = self
+            .queue
+            .clone()
+            .ok_or_else(|| "Adapter not started".to_string())?;
+        let data = zcl_frame.to_buffer();
+        let cluster_id = zcl_frame.cluster.ID as u16;
+        let ieee_address = ieee_address.to_string();
+        queue
+            .execute(
+                || async move {
+                    self.data_request_extended(
+                        AddressMode::ADDR_64BIT,
+                        json!(ieee_address),
+                        0xfe,
+                        0xffff,
+                        12,
+                        cluster_id,
+                        30,
+                        &data,
+                        10000,
+                        false,
+                        0,
+                    )
+                    .await?;
+                    Ok(())
+                },
+                None,
+            )
+            .await
+    }
+
+    /// Upstream `sendZclFrameInterPANBroadcast(zclFrame, timeout, disableResponse)`.
+    pub async fn send_zcl_frame_inter_pan_broadcast(
+        &mut self,
+        zcl_frame: &crate::zspec::zcl::zcl_frame::Frame,
+        timeout: u64,
+        disable_response: bool,
+    ) -> Result<Option<ZclPayload>, String> {
+        let queue = self
+            .queue
+            .clone()
+            .ok_or_else(|| "Adapter not started".to_string())?;
+        let data = zcl_frame.to_buffer();
+        let cluster_id = zcl_frame.cluster.ID as u16;
+        let command = zcl_frame.command.clone();
+        queue
+            .execute(
+                || async move {
+                    if !disable_response && command.response.is_none() {
+                        return Err(format!(
+                            "Command '{}' has no response, cannot wait for response",
+                            command.name
+                        ));
+                    }
+                    let response = if !disable_response {
+                        let response = command.response.expect("response");
+                        Some(
+                            self.wait_for_internal(
+                                None, 0xfe, None, cluster_id, response, None, timeout,
+                            )
+                            .await,
+                        )
+                    } else {
+                        None
+                    };
+                    let result = self
+                        .data_request_extended(
+                            AddressMode::ADDR_16BIT,
+                            json!(0xffff),
+                            0xfe,
+                            0xffff,
+                            12,
+                            cluster_id,
+                            30,
+                            &data,
+                            10000,
+                            false,
+                            0,
+                        )
+                        .await;
+                    if let Err(error) = result {
+                        if let Some((waiter_id, _)) = response.as_ref() {
+                            self.waitress.remove(*waiter_id).await;
+                        }
+                        return Err(error);
+                    }
+                    if let Some((_, receiver)) = response {
+                        return Ok(Some(
+                            receiver.await.map_err(|_| "Waiter dropped".to_string())??,
+                        ));
+                    }
+                    Ok(None)
+                },
+                None,
+            )
+            .await
+    }
+
+    /// Upstream `restoreChannelInterPAN()`.
+    pub async fn restore_channel_inter_pan(&mut self) -> Result<(), String> {
+        let queue = self
+            .queue
+            .clone()
+            .ok_or_else(|| "Adapter not started".to_string())?;
+        queue
+            .execute(
+                || async move {
+                    self.znp
+                        .lock()
+                        .await
+                        .request(
+                            Subsystem::AF,
+                            "interPanCtl",
+                            json!({"cmd": 0, "data": []}),
+                            None,
+                            None,
+                            &[0],
+                        )
+                        .await?;
+                    wait(3000).await;
+                    self.interpan_lock = false;
+                    Ok(())
+                },
+                None,
             )
             .await
     }
