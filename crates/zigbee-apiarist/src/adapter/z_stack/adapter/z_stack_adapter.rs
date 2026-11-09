@@ -130,7 +130,7 @@ pub async fn send_zdo_internal(
                 ),
                 NS,
             );
-            discover_route(znp, network_address).await?;
+            discover_route(znp, network_address, true).await?;
             znp.request_zdo(cluster_id, payload, waiter.as_ref().map(|(id, _)| *id))
                 .await?;
         } else {
@@ -146,7 +146,11 @@ pub async fn send_zdo_internal(
 }
 
 /// Upstream `ZStackAdapter.discoverRoute`.
-async fn discover_route(znp: &mut Znp, network_address: u16) -> Result<(), String> {
+async fn discover_route(
+    znp: &mut Znp,
+    network_address: u16,
+    wait_settled: bool,
+) -> Result<(), String> {
     logger().debug(&format!("Discovering route to {network_address}"), NS);
     znp.request(
         Subsystem::ZDO,
@@ -157,7 +161,9 @@ async fn discover_route(znp: &mut Znp, network_address: u16) -> Result<(), Strin
         &[0],
     )
     .await?;
-    wait(3000).await;
+    if wait_settled {
+        wait(3000).await;
+    }
     Ok(())
 }
 
@@ -226,6 +232,8 @@ pub struct ZStackAdapter {
     pub manufacturer_id: u16,
     pub version: Option<Value>,
     pub queue: Option<Queue>,
+    device_announce_route_discovery:
+        Arc<std::sync::Mutex<std::collections::HashMap<u16, std::time::Instant>>>,
     pub waitress: Arc<crate::utils::waitress::Waitress<ZclPayload, ClusterWaitressMatcher>>,
     pub events: tokio::sync::broadcast::Sender<AdapterEvent>,
     listener: Option<tokio::task::JoinHandle<()>>,
@@ -252,6 +260,9 @@ impl ZStackAdapter {
             manufacturer_id: 0x1037, // Zcl.ManufacturerCode.TEXAS_INSTRUMENTS
             version: None,
             queue: None,
+            device_announce_route_discovery: Arc::new(std::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
             waitress: Arc::new(crate::utils::waitress::Waitress::new(
                 |payload: &ZclPayload, matcher: &ClusterWaitressMatcher| {
                     (matcher
@@ -531,10 +542,18 @@ impl ZStackAdapter {
         let events = self.events.clone();
         let znp = self.znp.clone();
         let queue = self.queue.clone().expect("queue");
+        let debouncers = self.device_announce_route_discovery.clone();
         self.listener = Some(tokio::spawn(async move {
-            let _ = (znp, queue);
             while let Ok(object) = receiver.recv().await {
-                dispatch_znp_object(&object, &waitress, &events).await;
+                dispatch_znp_object(
+                    &object,
+                    &waitress,
+                    &events,
+                    Some(&znp),
+                    Some(&queue),
+                    &debouncers,
+                )
+                .await;
             }
         }));
         Ok(())
@@ -637,7 +656,15 @@ impl ZStackAdapter {
         &self,
         object: &crate::adapter::z_stack::znp::zpi_object::ZpiObject,
     ) {
-        dispatch_znp_object(object, &self.waitress, &self.events).await;
+        dispatch_znp_object(
+            object,
+            &self.waitress,
+            &self.events,
+            Some(&self.znp),
+            self.queue.as_ref(),
+            &self.device_announce_route_discovery,
+        )
+        .await;
     }
 }
 
@@ -645,6 +672,9 @@ async fn dispatch_znp_object(
     object: &crate::adapter::z_stack::znp::zpi_object::ZpiObject,
     waitress: &crate::utils::waitress::Waitress<ZclPayload, ClusterWaitressMatcher>,
     events: &tokio::sync::broadcast::Sender<AdapterEvent>,
+    znp: Option<&Arc<Mutex<Znp>>>,
+    queue: Option<&Queue>,
+    debouncers: &Arc<std::sync::Mutex<std::collections::HashMap<u16, std::time::Instant>>>,
 ) {
     if object.r#type != Type::AREQ {
         return;
@@ -678,6 +708,51 @@ async fn dispatch_znp_object(
                         .cloned()
                         .unwrap_or(Value::Null),
                 });
+            }
+            "endDeviceAnnceInd" => {
+                let zdo = object.payload.get("zdo").cloned().unwrap_or(Value::Null);
+                if crate::zspec::zdo::buffalo_zdo::BuffaloZdo::check_status(&zdo) {
+                    let zdo_payload = zdo.get(1).cloned().unwrap_or(Value::Null);
+                    // Only discover routes to end devices, if bit 1 of
+                    // capabilities === 0 it's an end device.
+                    let is_end_device = zdo_payload
+                        .get("capabilities")
+                        .and_then(|capabilities| capabilities.get("deviceType"))
+                        .and_then(Value::as_u64)
+                        == Some(0);
+                    if is_end_device {
+                        let nwk_address = zdo_payload
+                            .get("nwkAddress")
+                            .and_then(Value::as_u64)
+                            .unwrap_or(0) as u16;
+                        // If a device announces multiple times in a very short
+                        // time, it makes no sense to rediscover the route every
+                        // time. Upstream `debounce(..., 60 * 1000, {immediate:
+                        // true})`: the first announce fires immediately, later
+                        // ones within 60s are swallowed.
+                        let should_discover = {
+                            let mut map = debouncers
+                                .lock()
+                                .expect("device announce debouncers lock poisoned");
+                            route_discovery_due(&mut map, nwk_address, std::time::Instant::now())
+                        };
+                        if should_discover {
+                            if let (Some(znp), Some(queue)) = (znp, queue) {
+                                let znp = znp.clone();
+                                let _ = queue
+                                    .execute(
+                                        || async move {
+                                            let mut znp = znp.lock().await;
+                                            let _ =
+                                                discover_route(&mut znp, nwk_address, false).await;
+                                        },
+                                        Some(nwk_address.to_string()),
+                                    )
+                                    .await;
+                            }
+                        }
+                    }
+                }
             }
             "concentratorIndCb" => {
                 let _ = events.send(AdapterEvent::ZdoResponse {
@@ -787,6 +862,22 @@ async fn dispatch_znp_object(
     }
 }
 
+/// Upstream `debounce(..., 60 * 1000, {immediate: true})` for
+/// `deviceAnnounceRouteDiscoveryDebouncers`.
+fn route_discovery_due(
+    debouncers: &mut std::collections::HashMap<u16, std::time::Instant>,
+    nwk_address: u16,
+    now: std::time::Instant,
+) -> bool {
+    match debouncers.get(&nwk_address) {
+        Some(last) if now.duration_since(*last) < std::time::Duration::from_secs(60) => false,
+        _ => {
+            debouncers.insert(nwk_address, now);
+            true
+        }
+    }
+}
+
 fn bytes(value: Option<&Value>) -> Vec<u8> {
     value
         .and_then(Value::as_array)
@@ -833,7 +924,15 @@ mod tests {
             json!({"rejoin": false, "srcaddr": 0x1234, "extaddr": "0x00124b0024c2d400"}),
             Vec::new(),
         );
-        dispatch_znp_object(&object, &waitress, &events).await;
+        dispatch_znp_object(
+            &object,
+            &waitress,
+            &events,
+            None,
+            None,
+            &Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+        )
+        .await;
         match receiver.recv().await.expect("event") {
             AdapterEvent::DeviceLeave {
                 network_address,
@@ -883,7 +982,15 @@ mod tests {
             }),
             Vec::new(),
         );
-        dispatch_znp_object(&object, &waitress, &events).await;
+        dispatch_znp_object(
+            &object,
+            &waitress,
+            &events,
+            None,
+            None,
+            &Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+        )
+        .await;
         let payload = waiter.await.expect("waiter").expect("payload");
         assert_eq!(payload.cluster_id, 6);
         assert_eq!(payload.endpoint, 1);
@@ -891,6 +998,70 @@ mod tests {
             AdapterEvent::ZclPayload(payload) => assert_eq!(payload.data, vec![0, 1, 0]),
             other => panic!("unexpected event {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn device_announce_route_discovery_is_debounced() {
+        let mut debouncers = std::collections::HashMap::new();
+        let start = std::time::Instant::now();
+
+        // First announce fires immediately.
+        assert!(route_discovery_due(&mut debouncers, 4321, start));
+        // A second announce within 60s is swallowed.
+        assert!(!route_discovery_due(
+            &mut debouncers,
+            4321,
+            start + std::time::Duration::from_secs(59)
+        ));
+        // Another device is independent.
+        assert!(route_discovery_due(&mut debouncers, 1234, start));
+        // After the 60s window the route is discovered again.
+        assert!(route_discovery_due(
+            &mut debouncers,
+            4321,
+            start + std::time::Duration::from_secs(60)
+        ));
+    }
+
+    #[tokio::test]
+    async fn schedules_route_discovery_only_for_end_devices() {
+        let (waitress, events, _receiver) = channel();
+        let debouncers = Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+
+        let end_device = ZpiObject::new(
+            Type::AREQ,
+            Subsystem::ZDO,
+            "endDeviceAnnceInd",
+            0,
+            json!({"zdo": [0, {
+                "nwkAddress": 4321,
+                "eui64": "0x00124b0024c2d400",
+                "capabilities": {
+                    "alternatePANCoordinator": 0,
+                    "deviceType": 0,
+                    "powerSource": 1,
+                    "rxOnWhenIdle": 0,
+                },
+            }]}),
+            Vec::new(),
+        );
+        dispatch_znp_object(&end_device, &waitress, &events, None, None, &debouncers).await;
+        assert!(debouncers.lock().unwrap().contains_key(&4321));
+
+        let router = ZpiObject::new(
+            Type::AREQ,
+            Subsystem::ZDO,
+            "endDeviceAnnceInd",
+            0,
+            json!({"zdo": [0, {
+                "nwkAddress": 1234,
+                "eui64": "0x00124b0024c2d401",
+                "capabilities": {"deviceType": 1},
+            }]}),
+            Vec::new(),
+        );
+        dispatch_znp_object(&router, &waitress, &events, None, None, &debouncers).await;
+        assert!(!debouncers.lock().unwrap().contains_key(&1234));
     }
 }
 

@@ -227,6 +227,11 @@ impl BuffaloZdo {
         build_request_internal(has_zdo_message_overhead, cluster_id, args, false)
     }
 
+    /// Upstream `Zdo.Buffalo.checkStatus(result)`.
+    pub fn check_status(result: &Value) -> bool {
+        result.get(0).and_then(Value::as_u64) == Some(0)
+    }
+
     pub fn read_response(has_zdo_message_overhead: bool, cluster_id: u16, buffer: &[u8]) -> Value {
         read_response_internal(has_zdo_message_overhead, cluster_id, buffer)
     }

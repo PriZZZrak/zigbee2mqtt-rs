@@ -41,3 +41,30 @@ Full HIL suite: **10 passed, 0 failed, 0 ignored**.
 - `endDeviceAnnceInd` route discovery with the upstream 60s debounce;
 - HIL for `restoreBackup` and commissioning paths;
 - endpoint registration evidence beyond the existing manager start.
+
+## endDeviceAnnceInd route discovery
+
+`onZnpReceived` now handles `endDeviceAnnceInd` with the upstream rules:
+status check, end-device only (`capabilities.deviceType === 0`), and the 60s
+`debounce(..., {immediate: true})` route discovery through the queue.
+
+Transcript tests:
+
+```text
+device_announce_route_discovery_is_debounced ... ok
+schedules_route_discovery_only_for_end_devices ... ok
+```
+
+## Endpoint registration evidence
+
+Read-only `activeEpRsp` from the real coordinator after `manager.start()`:
+
+```text
+coordinator active endpoints: [242, 239, 47, 13, 12, 110, 11, 10, 8, 6, 5, 4, 3, 2, 1]
+test hil_zstack_active_endpoints_match_upstream ... ok
+```
+
+Every endpoint from upstream `endpoints()` is present, so the manager's
+`registerEndpoints` path is confirmed against the running adapter.
+
+Full HIL suite: **11 passed, 0 failed, 0 ignored**.

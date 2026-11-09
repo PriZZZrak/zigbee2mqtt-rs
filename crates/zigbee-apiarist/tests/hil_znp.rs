@@ -557,3 +557,67 @@ async fn hil_zstack_interpan_set_restore() {
     eprintln!("interPAN restored");
     adapter.stop().await.expect("adapter stop");
 }
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_zstack_active_endpoints_match_upstream() {
+    use serde_json::json;
+    use zigbee_apiarist::adapter::z_stack::adapter::endpoints::endpoints;
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
+    use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut adapter = ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        format!("{hil_dir}/router-node/coordinator_backup.json"),
+        AdapterOptions::default(),
+    );
+    adapter.start().await.expect("adapter start");
+
+    let cluster_id = ClusterId::ACTIVE_ENDPOINTS_REQUEST;
+    let payload = BuffaloZdo::build_request(false, cluster_id, &[json!(0)]);
+    let response = adapter
+        .send_zdo("0x0000000000000000", 0, cluster_id, &payload, false)
+        .await
+        .expect("active endpoints");
+    assert_eq!(response.get(0).and_then(serde_json::Value::as_u64), Some(0));
+
+    let active: Vec<u64> = response
+        .get(1)
+        .and_then(|payload| payload.get("endpointList"))
+        .and_then(serde_json::Value::as_array)
+        .map(|items| items.iter().filter_map(serde_json::Value::as_u64).collect())
+        .unwrap_or_default();
+    eprintln!("coordinator active endpoints: {active:?}");
+
+    for endpoint in endpoints() {
+        assert!(
+            active.contains(&(endpoint.endpoint as u64)),
+            "upstream endpoint {} is not registered on the coordinator",
+            endpoint.endpoint
+        );
+    }
+
+    adapter.stop().await.expect("adapter stop");
+}
