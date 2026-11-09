@@ -3,6 +3,7 @@
 use serde_json::Value;
 
 use super::request::Request;
+use crate::utils::datetime::now_ms;
 
 /// Upstream `RequestQueue` (kept per endpoint).
 #[derive(Default)]
@@ -64,10 +65,7 @@ impl RequestQueue {
             return Vec::new();
         }
         self.send_in_progress = true;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_millis() as u64)
-            .unwrap_or(0);
+        let now = now_ms();
         self.requests.retain(|request| now <= request.expires);
 
         let mut results = Vec::new();

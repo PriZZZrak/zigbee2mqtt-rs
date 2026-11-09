@@ -5,6 +5,7 @@ use std::pin::Pin;
 
 use serde_json::Value;
 
+use crate::utils::datetime::now_ms;
 use crate::zspec::zcl::zcl_frame::Frame;
 
 pub type BoxedRequestFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send>>;
@@ -54,11 +55,4 @@ impl Request {
     pub fn last_error(&self) -> Option<&str> {
         self.last_error.as_deref()
     }
-}
-
-fn now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0)
 }

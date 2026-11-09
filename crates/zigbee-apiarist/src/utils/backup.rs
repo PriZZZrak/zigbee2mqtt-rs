@@ -8,6 +8,7 @@ use crate::adapter::z_stack::structs::entries::nwk_sec_material_descriptor_entry
 use crate::adapter::z_stack::utils::channel_list::unpack_channel_list;
 use crate::models::backup::{Backup, BackupDevice, LinkKey, NetworkKeyInfo, UnifiedBackupStorage};
 use crate::models::network_options::NetworkOptions;
+use crate::utils::datetime::now_iso8601;
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -24,46 +25,6 @@ fn from_hex(value: &str) -> Vec<u8> {
 const HERDSMAN_PACKAGE_NAME: &str = "zigbee-herdsman";
 const HERDSMAN_PACKAGE_VERSION: &str = "11.2.0";
 
-/// Upstream `new Date().toISOString()`.
-fn iso8601_now() -> String {
-    let elapsed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let seconds = elapsed.as_secs() as i64;
-    let millis = elapsed.subsec_millis();
-    let days = seconds.div_euclid(86_400);
-    let seconds_of_day = seconds.rem_euclid(86_400);
-    let (year, month, day) = civil_from_days(days);
-    let hour = seconds_of_day / 3_600;
-    let minute = (seconds_of_day % 3_600) / 60;
-    let second = seconds_of_day % 60;
-    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{millis:03}Z")
-}
-
-/// Days since 1970-01-01 to a proleptic Gregorian date
-/// (Howard Hinnant's `civil_from_days`).
-fn civil_from_days(days_since_epoch: i64) -> (i64, u32, u32) {
-    let z = days_since_epoch + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let day_of_era = z - era * 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_prime = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
-    let month = if month_prime < 10 {
-        month_prime + 3
-    } else {
-        month_prime - 9
-    };
-    (
-        if month <= 2 { year + 1 } else { year },
-        month as u32,
-        day as u32,
-    )
-}
-
 /// Upstream `toUnifiedBackup(backup)`.
 pub fn to_unified_backup(backup: &Backup) -> UnifiedBackupStorage {
     json!({
@@ -72,7 +33,7 @@ pub fn to_unified_backup(backup: &Backup) -> UnifiedBackupStorage {
             "version": 1,
             "source": format!("{HERDSMAN_PACKAGE_NAME}@{HERDSMAN_PACKAGE_VERSION}"),
             "internal": {
-                "date": iso8601_now(),
+                "date": now_iso8601(),
                 "znpVersion": backup.znp_version,
                 "ezspVersion": backup.ezsp_version,
             },

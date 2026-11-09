@@ -241,7 +241,7 @@ pub fn find_all_devices(context: &DiscoveryContext) -> Vec<DiscoveredAdapter> {
 /// `serial2` exposes device paths only; on Linux we enrich them from sysfs and
 /// prefer stable `/dev/serial/by-id/...` paths when available.
 pub fn live_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
-    let paths = serial2_tokio::SerialPort::available_ports().map_err(|error| error.to_string())?;
+    let paths = crate::adapter::transport::AdapterTransport::available_ports()?;
     let by_id = by_id_paths();
     let mut ports = Vec::new();
     for path in paths {

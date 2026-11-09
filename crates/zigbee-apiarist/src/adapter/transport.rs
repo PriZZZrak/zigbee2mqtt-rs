@@ -18,6 +18,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
 
 use super::utils::{is_tcp_path, parse_tcp_path, TcpPath};
+use crate::utils::logger::logger;
+
+/// Upstream `NS`.
+const NS: &str = "zh:adapter:transport";
 
 /// Upstream `TransportOptions`.
 #[derive(Debug, Clone, Default)]
@@ -90,6 +94,12 @@ impl AdapterTransport {
             reader: None,
             events: None,
         }
+    }
+
+    /// Upstream `SerialPort.list()` equivalent. Kept here so `serial2-tokio`
+    /// stays behind a single wrapper module.
+    pub fn available_ports() -> Result<Vec<std::path::PathBuf>, String> {
+        serial2_tokio::SerialPort::available_ports().map_err(|error| error.to_string())
     }
 
     /// Upstream `isOpen` — transport.ts:36.
@@ -220,6 +230,7 @@ impl AdapterTransport {
         self.start_serial_reader(port);
         self.writer = Some(TransportWriter::Serial(writer));
         self.is_open.store(true, Ordering::SeqCst);
+        logger().info("Serial port opened", NS);
         Ok(())
     }
 
@@ -278,6 +289,7 @@ impl AdapterTransport {
                         }
                     }
                     Err(error) => {
+                        logger().error(&format!("Serial port error: {error}"), NS);
                         is_open.store(false, Ordering::SeqCst);
                         let _ = tx
                             .send(TransportEvent::Close(Some(error.to_string())))
@@ -329,6 +341,7 @@ impl AdapterTransport {
                         }
                     }
                     Err(error) => {
+                        logger().error(&format!("TCP socket error: {error}"), NS);
                         is_open.store(false, Ordering::SeqCst);
                         let _ = tx
                             .send(TransportEvent::Close(Some(error.to_string())))
@@ -343,6 +356,7 @@ impl AdapterTransport {
         self.reader = Some(task);
         self.writer = Some(TransportWriter::Tcp(writer));
         self.is_open.store(true, Ordering::SeqCst);
+        logger().info("Socket opened", NS);
         Ok(())
     }
 }

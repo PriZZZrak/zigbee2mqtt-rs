@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde_json::Value;
+use zigbee_apiarist::utils::datetime::now_ms;
 
 /// Upstream `EventBusMap` keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -315,11 +316,4 @@ impl EventBus {
     pub fn on_publish_availability(&mut self, key: usize, callback: Listener) {
         self.on(Event::PublishAvailability, key, callback);
     }
-}
-
-fn now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0)
 }

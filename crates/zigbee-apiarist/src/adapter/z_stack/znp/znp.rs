@@ -19,6 +19,8 @@ use super::definition;
 use super::zpi_object::{ParameterDef, ZpiObject};
 use crate::adapter::transport::{AdapterTransport, ModemBits, TransportEvent};
 use crate::utils::async_mutex::AsyncMutex;
+use crate::utils::logger::logger;
+use crate::utils::wait::wait;
 use crate::utils::waitress::Waitress;
 
 /// Upstream `timeouts`.
@@ -26,6 +28,9 @@ const SREQ_TIMEOUT: u64 = 6_000;
 const RESET_TIMEOUT: u64 = 30_000;
 const DEFAULT_TIMEOUT: u64 = 10_000;
 const LONG_TIMEOUT: u64 = 40_000;
+
+/// Upstream `NS`.
+const NS: &str = "zh:zstack:znp";
 
 /// Upstream `WaitressMatcher`.
 #[derive(Debug, Clone)]
@@ -142,7 +147,7 @@ impl Znp {
         received: &tokio::sync::Mutex<Vec<ZpiObject>>,
     ) {
         let Some(frame) = Frame::from_buffer(data_length, fcs_position, buffer) else {
-            eprintln!("--> error Invalid checksum");
+            logger().debug("--> error Invalid checksum", NS);
             return;
         };
 
@@ -151,7 +156,7 @@ impl Znp {
                 waitress.resolve(&object).await;
                 received.lock().await.push(object);
             }
-            Err(_) => eprintln!("Error while parsing to ZpiObject"),
+            Err(_) => logger().error("Error while parsing to ZpiObject", NS),
         }
     }
 
@@ -174,7 +179,9 @@ impl Znp {
                     }
                     TransportEvent::Close(error) => {
                         if let Some(error) = error {
-                            eprintln!("Port closed: {error}");
+                            logger().info(&format!("Port closed: {error}"), NS);
+                        } else {
+                            logger().info("Port closed", NS);
                         }
                         break;
                     }
@@ -205,9 +212,13 @@ impl Znp {
 
         // Skip bootloader on CC2530/CC2531: magic byte 0xef, then one second.
         if let Err(error) = self.transport.write(&[0xef]).await {
-            eprintln!("Writing CC2530/CC2531 skip bootloader payload failed: {error}");
+            logger().error(
+                &format!("Writing CC2530/CC2531 skip bootloader payload failed: {error}"),
+                NS,
+            );
         }
-        tokio::time::sleep(Duration::from_millis(1000)).await;
+        logger().info("Writing CC2530/CC2531 skip bootloader payload", NS);
+        wait(1000).await;
         if self
             .request(Subsystem::SYS, "ping", payload, None, Some(250), &[0])
             .await
@@ -217,6 +228,7 @@ impl Znp {
         }
 
         // Skip bootloader on some CC2652 devices (e.g. zzh-p).
+        logger().info("Skip bootloader for CC2652/CC1352", NS);
         if self.transport.is_serial() {
             let _ = self
                 .transport
@@ -225,7 +237,7 @@ impl Znp {
                     rts: Some(false),
                 })
                 .await;
-            tokio::time::sleep(Duration::from_millis(150)).await;
+            wait(150).await;
             let _ = self
                 .transport
                 .set(ModemBits {
@@ -233,7 +245,7 @@ impl Znp {
                     rts: Some(true),
                 })
                 .await;
-            tokio::time::sleep(Duration::from_millis(150)).await;
+            wait(150).await;
             let _ = self
                 .transport
                 .set(ModemBits {
@@ -241,12 +253,13 @@ impl Znp {
                     rts: Some(false),
                 })
                 .await;
-            tokio::time::sleep(Duration::from_millis(150)).await;
+            wait(150).await;
         }
     }
 
     /// Upstream `close()` — znp.ts:144.
     pub async fn close(&mut self) -> Result<(), String> {
+        logger().info("closing", NS);
         self.queue.clear();
         if let Some(dispatcher) = self.dispatcher.take() {
             dispatcher.abort();

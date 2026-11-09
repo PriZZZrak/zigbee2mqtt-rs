@@ -34,7 +34,7 @@ pub fn read(file: impl AsRef<Path>) -> Result<Value, YAMLFileException> {
     let file = file.as_ref();
     let content = std::fs::read_to_string(file)
         .map_err(|error| YAMLFileException::new(error.to_string(), file))?;
-    let value: Value = serde_yaml::from_str(&content)
+    let value: Value = serde_yaml_ng::from_str(&content)
         .map_err(|error| YAMLFileException::new(error.to_string(), file))?;
     if !value.is_object() {
         return Err(YAMLFileException::new(
@@ -65,7 +65,7 @@ pub fn write_if_changed(file: impl AsRef<Path>, content: &Value) -> Result<(), Y
     let file = file.as_ref();
     let before = read_if_exists(file, None)?;
     if &before != content {
-        let serialized = serde_yaml::to_string(content)
+        let serialized = serde_yaml_ng::to_string(content)
             .map_err(|error| YAMLFileException::new(error.to_string(), file))?;
         std::fs::write(file, serialized)
             .map_err(|error| YAMLFileException::new(error.to_string(), file))?;

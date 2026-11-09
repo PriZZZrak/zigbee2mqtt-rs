@@ -146,6 +146,10 @@ measurements and the non-device core are allowed.
 - Target `aarch64-unknown-linux-musl` (static); Routerich AX3000 / OpenWrt
   24.10.8. Native Linux builds must also work.
 - `src/lib.rs` + thin `src/main.rs`; bridge logic in the library.
+- Dependency policy: `docs/dependency-map.md` is normative. Every upstream
+  package has one Rust replacement and one wrapper module; third-party crates
+  may only be imported inside their wrapper. Do not re-implement the same helper
+  in two modules.
 - Single bridge event loop; static cluster handlers; ZNP transport actor with
   request matching and timeouts.
 - No `zigbee-herdsman-converters`, Boa or other JS runtime.
