@@ -358,3 +358,90 @@ async fn hil_zstack_adapter_send_zcl_broadcast() {
     eprintln!("broadcast ZCL read sent");
     adapter.stop().await.expect("adapter stop");
 }
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_zstack_adapter_zcl_read_roundtrip() {
+    use serde_json::json;
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
+    use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
+    use zigbee_apiarist::zspec::zcl::zcl_frame::Frame;
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut adapter = ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        format!("{hil_dir}/router-node/coordinator_backup.json"),
+        AdapterOptions::default(),
+    );
+    adapter.start().await.expect("adapter start");
+
+    let ieee = "0x404ccafffe5c4ce0"; // kitchen thermostat (router)
+    let network_address = adapter
+        .request_network_address(ieee)
+        .await
+        .expect("network address");
+    eprintln!("thermostat network address: {network_address}");
+
+    let frame = Frame::create(
+        0,
+        0,
+        true,
+        None,
+        7,
+        "read",
+        0x0000,
+        json!([{"attribute": 5}]),
+        json!({}),
+        0,
+    );
+    let response = adapter
+        .send_zcl_frame_to_endpoint(
+            ieee,
+            network_address,
+            1,
+            &frame,
+            10000,
+            false,
+            false,
+            Some(1),
+            Some(0x0104),
+        )
+        .await
+        .expect("ZCL read");
+    assert!(response.is_some(), "expected a ZCL read response");
+    let payload = response.unwrap();
+    eprintln!(
+        "ZCL read response: cluster={} endpoint={} cmd={} data={}",
+        payload.cluster_id,
+        payload.endpoint,
+        payload.header.command_identifier,
+        payload
+            .data
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    assert_eq!(payload.cluster_id, 0x0000);
+    assert_eq!(payload.endpoint, 1);
+
+    adapter.stop().await.expect("adapter stop");
+}

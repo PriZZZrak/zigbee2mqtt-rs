@@ -350,7 +350,12 @@ pub fn command_from_name(name: &'static str) -> Command {
         "addRsp" => 0x00,
         _ => 0,
     };
-    Command::new(name, id)
+    let command = Command::new(name, id);
+    match id {
+        0x00 => command.with_response(1),
+        0x06 => command.with_response(7),
+        _ => command,
+    }
 }
 
 fn u8_value(value: &Value) -> u8 {

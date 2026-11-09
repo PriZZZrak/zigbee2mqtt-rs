@@ -12,7 +12,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Adapter transport (serial/TCP) | `adapter/transport.ts` | PARTIAL | PTY unit tests; TCP/HIL and transcript replay missing |
 | ZNP framing + request/waitress | `adapter/z-stack/znp/znp.ts` | PARTIAL | PTY request tests; no full upstream znp transcript |
 | ZNP bootloader skip | `znp.ts:117` | PARTIAL | code path only; HIL pending |
-| `zStackAdapter` (start/ZDO/events/ZCL group+broadcast) | `adapter/z-stack/adapter/zStackAdapter.ts` | PARTIAL | start/stop/queue/sendZdo/onZnpReceived/dataRequest(Extended)/group+broadcast HIL; endpoint send pending |
+| `zStackAdapter` (start/ZDO/events/ZCL) | `adapter/z-stack/adapter/zStackAdapter.ts` | PARTIAL | endpoint read round-trip HIL on thermostat; interPAN/network-params/backup facade pending |
 | `zStackAdapter` (ZCL/queue/start) | `zStackAdapter.ts` | BLOCKED | not ported yet |
 | Adapter manager | `adapter/z-stack/adapter/manager.ts` | PARTIAL | full port; startup path HIL `Resumed`, restore/commissioning paths pending |
 | Adapter NV memory | `adapter-nv-memory.ts` | PORTED | wire transcript + HIL `init` |

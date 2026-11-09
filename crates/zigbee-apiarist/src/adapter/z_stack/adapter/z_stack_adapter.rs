@@ -1169,3 +1169,483 @@ impl ZStackAdapter {
             .await
     }
 }
+
+impl ZStackAdapter {
+    fn check_interpan_lock(&self) -> Result<(), String> {
+        if self.interpan_lock {
+            return Err("Cannot execute command, in Inter-PAN mode".to_string());
+        }
+        Ok(())
+    }
+
+    fn revision(&self) -> u64 {
+        self.version
+            .as_ref()
+            .and_then(|version| {
+                version.get("revision").and_then(Value::as_u64).or_else(|| {
+                    version
+                        .get("revision")
+                        .and_then(Value::as_str)
+                        .and_then(|value| value.parse().ok())
+                })
+            })
+            .unwrap_or(0)
+    }
+
+    fn supports_assoc_remove(&self) -> bool {
+        self.version
+            .as_ref()
+            .and_then(|v| v.get("product"))
+            .and_then(Value::as_u64)
+            == Some(ZnpVersion::ZStack3x0 as u64)
+            && self.revision() >= 20200805
+    }
+
+    fn supports_assoc_add(&self) -> bool {
+        self.version
+            .as_ref()
+            .and_then(|v| v.get("product"))
+            .and_then(Value::as_u64)
+            == Some(ZnpVersion::ZStack3x0 as u64)
+            && self.revision() >= 20201026
+    }
+
+    /// Upstream `requestNetworkAddress(ieeeAddr)`.
+    pub async fn request_network_address(&mut self, ieee_address: &str) -> Result<u16, String> {
+        let cluster_id = ClusterId::NETWORK_ADDRESS_REQUEST;
+        let payload = BuffaloZdo::build_request(
+            self.has_zdo_message_overhead,
+            cluster_id,
+            &[json!(ieee_address), json!(false), json!(0)],
+        );
+        let mut znp = self.znp.lock().await;
+        let result =
+            send_zdo_internal(&mut znp, ieee_address, 0xffff, cluster_id, &payload, false).await?;
+        let status = result.get(0).and_then(Value::as_u64).unwrap_or(1);
+        if status == 0 {
+            return Ok(result
+                .get(1)
+                .and_then(|payload| payload.get("nwkAddress"))
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u16);
+        }
+        Err(format!("ZDO status error: {status}"))
+    }
+
+    async fn discover_route(&self, network_address: u16, wait_settled: bool) -> Result<(), String> {
+        logger().debug(&format!("Discovering route to {network_address}"), NS);
+        let mut znp = self.znp.lock().await;
+        znp.request(
+            Subsystem::ZDO,
+            "extRouteDisc",
+            json!({"dstAddr": network_address, "options": 0, "radius": DEFAULT_RADIUS}),
+            None,
+            None,
+            &[0],
+        )
+        .await?;
+        if wait_settled {
+            wait(3000).await;
+        }
+        Ok(())
+    }
+
+    /// Upstream `sendZclFrameToEndpoint(...)`.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn send_zcl_frame_to_endpoint(
+        &mut self,
+        ieee_address: &str,
+        network_address: u16,
+        endpoint: u8,
+        zcl_frame: &crate::zspec::zcl::zcl_frame::Frame,
+        timeout: u64,
+        disable_response: bool,
+        disable_recovery: bool,
+        source_endpoint: Option<u8>,
+        profile_id: Option<u16>,
+    ) -> Result<Option<ZclPayload>, String> {
+        let source_endpoint = self.select_source_endpoint(source_endpoint, profile_id)?;
+        self.check_interpan_lock()?;
+        let queue = self
+            .queue
+            .clone()
+            .ok_or_else(|| "Adapter not started".to_string())?;
+        let ieee = ieee_address.to_string();
+        let frame = zcl_frame.clone();
+        queue
+            .execute(
+                || async move {
+                    Box::pin(self.send_zcl_frame_to_endpoint_internal(
+                        &ieee,
+                        network_address,
+                        endpoint,
+                        source_endpoint,
+                        &frame,
+                        timeout,
+                        disable_response,
+                        disable_recovery,
+                        0,
+                        0,
+                        false,
+                        false,
+                        false,
+                        None,
+                    ))
+                    .await
+                },
+                Some(network_address.to_string()),
+            )
+            .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn send_zcl_frame_to_endpoint_internal(
+        &mut self,
+        ieee_address: &str,
+        mut network_address: u16,
+        endpoint: u8,
+        source_endpoint: u8,
+        zcl_frame: &crate::zspec::zcl::zcl_frame::Frame,
+        timeout: u64,
+        disable_response: bool,
+        disable_recovery: bool,
+        response_attempt: u8,
+        data_request_attempt: u8,
+        mut checked_network_address: bool,
+        mut discovered_route: bool,
+        mut assoc_remove: bool,
+        mut assoc_restore: Option<(String, u16, u8)>,
+    ) -> Result<Option<ZclPayload>, String> {
+        logger().debug(
+            &format!(
+                "sendZclFrameToEndpointInternal {ieee_address}:{network_address}/{endpoint} ({response_attempt},{data_request_attempt},{})",
+                self.queue.as_ref().map(Queue::count).unwrap_or(0)
+            ),
+            NS,
+        );
+        self.check_interpan_lock()?;
+        let command = &zcl_frame.command;
+        let mut response = None;
+        if command.response.is_some() && !disable_response {
+            response = Some(
+                self.wait_for_internal(
+                    Some(network_address),
+                    endpoint,
+                    Some(zcl_frame.header.transaction_sequence_number),
+                    zcl_frame.cluster.ID as u16,
+                    command.response.unwrap(),
+                    None,
+                    timeout,
+                )
+                .await,
+            );
+        } else if !zcl_frame.header.frame_control.disable_default_response {
+            response = Some(
+                self.wait_for_internal(
+                    Some(network_address),
+                    endpoint,
+                    Some(zcl_frame.header.transaction_sequence_number),
+                    zcl_frame.cluster.ID as u16,
+                    0x0b,
+                    Some(command.ID),
+                    timeout,
+                )
+                .await,
+            );
+        }
+
+        let data = zcl_frame.to_buffer();
+        let data_confirm = self
+            .data_request(
+                network_address,
+                endpoint,
+                source_endpoint,
+                zcl_frame.cluster.ID as u16,
+                DEFAULT_RADIUS as u8,
+                &data,
+                timeout,
+            )
+            .await;
+
+        if data_confirm != ZnpCommandStatus::SUCCESS as u16 {
+            if let Some((waiter_id, _)) = response.take() {
+                self.waitress.remove(waiter_id).await;
+            }
+            logger().debug(
+                &format!(
+                    "Data confirm error ({ieee_address}:{network_address},{data_confirm},{data_request_attempt})"
+                ),
+                NS,
+            );
+            if assoc_remove && assoc_restore.is_some() && self.supports_assoc_add() {
+                let (ieee, nwk, relation) = assoc_restore.clone().unwrap();
+                logger().debug(&format!("assocAdd({ieee})"), NS);
+                self.znp
+                    .lock()
+                    .await
+                    .request(
+                        Subsystem::UTIL,
+                        "assocAdd",
+                        json!({"ieeeadr": ieee, "nwkaddr": nwk, "noderelation": relation}),
+                        None,
+                        None,
+                        &[0],
+                    )
+                    .await?;
+                assoc_restore = None;
+            }
+
+            let recoverable = [
+                ZnpCommandStatus::NWK_NO_ROUTE as u16,
+                ZnpCommandStatus::MAC_NO_ACK as u16,
+                ZnpCommandStatus::MAC_CHANNEL_ACCESS_FAILURE as u16,
+                ZnpCommandStatus::MAC_TRANSACTION_EXPIRED as u16,
+                ZnpCommandStatus::BUFFER_FULL as u16,
+                ZnpCommandStatus::MAC_NO_RESOURCES as u16,
+            ];
+            if data_request_attempt >= 4 || !recoverable.contains(&data_confirm) || disable_recovery
+            {
+                return Err(format!("Data request failed with error: '{data_confirm}'"));
+            }
+            if data_confirm == ZnpCommandStatus::MAC_CHANNEL_ACCESS_FAILURE as u16
+                || data_confirm == ZnpCommandStatus::BUFFER_FULL as u16
+                || data_confirm == ZnpCommandStatus::MAC_NO_RESOURCES as u16
+            {
+                wait(2000).await;
+                return Box::pin(self.send_zcl_frame_to_endpoint_internal(
+                    ieee_address,
+                    network_address,
+                    endpoint,
+                    source_endpoint,
+                    zcl_frame,
+                    timeout,
+                    disable_response,
+                    disable_recovery,
+                    response_attempt,
+                    data_request_attempt + 1,
+                    checked_network_address,
+                    discovered_route,
+                    assoc_remove,
+                    assoc_restore,
+                ))
+                .await;
+            }
+
+            let mut do_assoc_remove = false;
+            if !assoc_remove
+                && data_confirm == ZnpCommandStatus::MAC_TRANSACTION_EXPIRED as u16
+                && data_request_attempt >= 1
+                && self.supports_assoc_remove()
+            {
+                let match_response = self
+                    .znp
+                    .lock()
+                    .await
+                    .request_with_reply(
+                        Subsystem::UTIL,
+                        "assocGetWithAddress",
+                        json!({"extaddr": ieee_address, "nwkaddr": network_address}),
+                    )
+                    .await?;
+                let nwkaddr = match_response
+                    .payload
+                    .get("nwkaddr")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0xffff);
+                let noderelation = match_response
+                    .payload
+                    .get("noderelation")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(255);
+                if nwkaddr != 0xfffe && noderelation != 255 {
+                    do_assoc_remove = true;
+                    assoc_restore = Some((
+                        ieee_address.to_string(),
+                        network_address,
+                        noderelation as u8,
+                    ));
+                }
+                assoc_remove = true;
+            }
+
+            if do_assoc_remove {
+                logger().debug(&format!("assocRemove({ieee_address})"), NS);
+                self.znp
+                    .lock()
+                    .await
+                    .request(
+                        Subsystem::UTIL,
+                        "assocRemove",
+                        json!({"ieeeadr": ieee_address}),
+                        None,
+                        None,
+                        &[0],
+                    )
+                    .await?;
+            } else if !discovered_route && data_request_attempt >= 1 {
+                discovered_route = true;
+                self.discover_route(network_address, true).await?;
+            } else if !checked_network_address && data_request_attempt >= 1 {
+                checked_network_address = true;
+                if let Ok(actual) = self.request_network_address(ieee_address).await {
+                    if actual != network_address {
+                        logger().debug(
+                            "Failed because request was done with wrong network address",
+                            NS,
+                        );
+                        discovered_route = true;
+                        network_address = actual;
+                        self.discover_route(actual, true).await?;
+                    } else {
+                        logger().debug("Network address did not change", NS);
+                    }
+                }
+            } else {
+                wait(2000).await;
+            }
+
+            return Box::pin(self.send_zcl_frame_to_endpoint_internal(
+                ieee_address,
+                network_address,
+                endpoint,
+                source_endpoint,
+                zcl_frame,
+                timeout,
+                disable_response,
+                disable_recovery,
+                response_attempt,
+                data_request_attempt + 1,
+                checked_network_address,
+                discovered_route,
+                assoc_remove,
+                assoc_restore,
+            ))
+            .await;
+        }
+
+        if let Some((_, receiver)) = response {
+            match receiver.await {
+                Ok(Ok(payload)) => return Ok(Some(payload)),
+                Ok(Err(error)) => {
+                    logger().debug(
+                        &format!(
+                            "Response timeout ({ieee_address}:{network_address},{response_attempt}): {error}"
+                        ),
+                        NS,
+                    );
+                    if response_attempt < 1 && !disable_recovery {
+                        let match_response = self
+                            .znp
+                            .lock()
+                            .await
+                            .request_with_reply(
+                                Subsystem::UTIL,
+                                "assocGetWithAddress",
+                                json!({"extaddr": ieee_address, "nwkaddr": network_address}),
+                            )
+                            .await?;
+                        let nwkaddr = match_response
+                            .payload
+                            .get("nwkaddr")
+                            .and_then(Value::as_u64)
+                            .unwrap_or(0xffff);
+                        let noderelation = match_response
+                            .payload
+                            .get("noderelation")
+                            .and_then(Value::as_u64)
+                            .unwrap_or(255);
+                        logger().debug(
+                            &format!(
+                                "Response timeout recovery: Node relation {noderelation} ({ieee_address} / {nwkaddr})"
+                            ),
+                            NS,
+                        );
+                        if self.supports_assoc_add()
+                            && self.supports_assoc_remove()
+                            && nwkaddr != 0xfffe
+                            && noderelation == 1
+                        {
+                            logger().debug(
+                                &format!("Response timeout recovery: Rewrite association table entry ({ieee_address})"),
+                                NS,
+                            );
+                            self.znp
+                                .lock()
+                                .await
+                                .request(
+                                    Subsystem::UTIL,
+                                    "assocRemove",
+                                    json!({"ieeeadr": ieee_address}),
+                                    None,
+                                    None,
+                                    &[0],
+                                )
+                                .await?;
+                            self.znp
+                                .lock()
+                                .await
+                                .request(
+                                    Subsystem::UTIL,
+                                    "assocAdd",
+                                    json!({"ieeeadr": ieee_address, "nwkaddr": network_address, "noderelation": noderelation}),
+                                    None,
+                                    None,
+                                    &[0],
+                                )
+                                .await?;
+                        }
+                        self.discover_route(network_address, true).await?;
+                        return Box::pin(self.send_zcl_frame_to_endpoint_internal(
+                            ieee_address,
+                            network_address,
+                            endpoint,
+                            source_endpoint,
+                            zcl_frame,
+                            timeout,
+                            disable_response,
+                            disable_recovery,
+                            response_attempt + 1,
+                            data_request_attempt,
+                            checked_network_address,
+                            discovered_route,
+                            assoc_remove,
+                            assoc_restore,
+                        ))
+                        .await;
+                    }
+                    return Err(error);
+                }
+                Err(_) => return Err("Waiter dropped".to_string()),
+            }
+        }
+        Ok(None)
+    }
+
+    async fn wait_for_internal(
+        &self,
+        network_address: Option<u16>,
+        endpoint: u8,
+        transaction_sequence_number: Option<u8>,
+        cluster_id: u16,
+        command_id: u8,
+        default_rsp_command_id: Option<u8>,
+        timeout: u64,
+    ) -> (
+        u64,
+        tokio::sync::oneshot::Receiver<Result<ZclPayload, String>>,
+    ) {
+        self.waitress
+            .wait_for(
+                ClusterWaitressMatcher {
+                    address: network_address.map(|address| json!(address)),
+                    cluster_id,
+                    endpoint: Some(endpoint),
+                    command_id: Some(command_id),
+                    default_rsp_command_id,
+                    transaction_sequence_number,
+                },
+                timeout,
+            )
+            .await
+    }
+}

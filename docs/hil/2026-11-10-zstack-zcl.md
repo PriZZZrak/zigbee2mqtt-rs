@@ -42,3 +42,21 @@ test hil_zstack_adapter_send_zcl_broadcast ... ok
   discovery, response retry);
 - interPAN paths;
 - `getNetworkParameters`, backup facade.
+
+## Endpoint ZCL round-trip (real thermostat)
+
+`sendZclFrameToEndpointInternal` was added with waitress response, data-confirm
+recovery, assoc get/add/remove, route discovery and network-address recheck.
+HIL against the kitchen thermostat (`0x404ccafffe5c4ce0`, router):
+
+```text
+thermostat network address: 18008
+ZCL read response: cluster=0 endpoint=1 cmd=1 data=1807010000002008
+test hil_zstack_adapter_zcl_read_roundtrip ... ok
+```
+
+Full HIL suite: 8 passed, 0 failed.
+
+A `Frame::create` bug was exposed: `command_from_name("read")` did not set
+`response=1`, so the waiter was never registered. Fixed; the read response is
+now awaited correctly.
