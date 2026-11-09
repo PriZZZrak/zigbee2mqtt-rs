@@ -1,0 +1,78 @@
+[
+  {
+    "id": "nib-to-json",
+    "op": "nib_to_json",
+    "expected": {
+      "extendedPANID": "0101010101010101",
+      "nwkLogicalChannel": 21
+    }
+  },
+  {
+    "id": "nib-serialize",
+    "op": "nib_serialize",
+    "source": "fb050279147900640000000105018f000700020d1e000000150000000000000000000000ffff0800000020000f0f0400010000000100000000779fd609004b1200010000000000000000000000000000000000000000000000000000000000000000000000003c0c0001780a0100000006020000",
+    "expected": {
+      "unaligned": "fb050279147900640000000105018f0700020d1e00001500000000000000000000ffff08000020000f0f0400010000000100000000779fd609004b1200010000000000000000000000000000000000000000000000000000000000000000000000003c0c0001780a010000060200",
+      "aligned": "fb050279147900640000000105018f000700020d1e000000150000000000000000000000ffff0800000020000f0f0400010000000100000000779fd609004b1200010000000000000000000000000000000000000000000000000000000000000000000000003c0c0001780a0100000006020000",
+      "alignedLength": 116,
+      "alignedLengthUnpadded": 115,
+      "unalignedLength": 110
+    }
+  },
+  {
+    "id": "security-table-serialize",
+    "op": "security_table_serialize",
+    "capacity": 8,
+    "expected": {
+      "unaligned": "0000feff000000feff000000feff000000feff000000feff000000feff000000feff000000feff000000",
+      "aligned": "0000feff00000000feff00000000feff00000000feff00000000feff00000000feff00000000feff00000000feff00000000",
+      "free": 8,
+      "used": 0
+    }
+  },
+  {
+    "id": "security-table-occupancy",
+    "op": "security_table_occupancy",
+    "capacity": 8,
+    "expected": {
+      "free": 8,
+      "used": 0
+    }
+  },
+  {
+    "id": "nwk-table-serialize",
+    "op": "nwk_table_serialize",
+    "capacity": 8,
+    "expected": {
+      "unaligned": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "aligned": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "free": 8,
+      "used": 0,
+      "capacity": 8,
+      "entries": 8
+    }
+  },
+  {
+    "id": "invalid-nib-length",
+    "op": "invalid_nib_length",
+    "length": 10,
+    "error": "Invalid length for member extendedPANID (expected=8, got=10)"
+  },
+  {
+    "id": "invalid-nib-source",
+    "op": "invalid_nib_source",
+    "source": "01020304",
+    "error": "Struct length mismatch (expected=110/116, got=4)"
+  },
+  {
+    "id": "table-entries-mismatch",
+    "op": "table_entries_mismatch",
+    "error": "All table entries need to be the same length"
+  },
+  {
+    "id": "table-buffer-indivisible",
+    "op": "table_buffer_indivisible",
+    "length": 91,
+    "error": "Table length not divisible by entry length (alignment=unaligned, data_length=91, entry_length=5)"
+  }
+]

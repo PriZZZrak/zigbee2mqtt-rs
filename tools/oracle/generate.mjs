@@ -11,8 +11,9 @@ import {handle as buffalo_znp} from "./packages/buffalo_znp.mjs";
 import {handle as constants} from "./packages/constants.mjs";
 import {handle as zcl} from "./packages/zcl.mjs";
 import {handle as zpi_object} from "./packages/zpi_object.mjs";
+import {handle as structs} from "./packages/structs.mjs";
 
-const HANDLERS = {frame, buffalo, buffalo_znp, zcl, zpi_object, constants};
+const HANDLERS = {frame, buffalo, buffalo_znp, zcl, zpi_object, structs, constants};
 const FIXTURES = fileURLToPath(new URL("../../crates/zigbee-apiarist/tests/fixtures/", import.meta.url));
 
 const cases = {
@@ -155,6 +156,21 @@ const cases = {
             commandId: 8,
             data: "00020102",
         },
+    ],
+    structs: [
+        {id: "nib-to-json", op: "nib_to_json"},
+        {
+            id: "nib-serialize",
+            op: "nib_serialize",
+            source: "fb050279147900640000000105018f000700020d1e000000150000000000000000000000ffff0800000020000f0f0400010000000100000000779fd609004b1200010000000000000000000000000000000000000000000000000000000000000000000000003c0c0001780a0100000006020000",
+        },
+        {id: "security-table-serialize", op: "security_table_serialize", capacity: 8},
+        {id: "security-table-occupancy", op: "security_table_occupancy", capacity: 8},
+        {id: "nwk-table-serialize", op: "nwk_table_serialize", capacity: 8},
+        {id: "invalid-nib-length", op: "invalid_nib_length", length: 10},
+        {id: "invalid-nib-source", op: "invalid_nib_source", source: "01020304"},
+        {id: "table-entries-mismatch", op: "table_entries_mismatch"},
+        {id: "table-buffer-indivisible", op: "table_buffer_indivisible", length: 91},
     ],
     zcl: [
         {id: "get-cluster-name", op: "get_cluster", key: "genBasic"},

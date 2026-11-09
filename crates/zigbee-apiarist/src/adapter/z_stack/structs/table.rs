@@ -1,56 +1,106 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/structs/table.ts
-
-use serde_json::{json, Value};
+// Upstream revision: zigbee-herdsman v11.2.0 (c1a54e3d).
 
 use super::r#struct::{Alignment, Struct};
 
-/// Upstream `Table<T>`.
+/// Upstream `build(data | data[] | capacity)` input.
+#[derive(Debug, Clone)]
+pub enum TableData {
+    Capacity(usize),
+    Buffer(Vec<u8>),
+    Entries(Vec<Vec<u8>>),
+}
+
+/// Upstream `Table<R>`.
 #[derive(Debug, Clone)]
 pub struct Table {
     entry_factory: fn(Option<&[u8]>) -> Struct,
+    empty_entry: Struct,
     entries: Vec<Struct>,
-    capacity: usize,
-    inline_header: bool,
-    padding_byte: u8,
+    has_inline_length_header: bool,
+    entry_occupancy_function: Option<fn(&Struct) -> bool>,
 }
 
 impl Table {
-    pub fn new(entry_factory: fn(Option<&[u8]>) -> Struct, capacity: usize) -> Self {
+    /// Upstream `Table.new()`.
+    pub fn new(entry_factory: fn(Option<&[u8]>) -> Struct) -> Self {
         Self {
             entry_factory,
-            entries: (0..capacity).map(|_| entry_factory(None)).collect(),
-            capacity,
-            inline_header: true,
-            padding_byte: 0xff,
+            empty_entry: entry_factory(None),
+            entries: Vec::new(),
+            has_inline_length_header: false,
+            entry_occupancy_function: None,
         }
     }
 
-    /// Upstream `Table.build(data, source, alignment)`.
-    pub fn build(mut self, data: Option<&[u8]>, alignment: Alignment) -> Self {
-        let entry_length = (self.entry_factory)(None).get_length(alignment, false, 0);
-        if let Some(data) = data {
-            let mut offset = 0;
-            for entry in &mut self.entries {
-                let end = (offset + entry_length).min(data.len());
-                if offset >= end {
-                    break;
+    /// Upstream `occupancy(fn)`.
+    pub fn occupancy(mut self, function: fn(&Struct) -> bool) -> Self {
+        self.entry_occupancy_function = Some(function);
+        self
+    }
+
+    /// Upstream `inlineHeader(hasInlineHeader = true)`.
+    pub fn inline_header(mut self, has_inline_header: bool) -> Self {
+        self.has_inline_length_header = has_inline_header;
+        self
+    }
+
+    /// Upstream `build(dataOrCapacity, alignment)`.
+    pub fn build(mut self, data: TableData, alignment: Alignment) -> Self {
+        match data {
+            TableData::Entries(entries) => {
+                if let Some(first) = entries.first() {
+                    if !entries.iter().all(|entry| entry.len() == first.len()) {
+                        panic!("All table entries need to be the same length");
+                    }
                 }
-                let bytes = data[offset..end].to_vec();
-                *entry = std::mem::take(entry).build(Some(&bytes), None);
-                offset = end;
+                self.entries = entries
+                    .iter()
+                    .map(|entry| (self.entry_factory)(Some(entry)))
+                    .collect();
+            }
+            TableData::Buffer(data) => {
+                let entry_length = self.empty_entry.get_length(alignment, true, 0);
+                let data_length = if self.has_inline_length_header {
+                    data.len().saturating_sub(2)
+                } else {
+                    data.len()
+                };
+                if data_length % entry_length != 0 {
+                    panic!(
+                        "Table length not divisible by entry length (alignment={}, data_length={}, entry_length={entry_length})",
+                        alignment.as_str(),
+                        data.len()
+                    );
+                }
+                let capacity = data_length / entry_length;
+                let entries_start = if self.has_inline_length_header {
+                    data.get(2..).unwrap_or_default()
+                } else {
+                    data.as_slice()
+                };
+                self.entries = (0..capacity)
+                    .map(|index| {
+                        let start = index * entry_length;
+                        (self.entry_factory)(Some(&entries_start[start..start + entry_length]))
+                    })
+                    .collect();
+            }
+            TableData::Capacity(capacity) => {
+                self.entries = (0..capacity).map(|_| (self.entry_factory)(None)).collect();
             }
         }
         self
     }
 
-    pub fn get_next_free(&self) -> Option<usize> {
-        self.entries
-            .iter()
-            .position(|entry| entry.get_u8("isSet").unwrap_or(0) == 0)
+    /// Upstream `capacity`.
+    pub fn capacity(&self) -> usize {
+        self.entries.len()
     }
 
-    pub fn index_of(&self, predicate: impl Fn(&Struct) -> bool) -> Option<usize> {
-        self.entries.iter().position(predicate)
+    /// Upstream `entries`.
+    pub fn entries(&self) -> &[Struct] {
+        &self.entries
     }
 
     pub fn entry(&self, index: usize) -> Option<&Struct> {
@@ -61,64 +111,66 @@ impl Table {
         self.entries.get_mut(index)
     }
 
-    pub fn set_inline_header(&mut self, inline: bool) {
-        self.inline_header = inline;
-    }
-
-    /// Upstream `occupancy()`: `(used, free)`.
-    pub fn occupancy(&self) -> (usize, usize) {
-        let used = self
-            .entries
+    /// Upstream `used`.
+    pub fn used(&self) -> Vec<&Struct> {
+        let function = self
+            .entry_occupancy_function
+            .expect("Table usage cannot be determined without occupancy function when header is not present.");
+        self.entries
             .iter()
-            .filter(|entry| entry.get_u8("isSet").unwrap_or(0) != 0)
-            .count();
-        (used, self.capacity - used)
+            .filter(|entry| function(entry))
+            .collect()
     }
 
-    /// Upstream `serialize(alignment, padLength, includeHeader)`.
-    pub fn serialize(
-        &self,
-        alignment: Alignment,
-        pad_length: bool,
-        include_header: bool,
-    ) -> Vec<u8> {
-        let mut output = Vec::new();
-        if include_header && self.inline_header {
-            output.push((self.entries.len() & 0xff) as u8);
+    /// Upstream `free`.
+    pub fn free(&self) -> Vec<&Struct> {
+        let function = self
+            .entry_occupancy_function
+            .expect("Table usage cannot be determined without occupancy function when header is not present.");
+        self.entries
+            .iter()
+            .filter(|entry| !function(entry))
+            .collect()
+    }
+
+    /// Upstream `freeCount`.
+    pub fn free_count(&self) -> usize {
+        self.free().len()
+    }
+
+    /// Upstream `usedCount`.
+    pub fn used_count(&self) -> usize {
+        self.used().len()
+    }
+
+    /// Upstream `getNextFree()`.
+    pub fn next_free(&self) -> Option<&Struct> {
+        self.free().into_iter().next()
+    }
+
+    /// Upstream `indexOf(entry)`.
+    pub fn index_of(&self, entry: &Struct) -> Option<usize> {
+        let target = entry.serialize(Alignment::Unaligned, true, 0);
+        self.entries
+            .iter()
+            .position(|candidate| candidate.serialize(Alignment::Unaligned, true, 0) == target)
+    }
+
+    /// Upstream `serialize(alignment)`.
+    pub fn serialize(&self, alignment: Alignment) -> Vec<u8> {
+        let entry_length = self.empty_entry.get_length(alignment, true, 0);
+        let header = if self.has_inline_length_header { 2 } else { 0 };
+        let mut output = vec![0u8; header + self.entries.len() * entry_length];
+        let mut offset = 0usize;
+        if self.has_inline_length_header {
+            output[0..2].copy_from_slice(&(self.used_count() as u16).to_le_bytes());
+            offset += 2;
         }
         for entry in &self.entries {
-            output.extend(entry.serialize(alignment, pad_length));
-        }
-        while output.len() % 2 != 0 && pad_length {
-            output.push(self.padding_byte);
+            let data = entry.serialize(alignment, true, 0);
+            output[offset..offset + data.len()].copy_from_slice(&data);
+            offset += entry.get_length(alignment, true, 0);
         }
         output
-    }
-
-    pub fn to_json(&self) -> Value {
-        Value::Array(self.entries.iter().map(Struct::to_json).collect())
-    }
-
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    pub fn as_structs(&self) -> &[Struct] {
-        &self.entries
-    }
-
-    pub fn as_structs_mut(&mut self) -> &mut [Struct] {
-        &mut self.entries
-    }
-
-    pub fn build_json(&self) -> Value {
-        json!({"occupancy": {
-            "used": self.occupancy().0,
-            "free": self.occupancy().1,
-        }, "entries": self.to_json()})
     }
 }

@@ -55,5 +55,5 @@ pub fn nib(data: Option<&[u8]>) -> Struct {
         .member(MemberType::Uint16, "nwkManagerAddr")
         .member(MemberType::Uint16, "nwkTotalTransmissions")
         .member(MemberType::Uint8, "nwkUpdateId")
-        .build(data, None)
+        .build(data)
 }

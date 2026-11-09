@@ -5,7 +5,7 @@ use crate::adapter::z_stack::structs::r#struct::{MemberType, Struct};
 pub fn has_configured(data: Option<&[u8]>) -> Struct {
     Struct::new()
         .member(MemberType::Uint8, "hasConfigured")
-        .build(data, None)
+        .build(data)
 }
 
 pub fn is_configured(entry: &Struct) -> bool {

@@ -36,6 +36,7 @@ crates/zigbee-apiarist/tests/fixtures/zpi_object.json
 crates/zigbee-apiarist/tests/fixtures/zcl.json
 crates/zigbee-apiarist/tests/fixtures/constants.json
 crates/zigbee-apiarist/tests/fixtures/definition.json
+crates/zigbee-apiarist/tests/fixtures/structs.json
 ```
 
 The ZNP command catalog and constants modules are generated directly into

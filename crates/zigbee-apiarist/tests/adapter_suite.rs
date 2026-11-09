@@ -3,9 +3,6 @@
 #[path = "adapter/ember/ezsp_buffalo_test.rs"]
 mod ember_ezsp_buffalo_test;
 
-#[path = "adapter/z_stack/structs_test.rs"]
-mod z_stack_structs_test;
-
 #[path = "adapter/zboss/fix_zdo_response_test.rs"]
 mod zboss_fix_zdo_response_test;
 

@@ -15,7 +15,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | `zStackAdapter` (start/resume, permit join, NV) | `adapter/z-stack/adapter/zStackAdapter.ts` | BLOCKED | file not ported |
 | Adapter manager | `adapter/z-stack/adapter/manager.ts` | PARTIAL | simplified; not an upstream-faithful port |
 | Adapter backup / NV memory | `adapter-backup.ts`, `adapter-nv-memory.ts` | PARTIAL | unit paths; no differential fixtures |
-| Z-Stack structs | `adapter/z-stack/structs/*` | PARTIAL | byte fixtures for NIB/tables; full catalog missing |
+| Z-Stack structs | `adapter/z-stack/structs/*` | PORTED | buffer-backed Struct/Table + `differential_structs` fixtures |
 | Z-Stack constants | `adapter/z-stack/constants/*` | PORTED | generated from upstream + `differential_constants`/`generated_constants` |
 | ZNP MT command catalog | `znp/definition.ts` | PORTED | generated 241 commands + `differential_definition` |
 | Buffalo primitives | `buffalo/buffalo.ts` | PORTED | unit tests + `differential_buffalo` fixtures |

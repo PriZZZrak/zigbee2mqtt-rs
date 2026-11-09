@@ -10,5 +10,5 @@ pub fn aps_tc_link_key_entry(data: Option<&[u8]>) -> Struct {
         .member(MemberType::Uint8, "keyAttributes")
         .member(MemberType::Uint8, "keyType")
         .member(MemberType::Uint8, "SeedShift_IcIndex")
-        .build(data, None)
+        .build(data)
 }

@@ -11,8 +11,9 @@ import {handle as buffalo_znp} from "./packages/buffalo_znp.mjs";
 import {handle as constants} from "./packages/constants.mjs";
 import {handle as zcl} from "./packages/zcl.mjs";
 import {handle as zpi_object} from "./packages/zpi_object.mjs";
+import {handle as structs} from "./packages/structs.mjs";
 
-const HANDLERS = {frame, buffalo, buffalo_znp, zcl, zpi_object, constants};
+const HANDLERS = {frame, buffalo, buffalo_znp, zcl, zpi_object, structs, constants};
 
 const rl = createInterface({input: process.stdin, crlfDelay: Infinity});
 for await (const line of rl) {

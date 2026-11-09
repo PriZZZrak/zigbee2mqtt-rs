@@ -7,5 +7,5 @@ pub fn aps_link_key_data_entry(data: Option<&[u8]>) -> Struct {
         .member(MemberType::Uint8Array(16), "key")
         .member(MemberType::Uint32, "txFrmCntr")
         .member(MemberType::Uint32, "rxFrmCntr")
-        .build(data, None)
+        .build(data)
 }

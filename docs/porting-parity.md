@@ -119,7 +119,8 @@ dependency of `cargo test`. Node is required only to regenerate fixtures or run
 the live oracle; the Rust gate replays the committed JSON.
 
 Initial modules: `frame`, `buffalo`, `buffalo_znp`, `zpi_object`, `zcl`,
-`constants`, `definition` (see `crates/zigbee-apiarist/tests/differential_*.rs`).
+`constants`, `definition`, `structs` (see
+`crates/zigbee-apiarist/tests/differential_*.rs`).
 
 Regenerate:
 
