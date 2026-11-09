@@ -35,13 +35,20 @@ pub enum TableMode {
 
 /// Upstream `AdapterNvMemory`.
 pub struct AdapterNvMemory {
-    pub znp: Znp,
+    pub znp: std::sync::Arc<tokio::sync::Mutex<Znp>>,
     pub memory_alignment: Option<Alignment>,
 }
 
 impl AdapterNvMemory {
     /// Upstream `constructor(znp)`.
     pub fn new(znp: Znp) -> Self {
+        Self {
+            znp: std::sync::Arc::new(tokio::sync::Mutex::new(znp)),
+            memory_alignment: None,
+        }
+    }
+
+    pub fn from_shared(znp: std::sync::Arc<tokio::sync::Mutex<Znp>>) -> Self {
         Self {
             znp,
             memory_alignment: None,
@@ -58,8 +65,8 @@ impl AdapterNvMemory {
     ) -> Result<ZpiObject, String> {
         let mut last_error = String::new();
         for _ in 0..RETRIES {
-            match self
-                .znp
+            let mut znp = self.znp.lock().await;
+            match znp
                 .request(
                     subsystem,
                     command,
@@ -88,8 +95,8 @@ impl AdapterNvMemory {
     ) -> Result<Option<ZpiObject>, String> {
         let mut last_error = String::new();
         for _ in 0..RETRIES {
-            match self
-                .znp
+            let mut znp = self.znp.lock().await;
+            match znp
                 .request(
                     subsystem,
                     command,

@@ -18,6 +18,8 @@ pub struct ConfigNetworkOptions {
 pub struct AdapterOptions {
     pub concurrent: Option<u16>,
     pub delay: Option<u16>,
+    pub disable_led: bool,
+    pub transmit_power: Option<i8>,
     pub force_start_with_inconsistent_adapter_configuration: bool,
 }
 

@@ -174,7 +174,7 @@ async fn nv_memory_roundtrip_over_unpi() {
         .expect("read")
         .is_none());
 
-    nv.znp.close().await.expect("close");
+    nv.znp.lock().await.close().await.expect("close");
     server.abort();
 }
 

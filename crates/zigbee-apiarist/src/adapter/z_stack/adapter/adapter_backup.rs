@@ -73,11 +73,11 @@ impl AdapterBackup {
     ) -> Result<Backup, String> {
         let version = self.get_adapter_version().await?;
 
-        let ieee_response = self
-            .nv
-            .znp
-            .request_with_reply(Subsystem::SYS, "getExtAddr", serde_json::json!({}))
-            .await?;
+        let ieee_response = {
+            let mut znp = self.nv.znp.lock().await;
+            znp.request_with_reply(Subsystem::SYS, "getExtAddr", serde_json::json!({}))
+                .await?
+        };
         let extaddress = ieee_response
             .payload
             .get("extaddress")
@@ -95,15 +95,15 @@ impl AdapterBackup {
             .ok_or_else(|| "Cannot backup - adapter not commissioned".to_string())?;
 
         let active_key_info = if version == ZnpVersion::ZStack12 {
-            let key_response = self
-                .nv
-                .znp
-                .request_with_reply(
+            let key_response = {
+                let mut znp = self.nv.znp.lock().await;
+                znp.request_with_reply(
                     Subsystem::SAPI,
                     "readConfiguration",
                     serde_json::json!({"configid": NvItemsIds::PRECFGKEY}),
                 )
-                .await?;
+                .await?
+            };
             let key_bytes = bytes(key_response.payload.get("value"));
             let key = nwk_key(Some(&key_bytes));
             let mut descriptor = nwk_key_descriptor(None);
@@ -587,11 +587,11 @@ impl AdapterBackup {
     }
 
     async fn get_adapter_version(&mut self) -> Result<ZnpVersion, String> {
-        let version = self
-            .nv
-            .znp
-            .request_with_reply(Subsystem::SYS, "version", serde_json::json!({}))
-            .await?;
+        let version = {
+            let mut znp = self.nv.znp.lock().await;
+            znp.request_with_reply(Subsystem::SYS, "version", serde_json::json!({}))
+                .await?
+        };
         let product = version
             .payload
             .get("product")

@@ -76,6 +76,57 @@ pub struct ZnpAdapterManager<A: ZdoAdapter> {
 }
 
 impl<A: ZdoAdapter> ZnpAdapterManager<A> {
+    async fn znp_request(
+        &mut self,
+        subsystem: Subsystem,
+        command: &str,
+        payload: Value,
+        waiter_id: Option<u64>,
+        timeout: Option<u64>,
+        expected_statuses: &[u8],
+    ) -> Result<Option<crate::adapter::z_stack::znp::zpi_object::ZpiObject>, String> {
+        let mut znp = self.backup.nv.znp.lock().await;
+        znp.request(
+            subsystem,
+            command,
+            payload,
+            waiter_id,
+            timeout,
+            expected_statuses,
+        )
+        .await
+    }
+
+    async fn znp_request_with_reply(
+        &mut self,
+        subsystem: Subsystem,
+        command: &str,
+        payload: Value,
+    ) -> Result<crate::adapter::z_stack::znp::zpi_object::ZpiObject, String> {
+        let mut znp = self.backup.nv.znp.lock().await;
+        znp.request_with_reply(subsystem, command, payload).await
+    }
+
+    async fn znp_wait_for(
+        &mut self,
+        r#type: Type,
+        subsystem: Subsystem,
+        command: &str,
+        target: Option<Value>,
+        transid: Option<u8>,
+        state: Option<u8>,
+        timeout: Option<u64>,
+    ) -> (
+        u64,
+        tokio::sync::oneshot::Receiver<
+            Result<crate::adapter::z_stack::znp::zpi_object::ZpiObject, String>,
+        >,
+    ) {
+        let znp = self.backup.nv.znp.lock().await;
+        znp.wait_for(r#type, subsystem, command, target, transid, state, timeout)
+            .await
+    }
+
     pub fn new(adapter: A, nv: AdapterNvMemory, options: StartupOptions) -> Self {
         let backup = AdapterBackup::new(nv, options.backup_path.clone());
         Self {
@@ -174,10 +225,7 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
 
         let preconfigured_key = if version == ZnpVersion::ZStack12 {
             let response = self
-                .backup
-                .nv
-                .znp
-                .request_with_reply(
+                .znp_request_with_reply(
                     Subsystem::SAPI,
                     "readConfiguration",
                     json!({"configid": NvItemsIds::PRECFGKEY}),
@@ -421,10 +469,7 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
 
     async fn begin_startup(&mut self) -> Result<(), String> {
         let device_info = self
-            .backup
-            .nv
-            .znp
-            .request_with_reply(Subsystem::UTIL, "getDeviceInfo", json!({}))
+            .znp_request_with_reply(Subsystem::UTIL, "getDeviceInfo", json!({}))
             .await?;
         if device_info
             .payload
@@ -434,10 +479,7 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
         {
             logger().debug("starting adapter as coordinator", NS);
             let (_, receiver) = self
-                .backup
-                .nv
-                .znp
-                .wait_for(
+                .znp_wait_for(
                     Type::AREQ,
                     Subsystem::ZDO,
                     "stateChangeInd",
@@ -447,21 +489,18 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
                     Some(60000),
                 )
                 .await;
-            self.backup
-                .nv
-                .znp
-                .request(
-                    Subsystem::ZDO,
-                    "startupFromApp",
-                    json!({"startdelay": 100}),
-                    None,
-                    None,
-                    &[
-                        ZnpCommandStatus::SUCCESS as u8,
-                        ZnpCommandStatus::FAILURE as u8,
-                    ],
-                )
-                .await?;
+            self.znp_request(
+                Subsystem::ZDO,
+                "startupFromApp",
+                json!({"startdelay": 100}),
+                None,
+                None,
+                &[
+                    ZnpCommandStatus::SUCCESS as u8,
+                    ZnpCommandStatus::FAILURE as u8,
+                ],
+            )
+            .await?;
             receiver.await.map_err(|_| "Waiter dropped".to_string())??;
             logger().debug("adapter successfully started in coordinator mode", NS);
         } else {
@@ -527,35 +566,26 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
             ZnpVersion::ZStack30x | ZnpVersion::ZStack3x0
         ) {
             let packed = pack_channel_list(&nwk_options.channel_list)?;
-            self.backup
-                .nv
-                .znp
-                .request(
-                    Subsystem::APP_CNF,
-                    "bdbSetChannel",
-                    json!({"isPrimary": 1, "channel": packed}),
-                    None,
-                    None,
-                    &[0],
-                )
-                .await?;
-            self.backup
-                .nv
-                .znp
-                .request(
-                    Subsystem::APP_CNF,
-                    "bdbSetChannel",
-                    json!({"isPrimary": 0, "channel": 0}),
-                    None,
-                    None,
-                    &[0],
-                )
-                .await?;
+            self.znp_request(
+                Subsystem::APP_CNF,
+                "bdbSetChannel",
+                json!({"isPrimary": 1, "channel": packed}),
+                None,
+                None,
+                &[0],
+            )
+            .await?;
+            self.znp_request(
+                Subsystem::APP_CNF,
+                "bdbSetChannel",
+                json!({"isPrimary": 0, "channel": 0}),
+                None,
+                None,
+                &[0],
+            )
+            .await?;
             let (_, receiver) = self
-                .backup
-                .nv
-                .znp
-                .wait_for(
+                .znp_wait_for(
                     Type::AREQ,
                     Subsystem::ZDO,
                     "stateChangeInd",
@@ -565,18 +595,15 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
                     Some(100000),
                 )
                 .await;
-            self.backup
-                .nv
-                .znp
-                .request(
-                    Subsystem::APP_CNF,
-                    "bdbStartCommissioning",
-                    json!({"mode": 0x04}),
-                    None,
-                    None,
-                    &[0],
-                )
-                .await?;
+            self.znp_request(
+                Subsystem::APP_CNF,
+                "bdbStartCommissioning",
+                json!({"mode": 0x04}),
+                None,
+                None,
+                &[0],
+            )
+            .await?;
             if receiver
                 .await
                 .map_err(|_| "Waiter dropped".to_string())?
@@ -615,10 +642,7 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
         }
 
         let ext_nwk_info = self
-            .backup
-            .nv
-            .znp
-            .request_with_reply(Subsystem::ZDO, "extNwkInfo", json!({}))
+            .znp_request_with_reply(Subsystem::ZDO, "extNwkInfo", json!({}))
             .await?;
         let panid = ext_nwk_info.payload.get("panid").and_then(Value::as_u64);
         if panid != Some(nwk_options.pan_id as u64) && fail_on_collision {
@@ -709,10 +733,7 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
                 .update_item(NvItemsIds::PRECFGKEY, &options.network_key, true)
                 .await?;
         } else {
-            self.backup
-                .nv
-                .znp
-                .request(
+            self.znp_request(
                     Subsystem::SAPI,
                     "writeConfiguration",
                     json!({"configid": NvItemsIds::PRECFGKEY, "len": options.network_key.len(), "value": options.network_key}),
@@ -745,10 +766,11 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
             cluster_id,
             &[json!(COORDINATOR_ADDRESS)],
         );
+        let mut znp = self.backup.nv.znp.lock().await;
         let response = self
             .adapter
             .send_zdo(
-                &mut self.backup.nv.znp,
+                &mut znp,
                 BLANK_EUI64,
                 COORDINATOR_ADDRESS,
                 cluster_id,
@@ -777,28 +799,25 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
                 );
             } else {
                 logger().debug(&format!("registering endpoint '{}'", endpoint.endpoint), NS);
-                self.backup
-                    .nv
-                    .znp
-                    .request(
-                        Subsystem::AF,
-                        "register",
-                        json!({
-                            "endpoint": endpoint.endpoint,
-                            "appprofid": endpoint.appprofid,
-                            "appdeviceid": endpoint.appdeviceid,
-                            "appdevver": endpoint.appdevver,
-                            "latencyreq": endpoint.latencyreq,
-                            "appnuminclusters": endpoint.appnuminclusters,
-                            "appinclusterlist": endpoint.appinclusterlist,
-                            "appnumoutclusters": endpoint.appnumoutclusters,
-                            "appoutclusterlist": endpoint.appoutclusterlist,
-                        }),
-                        None,
-                        None,
-                        &[0],
-                    )
-                    .await?;
+                znp.request(
+                    Subsystem::AF,
+                    "register",
+                    json!({
+                        "endpoint": endpoint.endpoint,
+                        "appprofid": endpoint.appprofid,
+                        "appdeviceid": endpoint.appdeviceid,
+                        "appdevver": endpoint.appdevver,
+                        "latencyreq": endpoint.latencyreq,
+                        "appnuminclusters": endpoint.appnuminclusters,
+                        "appinclusterlist": endpoint.appinclusterlist,
+                        "appnumoutclusters": endpoint.appnumoutclusters,
+                        "appoutclusterlist": endpoint.appoutclusterlist,
+                    }),
+                    None,
+                    None,
+                    &[0],
+                )
+                .await?;
             }
         }
         Ok(())
@@ -806,10 +825,7 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
 
     async fn add_to_group(&mut self, endpoint: u8, group: u16) -> Result<(), String> {
         let result = self
-            .backup
-            .nv
-            .znp
-            .request(
+            .znp_request(
                 Subsystem::ZDO,
                 "extFindGroup",
                 json!({"endpoint": endpoint, "groupid": group}),
@@ -825,36 +841,30 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
         if result.payload.get("status").and_then(Value::as_u64)
             == Some(ZnpCommandStatus::FAILURE as u64)
         {
-            self.backup
-                .nv
-                .znp
-                .request(
-                    Subsystem::ZDO,
-                    "extAddGroup",
-                    json!({"endpoint": endpoint, "groupid": group, "namelen": 0, "groupname": []}),
-                    None,
-                    None,
-                    &[0],
-                )
-                .await?;
+            self.znp_request(
+                Subsystem::ZDO,
+                "extAddGroup",
+                json!({"endpoint": endpoint, "groupid": group, "namelen": 0, "groupname": []}),
+                None,
+                None,
+                &[0],
+            )
+            .await?;
         }
         Ok(())
     }
 
     async fn reset_adapter(&mut self) -> Result<(), String> {
         logger().debug("adapter reset requested", NS);
-        self.backup
-            .nv
-            .znp
-            .request(
-                Subsystem::SYS,
-                "resetReq",
-                json!({"type": sys::reset_type::SOFT}),
-                None,
-                None,
-                &[0],
-            )
-            .await?;
+        self.znp_request(
+            Subsystem::SYS,
+            "resetReq",
+            json!({"type": sys::reset_type::SOFT}),
+            None,
+            None,
+            &[0],
+        )
+        .await?;
         logger().debug("adapter reset successful", NS);
         Ok(())
     }
@@ -902,10 +912,7 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
         };
         if parsed.extended_pan_id == [0xdd; 8] {
             let response = self
-                .backup
-                .nv
-                .znp
-                .request_with_reply(Subsystem::SYS, "getExtAddr", json!({}))
+                .znp_request_with_reply(Subsystem::SYS, "getExtAddr", json!({}))
                 .await?;
             let extaddress = response
                 .payload

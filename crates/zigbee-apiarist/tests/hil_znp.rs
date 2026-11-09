@@ -74,7 +74,12 @@ async fn hil_nv_memory_init() {
     eprintln!("NV memory alignment: {:?}", nv.memory_alignment);
     assert!(nv.memory_alignment.is_some());
 
-    nv.znp.close().await.expect("close coordinator");
+    nv.znp
+        .lock()
+        .await
+        .close()
+        .await
+        .expect("close coordinator");
 }
 
 #[tokio::test]
@@ -185,6 +190,8 @@ async fn hil_create_backup_matches_router() {
     adapter_backup
         .nv
         .znp
+        .lock()
+        .await
         .close()
         .await
         .expect("close coordinator");
@@ -242,7 +249,68 @@ async fn hil_manager_start_resumes_network() {
         .backup
         .nv
         .znp
+        .lock()
+        .await
         .close()
         .await
         .expect("close coordinator");
+}
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_zstack_adapter_start_stop() {
+    use zigbee_apiarist::adapter::z_stack::adapter::manager::StartResult;
+    use zigbee_apiarist::adapter::z_stack::adapter::tstype::ZnpVersion;
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter;
+    use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut adapter = ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        format!("{hil_dir}/router-node/coordinator_backup.json"),
+        AdapterOptions::default(),
+    );
+
+    let result = adapter.start().await.expect("adapter start");
+    eprintln!("zstack adapter start: {result:?}");
+    assert_eq!(result, StartResult::Resumed);
+
+    let ieee = adapter
+        .get_coordinator_ieee()
+        .await
+        .expect("coordinator IEEE");
+    eprintln!("coordinator IEEE: {ieee}");
+    assert_eq!(ieee, "0x00124b0024c2d400");
+
+    let version = adapter.get_coordinator_version().expect("version");
+    eprintln!("coordinator version: {version:?}");
+    assert_eq!(version.type_name, "ZStack3x0");
+    assert_eq!(
+        version
+            .meta
+            .get("product")
+            .and_then(serde_json::Value::as_u64),
+        Some(ZnpVersion::ZStack3x0 as u64)
+    );
+
+    adapter.stop().await.expect("adapter stop");
 }
