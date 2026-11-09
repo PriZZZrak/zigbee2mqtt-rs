@@ -15,7 +15,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | `zStackAdapter` | `adapter/z-stack/adapter/zStackAdapter.ts` | PORTED | start/stop/queue/ZDO/events/ZCL endpoint+group+broadcast+chunked incomingMsgExt/interPAN/network-params/backup/waitFor/endDeviceAnnce debounce; PTY chunk test + HIL |
 | Adapter manager | `adapter/z-stack/adapter/manager.ts` | PORTED | startup HIL `Resumed`; restore and commissioning HIL (gated `Z2M_HIL_DESTRUCTIVE=1`) |
 | Adapter NV memory | `adapter-nv-memory.ts` | PORTED | wire transcript + HIL `init` |
-| Adapter backup | `adapter-backup.ts` | PARTIAL | `createBackup` HIL matched router backup; `restoreBackup` not HIL yet |
+| Adapter backup | `adapter-backup.ts` | PORTED | `createBackup` matched router backup; `restoreBackup` HIL restored the network (gated `Z2M_HIL_DESTRUCTIVE=1`) |
 | Z-Stack structs | `adapter/z-stack/structs/*` | PORTED | buffer-backed Struct/Table + `differential_structs` fixtures |
 | Z-Stack constants | `adapter/z-stack/constants/*` | PORTED | generated from upstream + `differential_constants`/`generated_constants` |
 | ZNP MT command catalog | `znp/definition.ts` | PORTED | generated 241 commands + `differential_definition` |
