@@ -621,3 +621,152 @@ async fn hil_zstack_active_endpoints_match_upstream() {
 
     adapter.stop().await.expect("adapter stop");
 }
+
+#[tokio::test]
+#[ignore = "requires Z2M_SERIAL_PORT, Z2M_HIL_DIR and a real Z-Stack coordinator"]
+async fn hil_manager_restore_backup_recovers_network() {
+    use serde_json::json;
+    use zigbee_apiarist::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
+    use zigbee_apiarist::adapter::z_stack::adapter::manager::{StartResult, ZnpAdapterManager};
+    use zigbee_apiarist::adapter::z_stack::adapter::tstype::ZnpVersion;
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackZdo;
+    use zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds;
+    use zigbee_apiarist::models::startup_options::{
+        AdapterOptions, ConfigNetworkOptions, StartupOptions,
+    };
+
+    let _guard = HIL_LOCK.lock().unwrap();
+    let path = std::env::var("Z2M_SERIAL_PORT").expect("set Z2M_SERIAL_PORT");
+    let hil_dir = std::env::var("Z2M_HIL_DIR").expect("set Z2M_HIL_DIR");
+    let baud_rate = std::env::var("Z2M_SERIAL_BAUD")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(115200);
+    let backup_path = format!("{hil_dir}/router-node/coordinator_backup.json");
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path,
+        baud_rate: Some(baud_rate),
+        rtscts: Some(false),
+    });
+    let mut znp = Znp::new(transport);
+    znp.open().await.expect("open coordinator");
+    let mut nv = AdapterNvMemory::new(znp);
+    nv.init().await.expect("NV init");
+
+    let original = {
+        use zigbee_apiarist::adapter::z_stack::adapter::adapter_backup::AdapterBackup;
+        let mut backup_nv = AdapterNvMemory::from_shared(nv.znp.clone());
+        backup_nv.init().await.expect("backup NV init");
+        let mut backup = AdapterBackup::new(backup_nv, backup_path.clone());
+        backup.create_backup(&[]).await.expect("create backup")
+    };
+    eprintln!(
+        "original: pan={:04x} channel={} devices={}",
+        original.network_options.pan_id,
+        original.logical_channel,
+        original.devices.len()
+    );
+
+    // Simulate a fresh adapter: the has-configured flag is not 0x55.
+    nv.write_item(NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK3, &[0x00], 0, true)
+        .await
+        .expect("clear has-configured flag");
+
+    let options = StartupOptions {
+        version: ZnpVersion::ZStack3x0,
+        network_options: ConfigNetworkOptions {
+            pan_id: original.network_options.pan_id,
+            extended_pan_id: Some(original.network_options.extended_pan_id.clone()),
+            network_key: Some(original.network_options.network_key.clone()),
+            channel_list: original.network_options.channel_list.clone(),
+            network_key_distribute: Some(false),
+        },
+        green_power_group: 242,
+        backup_path: backup_path.clone(),
+        adapter_options: AdapterOptions::default(),
+    };
+    let mut manager = ZnpAdapterManager::new(ZStackZdo::default(), nv, options);
+    let result = manager.start().await.expect("restore startup");
+    eprintln!("restore startup result: {result:?}");
+    assert_eq!(result, StartResult::Restored);
+
+    let params = manager
+        .backup
+        .nv
+        .znp
+        .lock()
+        .await
+        .request_with_reply(Subsystem::ZDO, "extNwkInfo", json!({}))
+        .await
+        .expect("network parameters");
+    let pan_id = params
+        .payload
+        .get("panid")
+        .and_then(serde_json::Value::as_u64);
+    let channel = params
+        .payload
+        .get("channel")
+        .and_then(serde_json::Value::as_u64);
+    eprintln!("restored network: panId={pan_id:?} channel={channel:?}");
+    assert_eq!(pan_id, Some(original.network_options.pan_id as u64));
+    assert_eq!(
+        channel,
+        original
+            .network_options
+            .channel_list
+            .first()
+            .copied()
+            .map(u64::from)
+    );
+
+    // The restored backup must match the original backup.
+    let restored = {
+        use zigbee_apiarist::adapter::z_stack::adapter::adapter_backup::AdapterBackup;
+        let mut backup_nv = AdapterNvMemory::from_shared(manager.backup.nv.znp.clone());
+        backup_nv.init().await.expect("restored NV init");
+        let mut backup = AdapterBackup::new(backup_nv, backup_path.clone());
+        backup.create_backup(&[]).await.expect("restored backup")
+    };
+    assert_eq!(
+        restored.network_options.pan_id,
+        original.network_options.pan_id
+    );
+    assert_eq!(
+        restored.network_options.extended_pan_id,
+        original.network_options.extended_pan_id
+    );
+    assert_eq!(
+        restored.network_options.network_key,
+        original.network_options.network_key
+    );
+    assert_eq!(restored.logical_channel, original.logical_channel);
+    assert_eq!(
+        restored.coordinator_ieee_address,
+        original.coordinator_ieee_address
+    );
+    let original_devices = original
+        .devices
+        .iter()
+        .map(|device| device.ieee_address.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    let restored_devices = restored
+        .devices
+        .iter()
+        .map(|device| device.ieee_address.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert!(
+        original_devices.is_subset(&restored_devices),
+        "restored backup lost devices"
+    );
+
+    manager
+        .backup
+        .nv
+        .znp
+        .lock()
+        .await
+        .close()
+        .await
+        .expect("close coordinator");
+}
