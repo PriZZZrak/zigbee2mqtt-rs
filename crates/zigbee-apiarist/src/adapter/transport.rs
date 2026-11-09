@@ -171,9 +171,9 @@ impl AdapterTransport {
         self.events = None;
 
         let result = match writer {
-            Some(TransportWriter::Serial(mut port)) => {
-                port.shutdown().await.map_err(|error| error.to_string())
-            }
+            // Dropping the cloned handle closes the serial port; `shutdown` is a
+            // socket operation and fails on PTYs.
+            Some(TransportWriter::Serial(_port)) => Ok(()),
             Some(TransportWriter::Tcp(mut socket)) => {
                 socket.shutdown().await.map_err(|error| error.to_string())
             }

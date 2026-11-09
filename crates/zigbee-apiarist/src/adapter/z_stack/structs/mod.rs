@@ -2,10 +2,12 @@
 // Upstream revision: zigbee-herdsman v11.2.0 (c1a54e3d).
 
 pub mod entries;
+pub mod serializable_memory_object;
 pub mod r#struct;
 pub mod table;
 
 pub use entries::nib::nib;
+pub use serializable_memory_object::SerializableMemoryObject;
 
 /// Convenience for `nib(buffer)` with an owned buffer (upstream accepts a Buffer).
 pub fn nib_from(buffer: Vec<u8>) -> r#struct::Struct {

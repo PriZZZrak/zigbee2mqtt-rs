@@ -14,7 +14,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | ZNP bootloader skip | `znp.ts:117` | PARTIAL | code path only; HIL pending |
 | `zStackAdapter` (start/resume, permit join, NV) | `adapter/z-stack/adapter/zStackAdapter.ts` | BLOCKED | file not ported |
 | Adapter manager | `adapter/z-stack/adapter/manager.ts` | PARTIAL | simplified; not an upstream-faithful port |
-| Adapter backup / NV memory | `adapter-backup.ts`, `adapter-nv-memory.ts` | PARTIAL | unit paths; no differential fixtures |
+| Adapter backup / NV memory | `adapter-backup.ts`, `adapter-nv-memory.ts` | PARTIAL | NV memory has wire-transcript test; backup still partial |
 | Z-Stack structs | `adapter/z-stack/structs/*` | PORTED | buffer-backed Struct/Table + `differential_structs` fixtures |
 | Z-Stack constants | `adapter/z-stack/constants/*` | PORTED | generated from upstream + `differential_constants`/`generated_constants` |
 | ZNP MT command catalog | `znp/definition.ts` | PORTED | generated 241 commands + `differential_definition` |
