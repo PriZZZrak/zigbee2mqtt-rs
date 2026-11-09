@@ -41,3 +41,20 @@ pub fn try_parse_tcp_path(path: &str) -> Result<TcpPath, ()> {
         port,
     })
 }
+
+/// Upstream `readBackup(path)`.
+pub fn read_backup(path: &str) -> Result<Option<serde_json::Value>, String> {
+    if !std::path::Path::new(path).exists() {
+        return Ok(None);
+    }
+    let content = std::fs::read_to_string(path).map_err(|error| {
+        format!(
+            "[BACKUP] Coordinator backup is corrupted. This can happen due to filesystem corruption. To re-create the backup, delete '{path}' and start again. ({error})"
+        )
+    })?;
+    serde_json::from_str(&content).map(Some).map_err(|error| {
+        format!(
+            "[BACKUP] Coordinator backup is corrupted. This can happen due to filesystem corruption. To re-create the backup, delete '{path}' and start again. ({error})"
+        )
+    })
+}

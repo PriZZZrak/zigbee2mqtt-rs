@@ -66,7 +66,7 @@ impl ZnpAdapterManager {
                 };
                 // Restoring NV requires the same ZNP instance; the public
                 // adapter wires that up. Here we validate and report the result.
-                if stored.get("data").is_none() {
+                if stored.network_options.network_key.is_empty() {
                     return Err("Backup corrupted".to_string());
                 }
                 Ok("restored".to_string())

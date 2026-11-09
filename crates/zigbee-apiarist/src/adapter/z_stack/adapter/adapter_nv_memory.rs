@@ -188,6 +188,20 @@ impl AdapterNvMemory {
             .map(|buffer| use_struct(Some(&buffer))))
     }
 
+    /// Upstream `readItem(id, offset, useTable)`.
+    pub async fn read_item_table(
+        &mut self,
+        id: u16,
+        offset: usize,
+        use_table: TableFactory,
+    ) -> Result<Option<Table>, String> {
+        self.check_memory_alignment_setup()?;
+        Ok(self.read_item(id, offset).await?.map(|buffer| {
+            let alignment = self.memory_alignment.expect("memory alignment");
+            use_table(TableData::Buffer(buffer), alignment)
+        }))
+    }
+
     /// Upstream `writeItem(id, data, offset, autoInit)`.
     pub async fn write_item(
         &mut self,

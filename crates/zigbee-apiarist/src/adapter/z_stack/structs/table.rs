@@ -148,6 +148,14 @@ impl Table {
         self.free().into_iter().next()
     }
 
+    /// Index variant used by mutable restore procedures.
+    pub fn next_free_index(&self) -> Option<usize> {
+        let function = self
+            .entry_occupancy_function
+            .expect("Table usage cannot be determined without occupancy function when header is not present.");
+        self.entries.iter().position(|entry| !function(entry))
+    }
+
     /// Upstream `indexOf(entry)`.
     pub fn index_of(&self, entry: &Struct) -> Option<usize> {
         let target = entry.serialize(Alignment::Unaligned, true, 0);
