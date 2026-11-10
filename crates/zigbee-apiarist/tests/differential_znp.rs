@@ -218,3 +218,69 @@ async fn times_out_when_areq_never_arrives() {
     znp.close().await.expect("close");
     server.abort();
 }
+
+#[tokio::test]
+async fn skips_cc2530_bootloader_with_magic_byte() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
+    let mut transport = AdapterTransport::new(TransportOptions::new("/dev/null"));
+    transport.attach_serial(reader).expect("attach");
+
+    let magic_seen = Arc::new(AtomicBool::new(false));
+    let seen = magic_seen.clone();
+    let server = tokio::spawn(async move {
+        let mut buffer = [0u8; 256];
+        let mut pending = Vec::new();
+        let mut first_ping = true;
+        loop {
+            let read = match peer.read(&mut buffer).await {
+                Ok(0) => return,
+                Ok(read) => read,
+                Err(_) => return,
+            };
+            pending.extend_from_slice(&buffer[..read]);
+            // The magic byte is sent raw, outside of UNPI framing.
+            while let Some(position) = pending.iter().position(|byte| *byte == 0xef) {
+                pending.drain(..=position);
+                seen.store(true, Ordering::SeqCst);
+            }
+            loop {
+                if pending.len() < 5 || pending[0] != 0xfe {
+                    break;
+                }
+                let length = pending[1] as usize;
+                let frame_length = 4 + length + 1;
+                if pending.len() < frame_length {
+                    break;
+                }
+                let raw = pending[..frame_length].to_vec();
+                pending.drain(..frame_length);
+                let frame = Frame::from_buffer(length as u8, 4 + length, &raw).expect("frame");
+                let object = ZpiObject::from_unpi_frame(&frame);
+                assert_eq!(object.command.name, "ping");
+                if first_ping {
+                    // Simulate a coordinator stuck in the bootloader: no SRSP.
+                    first_ping = false;
+                    continue;
+                }
+                let response = Frame::new(
+                    Type::SRSP,
+                    Subsystem::SYS,
+                    frame.commandID,
+                    vec![0x01, 0x00],
+                    0,
+                    0,
+                );
+                peer.write_all(&response.to_buffer()).await.expect("write");
+            }
+        }
+    });
+
+    let mut znp = Znp::new(transport);
+    znp.open().await.expect("open after bootloader skip");
+    assert!(magic_seen.load(Ordering::SeqCst), "0xef was not written");
+    znp.close().await.expect("close");
+    server.abort();
+}
