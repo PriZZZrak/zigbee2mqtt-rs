@@ -262,33 +262,56 @@ impl Cluster {
     }
 }
 
-/// Upstream `CustomClusters` used by the ported tests.
-#[allow(non_snake_case)]
-#[derive(Debug, Clone)]
+/// Upstream `CustomClusters` — a map of cluster name to cluster definition.
+#[derive(Debug, Clone, Default)]
 pub struct CustomClusters {
-    pub genBasic: Cluster,
-    pub myCustomCluster: Cluster,
-    pub myCustomClusterManuf: Cluster,
-    pub myCustomWithManufAttr: Cluster,
+    clusters: Vec<Cluster>,
 }
 
 impl CustomClusters {
     pub fn empty() -> Self {
         Self {
-            genBasic: Cluster::new("genBasic", 0x0000),
-            myCustomCluster: Cluster::new("myCustomCluster", 65534),
-            myCustomClusterManuf: Cluster::new("myCustomClusterManuf", 65533),
-            myCustomWithManufAttr: Cluster::new("haDiagnostic", 0x0b05),
+            clusters: Vec::new(),
         }
     }
 
-    fn clusters(&self) -> [&Cluster; 4] {
-        [
-            &self.genBasic,
-            &self.myCustomCluster,
-            &self.myCustomClusterManuf,
-            &self.myCustomWithManufAttr,
-        ]
+    pub fn from_clusters(clusters: Vec<Cluster>) -> Self {
+        Self { clusters }
+    }
+
+    /// Insert/replace by cluster name (upstream object assignment semantics).
+    pub fn insert(&mut self, cluster: Cluster) {
+        if let Some(existing) = self
+            .clusters
+            .iter_mut()
+            .find(|existing| existing.name == cluster.name)
+        {
+            *existing = cluster;
+        } else {
+            self.clusters.push(cluster);
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Cluster> {
+        self.clusters.iter().find(|cluster| cluster.name == name)
+    }
+
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Cluster> {
+        self.clusters
+            .iter_mut()
+            .find(|cluster| cluster.name == name)
+    }
+
+    pub fn clusters(&self) -> impl Iterator<Item = &Cluster> {
+        self.clusters.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.clusters.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.clusters.is_empty()
     }
 }
 
@@ -495,18 +518,92 @@ impl Utils {
 
     /// Upstream `Utils.getGlobalCommand(key)`.
     pub fn get_global_command(key: impl Into<CommandKey>) -> Command {
+        use crate::zspec::zcl::definition::foundation::Foundation;
         let key = key.into();
-        match key {
+        let name = match key {
             CommandKey::Id(id) => match id {
-                2 => Command::new("writeUndiv", 2),
-                0 => Command::new("read", 0).with_response(1),
+                0x00 => "read",
+                0x01 => "readRsp",
+                0x02 => "write",
+                0x03 => "writeUndiv",
+                0x04 => "writeRsp",
+                0x05 => "writeNoRsp",
+                0x06 => "configReport",
+                0x07 => "configReportRsp",
+                0x08 => "readReportConfig",
+                0x09 => "readReportConfigRsp",
+                0x0a => "report",
+                0x0b => "defaultRsp",
+                0x0c => "discover",
+                0x0d => "discoverRsp",
+                0x0e => "readStructured",
+                0x0f => "writeStructured",
+                0x10 => "writeStructuredRsp",
+                0x11 => "discoverCommands",
+                0x12 => "discoverCommandsRsp",
+                0x13 => "discoverCommandsGen",
+                0x14 => "discoverCommandsGenRsp",
+                0x15 => "discoverExt",
+                0x16 => "discoverExtRsp",
                 _ => panic!("Global command does not exist"),
             },
             CommandKey::Name(name) => match name.as_str() {
-                "writeUndiv" => Command::new("writeUndiv", 2),
-                "read" => Command::new("read", 0).with_response(1),
+                "read" => "read",
+                "readRsp" => "readRsp",
+                "write" => "write",
+                "writeUndiv" => "writeUndiv",
+                "writeRsp" => "writeRsp",
+                "writeNoRsp" => "writeNoRsp",
+                "configReport" => "configReport",
+                "configReportRsp" => "configReportRsp",
+                "readReportConfig" => "readReportConfig",
+                "readReportConfigRsp" => "readReportConfigRsp",
+                "report" => "report",
+                "defaultRsp" => "defaultRsp",
+                "discover" => "discover",
+                "discoverRsp" => "discoverRsp",
+                "readStructured" => "readStructured",
+                "writeStructured" => "writeStructured",
+                "writeStructuredRsp" => "writeStructuredRsp",
+                "discoverCommands" => "discoverCommands",
+                "discoverCommandsRsp" => "discoverCommandsRsp",
+                "discoverCommandsGen" => "discoverCommandsGen",
+                "discoverCommandsGenRsp" => "discoverCommandsGenRsp",
+                "discoverExt" => "discoverExt",
+                "discoverExtRsp" => "discoverExtRsp",
                 _ => panic!("Global command does not exist"),
             },
+        };
+        let (id, response) = match name {
+            "read" => (0u8, Some(1u8)),
+            "readRsp" => (1, None),
+            "write" => (2, Some(4)),
+            "writeUndiv" => (3, None),
+            "writeRsp" => (4, None),
+            "writeNoRsp" => (5, None),
+            "configReport" => (6, Some(7)),
+            "configReportRsp" => (7, None),
+            "readReportConfig" => (8, Some(9)),
+            "readReportConfigRsp" => (9, None),
+            "report" => (10, None),
+            "defaultRsp" => (11, None),
+            "discover" => (12, Some(13)),
+            "discoverRsp" => (13, None),
+            "readStructured" => (14, None),
+            "writeStructured" => (15, Some(16)),
+            "writeStructuredRsp" => (16, None),
+            "discoverCommands" => (17, None),
+            "discoverCommandsRsp" => (18, None),
+            "discoverCommandsGen" => (19, None),
+            "discoverCommandsGenRsp" => (20, None),
+            "discoverExt" => (21, None),
+            "discoverExtRsp" => (22, None),
+            _ => unreachable!(),
+        };
+        let command = Command::new(name, id);
+        match response {
+            Some(response) => command.with_response(response),
+            None => command,
         }
     }
 

@@ -28,7 +28,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Controller helpers (request/queue/install codes/zclFrameConverter/zclTSN) | `controller/helpers/*` | PORTED | upstream request-queue semantics, full install-code vectors, converter tests |
 | `controller/touchlink.ts` | `controller/touchlink.ts` | PORTED | scan/identify/factory-reset frames + lock/restore tests |
 | Controller Entity / ZigbeeEntity + ControllerAdapter boundary | `controller/model/entity.ts`, `zigbeeEntity.ts` | PORTED | injection roundtrip + trait-object test |
-| Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | BLOCKED | not ported yet |
+| Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | BLOCKED | not ported; prerequisites in "Blocked: controller model layer" below |
 | `controller/controller.ts` | `controller/controller.ts` | BLOCKED | not ported yet |
 | `controller/greenPower.ts` | `controller/greenPower.ts` | BLOCKED | not ported yet |
 | `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | BLOCKED | not ported yet |
@@ -41,6 +41,44 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | HIL (coordinator in container) | — | PORTED | Dongle Plus `10c4:ea60`, SYS version + NV init, see `docs/hil/2026-11-09-dongle-plus.md` |
 | Upstream z2m oracle (container) | `zigbee2mqtt.14.3` | PORTED | resumed network, 3 devices, MQTT transcripts, see `docs/hil/2026-11-09-z2m-run.md` |
 | HIL (router + Dongle-P) | — | HARDWARE_PENDING | no Routerich/OpenWrt run recorded |
+
+## Blocked: controller model layer (`device.ts`, `endpoint.ts`, `group.ts`)
+
+Upstream is 1902 + 1254 + 432 lines. Remaining prerequisites for a faithful
+port (no stubs/simplifications):
+
+1. **Dynamic cluster/command identity in `Frame`.** `device.ts:1249`,
+   `endpoint.ts:1178` and `group.ts:290` pass the resolved `Cluster`/`Command`
+   objects (custom clusters, `manufacturerCode`) to `Zcl.Frame.create`.
+   `zcl_frame.rs` only accepts `ClusterRef::{Id(u16), Name(&'static str)}`,
+   stores static `cluster::Cluster`/`Command`, re-resolves commands from
+   `specific_command` and ignores `customClusters`. Custom clusters and
+   dynamic specific commands cannot be represented yet.
+2. **Cluster data catalog.** `Utils::get_cluster` currently knows only
+   genBasic/genDeviceTempCfg/genIdentify/genOnOff/genScenes/genLevelCtrl/
+   genAlarms/genRssiLocation/lightingColorCtrl/haDiagnostic/
+   manuSpecificAmazonWWAH. Models also need genGroups, genPollCtrl, ssIasZone,
+   genTime and genOta attributes/commands (`interviewInternal`, `onZclData`,
+   `addToGroup`, `removeFromGroup`, `removeFromAllGroups`, OTA). The static
+   modules have only the command subsets used by earlier tests.
+3. **OTA.** `controller/helpers/ota.ts` is not ported;
+   `ControllerAdapter` has no `waitFor` and there is no entity event emitter
+   for `once("deviceAnnounce")`, so the OTA methods in device.ts cannot be
+   ported faithfully yet.
+4. **Object graph ownership.** Upstream returns one shared mutable instance
+   from `Device.devices`/`Group.groups`; `Endpoint.getDevice()`/`save()`
+   re-enter that registry. `Arc<Mutex<Device>>` deadlocks in
+   `Device::interview` → `endpoint.bind()` → `save()`, while a value/snapshot
+   registry loses queued `Request` callbacks. A reentrant cell, per-field
+   interior mutability or an actor model must be chosen and documented.
+
+Already resolved in this slice: full `Foundation` global-command table
+(23 commands, correct IDs/responses), full ZCL/ZDO status enums,
+`CustomClusters` as a name→cluster map, `Request::new_with_policy`, and
+adapter `profileId` arguments.
+
+`AGENTS.md` §5 Q1 (device layer) is treated as answered for this scope by the
+current user objective ("port controller/").
 
 ## Next evidence to add
 

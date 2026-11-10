@@ -47,6 +47,7 @@ pub trait ControllerAdapter: Send + Sync {
         disable_response: bool,
         disable_recovery: bool,
         source_endpoint: Option<u8>,
+        profile_id: Option<u16>,
     ) -> AdapterFuture<'_, Option<ZclPayload>>;
 
     /// Upstream `sendZclFrameToGroup(...)`.
@@ -55,6 +56,7 @@ pub trait ControllerAdapter: Send + Sync {
         group_id: u16,
         frame: &Frame,
         source_endpoint: Option<u8>,
+        profile_id: Option<u16>,
     ) -> AdapterFuture<'_, ()>;
 
     /// Upstream `sendZclFrameToAll(...)`.
@@ -64,6 +66,7 @@ pub trait ControllerAdapter: Send + Sync {
         frame: &Frame,
         source_endpoint: u8,
         destination: u16,
+        profile_id: Option<u16>,
     ) -> AdapterFuture<'_, ()>;
 }
 
@@ -162,6 +165,7 @@ mod tests {
             _disable_response: bool,
             _disable_recovery: bool,
             _source_endpoint: Option<u8>,
+            _profile_id: Option<u16>,
         ) -> AdapterFuture<'_, Option<ZclPayload>> {
             Box::pin(async move { Ok(None) })
         }
@@ -171,6 +175,7 @@ mod tests {
             _group_id: u16,
             _frame: &Frame,
             _source_endpoint: Option<u8>,
+            _profile_id: Option<u16>,
         ) -> AdapterFuture<'_, ()> {
             Box::pin(async move { Ok(()) })
         }
@@ -181,6 +186,7 @@ mod tests {
             _frame: &Frame,
             _source_endpoint: u8,
             _destination: u16,
+            _profile_id: Option<u16>,
         ) -> AdapterFuture<'_, ()> {
             Box::pin(async move { Ok(()) })
         }

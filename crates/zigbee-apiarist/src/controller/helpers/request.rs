@@ -43,7 +43,17 @@ impl Request {
         frame: Frame,
         timeout: u64,
     ) -> Self {
-        let send_policy = default_send_policy(frame.command.ID);
+        Self::new_with_policy(function, frame, timeout, None)
+    }
+
+    /// Upstream optional `sendPolicy` constructor argument.
+    pub fn new_with_policy(
+        function: impl Fn() -> BoxedRequestFuture + Send + 'static,
+        frame: Frame,
+        timeout: u64,
+        send_policy: Option<SendPolicy>,
+    ) -> Self {
+        let send_policy = send_policy.or_else(|| default_send_policy(frame.command.ID));
         Self {
             frame,
             expires: timeout + now_ms(),
@@ -93,5 +103,35 @@ impl Request {
 
     pub fn last_error(&self) -> &str {
         &self.last_error
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::zspec::zcl::zcl_frame::Frame;
+    use serde_json::json;
+
+    fn frame() -> Frame {
+        Frame::create(0, 0, true, None, 1, "read", 6, json!([]), json!({}), 0)
+    }
+
+    #[test]
+    fn explicit_send_policy_overrides_default() {
+        let request = Request::new_with_policy(
+            || Box::pin(async { Ok(serde_json::Value::Null) }),
+            frame(),
+            1000,
+            Some(SendPolicy::Bulk),
+        );
+        assert_eq!(request.send_policy, Some(SendPolicy::Bulk));
+
+        let request = Request::new_with_policy(
+            || Box::pin(async { Ok(serde_json::Value::Null) }),
+            frame(),
+            1000,
+            None,
+        );
+        assert_eq!(request.send_policy, Some(SendPolicy::KeepPayload));
     }
 }

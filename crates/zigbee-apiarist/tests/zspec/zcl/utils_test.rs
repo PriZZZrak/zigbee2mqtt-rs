@@ -30,26 +30,32 @@ fn custom_clusters() -> CustomClusters {
     let mut clusters = CustomClusters::empty();
     let my_custom_attr = Attribute::new("myCustomAttr", 65533, DataType::UINT8);
 
-    clusters
-        .genBasic
+    let mut gen_basic = Cluster::new("genBasic", 0x0000);
+    gen_basic
         .attributes
         .insert("myCustomAttr".to_string(), my_custom_attr.clone());
-    clusters
-        .myCustomCluster
+    clusters.insert(gen_basic);
+
+    let mut my_custom = Cluster::new("myCustomCluster", 65534);
+    my_custom
         .attributes
         .insert("myCustomAttr".to_string(), my_custom_attr.clone());
-    clusters
-        .myCustomClusterManuf
+    clusters.insert(my_custom);
+
+    let mut my_custom_manuf = Cluster::new("myCustomClusterManuf", 65533);
+    my_custom_manuf
         .attributes
         .insert("myCustomAttr".to_string(), my_custom_attr);
-    clusters.myCustomClusterManuf.manufacturerCode = Some(65534);
+    my_custom_manuf.manufacturerCode = Some(65534);
+    clusters.insert(my_custom_manuf);
 
+    let mut my_custom_with_manuf_attr = Cluster::new("haDiagnostic", 0x0b05);
     let mut danfoss = Attribute::new("danfossSystemStatusCode", 65530, DataType::UINT8);
     danfoss.manufacturerCode = Some(manufacturer_code::DANFOSS_A_S);
-    clusters
-        .myCustomWithManufAttr
+    my_custom_with_manuf_attr
         .attributes
         .insert("danfossSystemStatusCode".to_string(), danfoss);
+    clusters.insert(my_custom_with_manuf_attr);
 
     clusters
 }
@@ -125,21 +131,33 @@ fn gets_cluster() {
 
     // custom by ID
     let cluster = Utils::get_cluster(65534, None, &customs);
-    assert_cluster(&cluster, &customs.myCustomCluster, "myCustomCluster");
+    assert_cluster(
+        &cluster,
+        &customs.get("myCustomCluster").unwrap(),
+        "myCustomCluster",
+    );
 
     // custom by name
     let cluster = Utils::get_cluster("myCustomCluster", None, &customs);
-    assert_cluster(&cluster, &customs.myCustomCluster, "myCustomCluster");
+    assert_cluster(
+        &cluster,
+        &customs.get("myCustomCluster").unwrap(),
+        "myCustomCluster",
+    );
 
     // custom by ID with no manufacturer code
     let cluster = Utils::get_cluster(65534, Some(123), &customs);
-    assert_cluster(&cluster, &customs.myCustomCluster, "myCustomCluster");
+    assert_cluster(
+        &cluster,
+        &customs.get("myCustomCluster").unwrap(),
+        "myCustomCluster",
+    );
 
     // custom by ID with non-matching manufacturer code
     let cluster = Utils::get_cluster(65533, Some(123), &customs);
     assert_cluster(
         &cluster,
-        &customs.myCustomClusterManuf,
+        &customs.get("myCustomClusterManuf").unwrap(),
         "myCustomClusterManuf",
     );
 
@@ -147,13 +165,13 @@ fn gets_cluster() {
     let cluster = Utils::get_cluster(65533, Some(65534), &customs);
     assert_cluster(
         &cluster,
-        &customs.myCustomClusterManuf,
+        &customs.get("myCustomClusterManuf").unwrap(),
         "myCustomClusterManuf",
     );
 
     // custom by ID overriding same Zcl ID entirely
     let cluster = Utils::get_cluster(0x0000, None, &customs);
-    assert_cluster(&cluster, &customs.genBasic, "genBasic");
+    assert_cluster(&cluster, &customs.get("genBasic").unwrap(), "genBasic");
 }
 
 #[test]
@@ -285,11 +303,53 @@ fn throws_when_getting_invalid_command_response() {
 }
 
 #[test]
+fn global_commands_cover_the_full_foundation_table() {
+    let expected = [
+        (0, "read"),
+        (1, "readRsp"),
+        (2, "write"),
+        (3, "writeUndiv"),
+        (4, "writeRsp"),
+        (5, "writeNoRsp"),
+        (6, "configReport"),
+        (7, "configReportRsp"),
+        (8, "readReportConfig"),
+        (9, "readReportConfigRsp"),
+        (10, "report"),
+        (11, "defaultRsp"),
+        (12, "discover"),
+        (13, "discoverRsp"),
+        (14, "readStructured"),
+        (15, "writeStructured"),
+        (16, "writeStructuredRsp"),
+        (17, "discoverCommands"),
+        (18, "discoverCommandsRsp"),
+        (19, "discoverCommandsGen"),
+        (20, "discoverCommandsGenRsp"),
+        (21, "discoverExt"),
+        (22, "discoverExtRsp"),
+    ];
+    for (id, name) in expected {
+        let by_id = Utils::get_global_command(id);
+        assert_eq!(by_id.ID as u32, id);
+        assert_eq!(by_id.name, name);
+        let by_name = Utils::get_global_command(name);
+        assert_eq!(by_name.ID, by_id.ID);
+        assert_eq!(by_name.response, by_id.response);
+    }
+}
+
+#[test]
 fn gets_global_command() {
     // by ID
     let command = Utils::get_global_command(2);
     assert_eq!(command.ID, 2);
+    assert_eq!(command.name, "write");
+    assert_eq!(command.response, Some(4));
+    let command = Utils::get_global_command(3);
+    assert_eq!(command.ID, 3);
     assert_eq!(command.name, "writeUndiv");
+    assert_eq!(command.response, None);
 
     // by name
     let command = Utils::get_global_command("read");
