@@ -2045,6 +2045,8 @@ mod tests {
         sent_group: Mutex<Vec<Frame>>,
         permit_joins: Mutex<Vec<(u8, Option<u16>)>>,
         zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
+        interpan_to_ieee: Mutex<Vec<(Frame, String)>>,
+        interpan_broadcast: Mutex<Vec<Frame>>,
         channel: u8,
         coordinator_ieee: String,
         stopped: AtomicBool,
@@ -2061,6 +2063,8 @@ mod tests {
                 sent_group: Mutex::new(Vec::new()),
                 permit_joins: Mutex::new(Vec::new()),
                 zdo_calls: Mutex::new(Vec::new()),
+                interpan_to_ieee: Mutex::new(Vec::new()),
+                interpan_broadcast: Mutex::new(Vec::new()),
                 channel,
                 coordinator_ieee: "0x00124b0000000001".to_string(),
                 stopped: AtomicBool::new(false),
@@ -2215,18 +2219,23 @@ mod tests {
 
         fn send_zcl_frame_inter_pan_broadcast(
             &self,
-            _frame: &Frame,
+            frame: &Frame,
             _timeout: u64,
             _disable_response: bool,
         ) -> ControllerFuture<'_, Option<ZclPayload>> {
+            self.interpan_broadcast.lock().unwrap().push(frame.clone());
             Box::pin(async move { Ok(None) })
         }
 
         fn send_zcl_frame_inter_pan_to_ieee_addr(
             &self,
-            _frame: &Frame,
-            _ieee_address: &str,
+            frame: &Frame,
+            ieee_address: &str,
         ) -> ControllerFuture<'_, ()> {
+            self.interpan_to_ieee
+                .lock()
+                .unwrap()
+                .push((frame.clone(), ieee_address.to_string()));
             Box::pin(async move { Ok(()) })
         }
     }
@@ -3278,6 +3287,438 @@ mod tests {
             .expect("gp response");
 
         assert!(events.lock().unwrap().is_empty());
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn send_raw_inter_pan_dispatches_to_touchlink() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-interpan-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let interpan_zcl = RawZclPayload {
+            command_key: json!("identifyRequest"),
+            payload: Some(json!({"transactionID": 1, "duration": 65535})),
+            ..Default::default()
+        };
+
+        controller
+            .send_raw(
+                RawPayload {
+                    inter_pan: Some(true),
+                    ieee_address: Some("0x00124b000000000b".to_string()),
+                    cluster_key: Some(json!("touchlink")),
+                    zcl: Some(interpan_zcl.clone()),
+                    ..Default::default()
+                },
+                &CustomClusters::empty(),
+            )
+            .await
+            .expect("interpan to ieee");
+        {
+            let calls = adapter.interpan_to_ieee.lock().unwrap();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0].1, "0x00124b000000000b");
+            assert_eq!(calls[0].0.command.name, "identifyRequest");
+        }
+
+        controller
+            .send_raw(
+                RawPayload {
+                    inter_pan: Some(true),
+                    cluster_key: Some(json!("touchlink")),
+                    zcl: Some(interpan_zcl),
+                    ..Default::default()
+                },
+                &CustomClusters::empty(),
+            )
+            .await
+            .expect("interpan broadcast");
+        assert_eq!(adapter.interpan_broadcast.lock().unwrap().len(), 1);
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn default_response_is_skipped_when_disabled_broadcast_or_headerless() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-default-skip-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let device = Device::create(
+            DeviceType::Router,
+            "0x00124b000000000c",
+            0x1234,
+            Some(0x1234),
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create device");
+        device.create_endpoint(1).expect("create endpoint");
+        device.save(true);
+
+        let report = |disable_default_response: bool| {
+            Frame::create(
+                0,
+                Direction::CLIENT_TO_SERVER as u8,
+                disable_default_response,
+                None,
+                9,
+                "report",
+                "genOnOff",
+                json!([{"attrId": 0, "attrData": true, "dataType": 0x10}]),
+                json!({}),
+                0,
+            )
+        };
+
+        let send = |frame: Frame, was_broadcast: bool| {
+            let data = frame.to_buffer();
+            ZclPayload {
+                cluster_id: 0x0006,
+                data,
+                header: Some(frame.header),
+                address: json!(0x1234),
+                endpoint: 1,
+                linkquality: 50,
+                group_id: 0,
+                was_broadcast,
+                destination_endpoint: 1,
+            }
+        };
+
+        adapter.sent_endpoint.lock().unwrap().clear();
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(send(
+                report(true),
+                false,
+            )))
+            .await
+            .expect("disabled default response");
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(send(
+                report(false),
+                true,
+            )))
+            .await
+            .expect("broadcast default response");
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(ZclPayload {
+                cluster_id: 0x0006,
+                data: vec![0, 1],
+                header: None,
+                address: json!(0x1234),
+                endpoint: 1,
+                linkquality: 50,
+                group_id: 0,
+                was_broadcast: false,
+                destination_endpoint: 1,
+            }))
+            .await
+            .expect("headerless default response");
+        assert!(!adapter
+            .sent_endpoint
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|frame| frame.command.name == "defaultRsp"));
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn xiaomi_retransmit_resolves_target_device_from_group_id() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-xiaomi-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let router = Device::create(
+            DeviceType::Router,
+            "0x00124b000000000d",
+            0x1234,
+            Some(0x1234),
+            Some("LUMI".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("lumi.router".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create router");
+        router.create_endpoint(1).expect("router endpoint");
+        router.save(true);
+
+        let end_device = Device::create(
+            DeviceType::EndDevice,
+            "0x00124b000000000e",
+            0x5678,
+            Some(0x1234),
+            Some("LUMI".to_string()),
+            Some("Battery".to_string()),
+            Some("lumi.sensor".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create end device");
+        end_device.create_endpoint(1).expect("end device endpoint");
+        end_device.save(true);
+
+        let frame = message_frame();
+        let data = frame.to_buffer();
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(ZclPayload {
+                cluster_id: 0x0006,
+                data,
+                header: Some(frame.header),
+                address: json!(0x1234),
+                endpoint: 1,
+                linkquality: 50,
+                group_id: 0x5678,
+                was_broadcast: false,
+                destination_endpoint: 1,
+            }))
+            .await
+            .expect("xiaomi retransmit");
+
+        let events = events.lock().unwrap();
+        let message = events
+            .iter()
+            .find_map(|event| match event {
+                ControllerEvent::Message(payload) => Some(payload),
+                _ => None,
+            })
+            .expect("message");
+        assert_eq!(message.device.ieee_addr(), "0x00124b000000000e");
+
+        drop(events);
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn unknown_device_is_identified_once_and_then_processed() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-identify-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let device = Device::create(
+            DeviceType::Router,
+            "0x00124b0000000002",
+            0x1111,
+            Some(0x1234),
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create device");
+        device.create_endpoint(1).expect("create endpoint");
+        device.save(true);
+
+        let frame = message_frame();
+        let data = frame.to_buffer();
+        let payload = ZclPayload {
+            cluster_id: 0x0006,
+            data,
+            header: Some(frame.header),
+            address: json!(0x2222),
+            endpoint: 1,
+            linkquality: 50,
+            group_id: 0,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        };
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(payload.clone()))
+            .await
+            .expect("identify device");
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(payload))
+            .await
+            .expect("identify device again");
+
+        assert_eq!(
+            adapter
+                .zdo_calls
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|call| call.2 == ClusterId::IEEE_ADDRESS_REQUEST)
+                .count(),
+            1
+        );
+        let events = events.lock().unwrap();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            ControllerEvent::Message(payload)
+                if payload.device.ieee_addr() == "0x00124b0000000002"
+        )));
+
+        drop(events);
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn green_power_decommissioning_removes_device() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-gp-decommission-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let source_id = 0x1234_5678u32;
+        let mut data = vec![0x01, 19, 0x04];
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&source_id.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.push(0xe0);
+        data.push(2);
+        data.extend_from_slice(&[0x02, 0x00]);
+        let payload = |data: Vec<u8>| ZclPayload {
+            cluster_id: 0x0021,
+            header: Header::from_buffer(&data),
+            data,
+            address: json!((source_id & 0xffff) as u16),
+            endpoint: 242,
+            linkquality: 200,
+            group_id: 0x0b84,
+            was_broadcast: true,
+            destination_endpoint: 242,
+        };
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(payload(data)))
+            .await
+            .expect("commissioning");
+        let ieee = GreenPower::source_id_to_ieee_address(source_id);
+        assert!(Device::by_ieee_addr(&ieee, false).is_some());
+
+        let mut decommission = vec![0x01, 20, 0x04];
+        decommission.extend_from_slice(&0u16.to_le_bytes());
+        decommission.extend_from_slice(&source_id.to_le_bytes());
+        decommission.extend_from_slice(&2u32.to_le_bytes());
+        decommission.push(0xe1);
+        decommission.push(0);
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(payload(decommission)))
+            .await
+            .expect("decommissioning");
+
+        assert!(Device::by_ieee_addr(&ieee, false).is_none());
+        let events = events.lock().unwrap();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            ControllerEvent::DeviceLeave(payload) if payload.ieee_addr == ieee
+        )));
+
+        drop(events);
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn green_power_channel_request_sends_response() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-gp-channel-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(25));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let source_id = 0x1234_5678u32;
+        let mut data = vec![0x01, 21, 0x00];
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&source_id.to_le_bytes());
+        data.extend_from_slice(&3u32.to_le_bytes());
+        data.push(0xe3);
+        data.push(1);
+        data.push(0x0c);
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(ZclPayload {
+                cluster_id: 0x0021,
+                header: Header::from_buffer(&data),
+                data,
+                address: json!((source_id & 0xffff) as u16),
+                endpoint: 242,
+                linkquality: 200,
+                group_id: 0x0b84,
+                was_broadcast: true,
+                destination_endpoint: 242,
+            }))
+            .await
+            .expect("channel request");
+
+        let frames = adapter.sent_all.lock().unwrap();
+        assert!(frames.iter().any(|frame| {
+            frame.command.name == "response"
+                && frame
+                    .payload
+                    .get("gpdPayload")
+                    .and_then(|value| value.get("commandID"))
+                    == Some(&json!(0xf3))
+        }));
+        drop(frames);
 
         controller.stop().await.expect("stop");
         let _ = std::fs::remove_file(path);

@@ -1438,7 +1438,8 @@ fn decode_parameters(command: &Command, buffer: &[u8], header_length: usize) -> 
         if !Frame::conditions_valid(parameter, &current, Some(remaining)) {
             continue;
         }
-        if position >= buffer.len() {
+        if position >= buffer.len() && parameter.buffalo_type != Some(BuffaloZclDataType::GPD_FRAME)
+        {
             if parameter.name == "minimumBlockPeriod" {
                 break;
             }
