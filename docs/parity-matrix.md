@@ -13,7 +13,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | ZNP framing + request/waitress | `adapter/z-stack/znp/znp.ts` | PARTIAL | PTY request tests; no full upstream znp transcript |
 | ZNP bootloader skip | `znp.ts:117` | PARTIAL | code path only; HIL pending |
 | `zStackAdapter` | `adapter/z-stack/adapter/zStackAdapter.ts` | PORTED | start/stop/queue/ZDO/events/ZCL endpoint+group+broadcast+chunked incomingMsgExt/interPAN/network-params/backup/waitFor/endDeviceAnnce debounce; endpoint 239 Shelly profile fixed; PTY chunk test + HIL |
-| Adapter manager | `adapter/z-stack/adapter/manager.ts` | PORTED | startup HIL `Resumed`; restore/commissioning validated once (2026-11-10) — **re-run forbidden** (AGENTS §3.11) |
+| Adapter manager | `adapter/z-stack/adapter/manager.ts` | PORTED | startup HIL `Resumed`; PTY tests cover `startup`/`restoreBackup`/`startCommissioning` strategy selection; destructive HIL validated once (2026-11-10) — **re-run forbidden** (AGENTS §3.11) |
 | Adapter NV memory | `adapter-nv-memory.ts` | PORTED | wire transcript + HIL `init` |
 | Adapter backup | `adapter-backup.ts` | PORTED | `createBackup` matched router backup; `restoreBackup` validated once (2026-11-10) — **re-run forbidden** (AGENTS §3.11) |
 | Z-Stack structs | `adapter/z-stack/structs/*` | PORTED | buffer-backed Struct/Table + `differential_structs` fixtures |

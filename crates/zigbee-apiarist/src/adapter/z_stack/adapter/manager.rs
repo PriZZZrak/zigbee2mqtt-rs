@@ -967,3 +967,233 @@ fn random_u16() -> u16 {
     let bytes = random_bytes(2);
     u16::from_le_bytes([bytes[0], bytes[1]])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adapter::transport::{AdapterTransport, TransportOptions};
+    use crate::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
+    use crate::adapter::z_stack::adapter::z_stack_adapter::ZStackZdo;
+    use crate::adapter::z_stack::structs::entries::nib::nib;
+    use crate::adapter::z_stack::structs::r#struct::Alignment;
+    use crate::adapter::z_stack::unpi::frame::Frame;
+    use crate::adapter::z_stack::znp::zpi_object::ZpiObject;
+    use std::collections::BTreeMap;
+    use tokio::io::AsyncWriteExt;
+
+    const NETWORK_KEY: [u8; 16] = [
+        0x01, 0x03, 0x05, 0x07, 0x09, 0x0b, 0x0d, 0x0f, 0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c,
+        0x0d,
+    ];
+    const EXTENDED_PAN_ID: [u8; 8] = [0x00, 0x12, 0x4b, 0x00, 0x24, 0xc2, 0xd4, 0x00];
+    const PAN_ID: u16 = 0x1a62;
+    const CHANNEL: u8 = 11;
+
+    struct FakeCoordinator {
+        server: tokio::task::JoinHandle<()>,
+    }
+
+    impl FakeCoordinator {
+        fn spawn(items: BTreeMap<u16, Vec<u8>>) -> (AdapterTransport, Self) {
+            let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
+            let mut transport = AdapterTransport::new(TransportOptions::new("/dev/null"));
+            transport.attach_serial(reader).expect("attach");
+            let server = tokio::spawn(async move {
+                let mut buffer = [0u8; 512];
+                let mut pending = Vec::new();
+                loop {
+                    let read = match peer.read(&mut buffer).await {
+                        Ok(0) => return,
+                        Ok(read) => read,
+                        Err(_) => return,
+                    };
+                    pending.extend_from_slice(&buffer[..read]);
+                    loop {
+                        if pending.len() < 5 {
+                            break;
+                        }
+                        let length = pending[1] as usize;
+                        let frame_length = 4 + length + 1;
+                        if pending.len() < frame_length {
+                            break;
+                        }
+                        let raw = pending[..frame_length].to_vec();
+                        pending.drain(..frame_length);
+                        let frame =
+                            Frame::from_buffer(length as u8, 4 + length, &raw).expect("frame");
+                        let object = ZpiObject::from_unpi_frame(&frame);
+                        let payload = &object.payload;
+                        let data = match object.command.name.as_str() {
+                            "ping" => vec![0x01, 0x00],
+                            "osalNvLength" => {
+                                let id = payload["id"].as_u64().unwrap() as u16;
+                                let length = items.get(&id).map(Vec::len).unwrap_or(0) as u16;
+                                length.to_le_bytes().to_vec()
+                            }
+                            "osalNvReadExt" => {
+                                let id = payload["id"].as_u64().unwrap() as u16;
+                                let offset = payload["offset"].as_u64().unwrap() as usize;
+                                let value = items.get(&id).cloned().unwrap_or_default();
+                                let end = (offset + 240).min(value.len());
+                                let chunk = &value[offset..end];
+                                let mut data = vec![0x00, chunk.len() as u8];
+                                data.extend_from_slice(chunk);
+                                data
+                            }
+                            other => panic!("unexpected NV command '{other}'"),
+                        };
+                        let response =
+                            Frame::new(Type::SRSP, frame.subsystem, frame.commandID, data, 0, 0);
+                        peer.write_all(&response.to_buffer()).await.expect("write");
+                    }
+                }
+            });
+            (transport, Self { server })
+        }
+    }
+
+    impl Drop for FakeCoordinator {
+        fn drop(&mut self) {
+            self.server.abort();
+        }
+    }
+
+    fn nib_bytes(pan_id: u16, channel: u8, extended_pan_id: &[u8]) -> Vec<u8> {
+        let mut value = nib(None);
+        value.set_u16("nwkPanId", pan_id);
+        value.set_u32("channelList", 1u32 << channel);
+        value.set_u8("nwkLogicalChannel", channel);
+        value.set_bytes("extendedPANID", extended_pan_id);
+        value.set_u8("SecurityLevel", 5);
+        value.set_u8("nwkUpdateId", 0);
+        value.serialize(Alignment::Unaligned, true, 0)
+    }
+
+    fn items(
+        has_configured: u8,
+        pan_id: u16,
+        channel: u8,
+        extended_pan_id: &[u8],
+    ) -> BTreeMap<u16, Vec<u8>> {
+        let mut items = BTreeMap::new();
+        items.insert(NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK3, vec![has_configured]);
+        items.insert(NvItemsIds::NIB, nib_bytes(pan_id, channel, extended_pan_id));
+        items.insert(NvItemsIds::PRECFGKEY, NETWORK_KEY.to_vec());
+        let mut key_info = vec![0u8];
+        key_info.extend_from_slice(&NETWORK_KEY);
+        items.insert(NvItemsIds::NWK_ACTIVE_KEY_INFO, key_info.clone());
+        items.insert(NvItemsIds::NWK_ALTERN_KEY_INFO, key_info);
+        // 21 bytes => unaligned memory detection.
+        let mut nwk_key = vec![0u8];
+        nwk_key.extend_from_slice(&NETWORK_KEY);
+        nwk_key.extend_from_slice(&[0u8; 4]);
+        items.insert(NvItemsIds::NWKKEY, nwk_key);
+        items
+    }
+
+    fn options(pan_id: u16, extended_pan_id: &[u8], channel: u8, path: &str) -> StartupOptions {
+        StartupOptions {
+            version: ZnpVersion::ZStack3x0,
+            network_options: ConfigNetworkOptions {
+                pan_id,
+                extended_pan_id: Some(extended_pan_id.to_vec()),
+                network_key: Some(NETWORK_KEY.to_vec()),
+                channel_list: vec![channel],
+                network_key_distribute: Some(false),
+            },
+            green_power_group: 242,
+            backup_path: path.to_string(),
+            adapter_options: AdapterOptions::default(),
+        }
+    }
+
+    async fn manager_with(
+        items: BTreeMap<u16, Vec<u8>>,
+        options: StartupOptions,
+    ) -> (ZnpAdapterManager<ZStackZdo>, FakeCoordinator) {
+        let (transport, coordinator) = FakeCoordinator::spawn(items);
+        let mut znp = Znp::new(transport);
+        znp.open().await.expect("open fake coordinator");
+        let mut nv = AdapterNvMemory::new(znp);
+        nv.init().await.expect("NV init");
+        let mut manager = ZnpAdapterManager::new(ZStackZdo::default(), nv, options);
+        manager.nwk_options = Some(
+            manager
+                .parse_config_network_options()
+                .await
+                .expect("network options"),
+        );
+        (manager, coordinator)
+    }
+
+    #[tokio::test]
+    async fn selects_startup_when_config_matches_adapter() {
+        let (mut manager, _coordinator) = manager_with(
+            items(0x55, PAN_ID, CHANNEL, &EXTENDED_PAN_ID),
+            options(
+                PAN_ID,
+                &EXTENDED_PAN_ID,
+                CHANNEL,
+                "/tmp/opencode/does-not-exist.json",
+            ),
+        )
+        .await;
+        assert_eq!(
+            manager.determine_strategy().await.expect("strategy"),
+            StartupStrategy::Startup
+        );
+    }
+
+    #[tokio::test]
+    async fn selects_restore_backup_when_unconfigured_and_backup_matches() {
+        let path = "/tmp/opencode/manager-strategy-restore.json";
+        std::fs::write(
+            path,
+            serde_json::json!({
+                "metadata": {"format": "zigpy/open-coordinator-backup", "version": 1},
+                "coordinator_ieee": "00124b0024c2d400",
+                "pan_id": "1a62",
+                "extended_pan_id": "00124b0024c2d400",
+                "nwk_update_id": 0,
+                "security_level": 5,
+                "channel": 11,
+                "channel_mask": [11],
+                "network_key": {
+                    "key": "01030507090b0d0f00020406080a0c0d",
+                    "sequence_number": 0,
+                    "frame_counter": 1000
+                },
+                "devices": []
+            })
+            .to_string(),
+        )
+        .expect("write backup");
+        let (mut manager, _coordinator) = manager_with(
+            items(0x00, PAN_ID, CHANNEL, &EXTENDED_PAN_ID),
+            options(PAN_ID, &EXTENDED_PAN_ID, CHANNEL, path),
+        )
+        .await;
+        assert_eq!(
+            manager.determine_strategy().await.expect("strategy"),
+            StartupStrategy::RestoreBackup
+        );
+    }
+
+    #[tokio::test]
+    async fn selects_commissioning_when_config_mismatches_and_backup_missing() {
+        let (mut manager, _coordinator) = manager_with(
+            items(0x55, PAN_ID, CHANNEL, &EXTENDED_PAN_ID),
+            options(
+                0x1b63,
+                &EXTENDED_PAN_ID,
+                CHANNEL,
+                "/tmp/opencode/does-not-exist.json",
+            ),
+        )
+        .await;
+        assert_eq!(
+            manager.determine_strategy().await.expect("strategy"),
+            StartupStrategy::StartCommissioning
+        );
+    }
+}
