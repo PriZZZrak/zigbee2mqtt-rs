@@ -889,6 +889,13 @@ fn read_response_internal(overhead: bool, cluster_id: u16, buffer: &[u8]) -> Val
                 "entryList": list,
             })
         }
+        ClusterId::BIND_RESPONSE
+        | ClusterId::UNBIND_RESPONSE
+        | ClusterId::CLEAR_ALL_BINDINGS_RESPONSE
+        | ClusterId::LEAVE_RESPONSE
+        | ClusterId::PERMIT_JOINING_RESPONSE
+        | ClusterId::START_KEY_UPDATE_RESPONSE
+        | ClusterId::DECOMMISSION_RESPONSE => Value::Null,
         ClusterId::NWK_UPDATE_RESPONSE | ClusterId::NWK_ENHANCED_UPDATE_RESPONSE => {
             let scanned = reader.read_u32();
             let transmissions = reader.read_u16();
@@ -1067,4 +1074,35 @@ fn read_set_configuration_tlvs(reader: &mut BuffaloZdo) -> Vec<Value> {
         tlvs.push(json!({"tagId": tag, "length": length, "tlv": tlv}));
     }
     tlvs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Upstream `readBindResponse` / `readUnbindResponse` /
+    /// `readClearAllBindingsResponse` / `readLeaveResponse` /
+    /// `readPermitJoiningResponse` / `readStartKeyUpdateResponse` /
+    /// `readDecommissionResponse` all return `[status, undefined]`.
+    #[test]
+    fn reads_status_only_responses() {
+        for cluster in [
+            ClusterId::BIND_RESPONSE,
+            ClusterId::UNBIND_RESPONSE,
+            ClusterId::CLEAR_ALL_BINDINGS_RESPONSE,
+            ClusterId::LEAVE_RESPONSE,
+            ClusterId::PERMIT_JOINING_RESPONSE,
+            ClusterId::START_KEY_UPDATE_RESPONSE,
+            ClusterId::DECOMMISSION_RESPONSE,
+        ] {
+            assert_eq!(
+                BuffaloZdo::read_response(false, cluster, &[0x00]),
+                serde_json::json!([0, null])
+            );
+            assert_eq!(
+                BuffaloZdo::read_response(false, cluster, &[0x02]),
+                serde_json::json!([2, null])
+            );
+        }
+    }
 }

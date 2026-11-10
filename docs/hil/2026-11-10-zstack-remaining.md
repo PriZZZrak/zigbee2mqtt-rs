@@ -68,3 +68,17 @@ Every endpoint from upstream `endpoints()` is present, so the manager's
 `registerEndpoints` path is confirmed against the running adapter.
 
 Full HIL suite: **11 passed, 0 failed, 0 ignored**.
+
+## ZDO status-only responses (found on hardware)
+
+`permitJoin` on the real coordinator produced a `permitJoiningRsp` AREQ that
+panicked the ZDO reader (`Unknown cluster id 0x8036`) and killed the event
+dispatcher. Upstream `readResponse` handles seven status-only responses that
+were missing:
+
+- `BIND_RESPONSE`, `UNBIND_RESPONSE`, `CLEAR_ALL_BINDINGS_RESPONSE`,
+  `LEAVE_RESPONSE`, `PERMIT_JOINING_RESPONSE`, `START_KEY_UPDATE_RESPONSE`,
+  `DECOMMISSION_RESPONSE` → `[status, undefined]`.
+
+Ported; test `reads_status_only_responses`. `permitJoin(60)` then ran without
+a dispatcher panic (no device joined because none is currently on the air).
