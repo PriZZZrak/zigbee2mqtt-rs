@@ -600,7 +600,14 @@ impl ZStackAdapter {
                 .znp
                 .lock()
                 .await
-                .request_with_reply(Subsystem::UTIL, "ledControl", payload)
+                .request(
+                    Subsystem::UTIL,
+                    "ledControl",
+                    payload,
+                    None,
+                    Some(500),
+                    &[0],
+                )
                 .await;
             if result.is_err() {
                 self.supports_led = Some(false);

@@ -515,9 +515,9 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
             .get_stored_backup()?
             .ok_or_else(|| "Cannot restore backup - none is available".to_string())?;
         let provisioning = NetworkOptions {
-            pan_id: 1 + (random_u16() % 65532),
+            pan_id: 1 + (f64::from(random_u16()) / 65535.0 * 65532.0).round() as u16,
             extended_pan_id: random_bytes(8),
-            channel_list: vec![11 + (random_u8() % 16)],
+            channel_list: vec![11 + (f64::from(random_u8()) / 255.0 * 15.0).round() as u8],
             network_key: random_bytes(16),
             network_key_distribute: false,
             has_default_extended_pan_id: false,
@@ -534,6 +534,13 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
         );
         logger().debug(
             &format!(" - networkKey: {}", hex(&provisioning.network_key)),
+            NS,
+        );
+        logger().debug(
+            &format!(
+                " - networkKeyDistribute: {}",
+                provisioning.network_key_distribute
+            ),
             NS,
         );
         self.begin_commissioning(provisioning, false, false).await?;
