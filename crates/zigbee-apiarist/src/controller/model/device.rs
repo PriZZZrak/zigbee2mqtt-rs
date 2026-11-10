@@ -1933,7 +1933,7 @@ impl Device {
                 "srcID": self.ieee_addr().trim_start_matches("0x").parse::<u64>().unwrap_or(0),
             });
             let cluster = Utils::get_cluster(33u32, None, &self.custom_clusters());
-            let command = Utils::get_cluster_command(&cluster, "pairing");
+            let command = Utils::get_cluster_command_response(&cluster, "pairing");
             let frame = Frame::create_with_definitions(
                 cluster,
                 command,

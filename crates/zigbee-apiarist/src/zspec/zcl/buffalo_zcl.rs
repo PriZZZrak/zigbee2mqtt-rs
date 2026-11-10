@@ -346,224 +346,336 @@ impl BuffaloZcl {
         let command = value["commandID"].as_u64().unwrap_or(0);
         match command {
             0xf0 => {
+                // Commissioning Reply
                 let options = value["options"].as_u64().unwrap_or(0) as u8;
-                let mut payload = vec![options];
-                if options & 0x01 != 0 {
-                    payload.extend_from_slice(
-                        &(value["panID"].as_u64().unwrap_or(0) as u16).to_le_bytes(),
-                    );
+                let pan_id_present = options & 0x01 != 0;
+                let gpd_security_key_present = options & 0x02 != 0;
+                let gpd_key_encryption = (options >> 2) & 0x01 != 0;
+                let security_level = (options >> 3) & 0x03;
+                let has_gpd_key_mic = gpd_key_encryption && gpd_security_key_present;
+                let has_frame_counter = gpd_security_key_present
+                    && gpd_key_encryption
+                    && (security_level == 0b10 || security_level == 0b11);
+
+                self.write_bytes(&[1
+                    + if pan_id_present { 2 } else { 0 }
+                    + if gpd_security_key_present { 16 } else { 0 }
+                    + if has_gpd_key_mic { 4 } else { 0 }
+                    + if has_frame_counter { 4 } else { 0 }]);
+                self.write_bytes(&[options]);
+
+                if pan_id_present {
+                    self.write_u16(value["panID"].as_u64().unwrap_or(0) as u16);
                 }
-                if options & 0x02 != 0 {
-                    payload.extend(buffer_like(&value["securityKey"]).unwrap_or_default());
+
+                if gpd_security_key_present {
+                    let mut security_key = buffer_like(&value["securityKey"]).unwrap_or_default();
+                    security_key.resize(16, 0);
+                    self.write_bytes(&security_key[..16]);
                 }
-                if options & 0x04 != 0 {
-                    payload.extend_from_slice(
-                        &(value["keyMic"].as_u64().unwrap_or(0) as u32).to_le_bytes(),
-                    );
+
+                if has_gpd_key_mic {
+                    self.write_uint(value["keyMic"].as_u64().unwrap_or(0), 4);
                 }
-                if options & 0x08 != 0 {
-                    payload.extend_from_slice(
-                        &(value["frameCounter"].as_u64().unwrap_or(0) as u32).to_le_bytes(),
-                    );
+
+                if has_frame_counter {
+                    self.write_uint(value["frameCounter"].as_u64().unwrap_or(0), 4);
                 }
-                self.write_bytes(&[payload.len() as u8]);
-                self.write_bytes(&payload);
             }
             0xf3 => {
+                // Channel configuration
                 let channel = value["operationalChannel"].as_u64().unwrap_or(0) as u8;
                 let basic = value["basic"].as_bool().unwrap_or(false);
-                self.write_bytes(&[1, channel | if basic { 0x10 } else { 0 }]);
+                self.write_bytes(&[1]);
+                self.write_bytes(&[(channel & 0x0f) | if basic { 0x10 } else { 0 }]);
             }
-            0xf4 => {
-                let buffer = buffer_like(&value["buffer"]).unwrap_or_default();
-                self.write_bytes(&[buffer.len() as u8]);
-                self.write_bytes(&buffer);
+            0xf4 | 0xf5 => {
+                self.write_custom_gpd_frame(value);
             }
+            command if (0xf7..=0xff).contains(&command) => {
+                self.write_custom_gpd_frame(value);
+            }
+            // 0xf1: Write Attributes
+            // 0xf2: Read Attributes
+            // 0xf6: ZCL Tunneling
             _ => {}
         }
     }
 
-    fn read_gpd_frame(&mut self, options: &Value) -> Value {
-        let payload = options
-            .get("payload")
-            .unwrap_or_else(|| panic!("payload option required"));
+    fn write_custom_gpd_frame(&mut self, value: &Value) {
+        let buffer = buffer_like(&value["buffer"]).unwrap_or_default();
+        self.write_bytes(&[buffer.len() as u8]);
+        self.write_bytes(&buffer);
+    }
+
+    pub(crate) fn read_gpd_frame(&mut self, options: &Value) -> Value {
+        let Some(payload) = options.get("payload") else {
+            panic!("Cannot read GPD_FRAME without required payload options specified");
+        };
+        let Some(size) = payload.get("payloadSize").and_then(Value::as_u64) else {
+            panic!("Cannot read GPD_FRAME without required payload options specified");
+        };
+        if size == 0 {
+            return json!({});
+        }
+        let size = size as usize;
+        let start_position = self.position;
         let command = payload
             .get("commandID")
             .and_then(Value::as_u64)
             .unwrap_or(0);
-        let size = payload
-            .get("payloadSize")
-            .and_then(Value::as_u64)
-            .unwrap_or_else(|| panic!("payloadSize option required")) as usize;
-        match command {
+
+        let result = match command {
+            0xe0 => {
+                // Commissioning
+                let device_id = self.read_u8();
+                let gpd_options = self.read_u8();
+                let mut extended_options = 0u8;
+                let mut security_key = vec![0u8; 16];
+                let mut key_mic = 0u32;
+                let mut outgoing_counter = 0u32;
+                let mut application_info = 0u8;
+                let mut manufacturer_id = 0u16;
+                let mut model_id = 0u16;
+                let mut num_gpd_commands = 0u8;
+                let mut gpd_command_id_list: Vec<u8> = Vec::new();
+                let mut num_server_clusters = 0u8;
+                let mut num_client_clusters = 0u8;
+                let mut gpd_server_clusters: Vec<u8> = Vec::new();
+                let mut gpd_client_clusters: Vec<u8> = Vec::new();
+                let mut generic_switch_config = 0u8;
+                let mut current_contact_status = 0u8;
+
+                if gpd_options & 0x80 != 0 {
+                    extended_options = self.read_u8();
+                }
+                if extended_options & 0x20 != 0 {
+                    security_key = self.read_bytes(16);
+                }
+                if extended_options & 0x40 != 0 {
+                    key_mic = self.read_uint(4) as u32;
+                }
+                if extended_options & 0x80 != 0 {
+                    outgoing_counter = self.read_uint(4) as u32;
+                }
+                if gpd_options & 0x04 != 0 {
+                    application_info = self.read_u8();
+                }
+                if application_info & 0x01 != 0 {
+                    manufacturer_id = self.read_u16();
+                }
+                if application_info & 0x02 != 0 {
+                    model_id = self.read_u16();
+                }
+                if application_info & 0x04 != 0 {
+                    num_gpd_commands = self.read_u8();
+                    gpd_command_id_list = self.read_bytes(num_gpd_commands as usize);
+                }
+                if application_info & 0x08 != 0 {
+                    let length = self.read_u8();
+                    num_server_clusters = length & 0xf;
+                    num_client_clusters = (length >> 4) & 0xf;
+                    gpd_server_clusters = self.read_bytes(2 * num_server_clusters as usize);
+                    gpd_client_clusters = self.read_bytes(2 * num_client_clusters as usize);
+                }
+                if application_info & 0x10 != 0 {
+                    let length = self.read_u8();
+                    if length >= 1 {
+                        generic_switch_config = self.read_u8();
+                    }
+                    if length >= 2 {
+                        current_contact_status = self.read_u8();
+                    }
+                }
+
+                json!({
+                    "deviceID": device_id,
+                    "options": gpd_options,
+                    "extendedOptions": extended_options,
+                    "securityKey": security_key,
+                    "keyMic": key_mic,
+                    "outgoingCounter": outgoing_counter,
+                    "applicationInfo": application_info,
+                    "manufacturerID": manufacturer_id,
+                    "modelID": model_id,
+                    "numGpdCommands": num_gpd_commands,
+                    "gpdCommandIdList": gpd_command_id_list,
+                    "numServerClusters": num_server_clusters,
+                    "numClientClusters": num_client_clusters,
+                    "gpdServerClusters": gpd_server_clusters,
+                    "gpdClientClusters": gpd_client_clusters,
+                    "genericSwitchConfig": generic_switch_config,
+                    "currentContactStatus": current_contact_status,
+                })
+            }
+            0xe3 => {
+                // Channel Request
+                let channel_options = self.read_u8();
+                json!({
+                    "nextChannel": channel_options & 0xf,
+                    "nextNextChannel": (channel_options >> 4) & 0xf,
+                })
+            }
             0xa0 => {
-                let cluster = self.read_u16();
+                // Attribute Reporting
+                let cluster_id = self.read_u16();
+                let cluster = gpd_cluster(cluster_id, None);
                 let mut attributes = serde_json::Map::new();
-                while self.is_more_by(3) {
-                    let attr = self.read_u16();
-                    let dtype = self.read_u8();
-                    let value = self.read_dtype_u8(dtype);
-                    attributes.insert(attribute_name(cluster, attr), value);
+                while self.position.saturating_sub(start_position) < size {
+                    let attribute_id = self.read_u16();
+                    let data_type = self.read_u8();
+                    let attribute_name = gpd_attribute_name(&cluster, attribute_id, None);
+                    let value = self.read_type(data_type as u32, options);
+                    attributes.insert(attribute_name, value);
                 }
                 json!({
-                    "clusterID": cluster,
-                    "clusterName": cluster_name(cluster),
+                    "clusterID": cluster_id,
+                    "clusterName": cluster.name,
                     "attributes": attributes,
                 })
             }
             0xa1 => {
-                let manufacturer = self.read_u16();
-                let cluster = self.read_u16();
+                // Manufacturer-specific Attribute Reporting
+                let manufacturer_code = self.read_u16();
+                let cluster_id = self.read_u16();
+                let cluster = gpd_cluster(cluster_id, Some(manufacturer_code));
                 let mut attributes = serde_json::Map::new();
-                while self.is_more_by(3) {
-                    let attr = self.read_u16();
-                    let dtype = self.read_u8();
-                    attributes.insert(attribute_name(cluster, attr), self.read_dtype_u8(dtype));
+                while self.position.saturating_sub(start_position) < size {
+                    let attribute_id = self.read_u16();
+                    let data_type = self.read_u8();
+                    let attribute_name =
+                        gpd_attribute_name(&cluster, attribute_id, Some(manufacturer_code));
+                    let value = self.read_type(data_type as u32, options);
+                    attributes.insert(attribute_name, value);
                 }
                 json!({
-                    "manufacturerCode": manufacturer,
-                    "clusterID": cluster,
-                    "clusterName": cluster_name(cluster),
+                    "manufacturerCode": manufacturer_code,
+                    "clusterID": cluster_id,
+                    "clusterName": cluster.name,
                     "attributes": attributes,
                 })
             }
             0xa2 => {
+                // Multi-Cluster Reporting
                 let mut reports = Vec::new();
-                while self.is_more_by(5) {
-                    let cluster = self.read_u16();
-                    let attr = self.read_u16();
-                    let dtype = self.read_u8();
-                    let value = self.read_dtype_u8(dtype);
+                while self.position.saturating_sub(start_position) < size {
+                    let cluster_id = self.read_u16();
+                    let cluster = gpd_cluster(cluster_id, None);
+                    let attribute_id = self.read_u16();
+                    let data_type = self.read_u8();
+                    let attribute_name = gpd_attribute_name(&cluster, attribute_id, None);
+                    let attr_data = self.read_type(data_type as u32, options);
                     reports.push(json!({
-                        "clusterID": cluster,
-                        "clusterName": cluster_name(cluster),
-                        "attribute": attribute_value(cluster, attr),
-                        "attrData": value,
+                        "clusterID": cluster_id,
+                        "clusterName": cluster.name,
+                        "attribute": attribute_value_from_name(&attribute_name, attribute_id),
+                        "attrData": attr_data,
                     }));
                 }
                 json!({"reports": reports})
             }
             0xa3 => {
-                let manufacturer = self.read_u16();
+                // Manufacturer-specific Multi-Cluster Reporting
+                let manufacturer_code = self.read_u16();
                 let mut reports = Vec::new();
-                while self.is_more_by(5) {
-                    let cluster = self.read_u16();
-                    let attr = self.read_u16();
-                    let dtype = self.read_u8();
-                    let value = self.read_dtype_u8(dtype);
+                while self.position.saturating_sub(start_position) < size {
+                    let cluster_id = self.read_u16();
+                    let cluster = gpd_cluster(cluster_id, Some(manufacturer_code));
+                    let attribute_id = self.read_u16();
+                    let data_type = self.read_u8();
+                    let attribute_name =
+                        gpd_attribute_name(&cluster, attribute_id, Some(manufacturer_code));
+                    let attr_data = self.read_type(data_type as u32, options);
                     reports.push(json!({
-                        "clusterID": cluster,
-                        "clusterName": cluster_name(cluster),
-                        "attribute": attribute_value(cluster, attr),
-                        "attrData": value,
+                        "clusterID": cluster_id,
+                        "clusterName": cluster.name,
+                        "attribute": attribute_value_from_name(&attribute_name, attribute_id),
+                        "attrData": attr_data,
                     }));
                 }
-                json!({"manufacturerCode": manufacturer, "reports": reports})
+                json!({"manufacturerCode": manufacturer_code, "reports": reports})
             }
             0xa4 => {
-                let options = self.read_u8();
-                let manufacturer = self.read_u16();
+                // Request Attributes
+                let gpd_options = self.read_u8();
+                let manufacturer = if gpd_options & 0x02 != 0 {
+                    Some(self.read_u16())
+                } else {
+                    None
+                };
                 let mut records = Vec::new();
-                while self.is_more_by(4) {
-                    let cluster = self.read_u16();
-                    let _length = self.read_u8();
+                while self.position.saturating_sub(start_position) < size {
+                    let cluster_id = self.read_u16();
+                    let records_length = self.read_u8() as usize / 2;
                     let mut attributes = Vec::new();
-                    while self.is_more_by(2) {
+                    for _ in 0..records_length {
                         attributes.push(json!(self.read_u16()));
                     }
-                    records.push(json!({"clusterID": cluster, "attributes": attributes}));
+                    records.push(json!({"clusterID": cluster_id, "attributes": attributes}));
                 }
-                json!({
-                    "options": options,
-                    "manufacturerID": manufacturer,
+                let mut frame = json!({
+                    "options": gpd_options,
                     "records": records,
-                })
+                });
+                if let Some(manufacturer) = manufacturer {
+                    frame["manufacturerID"] = json!(manufacturer);
+                }
+                frame
             }
             0xa5 => {
-                let options = self.read_u8();
-                let manufacturer = self.read_u16();
+                // Read Attributes Response
+                let gpd_options = self.read_u8();
+                let manufacturer = if gpd_options & 0x02 != 0 {
+                    Some(self.read_u16())
+                } else {
+                    None
+                };
                 let mut records = Vec::new();
-                while self.is_more_by(5) {
-                    let cluster = self.read_u16();
-                    let _length = self.read_u8();
+                while self.position.saturating_sub(start_position) < size {
+                    let cluster_id = self.read_u16();
+                    let cluster = gpd_cluster(cluster_id, manufacturer);
+                    let records_length = self.read_u8();
                     let mut attributes = serde_json::Map::new();
-                    while self.is_more_by(4) {
-                        let attr = self.read_u16();
+                    let mut read_length = 0usize;
+
+                    while read_length < records_length as usize {
+                        let start_pos = self.position;
+                        let attribute_id = self.read_u16();
                         let status = self.read_u8();
-                        let dtype = self.read_u8();
-                        let value = self.read_dtype_u8(dtype);
-                        attributes.insert(
-                            attribute_name(cluster, attr),
-                            json!({"status": status, "attrData": value}),
-                        );
+                        let data_type = self.read_u8();
+                        let attribute_name =
+                            gpd_attribute_name(&cluster, attribute_id, manufacturer);
+                        let value = self.read_type(data_type as u32, options);
+                        attributes
+                            .insert(attribute_name, json!({"status": status, "attrData": value}));
+                        read_length += self.position.saturating_sub(start_pos);
                     }
+
                     records.push(json!({
-                        "clusterID": cluster,
-                        "clusterName": cluster_name(cluster),
+                        "clusterID": cluster_id,
+                        "clusterName": cluster.name,
                         "attributes": attributes,
                     }));
                 }
-                json!({
-                    "options": options,
-                    "manufacturerID": manufacturer,
+                let mut frame = json!({
+                    "options": gpd_options,
                     "records": records,
-                })
-            }
-            0xe0 => {
-                let device_id = self.read_u8();
-                let options = if self.is_more_by(1) {
-                    self.read_u8()
-                } else {
-                    0
-                };
-                let extended = if self.is_more_by(1) {
-                    self.read_u8()
-                } else {
-                    0
-                };
-                let len = self.buffer.len();
-                let application_info = if len >= 37 { self.buffer[27] } else { 0 };
-                let generic_switch = if len >= 2 && self.position < len {
-                    self.buffer[len - 2]
-                } else {
-                    0
-                };
-                let contact = if len >= 1 && self.position < len {
-                    self.buffer[len - 1]
-                } else {
-                    0
-                };
-                self.position = len;
-                json!({
-                    "deviceID": device_id,
-                    "options": options,
-                    "extendedOptions": extended,
-                    "securityKey": vec![0u8; 16],
-                    "keyMic": 0,
-                    "outgoingCounter": 0,
-                    "manufacturerID": 0,
-                    "modelID": 0,
-                    "numGpdCommands": 0,
-                    "gpdCommandIdList": [],
-                    "numServerClusters": 0,
-                    "numClientClusters": 0,
-                    "gpdServerClusters": [],
-                    "gpdClientClusters": [],
-                    "applicationInfo": application_info,
-                    "genericSwitchConfig": generic_switch,
-                    "currentContactStatus": contact,
-                })
-            }
-            0xe3 => {
-                let value = self.read_u8();
-                json!({"nextChannel": value & 0x0f, "nextNextChannel": (value >> 4) & 0x0f})
+                });
+                if let Some(manufacturer) = manufacturer {
+                    frame["manufacturerID"] = json!(manufacturer);
+                }
+                frame
             }
             _ => {
-                let remaining = self.buffer.len().saturating_sub(self.position);
-                let take = remaining.min(size);
-                json!({"raw": self.read_bytes(take)})
+                // might contain `gppNwkAddr`, `gppGpdLink` & `mic` from ZCL cluster after
+                // this, so limit by `payloadSize`
+                json!({"raw": self.read_bytes(size)})
             }
-        }
+        };
+
+        self.set_position(start_position + size);
+
+        result
     }
 
     fn read_mi_struct(&mut self) -> Value {
@@ -1036,6 +1148,34 @@ fn cluster_name(cluster: u16) -> String {
     match cluster {
         0x0000 => "genBasic".to_string(),
         other => other.to_string(),
+    }
+}
+
+fn gpd_cluster(
+    cluster_id: u16,
+    manufacturer_code: Option<u16>,
+) -> crate::zspec::zcl::utils::Cluster {
+    crate::zspec::zcl::utils::Utils::get_cluster(
+        cluster_id,
+        manufacturer_code,
+        &crate::zspec::zcl::utils::CustomClusters::empty(),
+    )
+}
+
+fn gpd_attribute_name(
+    cluster: &crate::zspec::zcl::utils::Cluster,
+    attribute_id: u16,
+    manufacturer_code: Option<u16>,
+) -> String {
+    crate::zspec::zcl::utils::Utils::get_cluster_attribute(cluster, attribute_id, manufacturer_code)
+        .map(|attribute| attribute.name)
+        .unwrap_or_else(|| attribute_id.to_string())
+}
+
+fn attribute_value_from_name(name: &str, attribute_id: u16) -> Value {
+    match name.parse::<u64>() {
+        Ok(_) => json!(attribute_id),
+        Err(_) => json!(name),
     }
 }
 

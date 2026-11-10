@@ -11,8 +11,12 @@ use crate::zspec::zcl::definition::enums::DataType;
 pub enum ParameterCondition {
     /// `{type: ParameterCondition.MINIMUM_REMAINING_BUFFER_BYTES, value}`
     MINIMUM_REMAINING_BUFFER_BYTES(u32),
-    /// `{type: ParameterCondition.BITMASK_SET, field, value}`
-    BITMASK_SET { field: &'static str, value: u32 },
+    /// `{type: ParameterCondition.BITMASK_SET, field, value, reversed}`
+    BITMASK_SET {
+        field: &'static str,
+        value: u32,
+        reversed: bool,
+    },
     /// `{type: ParameterCondition.BITFIELD_ENUM, field, offset, size, value}`
     BITFIELD_ENUM {
         field: &'static str,
@@ -496,60 +500,6 @@ pub mod touchlink {
             Command::new("identifyRequest", 6).with_parameters(IDENTIFY_REQUEST_PARAMS);
         pub const resetToFactoryNew: Command =
             Command::new("resetToFactoryNew", 7).with_parameters(RESET_TO_FACTORY_NEW_PARAMS);
-    }
-}
-
-#[allow(non_snake_case)]
-pub mod greenPower {
-    use super::{Command, DataType, Parameter, ParameterCondition};
-
-    pub const ID: u16 = 0x0021;
-    pub const name: &str = "greenPower";
-
-    pub mod commands {
-        use super::*;
-
-        const OPTIONS_BITFIELD: ParameterCondition = ParameterCondition::BITFIELD_ENUM {
-            field: "options",
-            offset: 0,
-            size: 3,
-            value: 0b000,
-        };
-        const OPTIONS_BITMASK: ParameterCondition = ParameterCondition::BITMASK_SET {
-            field: "options",
-            value: 0x4000,
-        };
-        const OPTIONS_BITFIELD_CONDITIONS: &[ParameterCondition] = &[OPTIONS_BITFIELD];
-        const OPTIONS_BITMASK_CONDITIONS: &[ParameterCondition] = &[OPTIONS_BITMASK];
-
-        const RP: Parameter = Parameter::new("reserved", DataType::DATA8);
-        const OPTIONS_BITFIELD_PARAM: Parameter = Parameter {
-            name: "options",
-            r#type: DataType::BITMAP8,
-            conditions: OPTIONS_BITFIELD_CONDITIONS,
-            max: None,
-        };
-        const OPTIONS_BITMASK_PARAM: Parameter = Parameter {
-            name: "options",
-            r#type: DataType::BITMAP24,
-            conditions: OPTIONS_BITMASK_CONDITIONS,
-            max: None,
-        };
-
-        pub const NOTIFICATION_PARAMS: &[Parameter] = &[
-            RP,
-            OPTIONS_BITFIELD_PARAM,
-            RP,
-            RP,
-            RP,
-            RP,
-            RP,
-            RP,
-            OPTIONS_BITMASK_PARAM,
-        ];
-
-        pub const notification: Command =
-            Command::new("notification", 0).with_parameters(NOTIFICATION_PARAMS);
     }
 }
 

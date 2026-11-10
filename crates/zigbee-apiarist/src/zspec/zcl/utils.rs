@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::zspec::zcl::definition::enums::DataType;
+use crate::zspec::zcl::definition::enums::{BuffaloZclDataType, DataType};
 
 /// Upstream runtime value (JS number/string/null, including `NaN`).
 #[derive(Debug, Clone, PartialEq)]
@@ -174,6 +174,7 @@ pub enum ParameterCondition {
     BITMASK_SET {
         field: String,
         value: u32,
+        reversed: bool,
     },
     BITFIELD_ENUM {
         field: String,
@@ -197,9 +198,14 @@ impl ParameterCondition {
             Static::MINIMUM_REMAINING_BUFFER_BYTES(value) => {
                 Self::MINIMUM_REMAINING_BUFFER_BYTES(*value)
             }
-            Static::BITMASK_SET { field, value } => Self::BITMASK_SET {
+            Static::BITMASK_SET {
+                field,
+                value,
+                reversed,
+            } => Self::BITMASK_SET {
                 field: (*field).to_string(),
                 value: *value,
+                reversed: *reversed,
             },
             Static::BITFIELD_ENUM {
                 field,
@@ -231,6 +237,8 @@ pub struct Parameter {
     pub name: String,
     /// Upstream camelCase: `type`.
     pub r#type: DataType,
+    /// Upstream `type` may also be a `BuffaloZclDataType` (e.g. `GPD_FRAME`).
+    pub buffalo_type: Option<BuffaloZclDataType>,
     pub min: Option<f64>,
     pub max: Option<f64>,
     pub minExcl: Option<f64>,
@@ -247,6 +255,7 @@ impl Parameter {
         Self {
             name: name.to_string(),
             r#type,
+            buffalo_type: None,
             min: None,
             max: None,
             minExcl: None,
@@ -263,6 +272,11 @@ impl Parameter {
         self.conditions = conditions;
         self
     }
+
+    pub fn with_buffalo_type(mut self, buffalo_type: BuffaloZclDataType) -> Self {
+        self.buffalo_type = Some(buffalo_type);
+        self
+    }
 }
 
 impl From<&crate::zspec::zcl::definition::cluster::Parameter> for Parameter {
@@ -270,6 +284,7 @@ impl From<&crate::zspec::zcl::definition::cluster::Parameter> for Parameter {
         Self {
             name: parameter.name.to_string(),
             r#type: parameter.r#type,
+            buffalo_type: None,
             min: None,
             max: parameter.max.map(f64::from),
             minExcl: None,
@@ -1081,6 +1096,179 @@ fn gen_basic_attributes() -> Vec<Attribute> {
     ]
 }
 
+fn green_power_cluster() -> Cluster {
+    fn app(value: u32) -> ParameterCondition {
+        ParameterCondition::BITFIELD_ENUM {
+            field: "options".to_string(),
+            offset: 0,
+            size: 3,
+            value,
+        }
+    }
+    fn sink(value: u32) -> ParameterCondition {
+        ParameterCondition::BITFIELD_ENUM {
+            field: "options".to_string(),
+            offset: 4,
+            size: 3,
+            value,
+        }
+    }
+    fn mask(value: u32) -> ParameterCondition {
+        ParameterCondition::BITMASK_SET {
+            field: "options".to_string(),
+            value,
+            reversed: false,
+        }
+    }
+    fn mask_not(value: u32) -> ParameterCondition {
+        ParameterCondition::BITMASK_SET {
+            field: "options".to_string(),
+            value,
+            reversed: true,
+        }
+    }
+    fn source_parameters(options_type: DataType) -> Vec<Parameter> {
+        vec![
+            Parameter::new("options", options_type),
+            Parameter::new("srcID", DataType::UINT32).with_conditions(vec![app(0b000)]),
+            Parameter::new("gpdIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![app(0b010)]),
+            Parameter::new("gpdEndpoint", DataType::UINT8).with_conditions(vec![app(0b010)]),
+        ]
+    }
+
+    let mut cluster = Cluster::new("greenPower", 0x0021);
+
+    let mut notification = source_parameters(DataType::BITMAP16);
+    notification.push(Parameter::new("frameCounter", DataType::UINT32));
+    notification.push(Parameter::new("commandID", DataType::UINT8));
+    notification.push(Parameter::new("payloadSize", DataType::UINT8));
+    notification.push(
+        Parameter::new("commandFrame", DataType::UNKNOWN)
+            .with_buffalo_type(BuffaloZclDataType::GPD_FRAME)
+            .with_conditions(vec![mask_not(0xc0)]),
+    );
+    notification
+        .push(Parameter::new("gppNwkAddr", DataType::UINT16).with_conditions(vec![mask(0x4000)]));
+    notification
+        .push(Parameter::new("gppGpdLink", DataType::BITMAP8).with_conditions(vec![mask(0x4000)]));
+    cluster =
+        cluster.with_command(Command::new("notification", 0x00).with_parameters(notification));
+
+    cluster = cluster.with_command(
+        Command::new("pairingSearch", 0x01).with_parameters(source_parameters(DataType::BITMAP16)),
+    );
+
+    let mut tunneling_stop = source_parameters(DataType::BITMAP8);
+    tunneling_stop.push(Parameter::new("gpdSecurityFrameCounter", DataType::UINT32));
+    tunneling_stop.push(Parameter::new("gppShortAddress", DataType::UINT16));
+    tunneling_stop.push(Parameter::new("gppGpdLink", DataType::BITMAP8));
+    cluster =
+        cluster.with_command(Command::new("tunnelingStop", 0x03).with_parameters(tunneling_stop));
+
+    let mut commissioning_notification = source_parameters(DataType::BITMAP16);
+    commissioning_notification.push(Parameter::new("frameCounter", DataType::UINT32));
+    commissioning_notification.push(Parameter::new("commandID", DataType::UINT8));
+    commissioning_notification.push(Parameter::new("payloadSize", DataType::UINT8));
+    commissioning_notification.push(
+        Parameter::new("commandFrame", DataType::UNKNOWN)
+            .with_buffalo_type(BuffaloZclDataType::GPD_FRAME)
+            .with_conditions(vec![mask_not(0x30), mask_not(0x200)]),
+    );
+    commissioning_notification
+        .push(Parameter::new("gppNwkAddr", DataType::UINT16).with_conditions(vec![mask(0x800)]));
+    commissioning_notification
+        .push(Parameter::new("gppGpdLink", DataType::BITMAP8).with_conditions(vec![mask(0x800)]));
+    commissioning_notification
+        .push(Parameter::new("mic", DataType::UINT32).with_conditions(vec![mask(0x200)]));
+    cluster = cluster.with_command(
+        Command::new("commissioningNotification", 0x04).with_parameters(commissioning_notification),
+    );
+
+    let mut translation_table_update = source_parameters(DataType::BITMAP16);
+    translation_table_update.push(Parameter::new("reserved", DataType::UINT8));
+    cluster = cluster.with_command(
+        Command::new("translationTableUpdate", 0x07).with_parameters(translation_table_update),
+    );
+
+    cluster = cluster.with_command(
+        Command::new("translationTableReq", 0x08)
+            .with_parameters(vec![Parameter::new("startIndex", DataType::UINT8)])
+            .with_response(0x08),
+    );
+
+    let mut sink_table_req = source_parameters(DataType::BITMAP8);
+    sink_table_req.push(Parameter::new("index", DataType::UINT8));
+    cluster = cluster.with_command(
+        Command::new("sinkTableReq", 0x0a)
+            .with_parameters(sink_table_req)
+            .with_response(0x0a),
+    );
+
+    let mut notification_response = source_parameters(DataType::BITMAP8);
+    notification_response.push(Parameter::new("gpdSecurityFrameCounter", DataType::UINT32));
+    cluster = cluster.with_command_response(
+        Command::new("notificationResponse", 0x00).with_parameters(notification_response),
+    );
+
+    let mut pairing = source_parameters(DataType::BITMAP24);
+    pairing.push(
+        Parameter::new("sinkIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![sink(0b110)]),
+    );
+    pairing.push(
+        Parameter::new("sinkIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![sink(0b000)]),
+    );
+    pairing
+        .push(Parameter::new("sinkNwkAddr", DataType::UINT16).with_conditions(vec![sink(0b110)]));
+    pairing
+        .push(Parameter::new("sinkNwkAddr", DataType::UINT16).with_conditions(vec![sink(0b000)]));
+    pairing
+        .push(Parameter::new("sinkGroupID", DataType::UINT16).with_conditions(vec![sink(0b100)]));
+    pairing
+        .push(Parameter::new("sinkGroupID", DataType::UINT16).with_conditions(vec![sink(0b010)]));
+    pairing.push(Parameter::new("deviceID", DataType::UINT8).with_conditions(vec![mask(0x0008)]));
+    pairing
+        .push(Parameter::new("frameCounter", DataType::UINT32).with_conditions(vec![mask(0x4000)]));
+    pairing.push(Parameter::new("gpdKey", DataType::SEC_KEY).with_conditions(vec![mask(0x8000)]));
+    pairing.push(
+        Parameter::new("assignedAlias", DataType::UINT16).with_conditions(vec![mask(0x10000)]),
+    );
+    pairing.push(
+        Parameter::new("groupcastRadius", DataType::UINT8).with_conditions(vec![mask(0x20000)]),
+    );
+    cluster = cluster.with_command_response(Command::new("pairing", 0x01).with_parameters(pairing));
+
+    cluster = cluster.with_command_response(
+        Command::new("commisioningMode", 0x02).with_parameters(vec![
+            Parameter::new("options", DataType::BITMAP8),
+            Parameter::new("commisioningWindow", DataType::UINT16).with_conditions(vec![mask(0x2)]),
+            Parameter::new("channel", DataType::UINT8).with_conditions(vec![mask(0x10)]),
+        ]),
+    );
+
+    let mut response = source_parameters(DataType::UINT8);
+    response.insert(1, Parameter::new("tempMaster", DataType::UINT16));
+    response.insert(2, Parameter::new("tempMasterTx", DataType::BITMAP8));
+    response.push(Parameter::new("gpdCmd", DataType::UINT8));
+    response.push(
+        Parameter::new("gpdPayload", DataType::UNKNOWN)
+            .with_buffalo_type(BuffaloZclDataType::GPD_FRAME),
+    );
+    cluster =
+        cluster.with_command_response(Command::new("response", 0x06).with_parameters(response));
+
+    cluster = cluster.with_command_response(
+        Command::new("translationTableRsp", 0x08).with_parameters(vec![
+            Parameter::new("status", DataType::ENUM8),
+            Parameter::new("options", DataType::BITMAP8),
+            Parameter::new("totalNumberEntries", DataType::UINT8),
+            Parameter::new("startIndex", DataType::UINT8),
+            Parameter::new("entriesCount", DataType::UINT8),
+        ]),
+    );
+
+    cluster
+}
+
 fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
     match name {
         "genBasic" => {
@@ -1460,118 +1648,7 @@ fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
                 )
                 .with_command_response(Command::new("checkin", 0x00)),
         ),
-        "greenPower" => Some(
-            // Only the `pairing` command used by `Device.removeFromNetwork` for
-            // Green Power devices is defined; the rest of the cluster is not
-            // needed by the R1 surface (`controller/greenPower.ts` is BLOCKED).
-            Cluster::new("greenPower", 0x0021).with_command(
-                Command::new("pairing", 0x01).with_parameters(vec![
-                    Parameter::new("options", DataType::BITMAP24),
-                    Parameter::new("srcID", DataType::UINT32).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 0,
-                            size: 3,
-                            value: 0b000,
-                        },
-                    ]),
-                    Parameter::new("gpdIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 0,
-                            size: 3,
-                            value: 0b010,
-                        },
-                    ]),
-                    Parameter::new("gpdEndpoint", DataType::UINT8).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 0,
-                            size: 3,
-                            value: 0b010,
-                        },
-                    ]),
-                    Parameter::new("sinkIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 4,
-                            size: 3,
-                            value: 0b110,
-                        },
-                    ]),
-                    Parameter::new("sinkIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 4,
-                            size: 3,
-                            value: 0b000,
-                        },
-                    ]),
-                    Parameter::new("sinkNwkAddr", DataType::UINT16).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 4,
-                            size: 3,
-                            value: 0b110,
-                        },
-                    ]),
-                    Parameter::new("sinkNwkAddr", DataType::UINT16).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 4,
-                            size: 3,
-                            value: 0b000,
-                        },
-                    ]),
-                    Parameter::new("sinkGroupID", DataType::UINT16).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 4,
-                            size: 3,
-                            value: 0b100,
-                        },
-                    ]),
-                    Parameter::new("sinkGroupID", DataType::UINT16).with_conditions(vec![
-                        ParameterCondition::BITFIELD_ENUM {
-                            field: "options".to_string(),
-                            offset: 4,
-                            size: 3,
-                            value: 0b010,
-                        },
-                    ]),
-                    Parameter::new("deviceID", DataType::UINT8).with_conditions(vec![
-                        ParameterCondition::BITMASK_SET {
-                            field: "options".to_string(),
-                            value: 0x0008,
-                        },
-                    ]),
-                    Parameter::new("frameCounter", DataType::UINT32).with_conditions(vec![
-                        ParameterCondition::BITMASK_SET {
-                            field: "options".to_string(),
-                            value: 0x4000,
-                        },
-                    ]),
-                    Parameter::new("gpdKey", DataType::SEC_KEY).with_conditions(vec![
-                        ParameterCondition::BITMASK_SET {
-                            field: "options".to_string(),
-                            value: 0x8000,
-                        },
-                    ]),
-                    Parameter::new("assignedAlias", DataType::UINT16).with_conditions(vec![
-                        ParameterCondition::BITMASK_SET {
-                            field: "options".to_string(),
-                            value: 0x10000,
-                        },
-                    ]),
-                    Parameter::new("groupcastRadius", DataType::UINT8).with_conditions(vec![
-                        ParameterCondition::BITMASK_SET {
-                            field: "options".to_string(),
-                            value: 0x20000,
-                        },
-                    ]),
-                ]),
-            ),
-        ),
+        "greenPower" => Some(green_power_cluster()),
         "genOta" => Some(
             Cluster::new("genOta", 0x0019)
                 .with_attribute(Attribute::new(

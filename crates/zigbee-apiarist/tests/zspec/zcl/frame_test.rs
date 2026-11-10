@@ -7,6 +7,7 @@ use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
 use zigbee_apiarist::zspec::zcl::definition::foundation::Foundation;
 use zigbee_apiarist::zspec::zcl::definition::manufacturer_code::ManufacturerCode;
 use zigbee_apiarist::zspec::zcl::definition::status::Status;
+use zigbee_apiarist::zspec::zcl::utils::{CustomClusters, Utils};
 use zigbee_apiarist::zspec::zcl::zcl_frame::Frame;
 use zigbee_apiarist::zspec::zcl::zcl_header::{Direction, FrameControl, FrameType, Header};
 
@@ -476,25 +477,30 @@ fn minimum_remaining_buffer_bytes() {
 
 #[test]
 fn bitmask_set() {
-    let parameter = cluster::greenPower::commands::notification.parameters[8];
+    let cluster = Utils::get_cluster("greenPower", None, &CustomClusters::empty());
+    let notification = cluster
+        .commands
+        .get("notification")
+        .expect("greenPower notification");
+    let parameter = &notification.parameters[8];
 
     assert!(Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0x4000}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0x4150}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0x0400}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0x1400}),
         None
     ));
@@ -503,35 +509,40 @@ fn bitmask_set() {
 #[test]
 fn bitfield_enum() {
     // {param:'options', offset: 0, size: 3, value: 0b000}
-    let parameter = cluster::greenPower::commands::notification.parameters[1];
+    let cluster = Utils::get_cluster("greenPower", None, &CustomClusters::empty());
+    let notification = cluster
+        .commands
+        .get("notification")
+        .expect("greenPower notification");
+    let parameter = &notification.parameters[1];
 
     assert!(Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0b000}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0b1000}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0b001}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0b011}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0b100}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
+        parameter,
         &json!({"options": 0b1010}),
         None
     ));

@@ -21,3 +21,17 @@ pub const INSTALL_CODE_CRC_SIZE: usize = 2;
 
 /// Upstream `BLANK_EUI64` — consts.ts:50.
 pub const BLANK_EUI64: &str = "0xffffffffffffffff";
+
+/// Upstream `COORDINATOR_ADDRESS` — consts.ts:7.
+pub const COORDINATOR_ADDRESS: u16 = 0x0000;
+
+/// Upstream `GP_ENDPOINT` — consts.ts:30.
+pub const GP_ENDPOINT: u8 = 0xf2;
+
+/// Upstream `GP_GROUP_ID` — consts.ts:32.
+pub const GP_GROUP_ID: u16 = 0x0b84;
+
+/// Upstream `INTEROPERABILITY_LINK_KEY` — consts.ts:67 ("ZigBeeAlliance09").
+pub const INTEROPERABILITY_LINK_KEY: [u8; 16] = [
+    0x5a, 0x69, 0x67, 0x42, 0x65, 0x65, 0x41, 0x6c, 0x6c, 0x69, 0x61, 0x6e, 0x63, 0x65, 0x30, 0x39,
+];

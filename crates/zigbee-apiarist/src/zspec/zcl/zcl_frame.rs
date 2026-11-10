@@ -2,7 +2,8 @@
 
 use serde_json::{json, Value};
 
-use crate::zspec::zcl::definition::enums::DataType;
+use crate::zspec::zcl::buffalo_zcl::BuffaloZcl;
+use crate::zspec::zcl::definition::enums::{BuffaloZclDataType, DataType};
 use crate::zspec::zcl::utils::{
     Cluster, Command, CustomClusters, Parameter, ParameterCondition, Utils,
 };
@@ -224,12 +225,21 @@ impl Frame {
                         .map(|remaining| remaining >= *value as usize)
                         .unwrap_or(false)
                 }
-                ParameterCondition::BITMASK_SET { field, value } => {
+                ParameterCondition::BITMASK_SET {
+                    field,
+                    value,
+                    reversed,
+                } => {
                     let actual = payload
                         .get(field.as_str())
                         .and_then(Value::as_u64)
                         .unwrap_or(0);
-                    actual & u64::from(*value) == u64::from(*value)
+                    let set = actual & u64::from(*value) == u64::from(*value);
+                    if *reversed {
+                        !set
+                    } else {
+                        set
+                    }
                 }
                 ParameterCondition::BITFIELD_ENUM {
                     field,
@@ -1087,7 +1097,7 @@ fn parameter_to_string(parameter: &Parameter) -> String {
     let data_type = if parameter.name == "grouplist" {
         1002
     } else {
-        parameter.r#type as u16
+        parameter_type_code(parameter) as u16
     };
     let mut text = format!(
         "{{\"name\":{},\"type\":{data_type}",
@@ -1103,10 +1113,23 @@ fn parameter_to_string(parameter: &Parameter) -> String {
                 ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(value) => format!(
                     "{{\"type\":\"minimumRemainingBufferBytes\",\"value\":{value}}}"
                 ),
-                ParameterCondition::BITMASK_SET { field, value } => format!(
-                    "{{\"type\":\"bitmaskSet\",\"field\":{},\"value\":{value}}}",
-                    json_string(&json!(field))
-                ),
+                ParameterCondition::BITMASK_SET {
+                    field,
+                    value,
+                    reversed,
+                } => {
+                    if *reversed {
+                        format!(
+                            "{{\"type\":\"bitmaskSet\",\"field\":{},\"value\":{value},\"reversed\":true}}",
+                            json_string(&json!(field))
+                        )
+                    } else {
+                        format!(
+                            "{{\"type\":\"bitmaskSet\",\"field\":{},\"value\":{value}}}",
+                            json_string(&json!(field))
+                        )
+                    }
+                }
                 ParameterCondition::BITFIELD_ENUM {
                     field,
                     offset,
@@ -1235,7 +1258,7 @@ fn parameter_to_json(parameter: &Parameter) -> Value {
     let data_type = if parameter.name == "grouplist" {
         1002
     } else {
-        parameter.r#type as u16
+        parameter_type_code(parameter) as u16
     };
     object.insert("type".to_string(), json!(data_type));
     if !parameter.conditions.is_empty() {
@@ -1249,8 +1272,16 @@ fn parameter_to_json(parameter: &Parameter) -> Value {
                         ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(value) => {
                             json!({"type": "minimumRemainingBufferBytes", "value": value})
                         }
-                        ParameterCondition::BITMASK_SET { field, value } => {
-                            json!({"type": "bitmaskSet", "field": field, "value": value})
+                        ParameterCondition::BITMASK_SET {
+                            field,
+                            value,
+                            reversed,
+                        } => {
+                            if *reversed {
+                                json!({"type": "bitmaskSet", "field": field, "value": value, "reversed": true})
+                            } else {
+                                json!({"type": "bitmaskSet", "field": field, "value": value})
+                            }
                         }
                         ParameterCondition::BITFIELD_ENUM {
                             field,
@@ -1295,6 +1326,13 @@ fn parameter_to_json(parameter: &Parameter) -> Value {
     Value::Object(object)
 }
 
+fn parameter_type_code(parameter: &Parameter) -> u32 {
+    match parameter.buffalo_type {
+        Some(buffalo_type) => buffalo_type as u32,
+        None => parameter.r#type as u32,
+    }
+}
+
 fn encode_parameters(command: &Command, payload: &Value, buffer: &mut Vec<u8>) {
     for parameter in &command.parameters {
         let include = if parameter.conditions.iter().any(|condition| {
@@ -1317,6 +1355,10 @@ fn encode_parameters(command: &Command, payload: &Value, buffer: &mut Vec<u8>) {
             for item in value.as_array().cloned().unwrap_or_default() {
                 push_u16(buffer, u16_value(&item));
             }
+        } else if parameter.buffalo_type == Some(BuffaloZclDataType::GPD_FRAME) {
+            let mut buffalo = BuffaloZcl::new(Vec::new());
+            buffalo.write(parameter_type_code(parameter), value, &json!({}));
+            buffer.extend_from_slice(&buffalo.get_written());
         } else {
             write_data_type(buffer, parameter.r#type as u8, value);
         }
@@ -1338,13 +1380,6 @@ fn decode_parameters(command: &Command, buffer: &[u8], header_length: usize) -> 
             }
             panic!("INVALID_FIELD");
         }
-        let size = parameter_size(parameter, &payload);
-        if remaining < size {
-            if parameter.name == "minimumBlockPeriod" {
-                break;
-            }
-            panic!("INVALID_FIELD");
-        }
         let value = if parameter.name == "grouplist" {
             let count = payload
                 .get("groupcount")
@@ -1357,7 +1392,21 @@ fn decode_parameters(command: &Command, buffer: &[u8], header_length: usize) -> 
                 items.push(json!(u16::from_le_bytes([bytes[0], bytes[1]])));
             }
             Value::Array(items)
+        } else if parameter.buffalo_type == Some(BuffaloZclDataType::GPD_FRAME) {
+            let mut buffalo = BuffaloZcl::new(buffer.to_vec());
+            buffalo.set_position(position);
+            let options = json!({"payload": current});
+            let value = buffalo.read(parameter_type_code(parameter), &options);
+            position = buffalo.get_position();
+            value
         } else {
+            let size = parameter_size(parameter, &payload);
+            if remaining < size {
+                if parameter.name == "minimumBlockPeriod" {
+                    break;
+                }
+                panic!("INVALID_FIELD");
+            }
             read_data_type(buffer, &mut position, parameter.r#type as u8)
         };
         payload.insert(parameter.name.to_string(), value);
@@ -1383,6 +1432,7 @@ fn parameter_size(parameter: &Parameter, payload: &serde_json::Map<String, Value
         0x0d | 0x1d | 0x25 | 0x2d => 6,
         0x0e | 0x1e | 0x26 | 0x2e => 7,
         0x0f | 0x1f | 0x27 | 0x2f | 0xf0 => 8,
+        0xf1 => 16,
         _ => 0,
     }
 }
