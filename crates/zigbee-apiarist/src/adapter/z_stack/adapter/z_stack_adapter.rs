@@ -367,33 +367,45 @@ impl ZStackAdapter {
             backup_path: self.backup_path.clone(),
             adapter_options: self.adapter_options.clone(),
         };
-        let mut manager = ZnpAdapterManager::new(
+        // Upstream registers the ZNP handlers in the constructor, so events are
+        // processed while the manager starts.
+        self.start_event_loop().await?;
+
+        let manager = ZnpAdapterManager::new(
             ZStackZdo {
                 has_zdo_message_overhead: self.has_zdo_message_overhead,
             },
             AdapterNvMemory::from_shared(self.znp.clone()),
             manager_options,
         );
-        let result = manager.start().await?;
-        self.start_event_loop().await?;
-
-        if self.adapter_options.disable_led {
-            wait(200).await;
-            self.set_led("disable").await?;
-        }
-        if let Some(power) = self.adapter_options.transmit_power {
-            let mut znp = self.znp.lock().await;
-            znp.request(
-                Subsystem::SYS,
-                "stackTune",
-                json!({"operation": 0, "value": power}),
-                None,
-                None,
-                &[0],
-            )
-            .await?;
-        }
-        Ok(result)
+        // Upstream does not await the manager before configuring the LED and
+        // transmit power; it starts it and awaits the result at the end.
+        let start_manager = async move {
+            let mut manager = manager;
+            manager.start().await
+        };
+        let configure = async {
+            if self.adapter_options.disable_led {
+                wait(200).await;
+                self.set_led("disable").await?;
+            }
+            if let Some(power) = self.adapter_options.transmit_power {
+                let mut znp = self.znp.lock().await;
+                znp.request(
+                    Subsystem::SYS,
+                    "stackTune",
+                    json!({"operation": 0, "value": power}),
+                    None,
+                    None,
+                    &[0],
+                )
+                .await?;
+            }
+            Ok::<(), String>(())
+        };
+        let (start_result, configure_result) = tokio::join!(start_manager, configure);
+        configure_result?;
+        start_result
     }
 
     /// Upstream `stop()`.

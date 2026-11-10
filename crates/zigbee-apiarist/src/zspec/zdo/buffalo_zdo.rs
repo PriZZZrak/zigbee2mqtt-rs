@@ -1008,6 +1008,7 @@ fn read_beacon_survey_tlvs(reader: &mut BuffaloZdo) -> Vec<Value> {
         let length_minus_one = reader.read_u8();
         let length = usize::from(length_minus_one) + 1;
         let payload = reader.read_buffer(length);
+        let raw = payload.clone();
         let mut sub = BuffaloZdo::new(payload);
         let tlv = match tag {
             0x01 => json!({
@@ -1030,7 +1031,7 @@ fn read_beacon_survey_tlvs(reader: &mut BuffaloZdo) -> Vec<Value> {
                     "potentialParents": parents,
                 })
             }
-            _ => json!({"raw": Value::Null}),
+            _ => json!({"raw": raw}),
         };
         tlvs.push(json!({"tagId": tag, "length": length, "tlv": tlv}));
     }
@@ -1044,6 +1045,7 @@ fn read_set_configuration_tlvs(reader: &mut BuffaloZdo) -> Vec<Value> {
         let length_minus_one = reader.read_u8();
         let length = usize::from(length_minus_one) + 1;
         let payload = reader.read_buffer(length);
+        let raw = payload.clone();
         let mut sub = BuffaloZdo::new(payload);
         let tlv = if tag == 0x00 {
             let count = sub.read_u8();
@@ -1057,7 +1059,7 @@ fn read_set_configuration_tlvs(reader: &mut BuffaloZdo) -> Vec<Value> {
                 .collect::<Vec<_>>();
             json!({"count": count, "tlvs": entries})
         } else {
-            json!({"raw": Value::Null})
+            json!({"raw": raw})
         };
         tlvs.push(json!({"tagId": tag, "length": length, "tlv": tlv}));
     }
