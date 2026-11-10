@@ -28,10 +28,12 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Controller helpers (request/queue/install codes/zclFrameConverter/zclTSN) | `controller/helpers/*` | PORTED | upstream request-queue semantics, full install-code vectors, converter tests |
 | `controller/touchlink.ts` | `controller/touchlink.ts` | PORTED | scan/identify/factory-reset frames + lock/restore tests |
 | Controller Entity / ZigbeeEntity + ControllerAdapter boundary | `controller/model/entity.ts`, `zigbeeEntity.ts` | PORTED | injection roundtrip + trait-object test |
-| Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | BLOCKED | not ported; prerequisites in "Blocked: controller model layer" below |
+| Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | PARTIAL | ported: CRUD/registries, ZCL read/write/command/report/config-reporting, interview, `onZclData`, binds, groups, DB round-trip; unit tests in each file. Gaps: OTA (omitted), device/model-specific HA discovery, no Node differential fixture or transcript yet |
+| Device OTA methods (`checkOta`/`updateOta`/`abortOta`/`scheduleOta`/`unscheduleOta`/`findMatchingOtaImage`/`#waitForOtaCommand`/`#notifyOta`) | `controller/model/device.ts:1495-1899` | OMITTED | R1 excludes OTA (user decision); `controller/helpers/ota.ts` needs HTTPS + SHA-512 and no HTTP/TLS/hash dependency may be added. Fields `#scheduledOta`/`#otaInProgress`/`#otaAbortController` and the `scheduledOta` DB field are omitted consistently |
+| ZCL catalog used by the model layer (genBasic/genGroups/genTime/ssIasZone/genPollCtrl/genOnOff/greenPower `pairing`) | `zspec/zcl/definition/cluster.ts` | PARTIAL | attributes/commands/defaults needed by the controller model ported with `file.ts` anchors; the rest of the 200+ cluster catalog remains absent |
 | `controller/controller.ts` | `controller/controller.ts` | BLOCKED | not ported yet |
 | `controller/greenPower.ts` | `controller/greenPower.ts` | BLOCKED | not ported yet |
-| `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | BLOCKED | not ported yet |
+| `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | OMITTED | R1 excludes OTA flashing (user decision); no HTTP/TLS or SHA-512 dependency |
 | Green Power | `controller/greenPower.ts` | BLOCKED | not ported |
 | MQTT bridge + `bridge/request/*` | `zigbee2mqtt/lib/mqtt.ts`, `extension/*` | BLOCKED | not ported |
 | Home Assistant discovery | `extension/homeassistant.ts` | BLOCKED | not ported |
@@ -42,24 +44,38 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Upstream z2m oracle (container) | `zigbee2mqtt.14.3` | PORTED | resumed network, 3 devices, MQTT transcripts, see `docs/hil/2026-11-09-z2m-run.md` |
 | HIL (router + Dongle-P) | — | HARDWARE_PENDING | no Routerich/OpenWrt run recorded |
 
-## Controller model layer — remaining blocker
+## Controller model layer — status and remaining gaps
 
-The ZCL prerequisites are done: `Frame` stores owned `Cluster`/`Command`
-(custom clusters supported via `create_with_definitions`), parameters carry
-owned conditions, and the catalog now covers genGroups/genTime/genPollCtrl/
-ssIasZone/genOta/touchlink plus full ZCL/ZDO statuses and the Foundation table.
+Ported in `crates/zigbee-apiarist/src/controller/model/{device,endpoint,group}.rs`
+against zigbee-herdsman v11.2.0 (c1a54e3d), with the ZCL/ZDO prerequisites:
+`Frame` stores owned `Cluster`/`Command` (custom clusters via
+`create_with_definitions`), parameters carry owned conditions, and the catalog
+now defines genBasic (all attributes + defaults), genGroups, genTime, ssIasZone,
+genPollCtrl, genOnOff and greenPower `pairing`.
 
-Ownership model chosen (AGENTS §3.4): upstream static maps translate to
+Ownership model (AGENTS §3.4): upstream static maps translate to
 `RwLock<HashMap<...>>` registries with short synchronous access; models resolve
 each other through the registry (Endpoint stores the IEEE and calls
 `Device::by_ieee_addr`), so no `Arc` cycle and no lock across `.await`.
+`pendingRequests` is a `tokio::sync::Mutex<RequestQueue>`; upstream queues a
+promise, so the port enqueues and awaits the response without holding the lock.
 
-Remaining blocker: **`controller/helpers/ota.ts` needs HTTPS and SHA-512**.
+Known gaps (not parity claims):
+
+- **OTA** is omitted per the user decision (see the matrix row above).
+- No Node differential fixture/transcript yet for the model layer; evidence is
+  the ported upstream unit cases (device.test.ts) plus frame-level assertions
+  through a recording `FakeAdapter`.
+- `serde_json::Map` keeps keys sorted, so object-iteration order is normalised
+  (array-index keys ascending first, like JavaScript; remaining keys sorted
+  instead of insertion order). Only visible in multi-attribute write/read-rsp
+  payload ordering.
+- Green Power `removeFromNetwork` derives `srcID` from the exact EUI64 integer
+  instead of the JavaScript double; `controller/greenPower.ts` remains BLOCKED.
+
+Remaining ledger item: **`controller/helpers/ota.ts` needs HTTPS and SHA-512**.
 The crate has no HTTP/TLS or hashing dependency and `docs/dependency-map.md`
-declares none. `Device`'s OTA methods (checkOta/updateOta/abortOta/scheduleOta/
-unscheduleOta and matching) cannot be ported completely without deciding how to
-fetch `https://raw.githubusercontent.com/Koenkk/zigbee-OTA/...` and verify
-SHA-512. Local-file OTA indexes/images are already portable without new crates.
+declares none; that is why OTA stays out of R1 rather than being stubbed.
 
 ## Next evidence to add
 

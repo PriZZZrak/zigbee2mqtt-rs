@@ -12,3 +12,6 @@ pub const UNICAST_BINDING: u8 = 0x03;
 pub const CHALLENGE_VALUE_SIZE: usize = 8;
 /// The 256-bit Curve 25519 public point.
 pub const CURVE_PUBLIC_POINT_SIZE: usize = 32;
+
+/// Upstream `LeaveRequestFlags.WITHOUT_REJOIN` — enums.ts:7.
+pub const WITHOUT_REJOIN: u8 = 0x00;

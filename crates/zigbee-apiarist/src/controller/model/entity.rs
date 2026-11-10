@@ -194,6 +194,7 @@ mod tests {
 
     #[tokio::test]
     async fn injection_roundtrip() {
+        let _guard = crate::controller::model::test_support::serial();
         let database = Arc::new(Mutex::new(Database::open(
             "/tmp/opencode/controller-entity-test.db",
         )));

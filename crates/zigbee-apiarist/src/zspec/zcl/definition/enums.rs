@@ -158,3 +158,17 @@ pub enum StructuredIndicatorType {
     // Remove element from the set/bag
     WriteRemove = 0x20,
 }
+
+/// Upstream `PowerSource` — enums.ts:194. Numeric values are the ZCL
+/// `PowerSource` attribute values indexed by the upstream `POWER_SOURCES` map.
+pub struct PowerSource;
+
+impl PowerSource {
+    pub const UNKNOWN: u8 = 0;
+    pub const MAINS_SINGLE_PHASE: u8 = 1;
+    pub const MAINS_3_PHASE: u8 = 2;
+    pub const BATTERY: u8 = 3;
+    pub const DC_SOURCE: u8 = 4;
+    pub const EMERGENCY_MAINS_CONSTANTLY_POWERED: u8 = 5;
+    pub const EMERGENCY_MAINS_AND_TRANSFER_SWITCH: u8 = 6;
+}

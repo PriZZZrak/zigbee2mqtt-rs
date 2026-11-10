@@ -6,7 +6,7 @@ use std::pin::Pin;
 
 use serde_json::Value;
 
-type EntityFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send + 'a>>;
+pub type EntityFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send + 'a>>;
 
 /// Upstream `ZigbeeEntity` abstract methods — zigbeeEntity.ts:13.
 pub trait ZigbeeEntity {

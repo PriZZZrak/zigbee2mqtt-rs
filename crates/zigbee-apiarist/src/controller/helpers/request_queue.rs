@@ -55,7 +55,12 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
     }
 
     /// Upstream `queue(request)` — requestQueue.ts:67.
-    pub async fn queue(&mut self, mut request: Request<T>) -> Result<T, String> {
+    ///
+    /// Split in the Rust port: `enqueue` performs the upstream insertion and
+    /// returns the response channel, `queue` awaits it. Keeping the await out of
+    /// `enqueue` lets callers release the queue lock before waiting (upstream
+    /// queues a promise without any lock).
+    pub fn enqueue(&mut self, mut request: Request<T>) -> oneshot::Receiver<Result<T, String>> {
         logger().debug(
             &format!(
                 "Request Queue ({}/{}): Sending when active. Expires: {}",
@@ -67,6 +72,11 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
         request.add_callback(sender);
         self.requests.push(request);
         receiver
+    }
+
+    /// Upstream `queue(request)` — requestQueue.ts:67.
+    pub async fn queue(&mut self, request: Request<T>) -> Result<T, String> {
+        self.enqueue(request)
             .await
             .unwrap_or_else(|_| Err("Request dropped".to_string()))
     }

@@ -1,5 +1,8 @@
 // Original: .upstream/zigbee-herdsman/src/zspec/consts.ts
 
+/// Upstream `ZIGBEE_REVISION` — consts.ts:4.
+pub const ZIGBEE_REVISION: u16 = 23;
+
 pub const BROADCAST_MIN: u16 = 0xfff8;
 
 pub const ALL_802_15_4_CHANNELS_MASK: u32 = 0x07fff800;
@@ -15,3 +18,6 @@ pub const INSTALL_CODE_SIZES: [usize; 4] = [18, 8, 10, 14];
 
 /// Upstream `INSTALL_CODE_CRC_SIZE` — consts.ts:91.
 pub const INSTALL_CODE_CRC_SIZE: usize = 2;
+
+/// Upstream `BLANK_EUI64` — consts.ts:50.
+pub const BLANK_EUI64: &str = "0xffffffffffffffff";

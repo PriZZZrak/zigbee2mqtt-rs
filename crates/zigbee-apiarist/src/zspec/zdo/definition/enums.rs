@@ -46,6 +46,16 @@ impl ActiveLinkKeyType {
     pub const AUTHENTICATED_KEY_NEGOTIATION: u8 = 0x03;
 }
 
+/// Upstream `LeaveRequestFlags` — definition/enums.ts:1.
+pub struct LeaveRequestFlags;
+
+impl LeaveRequestFlags {
+    /// Leave and rejoin.
+    pub const AND_REJOIN: u8 = 0x80;
+    /// Leave.
+    pub const WITHOUT_REJOIN: u8 = 0x00;
+}
+
 pub struct RoutingTableStatus;
 
 impl RoutingTableStatus {
