@@ -24,7 +24,13 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | ZpiObject | `znp/zpiObject.ts` | PORTED | `differential_zpi_object` fixtures |
 | ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PARTIAL | `differential_zcl` fixtures for lookup/header; cluster catalog subset |
 | ZDO codecs | `zspec/zdo/*` | PORTED | full response catalog incl. status-only responses, non-success short-buffer guard, unknown-cluster panic parity |
-| Controller / Device / Endpoint / Group | `controller/*` | BLOCKED | not ported |
+| `controller/database.ts` | `controller/database.ts` | PORTED | CRUD/order/clear semantics + reload/corruption tests |
+| Controller helpers (request/queue/install codes/zclFrameConverter/zclTSN) | `controller/helpers/*` | PORTED | upstream request-queue semantics, full install-code vectors, converter tests |
+| `controller/touchlink.ts` | `controller/touchlink.ts` | PORTED | scan/identify/factory-reset frames + lock/restore tests |
+| Controller models (Device/Endpoint/Group/Entity) | `controller/model/*` | BLOCKED | not ported yet |
+| `controller/controller.ts` | `controller/controller.ts` | BLOCKED | not ported yet |
+| `controller/greenPower.ts` | `controller/greenPower.ts` | BLOCKED | not ported yet |
+| `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | BLOCKED | not ported yet |
 | Green Power | `controller/greenPower.ts` | BLOCKED | not ported |
 | MQTT bridge + `bridge/request/*` | `zigbee2mqtt/lib/mqtt.ts`, `extension/*` | BLOCKED | not ported |
 | Home Assistant discovery | `extension/homeassistant.ts` | BLOCKED | not ported |

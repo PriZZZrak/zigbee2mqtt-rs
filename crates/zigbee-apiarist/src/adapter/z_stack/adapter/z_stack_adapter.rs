@@ -629,19 +629,7 @@ impl ZStackAdapter {
     }
 }
 
-/// Upstream `Events.ZclPayload`.
-#[derive(Debug, Clone)]
-pub struct ZclPayload {
-    pub cluster_id: u16,
-    pub data: Vec<u8>,
-    pub header: crate::zspec::zcl::zcl_header::Header,
-    pub address: Value,
-    pub endpoint: u8,
-    pub linkquality: u8,
-    pub group_id: u16,
-    pub was_broadcast: bool,
-    pub destination_endpoint: u8,
-}
+pub use crate::adapter::events::ZclPayload;
 
 /// Upstream `ClusterWaitressMatcher`.
 #[derive(Debug, Clone)]

@@ -2,6 +2,7 @@
 
 pub mod adapter;
 pub mod adapter_discovery;
+pub mod events;
 pub use adapter::{Adapter, AdapterInstance, AdapterKind};
 pub use adapter_discovery::{find_all_devices, DiscoveredAdapter, DiscoveryContext, MdnsService};
 pub use serial_port::SerialPortInfo;

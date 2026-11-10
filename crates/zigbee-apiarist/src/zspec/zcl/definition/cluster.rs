@@ -466,6 +466,37 @@ pub mod touchlink {
         pub const scanResponse: Command =
             Command::new("scanResponse", 1).with_parameters(SCAN_RSP_PARAMS);
     }
+
+    pub mod commands {
+        use super::*;
+
+        pub const SCAN_REQUEST_PARAMS: &[Parameter] = &[
+            Parameter::new("transactionID", DataType::UINT32),
+            Parameter::new("zigbeeInformation", DataType::BITMAP8),
+            Parameter::new("touchlinkInformation", DataType::BITMAP8),
+        ];
+
+        pub const IDENTIFY_REQUEST_PARAMS: &[Parameter] = &[
+            Parameter::new("transactionID", DataType::UINT32),
+            Parameter {
+                name: "duration",
+                r#type: DataType::UINT16,
+                conditions: &[],
+                max: Some(0xffff),
+            },
+        ];
+
+        pub const RESET_TO_FACTORY_NEW_PARAMS: &[Parameter] =
+            &[Parameter::new("transactionID", DataType::UINT32)];
+
+        pub const scanRequest: Command = Command::new("scanRequest", 0)
+            .with_response(1)
+            .with_parameters(SCAN_REQUEST_PARAMS);
+        pub const identifyRequest: Command =
+            Command::new("identifyRequest", 6).with_parameters(IDENTIFY_REQUEST_PARAMS);
+        pub const resetToFactoryNew: Command =
+            Command::new("resetToFactoryNew", 7).with_parameters(RESET_TO_FACTORY_NEW_PARAMS);
+    }
 }
 
 #[allow(non_snake_case)]
