@@ -73,8 +73,39 @@ pub fn get_mac_cap_flags(value: u8) -> MacCapabilities {
 }
 
 pub fn get_response_cluster_id(request: u16) -> Option<u16> {
-    const RESPONSES: [u16; 6] = [0x8000, 0x8002, 0x8005, 0x8011, 0x8033, 0x8047];
-    if request > 0x8000 || request == 0x0013 {
+    use crate::zspec::zdo::definition::clusters::ClusterId;
+    const RESPONSES: &[u16] = &[
+        ClusterId::NETWORK_ADDRESS_RESPONSE,
+        ClusterId::IEEE_ADDRESS_RESPONSE,
+        ClusterId::NODE_DESCRIPTOR_RESPONSE,
+        ClusterId::POWER_DESCRIPTOR_RESPONSE,
+        ClusterId::SIMPLE_DESCRIPTOR_RESPONSE,
+        ClusterId::ACTIVE_ENDPOINTS_RESPONSE,
+        ClusterId::MATCH_DESCRIPTORS_RESPONSE,
+        ClusterId::SYSTEM_SERVER_DISCOVERY_RESPONSE,
+        ClusterId::PARENT_ANNOUNCE_RESPONSE,
+        ClusterId::BIND_RESPONSE,
+        ClusterId::UNBIND_RESPONSE,
+        ClusterId::CLEAR_ALL_BINDINGS_RESPONSE,
+        ClusterId::LQI_TABLE_RESPONSE,
+        ClusterId::ROUTING_TABLE_RESPONSE,
+        ClusterId::BINDING_TABLE_RESPONSE,
+        ClusterId::LEAVE_RESPONSE,
+        ClusterId::PERMIT_JOINING_RESPONSE,
+        ClusterId::NWK_UPDATE_RESPONSE,
+        ClusterId::NWK_ENHANCED_UPDATE_RESPONSE,
+        ClusterId::NWK_IEEE_JOINING_LIST_RESPONSE,
+        ClusterId::NWK_BEACON_SURVEY_RESPONSE,
+        ClusterId::START_KEY_NEGOTIATION_RESPONSE,
+        ClusterId::RETRIEVE_AUTHENTICATION_TOKEN_RESPONSE,
+        ClusterId::GET_AUTHENTICATION_LEVEL_RESPONSE,
+        ClusterId::SET_CONFIGURATION_RESPONSE,
+        ClusterId::GET_CONFIGURATION_RESPONSE,
+        ClusterId::START_KEY_UPDATE_RESPONSE,
+        ClusterId::DECOMMISSION_RESPONSE,
+        ClusterId::CHALLENGE_RESPONSE,
+    ];
+    if request > 0x8000 || request == ClusterId::END_DEVICE_ANNOUNCE {
         return None;
     }
     let response = request + 0x8000;

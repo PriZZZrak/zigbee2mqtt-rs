@@ -21,11 +21,18 @@ network.
 - Captured bytes are also written to a temporary `.hex` file, proving the file
   sink path.
 
-Two transcript cases:
+Four transcript cases, taken from upstream `test/adapter/z-stack/adapter.test.ts`:
 
-1. `ZStackAdapter::send_zcl_frame_to_all` → `AF dataRequestExt`.
+1. `ZStackAdapter::send_zcl_frame_to_all` → `AF dataRequestExt`
+   (upstream "Send zcl frame to all").
 2. `Endpoint::command` → `ZStackRuntimeAdapter` → `ZStackAdapter` →
-   `AF dataRequest` + `AF dataConfirm` (AREQ).
+   `AF dataRequest` + `AF dataConfirm` (AREQ) (upstream "Send zcl frame
+   network address").
+3. `ZStackAdapter::send_zcl_frame_to_group` → `AF dataRequestExt`
+   (upstream "Send zcl frame group").
+4. `ZStackAdapter::permit_join` → ZDO `mgmtPermitJoinReq` +
+   `mgmtPermitJoinRsp` (upstream "Sends proper ZDO request payload for
+   PERMIT_JOINING_REQUEST to target").
 
 Goldens are produced with the committed oracle:
 

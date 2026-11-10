@@ -30,6 +30,20 @@ use zigbee_apiarist::zspec::zcl::zcl_header::Direction;
 ///   data:[17,7,1]}`
 const GOLDEN_AF_DATA_REQUEST: &str = "fe17240202fdff00000000000001000001060001001e03001107013c";
 
+async fn recv_subsystem(
+    receiver: &mut mpsc::UnboundedReceiver<Vec<u8>>,
+    subsystem: Subsystem,
+) -> UnpiFrame {
+    loop {
+        let raw = receiver.recv().await.expect("captured frame");
+        let length = raw[1] as usize;
+        let frame = UnpiFrame::from_buffer(length as u8, 4 + length, &raw).expect("unpi");
+        if frame.subsystem == subsystem {
+            return frame;
+        }
+    }
+}
+
 async fn run_coordinator(listener: TcpListener, captured: mpsc::UnboundedSender<Vec<u8>>) {
     let (mut socket, _) = listener.accept().await.expect("accept");
     let mut buffer = [0u8; 1024];
@@ -67,11 +81,19 @@ async fn run_coordinator(listener: TcpListener, captured: mpsc::UnboundedSender<
 
             let frame = UnpiFrame::from_buffer(length as u8, 4 + length, &raw).expect("unpi");
             let object = ZpiObject::from_unpi_frame(&frame);
-            if object.subsystem == Subsystem::AF {
-                let _ = captured.send(raw);
-            }
+            eprintln!(
+                "captured {} {} {}",
+                object.subsystem.name(),
+                object.r#type.name(),
+                object.command.name
+            );
+            let _ = captured.send(raw);
 
-            if object.subsystem == Subsystem::AF || object.subsystem == Subsystem::SYS {
+            if object.subsystem == Subsystem::AF
+                || object.subsystem == Subsystem::SYS
+                || object.subsystem == Subsystem::ZDO
+                || object.subsystem == Subsystem::UTIL
+            {
                 let response =
                     UnpiFrame::new(Type::SRSP, object.subsystem, frame.commandID, vec![0], 0, 0);
                 socket
@@ -79,7 +101,7 @@ async fn run_coordinator(listener: TcpListener, captured: mpsc::UnboundedSender<
                     .await
                     .expect("write srsp");
 
-                if object.command.name == "dataRequest" {
+                if object.command.name == "dataRequest" || object.command.name == "dataRequestExt" {
                     let transid = object
                         .payload
                         .get("transid")
@@ -91,6 +113,16 @@ async fn run_coordinator(listener: TcpListener, captured: mpsc::UnboundedSender<
                         .write_all(&confirm.to_buffer())
                         .await
                         .expect("write dataConfirm");
+                }
+
+                if object.command.name == "mgmtPermitJoinReq" {
+                    // `mgmtPermitJoinRsp`: srcaddr (2 bytes) + status.
+                    let response =
+                        UnpiFrame::new(Type::AREQ, Subsystem::ZDO, 182, vec![0xd2, 0x04, 0], 0, 0);
+                    socket
+                        .write_all(&response.to_buffer())
+                        .await
+                        .expect("write permit join response");
                 }
             }
         }
@@ -148,8 +180,12 @@ async fn zcl_broadcast_is_captured_to_file_and_matches_upstream() {
         .await
         .expect("broadcast");
 
-    let captured = captured_rx.recv().await.expect("captured frame");
-    let captured_hex: String = captured.iter().map(|byte| format!("{byte:02x}")).collect();
+    let captured = recv_subsystem(&mut captured_rx, Subsystem::AF).await;
+    let captured_hex: String = captured
+        .to_buffer()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     assert_eq!(captured_hex, GOLDEN_AF_DATA_REQUEST);
 
     // The same bytes are persisted instead of written to a serial device.
@@ -254,11 +290,157 @@ async fn endpoint_command_is_captured_to_file_and_matches_upstream() {
         .await
         .expect("endpoint command");
 
-    let captured = captured_rx.recv().await.expect("captured frame");
-    let captured_hex: String = captured.iter().map(|byte| format!("{byte:02x}")).collect();
+    let captured = recv_subsystem(&mut captured_rx, Subsystem::AF).await;
+    let captured_hex: String = captured
+        .to_buffer()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     assert_eq!(captured_hex, GOLDEN_AF_DATA_REQUEST_ENDPOINT);
 
     adapter.lock().await.znp.lock().await.close().await.ok();
     server.abort();
     let _ = std::fs::remove_file(db_path);
+}
+
+/// Generated with:
+/// `zpi_object create_request AF dataRequestExt
+///  {dstaddrmode:1,dstaddr:"0x0000000000000019",destendpoint:255,dstpanid:0,
+///   srcendpoint:1,clusterid:0,transid:1,options:0,radius:30,len:5,
+///   data:[16,100,0,0,0]}`
+const GOLDEN_AF_GROUP: &str = "fe192402011900000000000000ff000001000001001e05001064000000b7";
+
+#[tokio::test]
+async fn group_send_matches_upstream_adapter_test() {
+    use zigbee_apiarist::zspec::zcl::zcl_header::FrameType;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
+    let server = tokio::spawn(run_coordinator(listener, captured_tx));
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path: format!("tcp://127.0.0.1:{port}"),
+        baud_rate: None,
+        rtscts: Some(false),
+    });
+    let adapter = Arc::new(Mutex::new(ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        String::new(),
+        AdapterOptions::default(),
+    )));
+
+    {
+        let mut adapter = adapter.lock().await;
+        adapter.znp.lock().await.open().await.expect("open znp");
+        adapter.queue = Some(Queue::new(1));
+    }
+
+    let frame = Frame::create(
+        FrameType::GLOBAL as u8,
+        Direction::CLIENT_TO_SERVER as u8,
+        true,
+        None,
+        100,
+        "read",
+        0,
+        json!([{"attrId": 0}]),
+        json!({}),
+        0,
+    );
+    adapter
+        .lock()
+        .await
+        .send_zcl_frame_to_group(25, &frame, Some(1), Some(HA_PROFILE_ID))
+        .await
+        .expect("group send");
+
+    let captured = recv_subsystem(&mut captured_rx, Subsystem::AF).await;
+    let captured_hex: String = captured
+        .to_buffer()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    assert_eq!(captured_hex, GOLDEN_AF_GROUP);
+
+    adapter.lock().await.znp.lock().await.close().await.ok();
+    server.abort();
+}
+
+#[tokio::test]
+async fn permit_join_zdo_frame_matches_upstream_adapter_test() {
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
+    let server = tokio::spawn(run_coordinator(listener, captured_tx));
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path: format!("tcp://127.0.0.1:{port}"),
+        baud_rate: None,
+        rtscts: Some(false),
+    });
+    let adapter = Arc::new(Mutex::new(ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        String::new(),
+        AdapterOptions::default(),
+    )));
+
+    {
+        let mut adapter = adapter.lock().await;
+        adapter.znp.lock().await.open().await.expect("open znp");
+        adapter.queue = Some(Queue::new(1));
+    }
+
+    assert_eq!(
+        zigbee_apiarist::adapter::z_stack::znp::definition::find_zdo_response(
+            Subsystem::ZDO,
+            0x8036
+        )
+        .map(|command| command.name),
+        Some("mgmtPermitJoinRsp")
+    );
+    let probe = UnpiFrame::new(Type::AREQ, Subsystem::ZDO, 182, vec![0xd2, 0x04, 0], 0, 0);
+    let probe_object = ZpiObject::from_unpi_frame(&probe);
+    assert_eq!(probe_object.payload["srcaddr"], json!(1234));
+    assert_eq!(probe_object.payload["zdo"], json!([0, null]));
+
+    adapter
+        .lock()
+        .await
+        .permit_join(250, Some(1234))
+        .await
+        .expect("permit join");
+
+    let captured = recv_subsystem(&mut captured_rx, Subsystem::ZDO).await;
+    let object = ZpiObject::from_unpi_frame(&captured);
+    assert_eq!(object.command.name, "mgmtPermitJoinReq");
+
+    let zdo_payload = BuffaloZdo::build_request(
+        false,
+        ClusterId::PERMIT_JOINING_REQUEST,
+        &[json!(250), json!(1), json!([])],
+    );
+    let mut expected = vec![2, 0xd2, 0x04];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(captured.data, expected);
+
+    adapter.lock().await.znp.lock().await.close().await.ok();
+    server.abort();
 }
