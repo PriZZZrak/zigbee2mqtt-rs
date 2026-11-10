@@ -4,14 +4,13 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use serde_json::Value;
 use tokio::sync::oneshot;
 
 use crate::controller::tstype::SendPolicy;
 use crate::utils::datetime::now_ms;
 use crate::zspec::zcl::zcl_frame::Frame;
 
-pub type BoxedRequestFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send>>;
+pub type BoxedRequestFuture<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
 
 /// Upstream `Request.defaultSendPolicy` — request.ts:7.
 pub fn default_send_policy(command_id: u8) -> Option<SendPolicy> {
@@ -24,22 +23,22 @@ pub fn default_send_policy(command_id: u8) -> Option<SendPolicy> {
     })
 }
 
-type Callback = oneshot::Sender<Result<Value, String>>;
+type Callback<T> = oneshot::Sender<Result<T, String>>;
 
 /// Upstream `Request<Type>` — request.ts:30.
-pub struct Request {
+pub struct Request<T> {
     pub frame: Frame,
     pub expires: u64,
     pub send_policy: Option<SendPolicy>,
-    function: Box<dyn Fn() -> BoxedRequestFuture + Send>,
-    callbacks: Vec<Callback>,
+    function: Box<dyn Fn() -> BoxedRequestFuture<T> + Send>,
+    callbacks: Vec<Callback<T>>,
     last_error: String,
 }
 
-impl Request {
+impl<T: Clone + Send + 'static> Request<T> {
     /// Upstream `constructor(func, frame, timeout, sendPolicy?, lastError?)`.
     pub fn new(
-        function: impl Fn() -> BoxedRequestFuture + Send + 'static,
+        function: impl Fn() -> BoxedRequestFuture<T> + Send + 'static,
         frame: Frame,
         timeout: u64,
     ) -> Self {
@@ -48,7 +47,7 @@ impl Request {
 
     /// Upstream optional `sendPolicy` constructor argument.
     pub fn new_with_policy(
-        function: impl Fn() -> BoxedRequestFuture + Send + 'static,
+        function: impl Fn() -> BoxedRequestFuture<T> + Send + 'static,
         frame: Frame,
         timeout: u64,
         send_policy: Option<SendPolicy>,
@@ -65,13 +64,13 @@ impl Request {
     }
 
     /// Upstream `moveCallbacks(from)` — request.ts:52.
-    pub fn move_callbacks(&mut self, from: &mut Request) {
+    pub fn move_callbacks(&mut self, from: &mut Request<T>) {
         self.callbacks.append(&mut from.callbacks);
         from.callbacks.clear();
     }
 
     /// Upstream `addCallbacks(resolve, reject)` — request.ts:58.
-    pub fn add_callback(&mut self, callback: Callback) {
+    pub fn add_callback(&mut self, callback: Callback<T>) {
         self.callbacks.push(callback);
     }
 
@@ -84,14 +83,14 @@ impl Request {
     }
 
     /// Upstream `resolve(value)` — request.ts:70.
-    pub fn resolve(&mut self, value: Value) {
+    pub fn resolve(&mut self, value: T) {
         for callback in self.callbacks.drain(..) {
             let _ = callback.send(Ok(value.clone()));
         }
     }
 
     /// Upstream `send()` — request.ts:77.
-    pub async fn send(&mut self) -> Result<Value, String> {
+    pub async fn send(&mut self) -> Result<T, String> {
         match (self.function)().await {
             Ok(value) => Ok(value),
             Err(error) => {

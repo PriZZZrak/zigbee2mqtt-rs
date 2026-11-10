@@ -12,15 +12,25 @@ use crate::utils::logger::logger;
 const NS: &str = "zh:controller:requestqueue";
 
 /// Upstream `RequestQueue extends Set<Request>` — requestQueue.ts:12.
-#[derive(Default)]
-pub struct RequestQueue {
+pub struct RequestQueue<T = Value> {
     pub device_ieee_address: String,
     pub endpoint_id: u8,
-    requests: Vec<Request>,
+    requests: Vec<Request<T>>,
     send_in_progress: bool,
 }
 
-impl RequestQueue {
+impl<T: Clone + Send + 'static> Default for RequestQueue<T> {
+    fn default() -> Self {
+        Self {
+            device_ieee_address: String::new(),
+            endpoint_id: 0,
+            requests: Vec::new(),
+            send_in_progress: false,
+        }
+    }
+}
+
+impl<T: Clone + Send + 'static> RequestQueue<T> {
     /// Upstream `constructor(endpoint)`.
     pub fn new(device_ieee_address: impl Into<String>, endpoint_id: u8) -> Self {
         Self {
@@ -40,12 +50,12 @@ impl RequestQueue {
     }
 
     #[cfg(test)]
-    fn push_request(&mut self, request: Request) {
+    fn push_request(&mut self, request: Request<T>) {
         self.requests.push(request);
     }
 
     /// Upstream `queue(request)` — requestQueue.ts:67.
-    pub async fn queue(&mut self, mut request: Request) -> Result<Value, String> {
+    pub async fn queue(&mut self, mut request: Request<T>) -> Result<T, String> {
         logger().debug(
             &format!(
                 "Request Queue ({}/{}): Sending when active. Expires: {}",
@@ -62,11 +72,11 @@ impl RequestQueue {
     }
 
     /// Upstream `filter(newRequest)` — requestQueue.ts:78.
-    pub fn filter(&mut self, new_request: &mut Request) {
+    pub fn filter(&mut self, new_request: &mut Request<T>) {
         if self.requests.is_empty() {
             return;
         }
-        let cluster_id = new_request.frame.cluster.ID;
+        let cluster_id = new_request.frame.cluster.ID as u16;
         let payload = new_request.frame.payload.clone();
         let command_id = new_request.frame.command.ID;
 
@@ -92,7 +102,9 @@ impl RequestQueue {
                 continue;
             }
 
-            if request.frame.cluster.ID != cluster_id || request.frame.command.ID != command_id {
+            if request.frame.cluster.ID as u16 != cluster_id
+                || request.frame.command.ID != command_id
+            {
                 index += 1;
                 continue;
             }
@@ -195,7 +207,6 @@ impl RequestQueue {
         }
         self.send_in_progress = true;
 
-        // Remove expired requests first.
         let now = now_ms();
         let mut index = 0usize;
         while index < self.requests.len() {
@@ -263,7 +274,6 @@ impl RequestQueue {
         self.send_in_progress = false;
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,7 +282,7 @@ mod tests {
     use serde_json::json;
     use tokio::sync::oneshot;
 
-    fn ok(value: Value) -> BoxedRequestFuture {
+    fn ok(value: Value) -> BoxedRequestFuture<Value> {
         Box::pin(async move { Ok(value) })
     }
 
@@ -287,7 +297,7 @@ mod tests {
     fn request_with_callback(
         frame: Frame,
         timeout: u64,
-    ) -> (Request, oneshot::Receiver<Result<Value, String>>) {
+    ) -> (Request<Value>, oneshot::Receiver<Result<Value, String>>) {
         let mut request = Request::new(move || ok(json!({"sent": true})), frame, timeout);
         let (sender, receiver) = oneshot::channel();
         request.add_callback(sender);
