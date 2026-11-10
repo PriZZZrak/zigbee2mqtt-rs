@@ -73,3 +73,11 @@ retrieves_chunked_af_payload ... ok
 
 The dispatcher now takes the chunked path when
 `incomingMsgExt.payload.data.length < payload.len`, matching upstream.
+
+## Current state of the endpoint round-trip
+
+After the destructive restore/commissioning HIL the live devices no longer
+answer and the round-trip test times out. The same run against upstream z2m
+shows identical behaviour (`dataConfirm` success, ZCL timeout, zero AF
+incoming messages, `numassocdevices=0`), so this is device-side, not a port
+regression — see `docs/hil/2026-11-10-z2m-oracle-after-restore.md`.
