@@ -50,3 +50,14 @@ key (from the first partial provisioning run) or are powered down.
 
 The coordinator NV is back to the exact working snapshot. Device recovery now
 requires physical action: power-cycle / pairing mode, then permit join.
+
+## Outcome (user-confirmed)
+
+Power-cycling the thermostats brought them back. The coordinator NV was already
+correct — the devices had kept the network key and only needed a reboot to
+rejoin. No key rotation had happened, so the type-byte NV snapshot restore was
+the right state and the earlier "unknown key" hypothesis was wrong.
+
+The adapter was disconnected from the dev host before the ZCL round-trip could
+be re-run; the endpoint read evidence from `2026-11-10-zstack-zcl.md` still
+stands.

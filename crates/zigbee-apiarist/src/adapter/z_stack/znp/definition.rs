@@ -71,19 +71,9 @@ pub fn find_zdo_request(subsystem: Subsystem, cluster_id: u16) -> Option<&'stati
         .find(|command| command.r#type == Type::SREQ && command.zdo_cluster_id == Some(cluster_id))
 }
 
-/// Upstream `isMtCmdAreqZdo`.
-pub fn is_mt_cmd_areq_zdo(command: &MtCmd) -> bool {
-    command.r#type == Type::AREQ && command.zdo_cluster_id.is_some()
-}
-
-/// Upstream `isMtCmdSreqZdo`.
-pub fn is_mt_cmd_sreq_zdo(command: &MtCmd) -> bool {
-    command.r#type == Type::SREQ && command.zdo_cluster_id.is_some()
-}
-
 /// Upstream `Definition[Subsystem.ZDO].find((c) => isMtCmdAreqZdo(c) && c.zdoClusterId === id)`.
 pub fn find_zdo_response(subsystem: Subsystem, cluster_id: u16) -> Option<&'static MtCmd> {
-    for_subsystem(subsystem)
-        .iter()
-        .find(|command| is_mt_cmd_areq_zdo(command) && command.zdo_cluster_id == Some(cluster_id))
+    for_subsystem(subsystem).iter().find(|command| {
+        super::utils::is_mt_cmd_areq_zdo(command) && command.zdo_cluster_id == Some(cluster_id)
+    })
 }

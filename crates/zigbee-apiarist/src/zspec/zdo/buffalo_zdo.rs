@@ -252,68 +252,8 @@ impl BuffaloZdo {
         read_response_internal(has_zdo_message_overhead, cluster_id, buffer)
     }
 
-    // The upstream class exposes one reader per response type; the port routes
-    // them through the generic `read_response` implementation above.
-    pub fn read_network_address_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_ieee_address_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_node_descriptor_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_power_descriptor_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_simple_descriptor_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_active_endpoints_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_match_descriptors_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_end_device_announce(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_system_server_discovery_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_parent_announce_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_lqi_table_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_routing_table_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_binding_table_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_nwk_update_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_nwk_enhanced_update_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_nwk_ieee_joining_list_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_nwk_unsolicited_enhanced_update_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_nwk_beacon_survey_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_start_key_negotiation_response(&mut self) -> Value {
-        Value::Null
-    }
-    pub fn read_retrieve_authentication_token_response(&mut self) -> Value {
-        Value::Null
-    }
+    // Upstream exposes one reader per response type; the port implements the
+    // same parsing in `read_response` (single entry point).
 }
 
 fn u64_arg(value: &Value) -> u64 {
@@ -669,7 +609,49 @@ fn capabilities_to_value(value: u8) -> Value {
     })
 }
 
+fn is_supported_response(cluster_id: u16) -> bool {
+    matches!(
+        cluster_id,
+        ClusterId::ACTIVE_ENDPOINTS_RESPONSE
+            | ClusterId::MATCH_DESCRIPTORS_RESPONSE
+            | ClusterId::NETWORK_ADDRESS_RESPONSE
+            | ClusterId::IEEE_ADDRESS_RESPONSE
+            | ClusterId::NODE_DESCRIPTOR_RESPONSE
+            | ClusterId::POWER_DESCRIPTOR_RESPONSE
+            | ClusterId::SIMPLE_DESCRIPTOR_RESPONSE
+            | ClusterId::BINDING_TABLE_RESPONSE
+            | ClusterId::CHALLENGE_RESPONSE
+            | ClusterId::GET_AUTHENTICATION_LEVEL_RESPONSE
+            | ClusterId::GET_CONFIGURATION_RESPONSE
+            | ClusterId::RETRIEVE_AUTHENTICATION_TOKEN_RESPONSE
+            | ClusterId::START_KEY_NEGOTIATION_RESPONSE
+            | ClusterId::LQI_TABLE_RESPONSE
+            | ClusterId::ROUTING_TABLE_RESPONSE
+            | ClusterId::BIND_RESPONSE
+            | ClusterId::UNBIND_RESPONSE
+            | ClusterId::CLEAR_ALL_BINDINGS_RESPONSE
+            | ClusterId::LEAVE_RESPONSE
+            | ClusterId::PERMIT_JOINING_RESPONSE
+            | ClusterId::START_KEY_UPDATE_RESPONSE
+            | ClusterId::DECOMMISSION_RESPONSE
+            | ClusterId::NWK_UPDATE_RESPONSE
+            | ClusterId::NWK_ENHANCED_UPDATE_RESPONSE
+            | ClusterId::NWK_UNSOLICITED_ENHANCED_UPDATE_RESPONSE
+            | ClusterId::NWK_IEEE_JOINING_LIST_RESPONSE
+            | ClusterId::NWK_BEACON_SURVEY_RESPONSE
+            | ClusterId::PARENT_ANNOUNCE_RESPONSE
+            | ClusterId::SET_CONFIGURATION_RESPONSE
+            | ClusterId::SYSTEM_SERVER_DISCOVERY_RESPONSE
+            | ClusterId::END_DEVICE_ANNOUNCE
+    )
+}
+
 fn read_response_internal(overhead: bool, cluster_id: u16, buffer: &[u8]) -> Value {
+    // Upstream switches on the cluster first and throws for anything unknown,
+    // before any status parsing.
+    if !is_supported_response(cluster_id) {
+        panic!("Unsupported response reading for cluster ID '{cluster_id}'.");
+    }
     let mut reader = BuffaloZdo::new(buffer.to_vec());
     if overhead {
         reader.read_u8();
@@ -688,6 +670,12 @@ fn read_response_internal(overhead: bool, cluster_id: u16, buffer: &[u8]) -> Val
         ]);
     }
     let status = reader.read_u8();
+    // Every upstream response reader only consumes the payload when the status
+    // is `SUCCESS`; otherwise it returns `[status, undefined]`. This also keeps
+    // short error responses from reading past the buffer.
+    if status != 0 {
+        return json!([status, Value::Null]);
+    }
     let value = match cluster_id {
         ClusterId::ACTIVE_ENDPOINTS_RESPONSE | ClusterId::MATCH_DESCRIPTORS_RESPONSE => {
             let nwk = reader.read_u16();
@@ -1102,6 +1090,36 @@ mod tests {
             assert_eq!(
                 BuffaloZdo::read_response(false, cluster, &[0x02]),
                 serde_json::json!([2, null])
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod short_error_response_tests {
+    use super::*;
+
+    /// Upstream returns `[status, undefined]` and does not read the payload on
+    /// non-success responses; short error frames must not panic.
+    #[test]
+    fn non_success_responses_return_status_only() {
+        for cluster in [
+            ClusterId::ACTIVE_ENDPOINTS_RESPONSE,
+            ClusterId::NETWORK_ADDRESS_RESPONSE,
+            ClusterId::IEEE_ADDRESS_RESPONSE,
+            ClusterId::NODE_DESCRIPTOR_RESPONSE,
+            ClusterId::POWER_DESCRIPTOR_RESPONSE,
+            ClusterId::SIMPLE_DESCRIPTOR_RESPONSE,
+            ClusterId::LQI_TABLE_RESPONSE,
+            ClusterId::ROUTING_TABLE_RESPONSE,
+            ClusterId::BINDING_TABLE_RESPONSE,
+            ClusterId::NWK_UPDATE_RESPONSE,
+            ClusterId::PARENT_ANNOUNCE_RESPONSE,
+        ] {
+            assert_eq!(
+                BuffaloZdo::read_response(false, cluster, &[0x02]),
+                serde_json::json!([2, null]),
+                "cluster {cluster:#06x}"
             );
         }
     }

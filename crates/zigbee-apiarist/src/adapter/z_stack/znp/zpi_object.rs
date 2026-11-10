@@ -58,7 +58,8 @@ impl ZpiObject {
                 subsystem.name()
             );
         };
-        if definition::is_mt_cmd_areq_zdo(definition) || definition::is_mt_cmd_sreq_zdo(definition)
+        if super::utils::is_mt_cmd_areq_zdo(definition)
+            || super::utils::is_mt_cmd_sreq_zdo(definition)
         {
             panic!(
                 "Command request '{command}' from subsystem '{}' not found",
@@ -140,7 +141,7 @@ impl ZpiObject {
 
         let mut payload = Map::new();
 
-        if definition::is_mt_cmd_areq_zdo(command) {
+        if super::utils::is_mt_cmd_areq_zdo(command) {
             let cluster_id = command.zdo_cluster_id.expect("zdo cluster id");
             if cluster_id == ClusterId::NETWORK_ADDRESS_RESPONSE
                 || cluster_id == ClusterId::IEEE_ADDRESS_RESPONSE
@@ -168,7 +169,7 @@ impl ZpiObject {
                     BuffaloZdo::read_response(false, cluster_id, &frame.data[2..]),
                 );
             }
-        } else if definition::is_mt_cmd_sreq_zdo(command) {
+        } else if super::utils::is_mt_cmd_sreq_zdo(command) {
             payload.insert(
                 "status".to_string(),
                 json!(*frame.data.first().expect("Not enough bytes to read status")),

@@ -12,7 +12,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Adapter transport (serial/TCP) | `adapter/transport.ts` | PARTIAL | PTY unit tests; TCP/HIL and transcript replay missing |
 | ZNP framing + request/waitress | `adapter/z-stack/znp/znp.ts` | PARTIAL | PTY request tests; no full upstream znp transcript |
 | ZNP bootloader skip | `znp.ts:117` | PARTIAL | code path only; HIL pending |
-| `zStackAdapter` | `adapter/z-stack/adapter/zStackAdapter.ts` | PORTED | start/stop/queue/ZDO/events/ZCL endpoint+group+broadcast+chunked incomingMsgExt/interPAN/network-params/backup/waitFor/endDeviceAnnce debounce; PTY chunk test + HIL |
+| `zStackAdapter` | `adapter/z-stack/adapter/zStackAdapter.ts` | PORTED | start/stop/queue/ZDO/events/ZCL endpoint+group+broadcast+chunked incomingMsgExt/interPAN/network-params/backup/waitFor/endDeviceAnnce debounce; endpoint 239 Shelly profile fixed; PTY chunk test + HIL |
 | Adapter manager | `adapter/z-stack/adapter/manager.ts` | PORTED | startup HIL `Resumed`; restore/commissioning validated once (2026-11-10) — **re-run forbidden** (AGENTS §3.11) |
 | Adapter NV memory | `adapter-nv-memory.ts` | PORTED | wire transcript + HIL `init` |
 | Adapter backup | `adapter-backup.ts` | PORTED | `createBackup` matched router backup; `restoreBackup` validated once (2026-11-10) — **re-run forbidden** (AGENTS §3.11) |
@@ -23,7 +23,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | BuffaloZnp | `znp/buffaloZnp.ts` | PORTED | `differential_buffalo_znp` fixtures |
 | ZpiObject | `znp/zpiObject.ts` | PORTED | `differential_zpi_object` fixtures |
 | ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PARTIAL | `differential_zcl` fixtures for lookup/header; cluster catalog subset |
-| ZDO codecs | `zspec/zdo/*` | PARTIAL | many unit ports; response catalog subset |
+| ZDO codecs | `zspec/zdo/*` | PORTED | full response catalog incl. status-only responses, non-success short-buffer guard, unknown-cluster panic parity |
 | Controller / Device / Endpoint / Group | `controller/*` | BLOCKED | not ported |
 | Green Power | `controller/greenPower.ts` | BLOCKED | not ported |
 | MQTT bridge + `bridge/request/*` | `zigbee2mqtt/lib/mqtt.ts`, `extension/*` | BLOCKED | not ported |

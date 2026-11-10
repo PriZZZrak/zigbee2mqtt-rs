@@ -685,7 +685,7 @@ async fn dispatch_znp_object(
     );
     if object.subsystem == Subsystem::ZDO {
         if let Some(command) = command {
-            if crate::adapter::z_stack::znp::definition::is_mt_cmd_areq_zdo(command) {
+            if crate::adapter::z_stack::znp::utils::is_mt_cmd_areq_zdo(command) {
                 if let Some(cluster_id) = command.zdo_cluster_id {
                     let _ = events.send(AdapterEvent::ZdoResponse {
                         cluster_id,

@@ -1,7 +1,7 @@
 // Original: .upstream/zigbee-herdsman/src/adapter/z-stack/znp/utils.ts
 
 use super::definition::MtCmd;
-use crate::adapter::z_stack::unpi::constants::{Subsystem, Type};
+use crate::adapter::z_stack::unpi::constants::Type;
 
 /// Upstream `isMtCmdAreqZdo`.
 pub fn is_mt_cmd_areq_zdo(command: &MtCmd) -> bool {
@@ -11,18 +11,4 @@ pub fn is_mt_cmd_areq_zdo(command: &MtCmd) -> bool {
 /// Upstream `isMtCmdSreqZdo`.
 pub fn is_mt_cmd_sreq_zdo(command: &MtCmd) -> bool {
     command.r#type == Type::SREQ && command.zdo_cluster_id.is_some()
-}
-
-impl MtCmd {
-    pub fn is_areq_zdo(&self) -> bool {
-        is_mt_cmd_areq_zdo(self)
-    }
-
-    pub fn is_sreq_zdo(&self) -> bool {
-        is_mt_cmd_sreq_zdo(self)
-    }
-}
-
-pub fn is_zdo_subsystem(subsystem: Subsystem) -> bool {
-    subsystem == Subsystem::ZDO
 }

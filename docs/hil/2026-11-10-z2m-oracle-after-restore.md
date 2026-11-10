@@ -62,8 +62,8 @@ MQTT publish: zigbee2mqtt-check/bridge/response/permit_join {"status":"ok"}
 - The coordinator's association table is empty (`numassocdevices=0`) and the
   device relation is unknown (`65534`).
 - Therefore the current ZCL HIL failure is **not** a port defect: the devices
-  lost their association/network key during the destructive re-commissioning
-  and must re-join/re-pair.
+  lost their association during the destructive re-commissioning. A power
+  cycle brought them back; the coordinator NV was correct.
 
 The log also confirms the newly ported `PERMIT_JOINING_RESPONSE` reader: z2m
 handles `mgmtPermitJoinRsp` as `PERMIT_JOINING_RESPONSE status=SUCCESS`.
