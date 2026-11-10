@@ -147,7 +147,7 @@ const RCON: [u8; 11] = [
     0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36,
 ];
 
-fn aes128_encrypt_block(key: &[u8; 16], block: &[u8; 16]) -> [u8; 16] {
+pub(crate) fn aes128_encrypt_block(key: &[u8; 16], block: &[u8; 16]) -> [u8; 16] {
     let mut round_keys = [0u8; 176];
     round_keys[..16].copy_from_slice(key);
     let mut bytes_generated = 16;
@@ -232,5 +232,88 @@ fn mix_columns(state: &mut [u8; 16]) {
         state[i + 1] = a[0] ^ xtime(a[1]) ^ (xtime(a[2]) ^ a[2]) ^ a[3];
         state[i + 2] = a[0] ^ a[1] ^ xtime(a[2]) ^ (xtime(a[3]) ^ a[3]);
         state[i + 3] = (xtime(a[0]) ^ a[0]) ^ a[1] ^ a[2] ^ xtime(a[3]);
+    }
+}
+
+/// Zigbee `aes128CcmStar(M, key, nonce, data)` (zigbee-on-host dist/zigbee/zigbee.js).
+/// `data = MIC(M bytes) || payload`; returns `(authTag, ciphertext)`.
+pub fn aes128_ccm_star(
+    m: usize,
+    key: &[u8; 16],
+    nonce: &[u8; 13],
+    data: &[u8],
+) -> (Vec<u8>, Vec<u8>) {
+    let payload_length_no_m = data.len().saturating_sub(m);
+    let block_count = 1 + payload_length_no_m.div_ceil(16);
+    let mut plaintext = vec![0u8; block_count * 16];
+    plaintext[..m].copy_from_slice(&data[data.len() - m..]);
+    plaintext[16..16 + payload_length_no_m].copy_from_slice(&data[..payload_length_no_m]);
+
+    let mut buffer = vec![0u8; block_count * 16];
+    let mut counter = [0u8; 16];
+    counter[0] = 1; // ZigbeeConsts.SEC_CCM_FLAG_L
+    counter[1..14].copy_from_slice(nonce);
+    for block_num in 0..block_count {
+        counter[14] = ((block_num >> 8) & 0xff) as u8;
+        counter[15] = (block_num & 0xff) as u8;
+        let cipher = aes128_encrypt_block(key, &counter);
+        for index in 0..16 {
+            buffer[block_num * 16 + index] = cipher[index] ^ plaintext[block_num * 16 + index];
+        }
+    }
+    let tag = buffer[..m].to_vec();
+    let ciphertext = buffer[16..16 + payload_length_no_m].to_vec();
+    (tag, ciphertext)
+}
+
+/// Node `crypto.createCipheriv("aes-128-ccm", key, nonce, {authTagLength: 16})`
+/// ciphertext output (tag excluded, as used by `encryptSecurityKey`).
+pub fn aes128_ccm_encrypt(key: &[u8; 16], nonce: &[u8; 13], message: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(message.len());
+    let mut counter = [0u8; 16];
+    counter[0] = 1; // L - 1 with L = 2 (OpenSSL CCM counter block)
+    counter[1..14].copy_from_slice(nonce);
+    for (index, chunk) in message.chunks(16).enumerate() {
+        let block_num = index + 1;
+        counter[14] = ((block_num >> 8) & 0xff) as u8;
+        counter[15] = (block_num & 0xff) as u8;
+        let cipher = aes128_encrypt_block(key, &counter);
+        for (offset, byte) in chunk.iter().enumerate() {
+            output.push(byte ^ cipher[offset]);
+        }
+    }
+    output
+}
+
+#[cfg(test)]
+mod aes_ccm_tests {
+    use super::*;
+
+    fn hex(value: &str) -> Vec<u8> {
+        (0..value.len())
+            .step_by(2)
+            .map(|index| u8::from_str_radix(&value[index..index + 2], 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn ccm_star_matches_zigbee_on_host() {
+        let key: [u8; 16] = hex("000102030405060708090a0b0c0d0e0f").try_into().unwrap();
+        let nonce: [u8; 13] = hex("1112131415161718191a1b1c1d").try_into().unwrap();
+        let data = hex("aabbccdd00112233445566778899aabbccddeeff");
+        let (tag, ciphertext) = aes128_ccm_star(4, &key, &nonce, &data);
+        assert_eq!(tag, hex("d361e2b7"));
+        assert_eq!(ciphertext, hex("156545d449d7e36000bb56dfca54a6e4"));
+    }
+
+    #[test]
+    fn node_ccm_ciphertext_matches() {
+        let key: [u8; 16] = hex("000102030405060708090a0b0c0d0e0f").try_into().unwrap();
+        let nonce: [u8; 13] = hex("1112131415161718191a1b1c1d").try_into().unwrap();
+        let message = hex("00112233445566778899aabbccddeeff");
+        assert_eq!(
+            aes128_ccm_encrypt(&key, &nonce, &message),
+            hex("bfcfab3a0d93a724cc779a138e10e2a0")
+        );
     }
 }

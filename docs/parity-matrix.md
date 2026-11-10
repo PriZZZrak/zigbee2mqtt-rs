@@ -31,8 +31,9 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | PARTIAL | ported: CRUD/registries, ZCL read/write/command/report/config-reporting, interview, `onZclData`, binds, groups, DB round-trip; unit tests in each file. Gaps: OTA (omitted), device/model-specific HA discovery, no Node differential fixture or transcript yet |
 | Device OTA methods (`checkOta`/`updateOta`/`abortOta`/`scheduleOta`/`unscheduleOta`/`findMatchingOtaImage`/`#waitForOtaCommand`/`#notifyOta`) | `controller/model/device.ts:1495-1899` | OMITTED | R1 excludes OTA (user decision); `controller/helpers/ota.ts` needs HTTPS + SHA-512 and no HTTP/TLS/hash dependency may be added. Fields `#scheduledOta`/`#otaInProgress`/`#otaAbortController` and the `scheduledOta` DB field are omitted consistently |
 | ZCL catalog used by the model layer (genBasic/genGroups/genTime/ssIasZone/genPollCtrl/genOnOff/greenPower `pairing`) | `zspec/zcl/definition/cluster.ts` | PARTIAL | attributes/commands/defaults needed by the controller model ported with `file.ts` anchors; the rest of the 200+ cluster catalog remains absent |
-| `controller/controller.ts` | `controller/controller.ts` | BLOCKED | not ported yet |
-| `controller/greenPower.ts` | `controller/greenPower.ts` | BLOCKED | not ported yet |
+| `controller/events.ts` | `controller/events.ts` | PORTED | typed payloads + `ControllerEvent` enum |
+| `controller/controller.ts` | `controller/controller.ts` | BLOCKED | not ported yet (needs greenPower) |
+| `controller/greenPower.ts` | `controller/greenPower.ts` | BLOCKED | ported next; AES-128-CCM* primitive is implemented and oracle-tested |
 | `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | OMITTED | R1 excludes OTA flashing (user decision); no HTTP/TLS or SHA-512 dependency |
 | Green Power | `controller/greenPower.ts` | BLOCKED | not ported |
 | MQTT bridge + `bridge/request/*` | `zigbee2mqtt/lib/mqtt.ts`, `extension/*` | BLOCKED | not ported |
