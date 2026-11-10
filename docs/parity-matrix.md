@@ -27,7 +27,8 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | `controller/database.ts` | `controller/database.ts` | PORTED | CRUD/order/clear semantics + reload/corruption tests |
 | Controller helpers (request/queue/install codes/zclFrameConverter/zclTSN) | `controller/helpers/*` | PORTED | upstream request-queue semantics, full install-code vectors, converter tests |
 | `controller/touchlink.ts` | `controller/touchlink.ts` | PORTED | scan/identify/factory-reset frames + lock/restore tests |
-| Controller models (Device/Endpoint/Group/Entity) | `controller/model/*` | BLOCKED | not ported yet |
+| Controller Entity / ZigbeeEntity + ControllerAdapter boundary | `controller/model/entity.ts`, `zigbeeEntity.ts` | PORTED | injection roundtrip + trait-object test |
+| Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | BLOCKED | not ported yet |
 | `controller/controller.ts` | `controller/controller.ts` | BLOCKED | not ported yet |
 | `controller/greenPower.ts` | `controller/greenPower.ts` | BLOCKED | not ported yet |
 | `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | BLOCKED | not ported yet |

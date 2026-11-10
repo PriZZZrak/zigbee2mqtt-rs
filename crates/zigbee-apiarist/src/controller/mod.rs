@@ -2,5 +2,6 @@
 
 pub mod database;
 pub mod helpers;
+pub mod model;
 pub mod touchlink;
 pub mod tstype;
