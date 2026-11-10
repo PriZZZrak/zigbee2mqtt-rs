@@ -63,6 +63,14 @@ catalog parity.
     and must reproduce the original TypeScript logic byte-for-byte. If a
     function is too large to port in one pass, stop and ask the user to split
     it into smaller functions before writing any code.
+11. **Re-commissioning a live network is FORBIDDEN.** Never run
+    `StartCommissioning` or the restore-backup path (`beginRestore`) against a
+    real coordinator that belongs to a live installation. Both delete the NIB
+    and form a new random provisioning network; devices lose the network key
+    and need physical re-pairing. Such paths may only be exercised against a
+    PTY/fake ZNP, or on a coordinator the user explicitly dedicated to
+    destructive testing. HIL evidence for these paths was captured once on
+    2026-11-10 and must not be re-run.
 
 ## 4. R1 scope
 
