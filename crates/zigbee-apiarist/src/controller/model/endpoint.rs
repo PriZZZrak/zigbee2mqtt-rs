@@ -632,7 +632,7 @@ impl Endpoint {
         &self,
         frame: Frame,
         options: &OptionsWithDefaults,
-    ) -> Result<ZclPayload, String> {
+    ) -> Result<EndpointRequestResult, String> {
         let ieee = self.device_ieee_address.lock().unwrap().clone();
         let network = *self.device_network_address.lock().unwrap();
         let endpoint = self.ID;
@@ -660,15 +660,13 @@ impl Endpoint {
                         profile_id,
                     )
                     .await?;
-                response
-                    .map(EndpointRequestResult::Payload)
-                    .ok_or_else(|| "No response received".to_string())
+                Ok(match response {
+                    Some(payload) => EndpointRequestResult::Payload(payload),
+                    None => EndpointRequestResult::Unit,
+                })
             })
         };
-        match self.send_request_with(frame, options, function).await? {
-            EndpointRequestResult::Payload(payload) => Ok(payload),
-            EndpointRequestResult::Unit => Err("Expected ZCL payload".to_string()),
-        }
+        self.send_request_with(frame, options, function).await
     }
 
     /// Upstream `sendRequest(frame, options, func)`.
@@ -1936,6 +1934,9 @@ impl Endpoint {
             NS,
         );
         let result = self.send_request(frame, &options).await?;
+        let EndpointRequestResult::Payload(result) = result else {
+            return Ok(None);
+        };
         let frame = Frame::from_buffer(
             result.cluster_id,
             result.header,
