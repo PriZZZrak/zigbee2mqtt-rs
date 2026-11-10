@@ -42,43 +42,24 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Upstream z2m oracle (container) | `zigbee2mqtt.14.3` | PORTED | resumed network, 3 devices, MQTT transcripts, see `docs/hil/2026-11-09-z2m-run.md` |
 | HIL (router + Dongle-P) | — | HARDWARE_PENDING | no Routerich/OpenWrt run recorded |
 
-## Blocked: controller model layer (`device.ts`, `endpoint.ts`, `group.ts`)
+## Controller model layer — remaining blocker
 
-Upstream is 1902 + 1254 + 432 lines. Remaining prerequisites for a faithful
-port (no stubs/simplifications):
+The ZCL prerequisites are done: `Frame` stores owned `Cluster`/`Command`
+(custom clusters supported via `create_with_definitions`), parameters carry
+owned conditions, and the catalog now covers genGroups/genTime/genPollCtrl/
+ssIasZone/genOta/touchlink plus full ZCL/ZDO statuses and the Foundation table.
 
-1. **Dynamic cluster/command identity in `Frame`.** `device.ts:1249`,
-   `endpoint.ts:1178` and `group.ts:290` pass the resolved `Cluster`/`Command`
-   objects (custom clusters, `manufacturerCode`) to `Zcl.Frame.create`.
-   `zcl_frame.rs` only accepts `ClusterRef::{Id(u16), Name(&'static str)}`,
-   stores static `cluster::Cluster`/`Command`, re-resolves commands from
-   `specific_command` and ignores `customClusters`. Custom clusters and
-   dynamic specific commands cannot be represented yet.
-2. **Cluster data catalog.** `Utils::get_cluster` currently knows only
-   genBasic/genDeviceTempCfg/genIdentify/genOnOff/genScenes/genLevelCtrl/
-   genAlarms/genRssiLocation/lightingColorCtrl/haDiagnostic/
-   manuSpecificAmazonWWAH. Models also need genGroups, genPollCtrl, ssIasZone,
-   genTime and genOta attributes/commands (`interviewInternal`, `onZclData`,
-   `addToGroup`, `removeFromGroup`, `removeFromAllGroups`, OTA). The static
-   modules have only the command subsets used by earlier tests.
-3. **OTA.** `controller/helpers/ota.ts` is not ported;
-   `ControllerAdapter` has no `waitFor` and there is no entity event emitter
-   for `once("deviceAnnounce")`, so the OTA methods in device.ts cannot be
-   ported faithfully yet.
-4. **Object graph ownership.** Upstream returns one shared mutable instance
-   from `Device.devices`/`Group.groups`; `Endpoint.getDevice()`/`save()`
-   re-enter that registry. `Arc<Mutex<Device>>` deadlocks in
-   `Device::interview` → `endpoint.bind()` → `save()`, while a value/snapshot
-   registry loses queued `Request` callbacks. A reentrant cell, per-field
-   interior mutability or an actor model must be chosen and documented.
+Ownership model chosen (AGENTS §3.4): upstream static maps translate to
+`RwLock<HashMap<...>>` registries with short synchronous access; models resolve
+each other through the registry (Endpoint stores the IEEE and calls
+`Device::by_ieee_addr`), so no `Arc` cycle and no lock across `.await`.
 
-Already resolved in this slice: full `Foundation` global-command table
-(23 commands, correct IDs/responses), full ZCL/ZDO status enums,
-`CustomClusters` as a name→cluster map, `Request::new_with_policy`, and
-adapter `profileId` arguments.
-
-`AGENTS.md` §5 Q1 (device layer) is treated as answered for this scope by the
-current user objective ("port controller/").
+Remaining blocker: **`controller/helpers/ota.ts` needs HTTPS and SHA-512**.
+The crate has no HTTP/TLS or hashing dependency and `docs/dependency-map.md`
+declares none. `Device`'s OTA methods (checkOta/updateOta/abortOta/scheduleOta/
+unscheduleOta and matching) cannot be ported completely without deciding how to
+fetch `https://raw.githubusercontent.com/Koenkk/zigbee-OTA/...` and verify
+SHA-512. Local-file OTA indexes/images are already portable without new crates.
 
 ## Next evidence to add
 
