@@ -3,3 +3,4 @@
 pub mod database;
 pub mod helpers;
 pub mod touchlink;
+pub mod tstype;

@@ -12,6 +12,7 @@ use crate::zspec::zcl::definition::enums::DataType;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ZclValue {
     Null,
+    Bool(bool),
     Number(f64),
     Text(String),
 }
@@ -29,6 +30,33 @@ impl ZclValue {
         matches!(self, Self::Number(value) if value.is_nan())
     }
 
+    /// Conversion used by the controller layer (upstream JS values).
+    pub fn from_json(value: &serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::Null => Self::Null,
+            serde_json::Value::Bool(value) => Self::Bool(*value),
+            serde_json::Value::Number(value) => Self::Number(value.as_f64().unwrap_or(f64::NAN)),
+            serde_json::Value::String(value) => Self::Text(value.clone()),
+            other => Self::Text(other.to_string()),
+        }
+    }
+
+    /// Conversion used by the controller layer (upstream JS values).
+    pub fn to_json(&self) -> serde_json::Value {
+        match self {
+            Self::Null => serde_json::Value::Null,
+            Self::Bool(value) => serde_json::Value::Bool(*value),
+            Self::Number(value) => {
+                if value.is_nan() {
+                    serde_json::Value::Null
+                } else {
+                    serde_json::json!(value)
+                }
+            }
+            Self::Text(value) => serde_json::Value::String(value.clone()),
+        }
+    }
+
     fn is_len(&self, length: usize) -> bool {
         match self {
             Self::Text(value) => value.len() == length,
@@ -41,6 +69,12 @@ impl ZclValue {
             Self::Text(value) => value.len(),
             _ => 0,
         }
+    }
+}
+
+impl From<bool> for ZclValue {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
     }
 }
 

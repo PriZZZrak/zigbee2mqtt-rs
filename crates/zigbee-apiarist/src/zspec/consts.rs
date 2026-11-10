@@ -9,3 +9,9 @@ pub const ALL_802_15_4_CHANNELS: [u8; 16] = [
     11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
 ];
 pub const PREFERRED_802_15_4_CHANNELS: [u8; 7] = [11, 14, 15, 19, 20, 24, 25];
+
+/// Upstream `INSTALL_CODE_SIZES` — consts.ts:89.
+pub const INSTALL_CODE_SIZES: [usize; 4] = [18, 8, 10, 14];
+
+/// Upstream `INSTALL_CODE_CRC_SIZE` — consts.ts:91.
+pub const INSTALL_CODE_CRC_SIZE: usize = 2;

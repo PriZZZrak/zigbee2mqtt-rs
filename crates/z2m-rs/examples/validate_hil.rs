@@ -56,9 +56,36 @@ fn main() {
     // 2. database.db through the Database port.
     let database = Database::open(router.join("database.db"));
     assert_eq!(database.all_entries().count(), 4);
-    assert_eq!(database.entries(&["Coordinator"]).count(), 1);
-    assert_eq!(database.entries(&["EndDevice"]).count(), 1);
-    assert_eq!(database.entries(&["Router"]).count(), 2);
+    assert_eq!(
+        database
+            .get_entries_iterator(&[
+                zigbee_apiarist::controller::database::EntityType::DeviceType(
+                    zigbee_apiarist::controller::database::DeviceType::Coordinator
+                )
+            ])
+            .count(),
+        1
+    );
+    assert_eq!(
+        database
+            .get_entries_iterator(&[
+                zigbee_apiarist::controller::database::EntityType::DeviceType(
+                    zigbee_apiarist::controller::database::DeviceType::EndDevice
+                )
+            ])
+            .count(),
+        1
+    );
+    assert_eq!(
+        database
+            .get_entries_iterator(&[
+                zigbee_apiarist::controller::database::EntityType::DeviceType(
+                    zigbee_apiarist::controller::database::DeviceType::Router
+                )
+            ])
+            .count(),
+        2
+    );
     println!("database: ok (4 entries)");
 
     // 3. coordinator_backup.json through fromUnifiedBackup/toUnifiedBackup.
