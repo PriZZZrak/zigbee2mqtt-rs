@@ -61,3 +61,8 @@ the right state and the earlier "unknown key" hypothesis was wrong.
 The adapter was disconnected from the dev host before the ZCL round-trip could
 be re-run; the endpoint read evidence from `2026-11-10-zstack-zcl.md` still
 stands.
+
+After the adapter was returned, the non-destructive HIL suite passed 11/11 on
+the recovered NV (`hil_zstack_adapter_zcl_read_roundtrip`,
+`hil_create_backup_matches_router`, manager start, endpoints, interPAN,
+network parameters, transport and NV init).

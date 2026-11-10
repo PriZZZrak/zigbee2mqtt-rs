@@ -81,3 +81,19 @@ answer and the round-trip test times out. The same run against upstream z2m
 shows identical behaviour (`dataConfirm` success, ZCL timeout, zero AF
 incoming messages, `numassocdevices=0`), so this is device-side, not a port
 regression — see `docs/hil/2026-11-10-z2m-oracle-after-restore.md`.
+
+## Re-verified after the device recovery (2026-11-10)
+
+After the thermostats were power-cycled and the adapter returned to the dev
+host, the full non-destructive HIL suite passed:
+
+```text
+test hil_zstack_adapter_zcl_read_roundtrip ... ok
+thermostat network address: 18008
+ZCL read response: cluster=0 endpoint=1 cmd=1 data=1807010000002008
+test result: ok. 11 passed; 0 failed; 0 ignored
+```
+
+A one-off transient `nwkAddrRsp` timeout was observed immediately after
+reconnect; the same request succeeded on the next attempt and in a separate
+run.
