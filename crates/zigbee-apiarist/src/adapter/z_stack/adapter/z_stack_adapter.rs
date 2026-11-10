@@ -403,6 +403,7 @@ impl ZStackAdapter {
 
     /// Upstream `getCoordinatorIEEE()`.
     pub async fn get_coordinator_ieee(&mut self) -> Result<String, String> {
+        self.check_interpan_lock()?;
         let queue = self
             .queue
             .clone()
@@ -455,6 +456,7 @@ impl ZStackAdapter {
         payload: &[u8],
         disable_response: bool,
     ) -> Result<Value, String> {
+        self.check_interpan_lock()?;
         let queue = self
             .queue
             .clone()
@@ -511,6 +513,7 @@ impl ZStackAdapter {
             self.send_zdo("0x0000000000000000", 0xfffc, cluster_id, &zdo_payload, true)
                 .await?;
         }
+        self.check_interpan_lock()?;
         self.set_led(if seconds == 0 { "off" } else { "on" }).await
     }
 
@@ -1496,6 +1499,7 @@ impl ZStackAdapter {
         profile_id: Option<u16>,
     ) -> Result<(), String> {
         let source_endpoint = self.select_source_endpoint(source_endpoint, profile_id)?;
+        self.check_interpan_lock()?;
         let queue = self
             .queue
             .clone()
@@ -1537,6 +1541,7 @@ impl ZStackAdapter {
         profile_id: Option<u16>,
     ) -> Result<(), String> {
         let source_endpoint = self.select_source_endpoint(Some(source_endpoint), profile_id)?;
+        self.check_interpan_lock()?;
         let queue = self
             .queue
             .clone()
@@ -1722,7 +1727,6 @@ impl ZStackAdapter {
             ),
             NS,
         );
-        self.check_interpan_lock()?;
         let command = &zcl_frame.command;
         let mut response = None;
         if command.response.is_some() && !disable_response {
