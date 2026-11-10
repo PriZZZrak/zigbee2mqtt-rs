@@ -40,7 +40,7 @@ use crate::zspec::consts::{BLANK_EUI64, COORDINATOR_ADDRESS, HA_ENDPOINT, HA_PRO
 use crate::zspec::enums::BroadcastAddress;
 use crate::zspec::utils::eui64_be_buffer_to_hex;
 use crate::zspec::zcl::utils::{ClusterKey, CommandKey, CustomClusters, Utils};
-use crate::zspec::zcl::zcl_frame::Frame;
+use crate::zspec::zcl::zcl_frame::{try_from_buffer, Frame, FrameParseError};
 use crate::zspec::zcl::zcl_header::{Direction, FrameType};
 use crate::zspec::zdo::buffalo_zdo::BuffaloZdo;
 use crate::zspec::zdo::definition::clusters::ClusterId;
@@ -50,7 +50,7 @@ const NS: &str = "zh:controller";
 
 pub type ControllerFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send + 'a>>;
 
-/// Upstream `TsType.StartResult`.
+/// Upstream `TsType.StartResult` — adapter/tstype.ts:44.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StartResult {
     Resumed,
@@ -58,7 +58,7 @@ pub enum StartResult {
     Restored,
 }
 
-/// Upstream `AdapterTsType.NetworkParameters`.
+/// Upstream `AdapterTsType.NetworkParameters` — adapter/tstype.ts:30.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ControllerNetworkParameters {
     pub pan_id: u16,
@@ -67,7 +67,7 @@ pub struct ControllerNetworkParameters {
     pub nwk_update_id: u8,
 }
 
-/// Upstream `AdapterTsType.CoordinatorVersion`.
+/// Upstream `AdapterTsType.CoordinatorVersion` — adapter/tstype.ts:37.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ControllerCoordinatorVersion {
     pub r#type: String,
@@ -254,7 +254,7 @@ impl Controller {
         })
     }
 
-    /// Upstream `get greenPower()`.
+    /// Upstream `get greenPower()` — controller.ts:123.
     pub fn green_power(&self) -> Option<Arc<GreenPower>> {
         self.green_power
             .lock()
@@ -262,14 +262,14 @@ impl Controller {
             .clone()
     }
 
-    /// Upstream `get touchlink()`.
+    /// Upstream `get touchlink()` — controller.ts:127.
     pub fn touchlink(
         &self,
     ) -> Arc<tokio::sync::Mutex<Option<Touchlink<Arc<dyn ControllerRuntimeAdapter>>>>> {
         self.touchlink.clone()
     }
 
-    /// Upstream `on(event, listener)`.
+    /// Upstream `on(event, listener)` — controller.ts:61 (EventEmitter base).
     pub fn on<F>(&self, listener: F)
     where
         F: Fn(&ControllerEvent) + Send + Sync + 'static,
@@ -291,10 +291,12 @@ impl Controller {
         }
     }
 
+    /// Upstream `selfAndDeviceEmit(device, event, ...args)` — controller.ts:815.
     fn self_and_device_emit(&self, event: ControllerEvent) {
-        // Upstream also forwards the event to the device's EventEmitter. The
-        // Rust model layer has no per-device emitter; consumers subscribe to
-        // the controller bus and filter by `device`.
+        // Upstream emits on the device first, then on the controller.
+        if let Some(device) = event.device() {
+            device.emit(&event);
+        }
         self.emit(&event);
     }
 
@@ -866,7 +868,7 @@ impl Controller {
             .expect("permit join end poisoned") = None;
     }
 
-    /// Upstream `getPermitJoin()`.
+    /// Upstream `getPermitJoin()` — controller.ts:417.
     pub fn get_permit_join(&self) -> bool {
         self.permit_join_end
             .lock()
@@ -874,7 +876,7 @@ impl Controller {
             .is_some()
     }
 
-    /// Upstream `getPermitJoinEnd()`.
+    /// Upstream `getPermitJoinEnd()` — controller.ts:421.
     pub fn get_permit_join_end(&self) -> Option<u64> {
         *self
             .permit_join_end
@@ -882,12 +884,12 @@ impl Controller {
             .expect("permit join end poisoned")
     }
 
-    /// Upstream `isStopping()`.
+    /// Upstream `isStopping()` — controller.ts:425.
     pub fn is_stopping(&self) -> bool {
         self.stopping.load(Ordering::SeqCst)
     }
 
-    /// Upstream `isAdapterDisconnected()`.
+    /// Upstream `isAdapterDisconnected()` — controller.ts:429.
     pub fn is_adapter_disconnected(&self) -> bool {
         self.adapter_disconnected.load(Ordering::SeqCst)
     }
@@ -990,12 +992,12 @@ impl Controller {
         Ok(missing_routers)
     }
 
-    /// Upstream `reset(type)`.
+    /// Upstream `reset(type)` — controller.ts:508.
     pub async fn reset(&self, r#type: &str) -> Result<(), String> {
         self.adapter()?.reset(r#type).await
     }
 
-    /// Upstream `getCoordinatorVersion()`.
+    /// Upstream `getCoordinatorVersion()` — controller.ts:512.
     pub async fn get_coordinator_version(&self) -> Result<ControllerCoordinatorVersion, String> {
         self.adapter()?.get_coordinator_version().await
     }
@@ -1011,12 +1013,12 @@ impl Controller {
             .ok_or_else(|| "Network parameters unavailable".to_string())
     }
 
-    /// Upstream `getDevices()`.
+    /// Upstream `getDevices()` — controller.ts:529.
     pub fn get_devices(&self) -> Vec<Arc<Device>> {
         Device::all()
     }
 
-    /// Upstream `getDevicesIterator(predicate?)`.
+    /// Upstream `getDevicesIterator(predicate?)` — controller.ts:536.
     pub fn get_devices_iterator(
         &self,
         predicate: impl Fn(&Arc<Device>) -> bool,
@@ -1024,22 +1026,22 @@ impl Controller {
         Device::all_iterator(predicate)
     }
 
-    /// Upstream `getDevicesByType(type)`.
+    /// Upstream `getDevicesByType(type)` — controller.ts:543.
     pub fn get_devices_by_type(&self, r#type: DeviceType) -> Vec<Arc<Device>> {
         Device::by_type(r#type)
     }
 
-    /// Upstream `getDeviceByIeeeAddr(ieeeAddr)`.
+    /// Upstream `getDeviceByIeeeAddr(ieeeAddr)` — controller.ts:550.
     pub fn get_device_by_ieee_addr(&self, ieee_addr: &str) -> Option<Arc<Device>> {
         Device::by_ieee_addr(ieee_addr, false)
     }
 
-    /// Upstream `getDeviceByNetworkAddress(networkAddress)`.
+    /// Upstream `getDeviceByNetworkAddress(networkAddress)` — controller.ts:557.
     pub fn get_device_by_network_address(&self, network_address: u16) -> Option<Arc<Device>> {
         Device::by_network_address(network_address, false)
     }
 
-    /// Upstream `getDeviceIeeeAddresses()`.
+    /// Upstream `getDeviceIeeeAddresses()` — controller.ts:564.
     pub fn get_device_ieee_addresses(&self) -> Vec<String> {
         Device::all_iterator(|_| true)
             .into_iter()
@@ -1047,22 +1049,22 @@ impl Controller {
             .collect()
     }
 
-    /// Upstream `getGroupByID(groupID)`.
+    /// Upstream `getGroupByID(groupID)` — controller.ts:577.
     pub fn get_group_by_id(&self, group_id: u16) -> Option<Arc<Group>> {
         Group::by_group_id(group_id)
     }
 
-    /// Upstream `getGroups()`.
+    /// Upstream `getGroups()` — controller.ts:585.
     pub fn get_groups(&self) -> Vec<Arc<Group>> {
         Group::all()
     }
 
-    /// Upstream `getGroupsIterator(predicate?)`.
+    /// Upstream `getGroupsIterator(predicate?)` — controller.ts:592.
     pub fn get_groups_iterator(&self, predicate: impl Fn(&Arc<Group>) -> bool) -> Vec<Arc<Group>> {
         Group::all_iterator(predicate)
     }
 
-    /// Upstream `createGroup(groupID)`.
+    /// Upstream `createGroup(groupID)` — controller.ts:599.
     pub fn create_group(&self, group_id: u16) -> Result<Arc<Group>, String> {
         Group::create(group_id)
     }
@@ -1199,7 +1201,7 @@ impl Controller {
         Ok(None)
     }
 
-    /// Upstream `checkDeviceNetworkAddress(device, ieeeAddress, nwkAddress)`.
+    /// Upstream `checkDeviceNetworkAddress(device, ieeeAddress, nwkAddress)` — controller.ts:672.
     fn check_device_network_address(
         &self,
         device: &Arc<Device>,
@@ -1222,6 +1224,7 @@ impl Controller {
         }
     }
 
+    /// Upstream `onNetworkAddress(payload)` — controller.ts:682.
     fn on_network_address(&self, payload: &Value) {
         let eui64 = payload
             .get("eui64")
@@ -1249,6 +1252,7 @@ impl Controller {
         self.check_device_network_address(&device, &eui64, nwk_address);
     }
 
+    /// Upstream `onIEEEAddress(payload)` — controller.ts:696.
     fn on_ieee_address(&self, payload: &Value) {
         let eui64 = payload
             .get("eui64")
@@ -1276,6 +1280,7 @@ impl Controller {
         self.check_device_network_address(&device, &eui64, nwk_address);
     }
 
+    /// Upstream `onDeviceAnnounce(payload)` — controller.ts:710.
     fn on_device_announce(&self, payload: &Value) {
         let eui64 = payload
             .get("eui64")
@@ -1308,6 +1313,7 @@ impl Controller {
         }));
     }
 
+    /// Upstream `onDeviceLeave(payload)` — controller.ts:727.
     fn on_device_leave(&self, payload: &DeviceLeavePayload) {
         logger().debug(
             &format!(
@@ -1350,6 +1356,7 @@ impl Controller {
         }));
     }
 
+    /// Upstream `onAdapterDisconnected()` — controller.ts:745.
     async fn on_adapter_disconnected(&self) -> Result<(), String> {
         logger().debug("Adapter disconnected", NS);
         self.adapter_disconnected.store(true, Ordering::SeqCst);
@@ -1367,6 +1374,7 @@ impl Controller {
         Ok(())
     }
 
+    /// Upstream `onDeviceJoinedGreenPower(payload)` — controller.ts:759.
     fn on_device_joined_green_power(&self, payload: GreenPowerDeviceJoinedPayload) {
         logger().debug(
             &format!(
@@ -1439,6 +1447,7 @@ impl Controller {
         }
     }
 
+    /// Upstream `onDeviceLeaveGreenPower(sourceID)` — controller.ts:797.
     fn on_device_leave_green_power(&self, source_id: u32) {
         logger().debug(&format!("Green power device '{source_id}' left"), NS);
 
@@ -1467,6 +1476,7 @@ impl Controller {
         }));
     }
 
+    /// Upstream `onDeviceJoined(payload)` — controller.ts:824.
     async fn on_device_joined(&self, payload: &DeviceJoinedPayload) -> Result<(), String> {
         logger().debug(&format!("Device '{}' joined", payload.ieee_addr), NS);
 
@@ -1646,6 +1656,7 @@ impl Controller {
         Ok(())
     }
 
+    /// Upstream `onZdoResponse(clusterId, response)` — controller.ts:907.
     fn on_zdo_response(&self, cluster_id: u16, response: &Value) {
         logger().debug(
             &format!(
@@ -1690,7 +1701,7 @@ impl Controller {
         }
 
         if payload.cluster_id == green_power_id {
-            frame = match Frame::try_from_buffer(
+            frame = match try_from_buffer(
                 payload.cluster_id,
                 Some(payload.header),
                 &payload.data,
@@ -1767,14 +1778,21 @@ impl Controller {
                 .as_ref()
                 .map(|device| device.custom_clusters())
                 .unwrap_or_else(CustomClusters::empty);
-            match Frame::try_from_buffer(
+            match try_from_buffer(
                 payload.cluster_id,
                 Some(payload.header),
                 &payload.data,
                 &custom_clusters,
             ) {
                 Ok(parsed) => frame = Some(parsed),
-                Err(error) => {
+                Err(FrameParseError::Status(status)) => {
+                    logger().debug(
+                        &format!("Failed to parse frame: ZCL status error '{status}'"),
+                        NS,
+                    );
+                    default_response = Some(status);
+                }
+                Err(FrameParseError::Other(error)) => {
                     logger().debug(&format!("Failed to parse frame: {error}"), NS);
                 }
             }
@@ -2026,6 +2044,7 @@ mod tests {
         sent_endpoint: Mutex<Vec<Frame>>,
         sent_group: Mutex<Vec<Frame>>,
         permit_joins: Mutex<Vec<(u8, Option<u16>)>>,
+        zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
         channel: u8,
         coordinator_ieee: String,
         stopped: AtomicBool,
@@ -2041,6 +2060,7 @@ mod tests {
                 sent_endpoint: Mutex::new(Vec::new()),
                 sent_group: Mutex::new(Vec::new()),
                 permit_joins: Mutex::new(Vec::new()),
+                zdo_calls: Mutex::new(Vec::new()),
                 channel,
                 coordinator_ieee: "0x00124b0000000001".to_string(),
                 stopped: AtomicBool::new(false),
@@ -2061,6 +2081,13 @@ mod tests {
             _payload: &[u8],
             _disable_response: bool,
         ) -> ControllerFuture<'_, Value> {
+            self.zdo_calls.lock().unwrap().push((
+                _ieee_address.to_string(),
+                _network_address,
+                cluster_id,
+                _payload.to_vec(),
+                _disable_response,
+            ));
             let response = match cluster_id {
                 ClusterId::ACTIVE_ENDPOINTS_REQUEST => json!([0, {"endpointList": [1]}]),
                 ClusterId::SIMPLE_DESCRIPTOR_REQUEST => json!([
@@ -2421,6 +2448,17 @@ mod tests {
         device.create_endpoint(1).expect("create endpoint");
         device.save(true);
 
+        let device_events: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured_device_events = device_events.clone();
+        device.on(move |event| {
+            if let ControllerEvent::Message(payload) = event {
+                captured_device_events
+                    .lock()
+                    .unwrap()
+                    .push(payload.r#type.clone());
+            }
+        });
+
         let frame = message_frame();
         let data = frame.to_buffer();
         let zcl_payload = ZclPayload {
@@ -2457,6 +2495,10 @@ mod tests {
             event,
             ControllerEvent::LastSeenChanged(payload) if payload.reason == "messageEmitted"
         )));
+        assert_eq!(
+            device_events.lock().unwrap().as_slice(),
+            &["attributeReport".to_string()]
+        );
 
         drop(events);
         controller.stop().await.expect("stop");
@@ -2506,6 +2548,354 @@ mod tests {
         )));
 
         drop(events);
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn parse_error_sends_default_response_with_status() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-default-rsp-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let device = Device::create(
+            DeviceType::Router,
+            "0x00124b0000000004",
+            0x1234,
+            Some(0x1234),
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create device");
+        device.create_endpoint(1).expect("create endpoint");
+        device.save(true);
+
+        // Unknown genOnOff command 0xfe -> Upstream ZclStatusError(UNSUP_COMMAND).
+        let data = vec![0x01, 5, 0xfe];
+        let zcl_payload = ZclPayload {
+            cluster_id: 0x0006,
+            data: data.clone(),
+            header: Header::from_buffer(&data).expect("header"),
+            address: json!(0x1234),
+            endpoint: 1,
+            linkquality: 50,
+            group_id: 0,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        };
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(zcl_payload))
+            .await
+            .expect("zcl payload");
+
+        let frames = adapter.sent_endpoint.lock().unwrap();
+        let default_response = frames
+            .iter()
+            .find(|frame| frame.command.name == "defaultRsp")
+            .expect("default response");
+        assert_eq!(default_response.payload["statusCode"], json!(0x81));
+        assert_eq!(default_response.payload["cmdId"], json!(0xfe));
+        assert_eq!(
+            default_response.header.frame_control.direction,
+            Direction::SERVER_TO_CLIENT
+        );
+        drop(frames);
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn zdo_network_address_and_announce_update_device_and_emit_events() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-zdo-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let device = Device::create(
+            DeviceType::Router,
+            "0x00124b0000000005",
+            0x1234,
+            Some(0x1234),
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create device");
+        device.save(true);
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZdoResponse {
+                cluster_id: ClusterId::NETWORK_ADDRESS_RESPONSE,
+                response: json!([
+                    0,
+                    {"eui64": "0x00124b0000000005", "nwkAddress": 0x2345}
+                ]),
+            })
+            .await
+            .expect("network address");
+        assert_eq!(device.network_address(), 0x2345);
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZdoResponse {
+                cluster_id: ClusterId::END_DEVICE_ANNOUNCE,
+                response: json!([
+                    0,
+                    {"eui64": "0x00124b0000000005", "nwkAddress": 0x3456}
+                ]),
+            })
+            .await
+            .expect("device announce");
+        assert_eq!(device.network_address(), 0x3456);
+
+        {
+            let events = events.lock().unwrap();
+            assert!(events
+                .iter()
+                .any(|event| matches!(event, ControllerEvent::DeviceNetworkAddressChanged(_))));
+            assert!(events
+                .iter()
+                .any(|event| matches!(event, ControllerEvent::DeviceAnnounce(_))));
+            assert!(events.iter().any(|event| matches!(
+                event,
+                ControllerEvent::LastSeenChanged(payload) if payload.reason == "deviceAnnounce"
+            )));
+        }
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn send_raw_dispatches_zdo_group_broadcast_and_endpoint() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-raw-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let zdo = controller
+            .send_raw(
+                RawPayload {
+                    profile_id: Some(ZDO_PROFILE_ID),
+                    ieee_address: Some("0x00124b0000000006".to_string()),
+                    network_address: Some(0x1234),
+                    cluster_key: Some(json!(ClusterId::IEEE_ADDRESS_REQUEST)),
+                    zdo_params: Some(vec![json!(0x1234), json!(false), json!(0)]),
+                    ..Default::default()
+                },
+                &CustomClusters::empty(),
+            )
+            .await
+            .expect("zdo sendRaw");
+        assert!(matches!(zdo, Some(SendRawResponse::Zdo(_))));
+        assert_eq!(
+            adapter.zdo_calls.lock().unwrap().last().unwrap().2,
+            ClusterId::IEEE_ADDRESS_REQUEST
+        );
+
+        let zcl = RawZclPayload {
+            frame_type: Some(FrameType::SPECIFIC as u8),
+            direction: Some(Direction::CLIENT_TO_SERVER as u8),
+            command_key: json!("on"),
+            payload: Some(json!({})),
+            ..Default::default()
+        };
+
+        controller
+            .send_raw(
+                RawPayload {
+                    profile_id: Some(HA_PROFILE_ID),
+                    group_id: Some(10),
+                    src_endpoint: Some(HA_ENDPOINT),
+                    cluster_key: Some(json!("genOnOff")),
+                    zcl: Some(zcl.clone()),
+                    ..Default::default()
+                },
+                &CustomClusters::empty(),
+            )
+            .await
+            .expect("group sendRaw");
+        assert_eq!(adapter.sent_group.lock().unwrap().len(), 1);
+
+        controller
+            .send_raw(
+                RawPayload {
+                    profile_id: Some(HA_PROFILE_ID),
+                    network_address: Some(BroadcastAddress::RX_ON_WHEN_IDLE as u16),
+                    dst_endpoint: Some(1),
+                    src_endpoint: Some(HA_ENDPOINT),
+                    cluster_key: Some(json!("genOnOff")),
+                    zcl: Some(zcl.clone()),
+                    ..Default::default()
+                },
+                &CustomClusters::empty(),
+            )
+            .await
+            .expect("broadcast sendRaw");
+        assert_eq!(adapter.sent_all.lock().unwrap().len(), 1);
+
+        controller
+            .send_raw(
+                RawPayload {
+                    profile_id: Some(HA_PROFILE_ID),
+                    ieee_address: Some("0x00124b0000000006".to_string()),
+                    network_address: Some(0x1234),
+                    dst_endpoint: Some(1),
+                    src_endpoint: Some(HA_ENDPOINT),
+                    cluster_key: Some(json!("genOnOff")),
+                    zcl: Some(zcl),
+                    ..Default::default()
+                },
+                &CustomClusters::empty(),
+            )
+            .await
+            .expect("endpoint sendRaw");
+        assert_eq!(adapter.sent_endpoint.lock().unwrap().len(), 1);
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn permit_join_unicast_passes_device_address() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-permit-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let device = Device::create(
+            DeviceType::Router,
+            "0x00124b0000000007",
+            0x1234,
+            Some(0x1234),
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create device");
+        device.save(true);
+
+        controller
+            .permit_join(30, Some(&device))
+            .await
+            .expect("permit join");
+        assert!(adapter
+            .permit_joins
+            .lock()
+            .unwrap()
+            .contains(&(30, Some(0x1234))));
+        assert!(adapter
+            .sent_endpoint
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|frame| frame.command.name == "commisioningMode"));
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn green_power_commissioning_creates_device_and_emits_join() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-gp-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let source_id = 0x1234_5678u32;
+        let mut data = vec![0x01, 19, 0x04];
+        data.extend_from_slice(&0u16.to_le_bytes()); // options
+        data.extend_from_slice(&source_id.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes()); // frameCounter
+        data.push(0xe0); // commissioning command
+        data.push(2); // payloadSize
+        data.extend_from_slice(&[0x02, 0x00]); // deviceID, options
+
+        let zcl_payload = ZclPayload {
+            cluster_id: 0x0021,
+            data: data.clone(),
+            header: Header::from_buffer(&data).expect("header"),
+            address: json!((source_id & 0xffff) as u16),
+            endpoint: 242,
+            linkquality: 200,
+            group_id: 0x0b84,
+            was_broadcast: true,
+            destination_endpoint: 242,
+        };
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(zcl_payload))
+            .await
+            .expect("green power payload");
+
+        let ieee = GreenPower::source_id_to_ieee_address(source_id);
+        let device = Device::by_ieee_addr(&ieee, false).expect("green power device");
+        assert_eq!(device.r#type(), DeviceType::GreenPower);
+
+        {
+            let events = events.lock().unwrap();
+            assert!(events.iter().any(|event| matches!(
+                event,
+                ControllerEvent::DeviceJoined(payload)
+                    if payload.device.ieee_addr() == ieee
+            )));
+            assert!(events.iter().any(|event| matches!(
+                event,
+                ControllerEvent::DeviceInterview(payload)
+                    if payload.status == "successful" && payload.device.ieee_addr() == ieee
+            )));
+        }
+
         controller.stop().await.expect("stop");
         let _ = std::fs::remove_file(path);
     }

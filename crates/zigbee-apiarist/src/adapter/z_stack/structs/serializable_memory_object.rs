@@ -5,7 +5,7 @@ use super::r#struct::{Alignment, Struct};
 use super::table::Table;
 
 /// Upstream `SerializableMemoryObject`.
-pub trait SerializableMemoryObject {
+pub trait SerializableMemoryObject: Sync {
     /// Upstream `serialize(alignment?)`.
     fn serialize_memory(&self, alignment: Alignment) -> Vec<u8>;
 }

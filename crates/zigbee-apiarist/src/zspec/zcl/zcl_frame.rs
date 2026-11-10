@@ -56,6 +56,60 @@ pub struct Frame {
     pub payload: Value,
 }
 
+/// Upstream `ZclStatusError` / decode failures surfaced by `Frame.fromBuffer`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FrameParseError {
+    /// Upstream `ZclStatusError.code`.
+    Status(u8),
+    /// Any non-status parse failure.
+    Other(String),
+}
+
+impl std::fmt::Display for FrameParseError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Status(status) => write!(formatter, "ZCL status error '{status}'"),
+            Self::Other(message) => write!(formatter, "{message}"),
+        }
+    }
+}
+
+/// Fallible variant of `Frame::fromBuffer` for callers that upstream wraps
+/// in `try/catch` (controller `onZclPayload`, green power decryption).
+///
+/// The codec port signals `ZclStatusError`/invalid fields with panics, so
+/// the boundary converts them into `Result` without changing the existing
+/// infallible `from_buffer` contract used by the model layer.
+pub fn try_from_buffer(
+    cluster_id: u16,
+    header: Option<Header>,
+    buffer: &[u8],
+    custom_clusters: &CustomClusters,
+) -> Result<Frame, FrameParseError> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        Frame::from_buffer(cluster_id, header, buffer, custom_clusters)
+    }))
+    .map_err(|payload| {
+        let message = if let Some(message) = payload.downcast_ref::<&str>() {
+            (*message).to_string()
+        } else if let Some(message) = payload.downcast_ref::<String>() {
+            message.clone()
+        } else {
+            "Frame parse failed".to_string()
+        };
+
+        if message == "INVALID_FIELD" {
+            FrameParseError::Status(0x85)
+        } else if message.starts_with("Command ")
+            || message.starts_with("Global command does not exist")
+        {
+            FrameParseError::Status(0x81)
+        } else {
+            FrameParseError::Other(message)
+        }
+    })
+}
+
 impl Frame {
     /// Upstream `ZclFrame.create(...)`.
     #[allow(clippy::too_many_arguments)]
@@ -177,32 +231,6 @@ impl Frame {
             command,
             payload,
         }
-    }
-
-    /// Fallible variant of `Frame::fromBuffer` for callers that upstream wraps
-    /// in `try/catch` (controller `onZclPayload`, green power decryption).
-    ///
-    /// The codec port signals `ZclStatusError`/invalid fields with panics, so
-    /// the boundary converts them into `Result` without changing the existing
-    /// infallible `from_buffer` contract used by the model layer.
-    pub fn try_from_buffer(
-        cluster_id: u16,
-        header: Option<Header>,
-        buffer: &[u8],
-        custom_clusters: &CustomClusters,
-    ) -> Result<Self, String> {
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            Self::from_buffer(cluster_id, header, buffer, custom_clusters)
-        }))
-        .map_err(|payload| {
-            if let Some(message) = payload.downcast_ref::<&str>() {
-                (*message).to_string()
-            } else if let Some(message) = payload.downcast_ref::<String>() {
-                message.clone()
-            } else {
-                "Frame parse failed".to_string()
-            }
-        })
     }
 
     /// Upstream `frame.toBuffer()`.

@@ -96,6 +96,21 @@ pub enum ControllerEvent {
     LastSeenChanged(LastSeenChangedPayload),
 }
 
+impl ControllerEvent {
+    /// The device associated with this event (`None` for adapter-level events).
+    pub fn device(&self) -> Option<&Arc<Device>> {
+        match self {
+            Self::Message(payload) => Some(&payload.device),
+            Self::DeviceJoined(payload) => Some(&payload.device),
+            Self::DeviceInterview(payload) => Some(&payload.device),
+            Self::DeviceAnnounce(payload) => Some(&payload.device),
+            Self::DeviceNetworkAddressChanged(payload) => Some(&payload.device),
+            Self::LastSeenChanged(payload) => Some(&payload.device),
+            Self::DeviceLeave(_) | Self::PermitJoinChanged(_) | Self::AdapterDisconnected => None,
+        }
+    }
+}
+
 /// Upstream `GreenPowerDeviceJoinedPayload`.
 #[derive(Clone)]
 pub struct GreenPowerDeviceJoinedPayload {

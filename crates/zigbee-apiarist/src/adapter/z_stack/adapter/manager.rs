@@ -64,7 +64,7 @@ pub trait ZdoAdapter {
         cluster_id: u16,
         payload: &'a [u8],
         disable_response: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<Value, String>> + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'a>>;
 }
 
 /// Upstream `ZnpAdapterManager`.

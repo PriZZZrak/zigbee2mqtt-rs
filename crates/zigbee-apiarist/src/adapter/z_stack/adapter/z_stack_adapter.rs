@@ -186,7 +186,7 @@ impl ZdoAdapter for ZStackZdo {
         cluster_id: u16,
         payload: &'a [u8],
         disable_response: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<Value, String>> + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'a>> {
         Box::pin(send_zdo_internal(
             znp,
             ieee_address,

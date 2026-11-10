@@ -122,6 +122,7 @@ pub struct Device {
     custom_clusters: Mutex<CustomClusters>,
     gp_security_key: Mutex<Option<Vec<u8>>>,
     pub meta: Mutex<KeyValue>,
+    listeners: Mutex<Vec<Arc<dyn Fn(&crate::controller::events::ControllerEvent) + Send + Sync>>>,
 }
 
 impl Device {
@@ -197,6 +198,23 @@ impl Device {
             custom_clusters: Mutex::new(CustomClusters::empty()),
             gp_security_key: Mutex::new(gp_security_key),
             meta: Mutex::new(meta),
+            listeners: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Upstream `device.on(event, listener)`.
+    pub fn on<F>(&self, listener: F)
+    where
+        F: Fn(&crate::controller::events::ControllerEvent) + Send + Sync + 'static,
+    {
+        self.listeners.lock().unwrap().push(Arc::new(listener));
+    }
+
+    /// Upstream `device.emit(event, ...args)`.
+    pub fn emit(&self, event: &crate::controller::events::ControllerEvent) {
+        let listeners = self.listeners.lock().unwrap().clone();
+        for listener in listeners {
+            listener(event);
         }
     }
 

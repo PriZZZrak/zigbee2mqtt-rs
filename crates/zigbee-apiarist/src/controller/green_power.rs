@@ -18,7 +18,7 @@ use crate::zspec::consts::{
 use crate::zspec::enums::BroadcastAddress;
 use crate::zspec::utils::{aes128_ccm_encrypt, aes128_ccm_star};
 use crate::zspec::zcl::utils::CustomClusters;
-use crate::zspec::zcl::zcl_frame::Frame;
+use crate::zspec::zcl::zcl_frame::{try_from_buffer, Frame};
 use crate::zspec::zcl::zcl_header::{Direction, FrameType};
 
 const NS: &str = "zh:controller:greenpower";
@@ -480,12 +480,13 @@ impl GreenPower {
             reparsed
                 .extend_from_slice(data_payload.data.get(data_end_offset..).unwrap_or_default());
 
-            *frame = Frame::from_buffer(
+            *frame = try_from_buffer(
                 data_payload.cluster_id,
                 Some(data_payload.header),
                 &reparsed,
                 &CustomClusters::empty(),
-            );
+            )
+            .map_err(|error| error.to_string())?;
         }
 
         let log_str = match payload_u64(&frame.payload, "gppGpdLink") {
