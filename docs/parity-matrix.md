@@ -32,7 +32,8 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Device OTA methods (`checkOta`/`updateOta`/`abortOta`/`scheduleOta`/`unscheduleOta`/`findMatchingOtaImage`/`#waitForOtaCommand`/`#notifyOta`) | `controller/model/device.ts:1495-1899` | OMITTED | R1 excludes OTA (user decision); `controller/helpers/ota.ts` needs HTTPS + SHA-512 and no HTTP/TLS/hash dependency may be added. Fields `#scheduledOta`/`#otaInProgress`/`#otaAbortController` and the `scheduledOta` DB field are omitted consistently |
 | ZCL catalog used by the controller layer (genBasic/genGroups/genTime/ssIasZone/genPollCtrl/genOnOff/greenPower) | `zspec/zcl/definition/cluster.ts` | PARTIAL | attributes/commands/defaults needed by the controller ported with `file.ts` anchors (including all Green Power commands/responses and the `GPD_FRAME` codec); the rest of the 200+ cluster catalog remains absent |
 | `controller/events.ts` | `controller/events.ts` | PORTED | typed payloads + `ControllerEvent` enum |
-| `controller/controller.ts` | `controller/controller.ts` | BLOCKED | not ported yet |
+| `controller/controller.ts` | `controller/controller.ts` | PORTED | options validation, start/stop, adapter event pump, permit-join/timers, backup/database-save, `sendRaw`, install codes, ZDO/ZCL routing, unknown-device identification, Xiaomi re-transmit handling, green power device creation/removal, message/lastSeen events; runtime adapter boundary `ControllerRuntimeAdapter` |
+| `controller/index.ts` | `controller/index.ts` | PORTED | re-exports `Controller` |
 | `controller/greenPower.ts` | `controller/greenPower.ts` | PORTED | pairing/commissioning option codecs, security-key encryption, notification decryption/re-parse, commissioning/decommissioning/channel-request handling, `permitJoin`, `deviceJoined`/`deviceLeave`; upstream unit cases ported (option vectors, GPP/MIC omission, FULLENCR decrypt, MOES commissioning vector) |
 | `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | OMITTED | R1 excludes OTA flashing (user decision); no HTTP/TLS or SHA-512 dependency |
 | Green Power | `controller/greenPower.ts` | PORTED | see row above |
@@ -74,6 +75,27 @@ Known gaps (not parity claims):
   payload ordering.
 - Green Power `removeFromNetwork` derives `srcID` from the exact EUI64 integer
   instead of the JavaScript double.
+
+## Controller orchestration — status and remaining gaps
+
+Ported in `crates/zigbee-apiarist/src/controller/controller.rs` against
+zigbee-herdsman v11.2.0 (c1a54e3d). The adapter is injected into `start()`
+instead of being constructed from transport options; the full adapter surface
+is the `ControllerRuntimeAdapter` trait (super-traits `ControllerAdapter`,
+`GreenPowerAdapter`, `TouchlinkAdapter`). The Z-Stack wrapper still needs to
+implement this trait before the bridge can run on hardware.
+
+Known deviations:
+
+- Upstream `device.emit(...)` forwarding is not reproduced: the Rust model has
+  no per-device `EventEmitter`. `selfAndDeviceEmit` emits on the controller bus
+  only; consumers filter by `device`.
+- `AbortSignal` is expressed by dropping the start future.
+- `onZclPayload` cannot distinguish `ZclStatusError.code` from other parse
+  failures (the codec boundary returns a string); `defaultResponse` is therefore
+  not populated from parse errors.
+- The `zdoResponse` event carries `clusterId`/`response` through the adapter
+  event channel instead of an `EventEmitter`.
 
 Remaining ledger item: **`controller/helpers/ota.ts` needs HTTPS and SHA-512**.
 The crate has no HTTP/TLS or hashing dependency and `docs/dependency-map.md`

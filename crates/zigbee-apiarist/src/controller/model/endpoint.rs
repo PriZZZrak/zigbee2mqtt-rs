@@ -1,6 +1,7 @@
 // Original: .upstream/zigbee-herdsman/src/controller/model/endpoint.ts
 // Upstream revision: zigbee-herdsman v11.2.0 (c1a54e3d).
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 
 use serde_json::{json, Value};
@@ -28,6 +29,15 @@ use crate::zspec::zdo::definition::clusters::ClusterId;
 use crate::zspec::zdo::definition::consts::{MULTICAST_BINDING, UNICAST_BINDING};
 
 const NS: &str = "zh:controller:endpoint";
+
+/// Upstream `sendRequest` is generic over the callback result. The endpoint
+/// queue carries both regular ZCL responses and Green Power broadcasts (which
+/// resolve to `undefined`); the enum keeps a single ordered queue.
+#[derive(Clone)]
+pub enum EndpointRequestResult {
+    Payload(ZclPayload),
+    Unit,
+}
 
 /// Upstream `BindInternal`.
 #[derive(Debug, Clone, PartialEq)]
@@ -149,7 +159,8 @@ pub struct Endpoint {
     binds: StdMutex<Vec<BindInternal>>,
     configured_reportings: StdMutex<Vec<ConfiguredReportingInternal>>,
     pub meta: StdMutex<KeyValue>,
-    pending_requests: Mutex<RequestQueue<ZclPayload>>,
+    pending_requests: Mutex<RequestQueue<EndpointRequestResult>>,
+    pending_request_count: Arc<AtomicUsize>,
     self_ref: std::sync::OnceLock<std::sync::Weak<Endpoint>>,
 }
 
@@ -169,6 +180,8 @@ impl Endpoint {
         configured_reportings: Vec<ConfiguredReportingInternal>,
         meta: KeyValue,
     ) -> Self {
+        let pending_requests = RequestQueue::new(device_ieee_address.clone(), id);
+        let pending_request_count = pending_requests.size_handle();
         Self {
             device_id: StdMutex::new(device_id),
             profile_id: StdMutex::new(profile_id),
@@ -181,7 +194,8 @@ impl Endpoint {
             binds: StdMutex::new(binds),
             configured_reportings: StdMutex::new(configured_reportings),
             meta: StdMutex::new(meta),
-            pending_requests: Mutex::new(RequestQueue::new(device_ieee_address, id)),
+            pending_requests: Mutex::new(pending_requests),
+            pending_request_count,
             self_ref: std::sync::OnceLock::new(),
         }
     }
@@ -605,10 +619,7 @@ impl Endpoint {
 
     /// Upstream `hasPendingRequests()`.
     pub fn has_pending_requests(&self) -> bool {
-        match self.pending_requests.try_lock() {
-            Ok(queue) => !queue.is_empty(),
-            Err(_) => true,
-        }
+        self.pending_request_count.load(Ordering::SeqCst) > 0
     }
 
     /// Upstream `sendPendingRequests(fastPolling)`.
@@ -631,7 +642,7 @@ impl Endpoint {
         let disable_recovery = options.disable_recovery;
         let src_endpoint = options.src_endpoint;
         let profile_id = options.profile_id;
-        let function = move || -> BoxedRequestFuture<ZclPayload> {
+        let function = move || -> BoxedRequestFuture<EndpointRequestResult> {
             let ieee = ieee.clone();
             let frame = frame_for_call.clone();
             Box::pin(async move {
@@ -649,10 +660,15 @@ impl Endpoint {
                         profile_id,
                     )
                     .await?;
-                response.ok_or_else(|| "No response received".to_string())
+                response
+                    .map(EndpointRequestResult::Payload)
+                    .ok_or_else(|| "No response received".to_string())
             })
         };
-        self.send_request_with(frame, options, function).await
+        match self.send_request_with(frame, options, function).await? {
+            EndpointRequestResult::Payload(payload) => Ok(payload),
+            EndpointRequestResult::Unit => Err("Expected ZCL payload".to_string()),
+        }
     }
 
     /// Upstream `sendRequest(frame, options, func)`.
@@ -661,9 +677,9 @@ impl Endpoint {
         frame: Frame,
         options: &OptionsWithDefaults,
         function: F,
-    ) -> Result<ZclPayload, String>
+    ) -> Result<EndpointRequestResult, String>
     where
-        F: Fn() -> BoxedRequestFuture<ZclPayload> + Send + 'static,
+        F: Fn() -> BoxedRequestFuture<EndpointRequestResult> + Send + 'static,
     {
         let device = self.get_device();
         let timeout = device.pending_request_timeout();
@@ -1644,7 +1660,7 @@ impl Endpoint {
                                 None,
                             )
                             .await?;
-                        Err("No response received".to_string())
+                        Ok(EndpointRequestResult::Unit)
                     })
                 }
             })

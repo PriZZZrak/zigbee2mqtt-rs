@@ -2,6 +2,8 @@
 // Upstream revision: zigbee-herdsman v11.2.0 (c1a54e3d).
 
 use serde_json::Value;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::sync::oneshot;
 
 use super::request::Request;
@@ -17,6 +19,8 @@ pub struct RequestQueue<T = Value> {
     pub endpoint_id: u8,
     requests: Vec<Request<T>>,
     send_in_progress: bool,
+    /// Upstream `get size()` — observable without acquiring the queue lock.
+    size: Arc<AtomicUsize>,
 }
 
 impl<T: Clone + Send + 'static> Default for RequestQueue<T> {
@@ -26,6 +30,7 @@ impl<T: Clone + Send + 'static> Default for RequestQueue<T> {
             endpoint_id: 0,
             requests: Vec::new(),
             send_in_progress: false,
+            size: Arc::new(AtomicUsize::new(0)),
         }
     }
 }
@@ -38,6 +43,7 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
             endpoint_id,
             requests: Vec::new(),
             send_in_progress: false,
+            size: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -49,9 +55,24 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
         self.requests.is_empty()
     }
 
+    /// Upstream `get size()`.
+    pub fn size(&self) -> usize {
+        self.size.load(Ordering::SeqCst)
+    }
+
+    /// Handle for `hasPendingRequests()` without locking the queue.
+    pub fn size_handle(&self) -> Arc<AtomicUsize> {
+        self.size.clone()
+    }
+
+    fn sync_size(&self) {
+        self.size.store(self.requests.len(), Ordering::SeqCst);
+    }
+
     #[cfg(test)]
     fn push_request(&mut self, request: Request<T>) {
         self.requests.push(request);
+        self.sync_size();
     }
 
     /// Upstream `queue(request)` — requestQueue.ts:67.
@@ -71,6 +92,7 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
         let (sender, receiver) = oneshot::channel();
         request.add_callback(sender);
         self.requests.push(request);
+        self.sync_size();
         receiver
     }
 
@@ -198,6 +220,7 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
             ),
             NS,
         );
+        self.sync_size();
     }
 
     /// Upstream `send(fastPolling)` — requestQueue.ts:23.
@@ -236,6 +259,7 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
                 index += 1;
             }
         }
+        self.sync_size();
 
         logger().debug(
             &format!(
@@ -282,6 +306,7 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
             }
         }
         self.send_in_progress = false;
+        self.sync_size();
     }
 }
 #[cfg(test)]
@@ -362,6 +387,22 @@ mod tests {
         queue.send(true).await;
         assert!(receiver.await.expect("callback").is_ok());
         assert!(queue.is_empty());
+    }
+
+    #[tokio::test]
+    async fn size_tracks_queued_requests_without_locking() {
+        let mut queue = RequestQueue::new("0x00124b0000000001", 1);
+        let size_handle = queue.size_handle();
+        assert_eq!(size_handle.load(Ordering::SeqCst), 0);
+
+        let (request, receiver) = request_with_callback(read_frame(json!([{"attrId": 0}])), 10_000);
+        queue.push_request(request);
+        assert_eq!(size_handle.load(Ordering::SeqCst), 1);
+        assert_eq!(queue.size(), 1);
+
+        queue.send(false).await;
+        assert!(receiver.await.expect("callback").is_ok());
+        assert_eq!(size_handle.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]

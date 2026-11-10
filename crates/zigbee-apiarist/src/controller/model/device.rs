@@ -604,14 +604,15 @@ impl Device {
         if header.is_global() {
             match command.name.as_str() {
                 "read" => {
-                    let custom = self.custom_read_response.lock().unwrap();
-                    if custom
-                        .as_ref()
-                        .is_some_and(|callback| callback(frame, endpoint))
-                    {
+                    let custom_hit = {
+                        let custom = self.custom_read_response.lock().unwrap();
+                        custom
+                            .as_ref()
+                            .is_some_and(|callback| callback(frame, endpoint))
+                    };
+                    if custom_hit {
                         return Ok(());
                     }
-                    drop(custom);
 
                     let mut response = Map::new();
                     match data_payload.cluster_id {
@@ -2327,12 +2328,14 @@ mod tests {
 
     struct FakeAdapter {
         frames: Mutex<Vec<Frame>>,
+        all_frames: Mutex<Vec<Frame>>,
     }
 
     impl FakeAdapter {
         fn new() -> Self {
             Self {
                 frames: Mutex::new(Vec::new()),
+                all_frames: Mutex::new(Vec::new()),
             }
         }
     }
@@ -2409,12 +2412,13 @@ mod tests {
         fn send_zcl_frame_to_all(
             &self,
             _endpoint: u8,
-            _frame: &Frame,
+            frame: &Frame,
             _source_endpoint: u8,
             _destination: u16,
             _profile_id: Option<u16>,
         ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
         {
+            self.all_frames.lock().unwrap().push(frame.clone());
             Box::pin(async move { Ok(()) })
         }
     }
@@ -2523,6 +2527,59 @@ mod tests {
                 .unwrap(),
             "0x00124b0000000002"
         );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn green_power_endpoint_242_broadcasts_command_response() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-model-gp-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Entity::inject_database(Arc::new(Mutex::new(Database::open(&path))));
+        let adapter = Arc::new(FakeAdapter::new());
+        Entity::inject_adapter(adapter.clone());
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let device = Device::create(
+            DeviceType::GreenPower,
+            "0x0000000000000002",
+            0x1234,
+            None,
+            None,
+            None,
+            Some("GreenPower_2".to_string()),
+            InterviewState::Successful,
+            Some(vec![0x11; 16]),
+        )
+        .expect("create green power device");
+        let endpoint = device.create_endpoint(242).expect("create endpoint 242");
+        assert!(!endpoint.has_pending_requests());
+
+        endpoint
+            .command_response(
+                Value::from("greenPower"),
+                Value::from("commisioningMode"),
+                json!({"options": 0x0b, "commisioningWindow": 180}),
+                None,
+                Some(7),
+            )
+            .await
+            .expect("command response broadcast");
+
+        let frames = adapter.all_frames.lock().unwrap();
+        assert_eq!(frames.len(), 1);
+        let frame = &frames[0];
+        assert_eq!(frame.cluster.name, "greenPower");
+        assert_eq!(frame.command.name, "commisioningMode");
+        assert_eq!(frame.header.transaction_sequence_number, 7);
+        assert_eq!(frame.payload["options"], json!(0x0b));
+        assert_eq!(frame.payload["commisioningWindow"], json!(180));
+        drop(frames);
+        assert!(!endpoint.has_pending_requests());
 
         let _ = std::fs::remove_file(path);
     }

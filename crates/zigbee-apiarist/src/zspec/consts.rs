@@ -25,6 +25,12 @@ pub const BLANK_EUI64: &str = "0xffffffffffffffff";
 /// Upstream `COORDINATOR_ADDRESS` — consts.ts:7.
 pub const COORDINATOR_ADDRESS: u16 = 0x0000;
 
+/// Upstream `HA_PROFILE_ID` — consts.ts:13.
+pub const HA_PROFILE_ID: u16 = 0x0104;
+
+/// Upstream `HA_ENDPOINT` — consts.ts:28.
+pub const HA_ENDPOINT: u8 = 0x01;
+
 /// Upstream `GP_ENDPOINT` — consts.ts:30.
 pub const GP_ENDPOINT: u8 = 0xf2;
 

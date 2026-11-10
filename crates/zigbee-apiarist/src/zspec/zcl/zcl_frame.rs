@@ -179,6 +179,32 @@ impl Frame {
         }
     }
 
+    /// Fallible variant of `Frame::fromBuffer` for callers that upstream wraps
+    /// in `try/catch` (controller `onZclPayload`, green power decryption).
+    ///
+    /// The codec port signals `ZclStatusError`/invalid fields with panics, so
+    /// the boundary converts them into `Result` without changing the existing
+    /// infallible `from_buffer` contract used by the model layer.
+    pub fn try_from_buffer(
+        cluster_id: u16,
+        header: Option<Header>,
+        buffer: &[u8],
+        custom_clusters: &CustomClusters,
+    ) -> Result<Self, String> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Self::from_buffer(cluster_id, header, buffer, custom_clusters)
+        }))
+        .map_err(|payload| {
+            if let Some(message) = payload.downcast_ref::<&str>() {
+                (*message).to_string()
+            } else if let Some(message) = payload.downcast_ref::<String>() {
+                message.clone()
+            } else {
+                "Frame parse failed".to_string()
+            }
+        })
+    }
+
     /// Upstream `frame.toBuffer()`.
     pub fn to_buffer(&self) -> Vec<u8> {
         let mut buffer = self.header.to_buffer();
@@ -305,7 +331,17 @@ fn push_selector(buffer: &mut Vec<u8>, selector: &Value) {
 pub(crate) fn write_data_type(buffer: &mut Vec<u8>, data_type: u8, value: &Value) {
     match data_type {
         0x00 => {}
-        0x08 | 0x10 | 0x18 | 0x20 | 0x28 | 0x30 => buffer.push(u8_value(value)),
+        0x10 => buffer.push(
+            if value
+                .as_bool()
+                .unwrap_or_else(|| value.as_u64().unwrap_or(0) != 0)
+            {
+                1
+            } else {
+                0
+            },
+        ),
+        0x08 | 0x18 | 0x20 | 0x28 | 0x30 => buffer.push(u8_value(value)),
         0x09 | 0x19 | 0x21 | 0x29 | 0x31 | 0xe8 | 0xe9 => push_u16(buffer, u16_value(value)),
         0x0a | 0x1a | 0x22 | 0x2a => {
             let number = value.as_u64().unwrap_or(0);
