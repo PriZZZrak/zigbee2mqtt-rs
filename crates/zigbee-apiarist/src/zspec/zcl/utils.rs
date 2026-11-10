@@ -158,6 +158,64 @@ impl Attribute {
     }
 }
 
+/// Upstream `ParameterCondition` with owned strings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParameterCondition {
+    MINIMUM_REMAINING_BUFFER_BYTES(u32),
+    BITMASK_SET {
+        field: String,
+        value: u32,
+    },
+    BITFIELD_ENUM {
+        field: String,
+        offset: u8,
+        size: u8,
+        value: u32,
+    },
+    FIELD_EQUAL {
+        field: String,
+        value: u32,
+        reversed: bool,
+    },
+}
+
+impl ParameterCondition {
+    pub fn from_static(
+        condition: &crate::zspec::zcl::definition::cluster::ParameterCondition,
+    ) -> Self {
+        use crate::zspec::zcl::definition::cluster::ParameterCondition as Static;
+        match condition {
+            Static::MINIMUM_REMAINING_BUFFER_BYTES(value) => {
+                Self::MINIMUM_REMAINING_BUFFER_BYTES(*value)
+            }
+            Static::BITMASK_SET { field, value } => Self::BITMASK_SET {
+                field: (*field).to_string(),
+                value: *value,
+            },
+            Static::BITFIELD_ENUM {
+                field,
+                offset,
+                size,
+                value,
+            } => Self::BITFIELD_ENUM {
+                field: (*field).to_string(),
+                offset: *offset,
+                size: *size,
+                value: *value,
+            },
+            Static::FIELD_EQUAL {
+                field,
+                value,
+                reversed,
+            } => Self::FIELD_EQUAL {
+                field: (*field).to_string(),
+                value: *value,
+                reversed: *reversed,
+            },
+        }
+    }
+}
+
 /// Upstream `Parameter`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
@@ -172,6 +230,7 @@ pub struct Parameter {
     pub minLen: Option<usize>,
     pub maxLen: Option<usize>,
     pub special: Vec<ZclValue>,
+    pub conditions: Vec<ParameterCondition>,
 }
 
 impl Parameter {
@@ -187,6 +246,34 @@ impl Parameter {
             minLen: None,
             maxLen: None,
             special: Vec::new(),
+            conditions: Vec::new(),
+        }
+    }
+
+    pub fn with_conditions(mut self, conditions: Vec<ParameterCondition>) -> Self {
+        self.conditions = conditions;
+        self
+    }
+}
+
+impl From<&crate::zspec::zcl::definition::cluster::Parameter> for Parameter {
+    fn from(parameter: &crate::zspec::zcl::definition::cluster::Parameter) -> Self {
+        Self {
+            name: parameter.name.to_string(),
+            r#type: parameter.r#type,
+            min: None,
+            max: parameter.max.map(f64::from),
+            minExcl: None,
+            maxExcl: None,
+            length: None,
+            minLen: None,
+            maxLen: None,
+            special: Vec::new(),
+            conditions: parameter
+                .conditions
+                .iter()
+                .map(ParameterCondition::from_static)
+                .collect(),
         }
     }
 }
@@ -199,6 +286,7 @@ pub struct Command {
     pub ID: u8,
     pub response: Option<u8>,
     pub parameters: Vec<Parameter>,
+    pub required: bool,
 }
 
 impl Command {
@@ -208,6 +296,7 @@ impl Command {
             ID,
             response: None,
             parameters: Vec::new(),
+            required: true,
         }
     }
 
@@ -350,6 +439,12 @@ impl From<&str> for ClusterKey {
     }
 }
 
+impl From<String> for ClusterKey {
+    fn from(value: String) -> Self {
+        Self::Name(value)
+    }
+}
+
 pub enum AttributeKey {
     Id(u32),
     Name(String),
@@ -398,6 +493,12 @@ impl From<u32> for CommandKey {
 
 impl From<i32> for CommandKey {
     fn from(value: i32) -> Self {
+        Self::Id(value as u32)
+    }
+}
+
+impl From<u8> for CommandKey {
+    fn from(value: u8) -> Self {
         Self::Id(value as u32)
     }
 }
@@ -855,7 +956,13 @@ fn builtin_name(id: u32) -> String {
         0x0005 => "genScenes",
         0x0006 => "genOnOff",
         0x0008 => "genLevelCtrl",
+        0x0004 => "genGroups",
         0x0009 => "genAlarms",
+        0x000a => "genTime",
+        0x0019 => "genOta",
+        0x0020 => "genPollCtrl",
+        0x0500 => "ssIasZone",
+        0x1000 => "touchlink",
         0x000b => "genRssiLocation",
         0x0300 => "lightingColorCtrl",
         0x0b05 => "haDiagnostic",
@@ -928,6 +1035,18 @@ fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
                     Attribute::new("options", 0x000f, DataType::BITMAP8)
                         .writable()
                         .with_default(0),
+                )
+                .with_command(
+                    Command::new("moveToLevelWithOnOff", 0x04).with_parameters(vec![
+                        Parameter::new("level", DataType::UINT8),
+                        Parameter::new("transtime", DataType::UINT16),
+                        Parameter::new("optionsMask", DataType::BITMAP8).with_conditions(vec![
+                            ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(2),
+                        ]),
+                        Parameter::new("optionsOverride", DataType::BITMAP8).with_conditions(vec![
+                            ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(2),
+                        ]),
+                    ]),
                 ),
         ),
         "genAlarms" => Some(
@@ -944,7 +1063,10 @@ fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
                 .with_command(Command::new("resetAll", 0x01))
                 .with_command(Command::new("getAlarm", 0x02))
                 .with_command(Command::new("resetLog", 0x03))
-                .with_command_response(Command::new("alarm", 0x00))
+                .with_command_response(Command::new("alarm", 0x00).with_parameters(vec![
+                    Parameter::new("alarmcode", DataType::ENUM8),
+                    Parameter::new("clusterid", DataType::CLUSTER_ID),
+                ]))
                 .with_command_response(Command::new("getRsp", 0x01).with_parameters(vec![
                     Parameter::new("status", DataType::ENUM8),
                     Parameter::new("alarmcode", DataType::ENUM8),
@@ -993,6 +1115,332 @@ fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
             manufacturerCode: Some(manufacturer_code::AMAZON_LAB126),
             ..Cluster::new("manuSpecificAmazonWWAH", 0xfc57)
         }),
+        "genGroups" => Some(
+            Cluster::new("genGroups", 0x0004)
+                .with_command(Command::new("add", 0x00).with_parameters(vec![
+                    Parameter::new("groupid", DataType::UINT16),
+                    Parameter::new("groupname", DataType::CHAR_STR),
+                ]))
+                .with_command(
+                    Command::new("view", 0x01)
+                        .with_parameters(vec![Parameter::new("groupid", DataType::UINT16)]),
+                )
+                .with_command(
+                    Command::new("getMembership", 0x02)
+                        .with_response(2)
+                        .with_parameters(vec![
+                            Parameter::new("groupcount", DataType::UINT8),
+                            Parameter::new("grouplist", DataType::UNKNOWN),
+                        ]),
+                )
+                .with_command(
+                    Command::new("remove", 0x03)
+                        .with_parameters(vec![Parameter::new("groupid", DataType::UINT16)]),
+                )
+                .with_command(Command::new("removeAll", 0x04))
+                .with_command(Command::new("addIfIdentifying", 0x05).with_parameters(vec![
+                    Parameter::new("groupid", DataType::UINT16),
+                    Parameter::new("groupname", DataType::CHAR_STR),
+                ]))
+                .with_command_response(Command::new("addRsp", 0x00).with_parameters(vec![
+                    Parameter::new("status", DataType::ENUM8),
+                    Parameter::new("groupid", DataType::UINT16),
+                ]))
+                .with_command_response(Command::new("viewRsp", 0x01).with_parameters(vec![
+                    Parameter::new("status", DataType::ENUM8),
+                    Parameter::new("groupid", DataType::UINT16),
+                    Parameter::new("groupname", DataType::CHAR_STR),
+                ]))
+                .with_command_response(Command::new("getMembershipRsp", 0x02).with_parameters(
+                    vec![
+                        Parameter::new("capacity", DataType::UINT8),
+                        Parameter::new("groupcount", DataType::UINT8),
+                        Parameter::new("grouplist", DataType::UNKNOWN),
+                    ],
+                ))
+                .with_command_response(Command::new("removeRsp", 0x03).with_parameters(vec![
+                    Parameter::new("status", DataType::ENUM8),
+                    Parameter::new("groupid", DataType::UINT16),
+                ])),
+        ),
+        "genTime" => Some(
+            Cluster::new("genTime", 0x000a)
+                .with_attribute(Attribute::new("time", 0x0000, DataType::UTC))
+                .with_attribute(Attribute::new("timeStatus", 0x0001, DataType::BITMAP8))
+                .with_attribute(Attribute::new("timeZone", 0x0002, DataType::INT16))
+                .with_attribute(Attribute::new("dstStart", 0x0003, DataType::UINT32))
+                .with_attribute(Attribute::new("dstEnd", 0x0004, DataType::UINT32))
+                .with_attribute(Attribute::new("dstShift", 0x0005, DataType::INT32))
+                .with_attribute(Attribute::new("standardTime", 0x0006, DataType::UINT32))
+                .with_attribute(Attribute::new("localTime", 0x0007, DataType::UINT32))
+                .with_attribute(Attribute::new("lastSetTime", 0x0008, DataType::UTC))
+                .with_attribute(Attribute::new("validUntilTime", 0x0009, DataType::UTC)),
+        ),
+        "genPollCtrl" => {
+            Some(
+                Cluster::new("genPollCtrl", 0x0020)
+                    .with_attribute(
+                        Attribute::new("checkinInterval", 0x0000, DataType::UINT32).writable(),
+                    )
+                    .with_command(Command::new("checkin", 0x00).with_parameters(vec![
+                        Parameter::new("startFastPolling", DataType::BOOLEAN),
+                        Parameter::new("fastPollTimeout", DataType::UINT16),
+                    ]))
+                    .with_command(Command::new("checkinRsp", 0x01).with_parameters(vec![
+                        Parameter::new("startFastPolling", DataType::BOOLEAN),
+                        Parameter::new("fastPollTimeout", DataType::UINT16),
+                    ]))
+                    .with_command(Command::new("fastPollStop", 0x03))
+                    .with_command(
+                        Command::new("setLongPollInterval", 0x04).with_parameters(vec![
+                            Parameter::new("newLongPollInterval", DataType::UINT32),
+                        ]),
+                    )
+                    .with_command(Command::new("setShortPollInterval", 0x05).with_parameters(
+                        vec![Parameter::new("newShortPollInterval", DataType::UINT16)],
+                    )),
+            )
+        }
+        "ssIasZone" => Some(
+            Cluster::new("ssIasZone", 0x0500)
+                .with_attribute(Attribute::new("zoneState", 0x0000, DataType::ENUM8))
+                .with_attribute(Attribute::new("zoneType", 0x0001, DataType::ENUM16))
+                .with_attribute(Attribute::new("zoneStatus", 0x0002, DataType::BITMAP16))
+                .with_attribute(
+                    Attribute::new("iasCieAddr", 0x0010, DataType::IEEE_ADDR).writable(),
+                )
+                .with_attribute(Attribute::new("zoneId", 0x0011, DataType::UINT8).writable())
+                .with_command(Command::new("enrollReq", 0x00))
+                .with_command(Command::new("enrollRsp", 0x01).with_parameters(vec![
+                    Parameter::new("enrollrspcode", DataType::ENUM8),
+                    Parameter::new("zoneid", DataType::UINT8),
+                ]))
+                .with_command(Command::new("initiateNormalOperationMode", 0x02))
+                .with_command(Command::new("initiateTestMode", 0x04).with_parameters(vec![
+                    Parameter::new("testModeDuration", DataType::UINT8),
+                    Parameter::new("currentZoneSensitivityLevel", DataType::UINT8),
+                ])),
+        ),
+        "genOta" => Some(
+            Cluster::new("genOta", 0x0019)
+                .with_attribute(Attribute::new(
+                    "upgradeServerID",
+                    0x0000,
+                    DataType::IEEE_ADDR,
+                ))
+                .with_attribute(Attribute::new("fileOffset", 0x0001, DataType::UINT32))
+                .with_attribute(Attribute::new(
+                    "currentFileVersion",
+                    0x0002,
+                    DataType::UINT32,
+                ))
+                .with_attribute(Attribute::new(
+                    "currentZigbeeStackVersion",
+                    0x0003,
+                    DataType::UINT16,
+                ))
+                .with_attribute(Attribute::new(
+                    "downloadedFileVersion",
+                    0x0004,
+                    DataType::UINT32,
+                ))
+                .with_attribute(Attribute::new(
+                    "downloadedZigbeeStackVersion",
+                    0x0005,
+                    DataType::UINT16,
+                ))
+                .with_attribute(Attribute::new(
+                    "imageUpgradeStatus",
+                    0x0006,
+                    DataType::ENUM8,
+                ))
+                .with_attribute(Attribute::new("manufacturerId", 0x0007, DataType::UINT16))
+                .with_attribute(Attribute::new("imageTypeId", 0x0008, DataType::UINT16))
+                .with_attribute(Attribute::new(
+                    "minimumBlockPeriod",
+                    0x0009,
+                    DataType::UINT16,
+                ))
+                .with_attribute(Attribute::new("imageStamp", 0x000a, DataType::UINT32))
+                .with_command(
+                    Command::new("queryNextImageRequest", 0x01).with_parameters(vec![
+                        Parameter::new("fieldControl", DataType::BITMAP8),
+                        Parameter::new("manufacturerCode", DataType::UINT16),
+                        Parameter::new("imageType", DataType::UINT16),
+                        Parameter::new("fileVersion", DataType::UINT32),
+                    ]),
+                )
+                .with_command(
+                    Command::new("imageBlockRequest", 0x03).with_parameters(vec![
+                        Parameter::new("fieldControl", DataType::BITMAP8),
+                        Parameter::new("manufacturerCode", DataType::UINT16),
+                        Parameter::new("imageType", DataType::UINT16),
+                        Parameter::new("fileVersion", DataType::UINT32),
+                        Parameter::new("fileOffset", DataType::UINT32),
+                        Parameter::new("maximumDataSize", DataType::UINT8),
+                        Parameter::new("minimumBlockPeriod", DataType::UINT16),
+                    ]),
+                )
+                .with_command(Command::new("imagePageRequest", 0x04).with_parameters(vec![
+                    Parameter::new("fieldControl", DataType::BITMAP8),
+                    Parameter::new("manufacturerCode", DataType::UINT16),
+                    Parameter::new("imageType", DataType::UINT16),
+                    Parameter::new("fileVersion", DataType::UINT32),
+                    Parameter::new("fileOffset", DataType::UINT32),
+                    Parameter::new("maximumDataSize", DataType::UINT8),
+                    Parameter::new("pageSize", DataType::UINT16),
+                    Parameter::new("responseSpacing", DataType::UINT16),
+                ]))
+                .with_command(
+                    Command::new("upgradeEndRequest", 0x06).with_parameters(vec![
+                        Parameter::new("status", DataType::ENUM8),
+                        Parameter::new("manufacturerCode", DataType::UINT16),
+                        Parameter::new("imageType", DataType::UINT16),
+                        Parameter::new("fileVersion", DataType::UINT32),
+                    ]),
+                )
+                .with_command_response(Command::new("imageNotify", 0x00).with_parameters(vec![
+                    Parameter::new("payloadType", DataType::ENUM8),
+                    Parameter::new("queryJitter", DataType::UINT8),
+                    Parameter::new("manufacturerCode", DataType::UINT16),
+                    Parameter::new("imageType", DataType::UINT16),
+                    Parameter::new("fileVersion", DataType::UINT32),
+                ]))
+                .with_command_response(
+                    Command::new("queryNextImageResponse", 0x02).with_parameters(vec![
+                        Parameter::new("status", DataType::ENUM8),
+                        Parameter::new("manufacturerCode", DataType::UINT16).with_conditions(vec![
+                            ParameterCondition::FIELD_EQUAL {
+                                field: "status".to_string(),
+                                value: 0,
+                                reversed: false,
+                            },
+                        ]),
+                        Parameter {
+                            max: Some(65471.0),
+                            ..Parameter::new("imageType", DataType::UINT16).with_conditions(vec![
+                                ParameterCondition::FIELD_EQUAL {
+                                    field: "status".to_string(),
+                                    value: 0,
+                                    reversed: false,
+                                },
+                            ])
+                        },
+                        Parameter::new("fileVersion", DataType::UINT32).with_conditions(vec![
+                            ParameterCondition::FIELD_EQUAL {
+                                field: "status".to_string(),
+                                value: 0,
+                                reversed: false,
+                            },
+                        ]),
+                        Parameter::new("imageSize", DataType::UINT32).with_conditions(vec![
+                            ParameterCondition::FIELD_EQUAL {
+                                field: "status".to_string(),
+                                value: 0,
+                                reversed: false,
+                            },
+                        ]),
+                    ]),
+                )
+                .with_command_response(Command::new("imageBlockResponse", 0x05).with_parameters(
+                    vec![
+                        Parameter::new("status", DataType::ENUM8),
+                        Parameter::new("manufacturerCode", DataType::UINT16),
+                        Parameter::new("imageType", DataType::UINT16),
+                        Parameter::new("fileVersion", DataType::UINT32),
+                        Parameter::new("fileOffset", DataType::UINT32),
+                        Parameter::new("dataSize", DataType::UINT8),
+                        Parameter::new("imageData", DataType::UNKNOWN),
+                    ],
+                ))
+                .with_command_response(Command::new("upgradeEndResponse", 0x07).with_parameters(
+                    vec![
+                        Parameter::new("manufacturerCode", DataType::UINT16),
+                        Parameter::new("imageType", DataType::UINT16),
+                        Parameter::new("fileVersion", DataType::UINT32),
+                        Parameter::new("currentTime", DataType::UTC),
+                        Parameter::new("upgradeTime", DataType::UTC),
+                    ],
+                )),
+        ),
+        "touchlink" => Some(
+            Cluster::new("touchlink", 0x1000)
+                .with_command(
+                    Command::new("scanRequest", 0x00)
+                        .with_response(0x01)
+                        .with_parameters(vec![
+                            Parameter::new("transactionID", DataType::UINT32),
+                            Parameter::new("zigbeeInformation", DataType::BITMAP8),
+                            Parameter::new("touchlinkInformation", DataType::BITMAP8),
+                        ]),
+                )
+                .with_command(
+                    Command::new("deviceInformation", 0x02)
+                        .with_response(0x03)
+                        .with_parameters(vec![
+                            Parameter::new("transactionID", DataType::UINT32),
+                            Parameter::new("startIndex", DataType::UINT8),
+                        ]),
+                )
+                .with_command(Command::new("identifyRequest", 0x06).with_parameters(vec![
+                    Parameter::new("transactionID", DataType::UINT32),
+                    Parameter::new("duration", DataType::UINT16),
+                ]))
+                .with_command(
+                    Command::new("resetToFactoryNew", 0x07)
+                        .with_parameters(vec![Parameter::new("transactionID", DataType::UINT32)]),
+                )
+                .with_command_response(Command::new("scanResponse", 0x01).with_parameters(vec![
+                    Parameter::new("transactionID", DataType::UINT32),
+                    Parameter::new("rssiCorrection", DataType::UINT8),
+                    Parameter::new("zigbeeInformation", DataType::BITMAP8),
+                    Parameter::new("touchlinkInformation", DataType::BITMAP8),
+                    Parameter::new("keyBitmask", DataType::BITMAP16),
+                    Parameter::new("responseID", DataType::UINT32),
+                    Parameter::new("extendedPanID", DataType::IEEE_ADDR),
+                    Parameter::new("networkUpdateID", DataType::UINT8),
+                    Parameter::new("logicalChannel", DataType::UINT8),
+                    Parameter::new("panID", DataType::UINT16),
+                    Parameter::new("networkAddress", DataType::UINT16),
+                    Parameter::new("numberOfSubDevices", DataType::UINT8),
+                    Parameter::new("totalGroupIdentifiers", DataType::UINT8),
+                    Parameter::new("endpointID", DataType::UINT8).with_conditions(vec![
+                        ParameterCondition::FIELD_EQUAL {
+                            field: "numberOfSubDevices".to_string(),
+                            value: 1,
+                            reversed: false,
+                        },
+                    ]),
+                    Parameter::new("profileID", DataType::UINT16).with_conditions(vec![
+                        ParameterCondition::FIELD_EQUAL {
+                            field: "numberOfSubDevices".to_string(),
+                            value: 1,
+                            reversed: false,
+                        },
+                    ]),
+                    Parameter::new("deviceID", DataType::UINT16).with_conditions(vec![
+                        ParameterCondition::FIELD_EQUAL {
+                            field: "numberOfSubDevices".to_string(),
+                            value: 1,
+                            reversed: false,
+                        },
+                    ]),
+                    Parameter::new("version", DataType::UINT8).with_conditions(vec![
+                        ParameterCondition::FIELD_EQUAL {
+                            field: "numberOfSubDevices".to_string(),
+                            value: 1,
+                            reversed: false,
+                        },
+                    ]),
+                    Parameter::new("groupIDCount", DataType::UINT8).with_conditions(vec![
+                        ParameterCondition::FIELD_EQUAL {
+                            field: "numberOfSubDevices".to_string(),
+                            value: 1,
+                            reversed: false,
+                        },
+                    ]),
+                ])),
+        ),
         _ => None,
     }
 }

@@ -47,7 +47,10 @@ catalog parity.
 2. **No JavaScript/converter interpreter in the bridge.** R1 has no Boa at all.
 3. **No per-device/per-session module evaluation.** Not applicable in R1, and
    forbidden if a JS layer is ever reconsidered.
-4. **No process-wide lock shared with the event loop.**
+4. **No process-wide lock shared with the event loop.** Short-lived
+   synchronous access to static model registries (`Device`/`Group`, database)
+   is allowed because upstream uses static maps; never hold such a lock across
+   an `.await`.
 5. **Bound every wait.** Mutexes, DB writes, MQTT publishes and coordinator
    requests need timeouts; on timeout, log and defer/fallback.
 6. **Publish early, work later.** Responses go out before expensive background
@@ -58,11 +61,35 @@ catalog parity.
 9. **No parity claim without evidence.** Upstream source, tests and hardware
    evidence are required.
 10. **No stubs, models or placeholders — ever.** It is STRICTLY FORBIDDEN to
-    create stub functions, function models, `todo!()`, `unimplemented!()` or
-    comments such as `// logic here`. Every function must be fully implemented
-    and must reproduce the original TypeScript logic byte-for-byte. If a
-    function is too large to port in one pass, stop and ask the user to split
-    it into smaller functions before writing any code.
+    introduce stub functions, placeholder implementations, `todo!()`,
+    `unimplemented!()` or comments such as `// logic here` in production code.
+    Every ported function must preserve the observable behavior and functional
+    semantics of the corresponding upstream TypeScript implementation.
+    Behavioral equivalence includes, where applicable:
+
+    - identical protocol messages, payloads, serialization formats and binary
+      wire representations;
+    - equivalent state transitions, side effects and persistence behavior;
+    - correct event ordering, command-response relationships and asynchronous
+      behavior;
+    - equivalent error handling, edge cases, retries and timeout semantics;
+    - compatibility with existing MQTT, Zigbee, Home Assistant and frontend
+      contracts.
+
+    Byte-for-byte equivalence is mandatory for externally observable binary
+    data and serialized outputs where the upstream protocol or compatibility
+    contract requires it, not for internal implementation details.
+    Rust implementations may use different internal structures, algorithms,
+    memory management and asynchronous mechanisms, provided behavioral
+    equivalence is demonstrated through upstream tests, golden fixtures,
+    differential testing or protocol transcripts.
+    Do not simplify, omit or silently change upstream behavior merely to make
+    the Rust implementation easier.
+    If a function is too large to port safely in one pass, split the work into
+    smaller, independently testable units while preserving the complete
+    behavior. Do not introduce temporary stubs or incomplete production paths.
+    If exact compatibility conflicts with project architecture or technical
+    constraints, document the conflict and ask the user before proceeding.
 11. **Re-commissioning a live network is FORBIDDEN.** Never run
     `StartCommissioning` or the restore-backup path (`beginRestore`) against a
     real coordinator that belongs to a live installation. Both delete the NIB
@@ -77,9 +104,11 @@ catalog parity.
 “100% working” means the following surfaces are complete for the core, with no
 placeholder responses, unbounded waits or deadlocks.
 
-Q1 is still open: **generic device state/commands (standard ZCL) are pending**
-and are not part of the initial implementation. Network identity, registry,
-interview, MQTT, HA bridge entities, Windfront and storage are in R1.
+Q1 is resolved for the port: the controller model layer (Device/Endpoint/Group,
+standard-ZCL state/commands) is ported as part of `controller/`. This is a
+code-parity decision; R1 runtime still excludes `zigbee-herdsman-converters`
+and vendor-specific quirks. Network identity, registry, interview, MQTT, HA
+bridge entities, Windfront and storage are in R1.
 
 - **ZNP / coordinator**
   - serial discovery/selection, ZNP framing, SREQ/SRSP matching, timeouts;
@@ -91,8 +120,8 @@ interview, MQTT, HA bridge entities, Windfront and storage are in R1.
   - ZCL: read/write/configure-reporting, report/read responses, default
     response handling, groups, standard cluster encoders/decoders.
   - Network identity/descriptors/interview/bind are in R1. Generic
-    standard-cluster state/commands are **pending Q1**; no model-specific
-    quirks.
+    standard-cluster state/commands are part of the controller model port; no
+    model-specific quirks.
 - **MQTT**
   - `bridge/state`, `info`, `devices`, `converters`, `groups`, `health`,
     `logging`, `definitions` where applicable;
@@ -106,7 +135,8 @@ interview, MQTT, HA bridge entities, Windfront and storage are in R1.
   - restart, `kill -9`/respawn and reboot recovery; no data loss.
 - **Home Assistant**
   - bridge entities, device-registry discovery, availability, retained cleanup
-    on rename/remove. Per-device cluster discovery is **pending Q1**.
+    on rename/remove. Per-device cluster discovery is **pending** (not part of
+    the initial R1 surface).
 - **Frontend**
   - HTTP/WebSocket protocol required by unmodified Windfront;
   - bridge responses, device/state replay and command dispatch on the
@@ -132,19 +162,12 @@ Resolved on 2026-11-06:
   (Dongle-P start/resume, network, permit join, MQTT/HA/frontend/storage). A
   real device is not required for R1 acceptance.
 - **Q3 — “100%” checklist:** the surface list in §4 is accepted as the R1
-  definition of “100% working”, with the Q1 caveat below.
-
-Still open:
-
-- **Q1 — device layer boundary.** User is undecided. Does R1 include generic
-  standard-ZCL device state/commands for arbitrary devices, or is the device
-  layer entirely out of scope? **Do not implement device state/commands,
-  per-device HA discovery or standard-cluster set/get until Q1 is answered.**
-  Network identity, interview, registry, MQTT bridge API, HA bridge entities,
-  Windfront and storage are allowed.
-
-Until Q1 is answered, the device-layer part is `BLOCKED`; protocol research,
-measurements and the non-device core are allowed.
+  definition of “100% working”.
+- **Q1 — device layer boundary:** resolved for the port. The controller model
+  layer (`device.ts`, `endpoint.ts`, `group.ts`) and generic standard-ZCL
+  state/commands are ported as part of `controller/`. This does not add
+  `zigbee-herdsman-converters` or a device catalog to R1; per-device HA
+  discovery remains outside the initial R1 surface.
 
 ## 6. Technical constraints
 
@@ -219,7 +242,7 @@ On the actual router + Dongle-P:
 - bridge API requests return correct transactions and payloads, not stubs;
 - config/database/state survive restart, kill/respawn and reboot;
 - HA bridge entities and device-registry discovery/cleanup work (per-device
-  cluster discovery only if Q1 approves it);
+  cluster discovery is added after the initial controller model port);
 - permit join, rename, remove/leave/block and options work end-to-end (fixtures
   are acceptable; coordinator-only HIL is the R1 acceptance);
 - no unbounded wait or event-loop deadlock remains;

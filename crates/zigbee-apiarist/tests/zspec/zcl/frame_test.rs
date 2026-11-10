@@ -463,12 +463,12 @@ fn minimum_remaining_buffer_bytes() {
     };
 
     assert!(Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"status": 1}),
         Some(3)
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"status": 1}),
         Some(2)
     ));
@@ -479,22 +479,22 @@ fn bitmask_set() {
     let parameter = cluster::greenPower::commands::notification.parameters[8];
 
     assert!(Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0x4000}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0x4150}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0x0400}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0x1400}),
         None
     ));
@@ -506,32 +506,32 @@ fn bitfield_enum() {
     let parameter = cluster::greenPower::commands::notification.parameters[1];
 
     assert!(Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0b000}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0b1000}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0b001}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0b011}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0b100}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"options": 0b1010}),
         None
     ));
@@ -563,69 +563,87 @@ fn field_equal() {
     };
 
     assert!(Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"status": 0}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&parameter),
         &json!({"status": 1}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &reversed_parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&reversed_parameter),
         &json!({"status": 0}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &reversed_parameter,
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(&reversed_parameter),
         &json!({"status": 1}),
         None
     ));
 
     assert!(Frame::conditions_valid(
-        &cluster::touchlink::commandsResponse::scanResponse.parameters[13],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::touchlink::commandsResponse::scanResponse.parameters[13]
+        ),
         &json!({"numberOfSubDevices": 1}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &cluster::touchlink::commandsResponse::scanResponse.parameters[13],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::touchlink::commandsResponse::scanResponse.parameters[13]
+        ),
         &json!({"numberOfSubDevices": 0}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &cluster::touchlink::commandsResponse::scanResponse.parameters[13],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::touchlink::commandsResponse::scanResponse.parameters[13]
+        ),
         &json!({"numberOfSubDevices": 3}),
         None
     ));
 
     assert!(!Frame::conditions_valid(
-        &cluster::genOta::commandsResponse::imageNotify.parameters[2],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::genOta::commandsResponse::imageNotify.parameters[2]
+        ),
         &json!({"payloadType": 0}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &cluster::genOta::commandsResponse::imageNotify.parameters[2],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::genOta::commandsResponse::imageNotify.parameters[2]
+        ),
         &json!({"payloadType": 1}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &cluster::genOta::commandsResponse::imageNotify.parameters[3],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::genOta::commandsResponse::imageNotify.parameters[3]
+        ),
         &json!({"payloadType": 1}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &cluster::genOta::commandsResponse::imageNotify.parameters[3],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::genOta::commandsResponse::imageNotify.parameters[3]
+        ),
         &json!({"payloadType": 2}),
         None
     ));
     assert!(!Frame::conditions_valid(
-        &cluster::genOta::commandsResponse::imageNotify.parameters[4],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::genOta::commandsResponse::imageNotify.parameters[4]
+        ),
         &json!({"payloadType": 2}),
         None
     ));
     assert!(Frame::conditions_valid(
-        &cluster::genOta::commandsResponse::imageNotify.parameters[4],
+        &zigbee_apiarist::zspec::zcl::utils::Parameter::from(
+            &cluster::genOta::commandsResponse::imageNotify.parameters[4]
+        ),
         &json!({"payloadType": 3}),
         None
     ));
@@ -915,8 +933,13 @@ fn zcl_frame() {
         assert_eq!(case.frame.header, case.header, "case: {}", case.name);
         assert_eq!(case.frame.to_buffer(), case.written, "case: {}", case.name);
         assert_eq!(
-            Frame::from_buffer(case.cluster_id, Some(case.header), &case.written, json!({}))
-                .to_string(),
+            Frame::from_buffer(
+                case.cluster_id,
+                Some(case.header),
+                &case.written,
+                &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty()
+            )
+            .to_string(),
             case.string,
             "case: {}",
             case.name
@@ -956,7 +979,12 @@ fn writes_reads_repetitive_strategy() {
 
     let buffer = frame.to_buffer();
     let read_header = Header::from_buffer(&buffer).expect("header");
-    let read_frame = Frame::from_buffer(0, Some(read_header), &buffer, json!({}));
+    let read_frame = Frame::from_buffer(
+        0,
+        Some(read_header),
+        &buffer,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 
     assert_eq!(read_frame.payload, expected);
 }
@@ -993,7 +1021,12 @@ fn writes_reads_flat_strategy() {
 
     let buffer = frame.to_buffer();
     let read_header = Header::from_buffer(&buffer).expect("header");
-    let read_frame = Frame::from_buffer(0, Some(read_header), &buffer, json!({}));
+    let read_frame = Frame::from_buffer(
+        0,
+        Some(read_header),
+        &buffer,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 
     assert_eq!(read_frame.payload, expected);
 }
@@ -1036,7 +1069,12 @@ fn writes_reads_oneof_strategy() {
 
     let buffer = frame.to_buffer();
     let read_header = Header::from_buffer(&buffer).expect("header");
-    let read_frame = Frame::from_buffer(0, Some(read_header), &buffer, json!({}));
+    let read_frame = Frame::from_buffer(
+        0,
+        Some(read_header),
+        &buffer,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 
     assert_eq!(read_frame.payload, expected);
 }
@@ -1065,13 +1103,23 @@ fn throws_when_writting_invalid_frame_type() {
 fn throws_when_reading_invalid_frame_type() {
     let buffer = [2u8, 123, 0];
     let header = Header::from_buffer(&buffer);
-    Frame::from_buffer(cluster::genBasic::ID, header, &buffer, json!({}));
+    Frame::from_buffer(
+        cluster::genBasic::ID,
+        header,
+        &buffer,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 }
 
 #[test]
 #[should_panic(expected = "Invalid ZclHeader.")]
 fn throws_when_reading_frame_without_header() {
-    Frame::from_buffer(cluster::genBasic::ID, None, &[], json!({}));
+    Frame::from_buffer(
+        cluster::genBasic::ID,
+        None,
+        &[],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 }
 
 #[test]
@@ -1193,7 +1241,12 @@ fn workaround_reads_foundation_char_str_as_mi_struct_for_xiaomi_attrid_id_65281(
     buffer.extend_from_slice(&[100, DataType::BOOLEAN as u8, 0]);
 
     let header = Header::from_buffer(&buffer).expect("header");
-    let frame = Frame::from_buffer(0, Some(header), &buffer, json!({}));
+    let frame = Frame::from_buffer(
+        0,
+        Some(header),
+        &buffer,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 
     assert_eq!(frame.payload, expected);
 }
@@ -1229,7 +1282,12 @@ fn workaround_reads_foundation_struct_with_extra_payload_to_match_zcl_packet() {
     buffer.extend_from_slice(&[DataType::UINT8 as u8, 86]);
 
     let header = Header::from_buffer(&buffer).expect("header");
-    let frame = Frame::from_buffer(0, Some(header), &buffer, json!({}));
+    let frame = Frame::from_buffer(
+        0,
+        Some(header),
+        &buffer,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 
     assert_eq!(frame.payload, expected);
 }
@@ -1250,7 +1308,12 @@ fn reads_writes_touchlink_scan_response_with_different_size_payloads() {
         0x8f, 0xb7, 0xdc, 0x1c, 0x0, 0x4b, 0x12, 0x0, 0x0, 0xf, 0x62, 0x1a, 0xb3, 0xaa, 0x3, 0x0,
     ];
 
-    let full_zcl = Frame::from_buffer(0x1000, Header::from_buffer(&full), &full, json!({}));
+    let full_zcl = Frame::from_buffer(
+        0x1000,
+        Header::from_buffer(&full),
+        &full,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert_eq!(full_zcl.payload["numberOfSubDevices"], json!(1));
     assert_eq!(full_zcl.payload["endpointID"], json!(11));
     assert_eq!(full_zcl.payload["profileID"], json!(0xc05e));
@@ -1258,7 +1321,12 @@ fn reads_writes_touchlink_scan_response_with_different_size_payloads() {
     assert_eq!(full_zcl.payload["version"], json!(0x02));
     assert_eq!(full_zcl.payload["groupIDCount"], json!(0));
 
-    let short_zcl = Frame::from_buffer(0x1000, Header::from_buffer(&short), &short, json!({}));
+    let short_zcl = Frame::from_buffer(
+        0x1000,
+        Header::from_buffer(&short),
+        &short,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert_eq!(short_zcl.payload["numberOfSubDevices"], json!(0));
     assert_eq!(short_zcl.payload.get("endpointID"), None);
     assert_eq!(short_zcl.payload.get("profileID"), None);
@@ -1266,7 +1334,12 @@ fn reads_writes_touchlink_scan_response_with_different_size_payloads() {
     assert_eq!(short_zcl.payload.get("version"), None);
     assert_eq!(short_zcl.payload.get("groupIDCount"), None);
 
-    let short2_zcl = Frame::from_buffer(0x1000, Header::from_buffer(&short2), &short2, json!({}));
+    let short2_zcl = Frame::from_buffer(
+        0x1000,
+        Header::from_buffer(&short2),
+        &short2,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert_eq!(short2_zcl.payload["numberOfSubDevices"], json!(3));
     assert_eq!(short2_zcl.payload.get("endpointID"), None);
     assert_eq!(short2_zcl.payload.get("profileID"), None);
@@ -1288,7 +1361,7 @@ fn throws_when_payload_too_short_to_continue_reading() {
         cluster::genOta::ID,
         Header::from_buffer(&buffer),
         &buffer,
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
 }
 
@@ -1299,7 +1372,7 @@ fn workaround_reads_gen_ota_image_block_request_even_if_minimum_block_period_is_
         cluster::genOta::ID,
         Header::from_buffer(&buffer),
         &buffer,
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
 
     assert_eq!(

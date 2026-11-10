@@ -475,7 +475,7 @@ fn zcl_green_power_read_gpd_attribute_report() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -486,7 +486,7 @@ fn zcl_green_power_read_gpd_channel_request() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -497,7 +497,7 @@ fn zcl_green_power_read_gpd_commissioning() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -508,7 +508,7 @@ fn zcl_green_power_read_gpd_commissioning_all_options() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -519,7 +519,7 @@ fn zcl_green_power_write_gpd_channel_configuration() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -530,7 +530,7 @@ fn zcl_green_power_write_gpd_channel_configuration_basic() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -541,7 +541,7 @@ fn zcl_green_power_write_gpd_commissioning() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -552,7 +552,7 @@ fn zcl_green_power_write_gpd_commissioning_all_options() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -563,7 +563,7 @@ fn zcl_green_power_write_gpd_custom_reply() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -574,7 +574,7 @@ fn zcl_green_power_write_gpd_unhandled_command() {
         0x0021,
         Header::from_buffer(&[0, 1, 0]),
         &[0, 1, 0],
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
     assert!(true);
 }
@@ -646,238 +646,408 @@ fn zcl_utils_get_command_non_existing() {
 #[test]
 fn zcl_frame_from_buffer_gpd_commission() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_gpd_pairing() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_gpd_scene_0() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_gpd_with_extra_data() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_config_report_rsp_hvac_thermostat() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_config_report_rsp_long() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_config_report_rsp_short() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_config_report_rsp_client_to_server_analog() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_config_report_rsp_failed() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_config_report_rsp_server_to_client() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_default_rsp() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_discover_rsp() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_error_on_malformed() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_gen_groups_get_membership() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_gen_ota_query_next_image_request_keeps_0x_ffff_manufacturer_code() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_gen_ota_upgrade_end_request_keeps_0x_ffff_manufacturer_code() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_get_weekly_schedule_rsp_hvac_thermostat() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_occupancy_report() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_parse_payload_with_unknown_frame_type() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_read_rsp() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_read_rsp_alias_type() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_read_rsp_failed() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_read_rsp_success() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_read_structured_multiple_elements() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_read_structured_single_elements() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_read_structured_whole_attribute() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_report() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_ss_ias_ace_arm_command() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_struct() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_with_reservered_bits() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_write_structured_rsp_failed_mixed_selectors() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_write_structured_rsp_failed_selector_unknown_or_none_for_type() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_write_structured_rsp_failed_with_selector() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_from_buffer_write_structured_rsp_success() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
@@ -1094,21 +1264,36 @@ fn zcl_frame_to_buffer_write_structured_rsp_success() {
 #[test]
 fn zcl_frame_with_assa_manufacturer_specific_cluster_create() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_with_assa_manufacturer_specific_cluster_create_with_non_assamanufcode() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 
 #[test]
 fn zcl_frame_with_assa_manufacturer_specific_cluster_from_buffer() {
     let header = Header::from_buffer(&[0, 1, 0]);
-    let _ = Frame::from_buffer(0, header, &[0, 1, 0], json!({}));
+    let _ = Frame::from_buffer(
+        0,
+        header,
+        &[0, 1, 0],
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
     assert!(true);
 }
 

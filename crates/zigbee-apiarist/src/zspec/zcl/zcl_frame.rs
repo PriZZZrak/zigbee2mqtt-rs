@@ -2,10 +2,10 @@
 
 use serde_json::{json, Value};
 
-use crate::zspec::zcl::definition::cluster::{
-    self, Cluster, Command, Parameter, ParameterCondition,
-};
 use crate::zspec::zcl::definition::enums::DataType;
+use crate::zspec::zcl::utils::{
+    Cluster, Command, CustomClusters, Parameter, ParameterCondition, Utils,
+};
 use crate::zspec::zcl::zcl_header::{Direction, FrameControl, FrameType, Header};
 
 /// Upstream command argument: a command name or a numeric command identifier.
@@ -73,23 +73,43 @@ impl Frame {
         if frame_type > 1 {
             panic!("Frametype '{frame_type}' not valid");
         }
+        let custom_clusters = CustomClusters::empty();
         let cluster = match cluster.into() {
-            ClusterRef::Id(id) => cluster_from_id(id),
-            ClusterRef::Name(name) => cluster_from_name(name),
+            ClusterRef::Id(id) => Utils::get_cluster(id, manufacturer_code, &custom_clusters),
+            ClusterRef::Name(name) => Utils::get_cluster(name, manufacturer_code, &custom_clusters),
         };
         let is_specific = frame_type == 1;
-        let command = if is_specific {
-            let key = command.into();
-            specific_command(cluster.ID, key, direction == 1).unwrap_or_else(|| match key {
-                CommandRef::Id(id) => command_from_id(id),
-                CommandRef::Name(name) => command_from_name(name),
-            })
-        } else {
-            match command.into() {
-                CommandRef::Id(id) => command_from_id(id),
-                CommandRef::Name(name) => command_from_name(name),
-            }
-        };
+        let command = resolve_command(&cluster, command.into(), is_specific, direction == 1);
+        Self::create_with_definitions(
+            cluster,
+            command,
+            frame_type,
+            direction,
+            disable_default_response,
+            manufacturer_code,
+            transaction_sequence_number,
+            payload,
+            reserved_bits,
+        )
+    }
+
+    /// Upstream `ZclFrame.create(...)` with already resolved definitions
+    /// (used for custom clusters and dynamic commands).
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_definitions(
+        cluster: Cluster,
+        command: Command,
+        frame_type: u8,
+        direction: u8,
+        disable_default_response: bool,
+        manufacturer_code: Option<u16>,
+        transaction_sequence_number: u8,
+        payload: Value,
+        reserved_bits: u8,
+    ) -> Self {
+        if frame_type > 1 {
+            panic!("Frametype '{frame_type}' not valid");
+        }
         let frame_type = if frame_type == 0 {
             FrameType::GLOBAL
         } else {
@@ -125,7 +145,7 @@ impl Frame {
         cluster_id: u16,
         header: Option<Header>,
         buffer: &[u8],
-        _custom_clusters: Value,
+        custom_clusters: &CustomClusters,
     ) -> Self {
         let Some(header) = header else {
             if buffer.is_empty() {
@@ -134,20 +154,20 @@ impl Frame {
             let frame_type = buffer[0] & 0x03;
             panic!("Unsupported frameType '{frame_type}'");
         };
-        let cluster = cluster_from_id(cluster_id);
+        let cluster = Utils::get_cluster(cluster_id, None, custom_clusters);
         let server_to_client = header.frame_control.direction == Direction::SERVER_TO_CLIENT;
         let (command, payload) = if header.frame_control.frame_type == FrameType::SPECIFIC {
-            let command = specific_command(
-                cluster_id,
+            let command = resolve_command(
+                &cluster,
                 CommandRef::Id(header.command_identifier),
+                true,
                 server_to_client,
-            )
-            .unwrap_or_else(|| command_from_id(header.command_identifier));
+            );
             let payload = decode_parameters(&command, buffer, header.length);
             (command, payload)
         } else {
-            let command = command_from_id(header.command_identifier);
-            let payload = decode_payload(command.name, buffer, header.length, cluster.name);
+            let command = Utils::get_global_command(header.command_identifier);
+            let payload = decode_payload(&command.name, buffer, header.length, &cluster.name);
             (command, payload)
         };
         Self {
@@ -164,7 +184,7 @@ impl Frame {
         if self.header.frame_control.frame_type == FrameType::SPECIFIC {
             encode_parameters(&self.command, &self.payload, &mut buffer);
         } else {
-            encode_payload(self.command.name, &self.payload, &mut buffer);
+            encode_payload(&self.command.name, &self.payload, &mut buffer);
         }
         buffer
     }
@@ -174,7 +194,7 @@ impl Frame {
         format!(
             "{{\"header\":{},\"payload\":{},\"command\":{}}}",
             header_to_string(&self.header),
-            payload_to_string(self.command.name, &self.payload),
+            payload_to_string(&self.command.name, &self.payload),
             command_to_string(&self.command, self.header.frame_control.frame_type),
         )
     }
@@ -205,7 +225,10 @@ impl Frame {
                         .unwrap_or(false)
                 }
                 ParameterCondition::BITMASK_SET { field, value } => {
-                    let actual = payload.get(*field).and_then(Value::as_u64).unwrap_or(0);
+                    let actual = payload
+                        .get(field.as_str())
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0);
                     actual & u64::from(*value) == u64::from(*value)
                 }
                 ParameterCondition::BITFIELD_ENUM {
@@ -214,7 +237,10 @@ impl Frame {
                     size,
                     value,
                 } => {
-                    let actual = payload.get(*field).and_then(Value::as_u64).unwrap_or(0);
+                    let actual = payload
+                        .get(field.as_str())
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0);
                     let mask = (1u64 << size) - 1;
                     ((actual >> offset) & mask) == u64::from(*value)
                 }
@@ -224,7 +250,7 @@ impl Frame {
                     reversed,
                 } => {
                     let actual = payload
-                        .get(*field)
+                        .get(field.as_str())
                         .and_then(Value::as_u64)
                         .unwrap_or(u64::MAX);
                     let equal = actual == u64::from(*value);
@@ -235,126 +261,6 @@ impl Frame {
                     }
                 }
             })
-    }
-}
-
-pub fn cluster_from_id(id: u16) -> Cluster {
-    let name = match id {
-        0x0000 => "genBasic",
-        0x0001 => "genPowerCfg",
-        0x0004 => "genGroups",
-        0x0005 => "genScenes",
-        0x0006 => "genOnOff",
-        0x0008 => "genLevelCtrl",
-        0x0009 => "genAlarms",
-        0x000a => "genTime",
-        0x0019 => "genOta",
-        0x0020 => "genPollCtrl",
-        0x0021 => "greenPower",
-        0x0500 => "ssIasZone",
-        0x1000 => "touchlink",
-        0x0b00 => "haApplianceIdentification",
-        _ => "unknown",
-    };
-    Cluster { name, ID: id }
-}
-
-pub fn cluster_from_name(name: &'static str) -> Cluster {
-    let id = match name {
-        "genBasic" => 0x0000,
-        "genPowerCfg" => 0x0001,
-        "genGroups" => 0x0004,
-        "genScenes" => 0x0005,
-        "genOnOff" => 0x0006,
-        "genLevelCtrl" => 0x0008,
-        "genAlarms" => 0x0009,
-        "genTime" => 0x000a,
-        "genOta" => 0x0019,
-        "genPollCtrl" => 0x0020,
-        "greenPower" => 0x0021,
-        "ssIasZone" => 0x0500,
-        "touchlink" => 0x1000,
-        "haApplianceIdentification" => 0x0b00,
-        _ => 0,
-    };
-    Cluster { name, ID: id }
-}
-
-pub fn command_from_id(id: u8) -> Command {
-    let name = match id {
-        0x00 => "read",
-        0x01 => "readRsp",
-        0x02 => "write",
-        0x03 => "writeUndiv",
-        0x04 => "writeRsp",
-        0x05 => "writeNoRsp",
-        0x06 => "configReport",
-        0x07 => "configReportRsp",
-        0x08 => "readReportConfig",
-        0x09 => "readReportConfigRsp",
-        0x0a => "report",
-        0x0b => "defaultRsp",
-        0x0c => "discover",
-        0x0d => "discoverRsp",
-        0x0e => "readStructured",
-        0x0f => "writeStructured",
-        0x10 => "writeStructuredRsp",
-        0x11 => "discoverCommands",
-        0x12 => "discoverCommandsRsp",
-        0x13 => "discoverCommandsGen",
-        0x14 => "discoverCommandsGenRsp",
-        0x15 => "discoverExt",
-        0x16 => "discoverExtRsp",
-        _ => "unknown",
-    };
-    let command = Command::new(name, id);
-    match id {
-        0x00 => command.with_response(1),
-        0x06 => command.with_response(7),
-        _ => command,
-    }
-}
-
-pub fn command_from_name(name: &'static str) -> Command {
-    let id = match name {
-        "read" => 0x00,
-        "readRsp" => 0x01,
-        "write" => 0x02,
-        "writeUndiv" => 0x03,
-        "writeRsp" => 0x04,
-        "writeNoRsp" => 0x05,
-        "configReport" => 0x06,
-        "configReportRsp" => 0x07,
-        "readReportConfig" => 0x08,
-        "readReportConfigRsp" => 0x09,
-        "report" => 0x0a,
-        "defaultRsp" => 0x0b,
-        "discover" => 0x0c,
-        "discoverRsp" => 0x0d,
-        "readStructured" => 0x0e,
-        "writeStructured" => 0x0f,
-        "writeStructuredRsp" => 0x10,
-        "discoverCommands" => 0x11,
-        "discoverCommandsRsp" => 0x12,
-        "discoverCommandsGen" => 0x13,
-        "discoverCommandsGenRsp" => 0x14,
-        "discoverExt" => 0x15,
-        "discoverExtRsp" => 0x16,
-        "enrollReq" => 0x01,
-        "enrollRsp" => 0x02,
-        "checkin" => 0x00,
-        "checkinRsp" => 0x01,
-        "fastPollStop" => 0x03,
-        "removeRsp" => 0x02,
-        "add" => 0x00,
-        "addRsp" => 0x00,
-        _ => 0,
-    };
-    let command = Command::new(name, id);
-    match id {
-        0x00 => command.with_response(1),
-        0x06 => command.with_response(7),
-        _ => command,
     }
 }
 
@@ -1111,6 +1017,46 @@ fn header_to_string(header: &Header) -> String {
     text
 }
 
+/// Upstream `getClusterCommand` / `getClusterCommandResponse` /
+/// `getGlobalCommand` resolution used by `ZclFrame.create`.
+fn resolve_command(
+    cluster: &Cluster,
+    key: CommandRef,
+    is_specific: bool,
+    server_to_client: bool,
+) -> Command {
+    if !is_specific {
+        return match key {
+            CommandRef::Id(id) => Utils::get_global_command(id),
+            CommandRef::Name(name) => Utils::get_global_command(name),
+        };
+    }
+
+    let primary = if server_to_client {
+        &cluster.commandsResponse
+    } else {
+        &cluster.commands
+    };
+    let secondary = if server_to_client {
+        &cluster.commands
+    } else {
+        &cluster.commandsResponse
+    };
+    let found = match key {
+        CommandRef::Id(id) => primary
+            .values()
+            .chain(secondary.values())
+            .find(|command| command.ID == id),
+        CommandRef::Name(name) => primary.get(name).or_else(|| secondary.get(name)),
+    };
+    found.cloned().unwrap_or_else(|| {
+        panic!(
+            "Command {key:?} does not exist for cluster '{}'",
+            cluster.name
+        )
+    })
+}
+
 fn command_to_string(command: &Command, frame_type: FrameType) -> String {
     let mut text = format!(
         "{{\"name\":{},\"ID\":{}",
@@ -1283,33 +1229,6 @@ fn json_string(value: &Value) -> String {
     serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string())
 }
 
-fn specific_command(cluster_id: u16, key: CommandRef, server_to_client: bool) -> Option<Command> {
-    let commands: Vec<Command> = match cluster_id {
-        cluster::genAlarms::ID => vec![
-            cluster::genAlarms::commands::getAlarm,
-            cluster::genAlarms::commands::reset,
-            cluster::genAlarms::commandsResponse::alarm,
-        ],
-        cluster::genGroups::ID => vec![cluster::genGroups::commands::getMembership],
-        cluster::genLevelCtrl::ID => vec![cluster::genLevelCtrl::commands::moveToLevelWithOnOff],
-        cluster::genOta::ID => vec![
-            cluster::genOta::commands::imageBlockRequest,
-            cluster::genOta::commandsResponse::queryNextImageResponse,
-            cluster::genOta::commandsResponse::imageNotify,
-        ],
-        cluster::touchlink::ID => vec![cluster::touchlink::commandsResponse::scanResponse],
-        _ => Vec::new(),
-    };
-    let mut ordered = commands;
-    if server_to_client {
-        ordered.reverse();
-    }
-    ordered.into_iter().find(|command| match key {
-        CommandRef::Id(id) => command.ID == id,
-        CommandRef::Name(name) => command.name == name,
-    })
-}
-
 fn parameter_to_json(parameter: &Parameter) -> Value {
     let mut object = serde_json::Map::new();
     object.insert("name".to_string(), json!(parameter.name));
@@ -1377,21 +1296,21 @@ fn parameter_to_json(parameter: &Parameter) -> Value {
 }
 
 fn encode_parameters(command: &Command, payload: &Value, buffer: &mut Vec<u8>) {
-    for parameter in command.parameters {
+    for parameter in &command.parameters {
         let include = if parameter.conditions.iter().any(|condition| {
             matches!(
                 condition,
                 ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(_)
             )
         }) {
-            payload.get(parameter.name).is_some()
+            payload.get(parameter.name.as_str()).is_some()
         } else {
             Frame::conditions_valid(parameter, payload, None)
         };
         if !include {
             continue;
         }
-        let Some(value) = payload.get(parameter.name) else {
+        let Some(value) = payload.get(parameter.name.as_str()) else {
             panic!("Parameter '{}' is missing", parameter.name);
         };
         if parameter.name == "grouplist" {
@@ -1407,7 +1326,7 @@ fn encode_parameters(command: &Command, payload: &Value, buffer: &mut Vec<u8>) {
 fn decode_parameters(command: &Command, buffer: &[u8], header_length: usize) -> Value {
     let mut position = header_length.min(buffer.len());
     let mut payload = serde_json::Map::new();
-    for parameter in command.parameters {
+    for parameter in &command.parameters {
         let remaining = buffer.len().saturating_sub(position);
         let current = Value::Object(payload.clone());
         if !Frame::conditions_valid(parameter, &current, Some(remaining)) {

@@ -12,7 +12,12 @@ use zigbee_apiarist::zspec::zcl::zcl_header::{Direction, FrameType};
 /// Upstream `expect(frame).toMatchObject({header, payload, cluster: {name}})`.
 fn assert_frame_roundtrip(frame: &Frame, cluster_name: &str) {
     let raw_frame = frame.to_buffer();
-    let parsed = Frame::from_buffer(frame.cluster.ID, Some(frame.header), &raw_frame, json!({}));
+    let parsed = Frame::from_buffer(
+        frame.cluster.ID as u16,
+        Some(frame.header),
+        &raw_frame,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
 
     assert_eq!(parsed.header, frame.header);
     assert_eq!(parsed.payload, frame.payload);
@@ -142,7 +147,7 @@ fn read_rsp_workaround_parses_char_str_as_mi_struct_for_attribute_0xff01() {
         0x0000,
         zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&raw_frame),
         &raw_frame,
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
 
     assert_eq!(
@@ -524,7 +529,7 @@ fn report_workaround_parses_char_str_as_mi_struct_for_attribute_0xff01() {
         0x0000,
         zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&raw_frame),
         &raw_frame,
-        json!({}),
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
     );
 
     assert_eq!(

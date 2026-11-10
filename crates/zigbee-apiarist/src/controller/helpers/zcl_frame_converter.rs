@@ -26,7 +26,11 @@ pub fn attribute_key_value(
     let legrand_workaround = frame.header.manufacturer_code.is_none()
         && device_manufacturer_id == Some(LEGRAND_GROUP_MANUF_CODE);
     let cluster = if legrand_workaround {
-        Utils::get_cluster(frame.cluster.name, device_manufacturer_id, custom_clusters)
+        Utils::get_cluster(
+            frame.cluster.name.clone(),
+            device_manufacturer_id,
+            custom_clusters,
+        )
     } else {
         Utils::get_cluster(
             frame.cluster.ID,
@@ -96,7 +100,11 @@ pub fn attribute_list(
     let legrand_workaround = frame.header.manufacturer_code.is_none()
         && device_manufacturer_id == Some(LEGRAND_GROUP_MANUF_CODE);
     let cluster = if legrand_workaround {
-        Utils::get_cluster(frame.cluster.name, device_manufacturer_id, custom_clusters)
+        Utils::get_cluster(
+            frame.cluster.name.clone(),
+            device_manufacturer_id,
+            custom_clusters,
+        )
     } else {
         Utils::get_cluster(
             frame.cluster.ID,
