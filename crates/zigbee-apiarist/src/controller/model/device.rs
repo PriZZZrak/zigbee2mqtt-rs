@@ -596,7 +596,9 @@ impl Device {
         }
 
         let Some(frame) = frame else {
-            let header = data_payload.header;
+            let Some(header) = data_payload.header else {
+                return Ok(());
+            };
             if !data_payload.was_broadcast
                 && !(header.is_global()
                     && header.command_identifier
@@ -2362,7 +2364,7 @@ mod tests {
         ZclPayload {
             cluster_id,
             data: vec![0, 0],
-            header: Header::new(
+            header: Some(Header::new(
                 FrameControl {
                     reserved_bits: 0,
                     frame_type: FrameType::GLOBAL,
@@ -2373,7 +2375,7 @@ mod tests {
                 None,
                 tsn,
                 11,
-            ),
+            )),
             address: Value::String("0x00124b0000000001".to_string()),
             endpoint: 1,
             linkquality: 0,

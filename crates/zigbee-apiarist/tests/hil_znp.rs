@@ -449,7 +449,7 @@ async fn hil_zstack_adapter_zcl_read_roundtrip() {
         "ZCL read response: cluster={} endpoint={} cmd={} data={}",
         payload.cluster_id,
         payload.endpoint,
-        payload.header.command_identifier,
+        payload.header.unwrap().command_identifier,
         payload
             .data
             .iter()

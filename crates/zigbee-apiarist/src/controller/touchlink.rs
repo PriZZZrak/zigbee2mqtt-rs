@@ -404,7 +404,7 @@ mod tests {
         ZclPayload {
             cluster_id: 0x1000,
             data: Vec::new(),
-            header: Header::new(
+            header: Some(Header::new(
                 FrameControl {
                     reserved_bits: 0,
                     frame_type: FrameType::SPECIFIC,
@@ -415,7 +415,7 @@ mod tests {
                 None,
                 0,
                 1,
-            ),
+            )),
             address,
             endpoint: 0,
             linkquality: 0,

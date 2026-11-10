@@ -482,7 +482,7 @@ impl GreenPower {
 
             *frame = try_from_buffer(
                 data_payload.cluster_id,
-                Some(data_payload.header),
+                data_payload.header,
                 &reparsed,
                 &CustomClusters::empty(),
             )
@@ -661,7 +661,7 @@ impl GreenPower {
                     if let Some(pairing_rsp) = pairing_rsp {
                         let pairing_rsp_frame = Frame::from_buffer(
                             pairing_rsp.cluster_id,
-                            Some(pairing_rsp.header),
+                            pairing_rsp.header,
                             &pairing_rsp.data,
                             &CustomClusters::empty(),
                         );
@@ -964,7 +964,7 @@ mod tests {
         ZclPayload {
             cluster_id: 0x0021,
             data,
-            header,
+            header: Some(header),
             address: json!(source_id & 0xffff),
             endpoint: GP_ENDPOINT,
             linkquality: 138,
@@ -977,7 +977,7 @@ mod tests {
     fn parse_frame(payload: &ZclPayload) -> Frame {
         Frame::from_buffer(
             payload.cluster_id,
-            Some(payload.header),
+            payload.header,
             &payload.data,
             &CustomClusters::empty(),
         )

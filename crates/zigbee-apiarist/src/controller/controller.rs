@@ -1703,7 +1703,7 @@ impl Controller {
         if payload.cluster_id == green_power_id {
             frame = match try_from_buffer(
                 payload.cluster_id,
-                Some(payload.header),
+                payload.header,
                 &payload.data,
                 &CustomClusters::empty(),
             ) {
@@ -1780,7 +1780,7 @@ impl Controller {
                 .unwrap_or_else(CustomClusters::empty);
             match try_from_buffer(
                 payload.cluster_id,
-                Some(payload.header),
+                payload.header,
                 &payload.data,
                 &custom_clusters,
             ) {
@@ -2464,7 +2464,7 @@ mod tests {
         let zcl_payload = ZclPayload {
             cluster_id: 0x0006,
             data: data.clone(),
-            header: Header::from_buffer(&data).expect("header"),
+            header: Some(Header::from_buffer(&data).expect("header")),
             address: json!(0x1234),
             endpoint: 1,
             linkquality: 120,
@@ -2586,7 +2586,7 @@ mod tests {
         let zcl_payload = ZclPayload {
             cluster_id: 0x0006,
             data: data.clone(),
-            header: Header::from_buffer(&data).expect("header"),
+            header: Some(Header::from_buffer(&data).expect("header")),
             address: json!(0x1234),
             endpoint: 1,
             linkquality: 50,
@@ -2864,7 +2864,7 @@ mod tests {
         let zcl_payload = ZclPayload {
             cluster_id: 0x0021,
             data: data.clone(),
-            header: Header::from_buffer(&data).expect("header"),
+            header: Some(Header::from_buffer(&data).expect("header")),
             address: json!((source_id & 0xffff) as u16),
             endpoint: 242,
             linkquality: 200,
@@ -2895,6 +2895,389 @@ mod tests {
                     if payload.status == "successful" && payload.device.ieee_addr() == ieee
             )));
         }
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn raw_data_with_header_emits_raw_message() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-raw-data-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let device = Device::create(
+            DeviceType::Router,
+            "0x00124b0000000008",
+            0x1234,
+            Some(0x1234),
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create device");
+        device.create_endpoint(1).expect("create endpoint");
+        device.save(true);
+
+        let header = Header::new(
+            FrameControl {
+                reserved_bits: 0,
+                frame_type: FrameType::SPECIFIC,
+                direction: Direction::CLIENT_TO_SERVER,
+                disable_default_response: false,
+                manufacturer_specific: false,
+            },
+            None,
+            5,
+            0xfe,
+        );
+        let data = vec![0, 1];
+        let zcl_payload = ZclPayload {
+            cluster_id: 9,
+            data: data.clone(),
+            header: Some(header),
+            address: json!(0x1234),
+            endpoint: 1,
+            linkquality: 50,
+            group_id: 1,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        };
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(zcl_payload))
+            .await
+            .expect("raw payload");
+
+        let events = events.lock().unwrap();
+        let message = events
+            .iter()
+            .find_map(|event| match event {
+                ControllerEvent::Message(payload) => Some(payload),
+                _ => None,
+            })
+            .expect("raw message");
+        assert_eq!(message.r#type, "raw");
+        assert_eq!(message.cluster, json!("genAlarms"));
+        assert_eq!(message.data, json!(data));
+        assert_eq!(message.meta.raw_data, data);
+
+        drop(events);
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn raw_data_without_header_from_unknown_cluster_emits_raw_message() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-raw-unknown-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let device = Device::create(
+            DeviceType::Router,
+            "0x00124b0000000009",
+            0x1234,
+            Some(0x1234),
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .expect("create device");
+        device.create_endpoint(1).expect("create endpoint");
+        device.save(true);
+
+        let data = vec![0, 1, 2, 3];
+        let zcl_payload = ZclPayload {
+            cluster_id: 0xffff,
+            data: data.clone(),
+            header: None,
+            address: json!(0x1234),
+            endpoint: 1,
+            linkquality: 50,
+            group_id: 1,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        };
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(zcl_payload))
+            .await
+            .expect("raw payload");
+
+        let events = events.lock().unwrap();
+        let message = events
+            .iter()
+            .find_map(|event| match event {
+                ControllerEvent::Message(payload) => Some(payload),
+                _ => None,
+            })
+            .expect("raw message");
+        assert_eq!(message.r#type, "raw");
+        assert_eq!(message.cluster, json!(0xffff));
+        assert_eq!(message.data, json!(data));
+        assert_eq!(message.meta.raw_data, data);
+
+        drop(events);
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn zdo_response_without_extra_processing_does_nothing() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-zdo-noop-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZdoResponse {
+                cluster_id: ClusterId::NODE_DESCRIPTOR_RESPONSE,
+                response: json!([0, {}]),
+            })
+            .await
+            .expect("zdo noop");
+
+        assert!(events.lock().unwrap().is_empty());
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn send_raw_uses_custom_cluster_definitions() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-custom-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let mut cluster = crate::zspec::zcl::utils::Cluster::new("customCluster", 0xfc00);
+        cluster.commands.insert(
+            "customCmd".to_string(),
+            crate::zspec::zcl::utils::Command::new("customCmd", 1),
+        );
+        let custom_clusters = CustomClusters::from_clusters(vec![cluster]);
+
+        controller
+            .send_raw(
+                RawPayload {
+                    profile_id: Some(HA_PROFILE_ID),
+                    ieee_address: Some("0x00124b000000000a".to_string()),
+                    network_address: Some(0x1234),
+                    dst_endpoint: Some(1),
+                    src_endpoint: Some(HA_ENDPOINT),
+                    cluster_key: Some(json!("customCluster")),
+                    zcl: Some(RawZclPayload {
+                        frame_type: Some(FrameType::SPECIFIC as u8),
+                        direction: Some(Direction::CLIENT_TO_SERVER as u8),
+                        command_key: json!("customCmd"),
+                        payload: Some(json!({})),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                &custom_clusters,
+            )
+            .await
+            .expect("custom sendRaw");
+
+        let frames = adapter.sent_endpoint.lock().unwrap();
+        let frame = frames.last().expect("custom frame");
+        assert_eq!(frame.cluster.name, "customCluster");
+        assert_eq!(frame.command.name, "customCmd");
+        assert_eq!(frame.cluster.ID, 0xfc00);
+        drop(frames);
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn invalid_green_power_frame_is_ignored() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-gp-invalid-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(ZclPayload {
+                cluster_id: 0x0021,
+                data: vec![0x01],
+                header: None,
+                address: json!(0x1234),
+                endpoint: 242,
+                linkquality: 200,
+                group_id: 0x0b84,
+                was_broadcast: true,
+                destination_endpoint: 242,
+            }))
+            .await
+            .expect("invalid gp frame");
+
+        assert!(events.lock().unwrap().is_empty());
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn green_power_ieee_addressing_is_skipped() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-gp-ieee-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let frame = Frame::create(
+            FrameType::SPECIFIC as u8,
+            Direction::CLIENT_TO_SERVER as u8,
+            false,
+            None,
+            5,
+            "notification",
+            "greenPower",
+            json!({
+                "options": 0b010,
+                "gpdIEEEAddr": "0x00124b0000000002",
+                "gpdEndpoint": 1,
+                "frameCounter": 1,
+                "commandID": 0xe0,
+                "payloadSize": 0,
+                "commandFrame": {},
+            }),
+            json!({}),
+            0,
+        );
+        let data = frame.to_buffer();
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(ZclPayload {
+                cluster_id: 0x0021,
+                data,
+                header: Some(frame.header),
+                address: json!("0x00124b0000000002"),
+                endpoint: 242,
+                linkquality: 200,
+                group_id: 0x0b84,
+                was_broadcast: true,
+                destination_endpoint: 242,
+            }))
+            .await
+            .expect("ieee gp frame");
+
+        assert!(events.lock().unwrap().is_empty());
+        assert!(Device::by_ieee_addr("0x00124b0000000002", false).is_none());
+
+        controller.stop().await.expect("stop");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn green_power_response_without_command_id_is_handled_gracefully() {
+        let _lock = crate::controller::model::test_support::serial();
+        let path = std::env::temp_dir().join(format!(
+            "z2m-controller-gp-response-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(Controller::new(options(path.to_str().unwrap(), 15)).unwrap());
+        let adapter = Arc::new(FakeRuntimeAdapter::new(15));
+        let events: Arc<Mutex<Vec<ControllerEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        controller.on(move |event| captured.lock().unwrap().push(event.clone()));
+        controller.start(adapter.clone()).await.expect("start");
+
+        let frame = Frame::create(
+            FrameType::GLOBAL as u8,
+            Direction::SERVER_TO_CLIENT as u8,
+            true,
+            None,
+            7,
+            "defaultRsp",
+            "greenPower",
+            json!({"cmdId": 0xe0, "statusCode": 0}),
+            json!({}),
+            0,
+        );
+        let data = frame.to_buffer();
+        controller
+            .handle_adapter_event(ControllerAdapterEvent::ZclPayload(ZclPayload {
+                cluster_id: 0x0021,
+                data,
+                header: Some(frame.header),
+                address: json!(0x9999),
+                endpoint: 242,
+                linkquality: 200,
+                group_id: 0x0b84,
+                was_broadcast: false,
+                destination_endpoint: 242,
+            }))
+            .await
+            .expect("gp response");
+
+        assert!(events.lock().unwrap().is_empty());
 
         controller.stop().await.expect("stop");
         let _ = std::fs::remove_file(path);

@@ -32,9 +32,9 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Device OTA methods (`checkOta`/`updateOta`/`abortOta`/`scheduleOta`/`unscheduleOta`/`findMatchingOtaImage`/`#waitForOtaCommand`/`#notifyOta`) | `controller/model/device.ts:1495-1899` | OMITTED | R1 excludes OTA (user decision); `controller/helpers/ota.ts` needs HTTPS + SHA-512 and no HTTP/TLS/hash dependency may be added. Fields `#scheduledOta`/`#otaInProgress`/`#otaAbortController` and the `scheduledOta` DB field are omitted consistently |
 | ZCL catalog used by the controller layer (genBasic/genGroups/genTime/ssIasZone/genPollCtrl/genOnOff/greenPower) | `zspec/zcl/definition/cluster.ts` | PARTIAL | attributes/commands/defaults needed by the controller ported with `file.ts` anchors (including all Green Power commands/responses and the `GPD_FRAME` codec); the rest of the 200+ cluster catalog remains absent |
 | `controller/events.ts` | `controller/events.ts` | PORTED | typed payloads + `ControllerEvent` enum |
-| `controller/controller.ts` | `controller/controller.ts` | PORTED | options validation, start/stop, adapter event pump, permit-join/timers, backup/database-save, `sendRaw`, install codes, ZDO/ZCL routing, unknown-device identification, Xiaomi re-transmit handling, green power device creation/removal, message/lastSeen events; runtime adapter boundary `ControllerRuntimeAdapter`; per-device event forwarding; `ZclStatusError` -> `defaultResponse`; controller tests ported from controller.test.ts (ZCL report/default-rsp status, ZDO network/announce, sendRaw, permitJoin, green power join) |
+| `controller/controller.ts` | `controller/controller.ts` | PORTED | options validation, start/stop, adapter event pump, permit-join/timers, backup/database-save, `sendRaw`, install codes, ZDO/ZCL routing, unknown-device identification, Xiaomi re-transmit handling, green power device creation/removal, message/lastSeen events; runtime adapter boundary `ControllerRuntimeAdapter`; per-device event forwarding; `ZclStatusError` -> `defaultResponse`; 16 controller tests ported from controller.test.ts (ZCL report/default-rsp status/raw data, unknown cluster raw data, ZDO network/announce/no-op, sendRaw ZDO/group/broadcast/endpoint/custom cluster, permitJoin, green power join/invalid/IEEE/response edge cases) |
 | `controller/index.ts` | `controller/index.ts` | PORTED | re-exports `Controller` |
-| Z-Stack controller runtime wrapper | `adapter/z-stack/adapter/zStackAdapter.ts` (controller surface) | PORTED | `ZStackRuntimeAdapter` implements `ControllerRuntimeAdapter` (model/green power/touchlink/runtime), forwards broadcast adapter events to the controller channel; unit test for event mapping |
+| Z-Stack controller runtime wrapper | `adapter/z-stack/adapter/zStackAdapter.ts` (controller surface) | PARTIAL | `ZStackRuntimeAdapter` implements `ControllerRuntimeAdapter` (model/green power/touchlink/runtime) and forwards broadcast adapter events; event-mapping unit test. Coordinator-only HIL smoke pending user coordination/redeploy |
 | `controller/greenPower.ts` | `controller/greenPower.ts` | PORTED | pairing/commissioning option codecs, security-key encryption, notification decryption/re-parse, commissioning/decommissioning/channel-request handling, `permitJoin`, `deviceJoined`/`deviceLeave`; upstream unit cases ported (option vectors, GPP/MIC omission, FULLENCR decrypt, MOES commissioning vector) |
 | `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | OMITTED | R1 excludes OTA flashing (user decision); no HTTP/TLS or SHA-512 dependency |
 | Green Power | `controller/greenPower.ts` | PORTED | see row above |
@@ -89,15 +89,26 @@ Z-Stack adapter and forwards its broadcast events into the controller channel.
 
 Known deviations:
 
-- `AbortSignal` is expressed by dropping the start future.
+- `AbortSignal` is expressed by dropping the start future. Rust futures are
+  cancellable by drop, so no separate abort handle is needed; the upstream
+  `throwIfAborted()` checkpoints are covered by not polling the future.
 - The `zdoResponse` event carries `clusterId`/`response` through the adapter
   event channel instead of an `EventEmitter`; the controller dispatch behaviour
-  is identical.
+  and ordering are identical (single consumer loop).
 - `Frame::try_from_buffer` converts codec panics into `FrameParseError`
-  (`Status` for `ZclStatusError` cases, `Other` otherwise). `INVALID_FIELD` and
-  unknown command/cluster-command lookups map to the upstream status, so
-  `defaultResponse` is populated for those cases; other parse failures remain
-  non-status errors without a default response.
+  (`Status` for `ZclStatusError` cases, `Other` otherwise). `INVALID_FIELD`
+  (0x85) and unknown command/global-command lookups (0x81) map to the upstream
+  status, so `defaultResponse` is populated for those cases. `UNSUPPORTED_CLUSTER`
+  (0xc3) is not emitted because the Rust ZCL catalog is an explicit subset and
+  unknown numeric cluster ids resolve to placeholder clusters; those frames
+  surface as `UNSUP_COMMAND` or raw data instead. Other parse failures remain
+  non-status errors without a default response, matching upstream (only
+  `ZclStatusError` sets `defaultResponse`).
+
+Coordinator-only HIL smoke with `ZStackRuntimeAdapter` is **not yet recorded**.
+Per AGENTS §1/§6 the test router currently runs the Node.js Zigbee2MQTT, so a
+hardware run needs an explicit redeploy and user coordination; no destructive
+operation or recommissioning was attempted.
 
 Remaining ledger item: **`controller/helpers/ota.ts` needs HTTPS and SHA-512**.
 The crate has no HTTP/TLS or hashing dependency and `docs/dependency-map.md`

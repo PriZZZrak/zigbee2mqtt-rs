@@ -1938,7 +1938,7 @@ impl Endpoint {
         let result = self.send_request(frame, &options).await?;
         let frame = Frame::from_buffer(
             result.cluster_id,
-            Some(result.header),
+            result.header,
             &result.data,
             &device.custom_clusters(),
         );

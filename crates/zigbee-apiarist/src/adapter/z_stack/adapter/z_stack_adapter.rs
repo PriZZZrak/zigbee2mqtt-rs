@@ -265,6 +265,9 @@ impl ZStackAdapter {
             )),
             waitress: Arc::new(crate::utils::waitress::Waitress::new(
                 |payload: &ZclPayload, matcher: &ClusterWaitressMatcher| {
+                    let Some(header) = payload.header else {
+                        return false;
+                    };
                     (matcher
                         .address
                         .as_ref()
@@ -275,11 +278,11 @@ impl ZStackAdapter {
                             .is_none_or(|endpoint| endpoint == payload.endpoint)
                         && matcher
                             .transaction_sequence_number
-                            .is_none_or(|tsn| tsn == payload.header.transaction_sequence_number)
-                        && (matcher.command_id == Some(payload.header.command_identifier)
-                            || (payload.header.frame_control.frame_type
+                            .is_none_or(|tsn| tsn == header.transaction_sequence_number)
+                        && (matcher.command_id == Some(header.command_identifier)
+                            || (header.frame_control.frame_type
                                 == crate::zspec::zcl::zcl_header::FrameType::GLOBAL
-                                && payload.header.command_identifier == 0x0b))
+                                && header.command_identifier == 0x0b))
                 },
                 |matcher: &ClusterWaitressMatcher, timeout: u64| {
                     format!(
@@ -902,7 +905,7 @@ async fn dispatch_znp_object(
                                 let payload = ZclPayload {
                                     cluster_id,
                                     data,
-                                    header,
+                                    header: Some(header),
                                     address,
                                     endpoint,
                                     linkquality,
@@ -931,7 +934,7 @@ async fn dispatch_znp_object(
         let payload = ZclPayload {
             cluster_id,
             data,
-            header,
+            header: Some(header),
             address,
             endpoint,
             linkquality,

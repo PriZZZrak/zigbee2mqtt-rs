@@ -27,7 +27,8 @@ pub struct ZclPayload {
     /// Upstream camelCase: `clusterID`.
     pub cluster_id: u16,
     pub data: Vec<u8>,
-    pub header: crate::zspec::zcl::zcl_header::Header,
+    /// Upstream `header` is optional (raw data without a parsable ZCL header).
+    pub header: Option<crate::zspec::zcl::zcl_header::Header>,
     pub address: Value,
     pub endpoint: u8,
     pub linkquality: u8,
