@@ -198,9 +198,12 @@ pub fn from_legacy_backup(backup: &Value) -> Result<Backup, String> {
             .ok_or_else(|| format!("Backup corrupted - missing {key}"))
     };
 
-    let nib_bytes = nv("ZCD_NV_NIB")?;
-    let active_key = nv("ZCD_NV_NWK_ACTIVE_KEY_INFO")?;
-    let preconfigured = nv("ZCD_NV_PRECFGKEY_ENABLE")?;
+    let nib_bytes = nv("ZCD_NV_NIB").map_err(|_| "Backup corrupted - missing NIB".to_string())?;
+    let active_key = nv("ZCD_NV_NWK_ACTIVE_KEY_INFO")
+        .map_err(|_| "Backup corrupted - missing active key info".to_string())?;
+    let preconfigured = nv("ZCD_NV_PRECFGKEY_ENABLE").map_err(|_| {
+        "Backup corrupted - missing pre-configured key enable attribute".to_string()
+    })?;
     let material = match nv("ZCD_NV_EX_NWK_SEC_MATERIAL_TABLE")
         .or_else(|_| nv("ZCD_NV_LEGACY_NWK_SEC_MATERIAL_TABLE_START"))
     {
@@ -209,7 +212,8 @@ pub fn from_legacy_backup(backup: &Value) -> Result<Backup, String> {
             return Err("Backup corrupted - missing network security material table".to_string())
         }
     };
-    let extaddr = nv("ZCD_NV_EXTADDR")?;
+    let extaddr = nv("ZCD_NV_EXTADDR")
+        .map_err(|_| "Backup corrupted - missing adapter IEEE address NV entry".to_string())?;
 
     let nib = nib(Some(&nib_bytes));
     let key_descriptor = nwk_key_descriptor(Some(&active_key));
