@@ -5,6 +5,7 @@
 // `CustomClusters`) and only cover what the ported tests exercise.
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 use crate::zspec::zcl::definition::enums::{BuffaloZclDataType, DataType};
 
@@ -127,6 +128,7 @@ pub struct Attribute {
     pub r#type: DataType,
     pub write: bool,
     pub read: bool,
+    pub required: bool,
     pub default: Option<ZclValue>,
     pub min: Option<f64>,
     pub max: Option<f64>,
@@ -148,6 +150,7 @@ impl Attribute {
             r#type,
             write: false,
             read: true,
+            required: false,
             default: None,
             min: None,
             max: None,
@@ -186,6 +189,10 @@ pub enum ParameterCondition {
         field: String,
         value: u32,
         reversed: bool,
+    },
+    FIELD_GT {
+        field: String,
+        value: u32,
     },
 }
 
@@ -372,6 +379,10 @@ impl Cluster {
     fn with_command_response(mut self, command: Command) -> Self {
         self.commandsResponse.insert(command.name.clone(), command);
         self
+    }
+
+    fn commands_response_mut(&mut self) -> &mut HashMap<String, Command> {
+        &mut self.commandsResponse
     }
 }
 
@@ -964,918 +975,255 @@ fn invalid_value(r#type: DataType) -> Option<ZclValue> {
     }
 }
 
-fn builtin_cluster_by_id(id: u32) -> Cluster {
-    if let Some(cluster) = builtin_cluster_by_name(&builtin_name(id)) {
-        return cluster;
-    }
+fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
+    catalog().by_name.get(name).cloned()
+}
 
+fn builtin_cluster_by_id(id: u32) -> Cluster {
+    if let Some(cluster) = catalog().by_name.get(&builtin_name(id)) {
+        return cluster.clone();
+    }
     Cluster::new(&id.to_string(), id)
 }
 
 fn builtin_name(id: u32) -> String {
-    match id {
-        0x0000 => "genBasic",
-        0x0002 => "genDeviceTempCfg",
-        0x0003 => "genIdentify",
-        0x0005 => "genScenes",
-        0x0006 => "genOnOff",
-        0x0008 => "genLevelCtrl",
-        0x0004 => "genGroups",
-        0x0009 => "genAlarms",
-        0x000a => "genTime",
-        0x0019 => "genOta",
-        0x0020 => "genPollCtrl",
-        0x0021 => "greenPower",
-        0x0500 => "ssIasZone",
-        0x1000 => "touchlink",
-        0x000b => "genRssiLocation",
-        0x0300 => "lightingColorCtrl",
-        0x0b05 => "haDiagnostic",
-        0xfc57 => "manuSpecificAmazonWWAH",
-        _ => return id.to_string(),
-    }
-    .to_string()
+    catalog()
+        .by_id
+        .get(&id)
+        .cloned()
+        .unwrap_or_else(|| id.to_string())
 }
 
-/// Upstream `Clusters.genBasic.attributes` — definition/cluster.ts:2.
-fn gen_basic_attributes() -> Vec<Attribute> {
-    vec![
-        Attribute {
-            max: Some(0xff.into()),
-            default: Some(ZclValue::num(8)),
-            ..Attribute::new("zclVersion", 0x0000, DataType::UINT8)
-        },
-        Attribute {
-            max: Some(0xff.into()),
-            default: Some(ZclValue::num(0)),
-            ..Attribute::new("appVersion", 0x0001, DataType::UINT8)
-        },
-        Attribute {
-            max: Some(0xff.into()),
-            default: Some(ZclValue::num(0)),
-            ..Attribute::new("stackVersion", 0x0002, DataType::UINT8)
-        },
-        Attribute {
-            max: Some(0xff.into()),
-            default: Some(ZclValue::num(0)),
-            ..Attribute::new("hwVersion", 0x0003, DataType::UINT8)
-        },
-        Attribute {
-            maxLen: Some(32),
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("manufacturerName", 0x0004, DataType::CHAR_STR)
-        },
-        Attribute {
-            maxLen: Some(32),
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("modelId", 0x0005, DataType::CHAR_STR)
-        },
-        Attribute {
-            maxLen: Some(16),
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("dateCode", 0x0006, DataType::CHAR_STR)
-        },
-        Attribute {
-            default: Some(ZclValue::num(0xff)),
-            ..Attribute::new("powerSource", 0x0007, DataType::ENUM8)
-        },
-        Attribute {
-            default: Some(ZclValue::num(0xff)),
-            ..Attribute::new("genericDeviceClass", 0x0008, DataType::ENUM8)
-        },
-        Attribute {
-            default: Some(ZclValue::num(0xff)),
-            ..Attribute::new("genericDeviceType", 0x0009, DataType::ENUM8)
-        },
-        Attribute {
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("productCode", 0x000a, DataType::OCTET_STR)
-        },
-        Attribute {
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("productUrl", 0x000b, DataType::CHAR_STR)
-        },
-        Attribute {
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("manufacturerVersionDetails", 0x000c, DataType::CHAR_STR)
-        },
-        Attribute {
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("serialNumber", 0x000d, DataType::CHAR_STR)
-        },
-        Attribute {
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("productLabel", 0x000e, DataType::CHAR_STR)
-        },
-        Attribute {
-            maxLen: Some(16),
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("locationDesc", 0x0010, DataType::CHAR_STR).writable()
-        },
-        Attribute {
-            default: Some(ZclValue::num(0)),
-            ..Attribute::new("physicalEnv", 0x0011, DataType::ENUM8).writable()
-        },
-        Attribute {
-            default: Some(ZclValue::num(1)),
-            ..Attribute::new("deviceEnabled", 0x0012, DataType::BOOLEAN).writable()
-        },
-        Attribute {
-            default: Some(ZclValue::num(0)),
-            ..Attribute::new("alarmMask", 0x0013, DataType::BITMAP8).writable()
-        },
-        Attribute {
-            default: Some(ZclValue::num(0)),
-            ..Attribute::new("disableLocalConfig", 0x0014, DataType::BITMAP8).writable()
-        },
-        Attribute {
-            maxLen: Some(16),
-            default: Some(ZclValue::text("")),
-            ..Attribute::new("swBuildId", 0x4000, DataType::CHAR_STR)
-        },
-    ]
+struct ClusterCatalog {
+    by_name: HashMap<String, Cluster>,
+    by_id: HashMap<u32, String>,
 }
 
-fn green_power_cluster() -> Cluster {
-    fn app(value: u32) -> ParameterCondition {
-        ParameterCondition::BITFIELD_ENUM {
-            field: "options".to_string(),
-            offset: 0,
-            size: 3,
-            value,
+static CATALOG: OnceLock<ClusterCatalog> = OnceLock::new();
+
+fn catalog() -> &'static ClusterCatalog {
+    CATALOG.get_or_init(|| {
+        let root: serde_json::Value =
+            serde_json::from_str(include_str!("definition/clusters.json"))
+                .expect("generated ZCL cluster catalog must be valid JSON");
+        let mut by_name = HashMap::new();
+        let mut by_id = HashMap::new();
+        for (name, value) in root.as_object().expect("cluster catalog must be an object") {
+            let cluster = parse_cluster(name, value);
+            by_id.insert(cluster.ID, name.clone());
+            by_name.insert(name.clone(), cluster);
+        }
+        ClusterCatalog { by_name, by_id }
+    })
+}
+
+fn parse_cluster(name: &str, value: &serde_json::Value) -> Cluster {
+    let mut cluster = Cluster::new(name, value["ID"].as_u64().unwrap_or(0) as u32);
+    cluster.manufacturerCode = value
+        .get("manufacturerCode")
+        .and_then(serde_json::Value::as_u64)
+        .map(|code| code as u16);
+    if let Some(attributes) = value.get("attributes").and_then(|v| v.as_object()) {
+        for (attribute_name, attribute_value) in attributes {
+            cluster.attributes.insert(
+                attribute_name.clone(),
+                parse_attribute(attribute_name, attribute_value),
+            );
         }
     }
-    fn sink(value: u32) -> ParameterCondition {
-        ParameterCondition::BITFIELD_ENUM {
-            field: "options".to_string(),
-            offset: 4,
-            size: 3,
-            value,
+    if let Some(commands) = value.get("commands").and_then(|v| v.as_object()) {
+        for (command_name, command_value) in commands {
+            cluster.commands.insert(
+                command_name.clone(),
+                parse_command(command_name, command_value),
+            );
         }
     }
-    fn mask(value: u32) -> ParameterCondition {
-        ParameterCondition::BITMASK_SET {
-            field: "options".to_string(),
-            value,
-            reversed: false,
+    if let Some(commands) = value.get("commandsResponse").and_then(|v| v.as_object()) {
+        for (command_name, command_value) in commands {
+            cluster.commands_response_mut().insert(
+                command_name.clone(),
+                parse_command(command_name, command_value),
+            );
         }
     }
-    fn mask_not(value: u32) -> ParameterCondition {
-        ParameterCondition::BITMASK_SET {
-            field: "options".to_string(),
-            value,
-            reversed: true,
-        }
-    }
-    fn source_parameters(options_type: DataType) -> Vec<Parameter> {
-        vec![
-            Parameter::new("options", options_type),
-            Parameter::new("srcID", DataType::UINT32).with_conditions(vec![app(0b000)]),
-            Parameter::new("gpdIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![app(0b010)]),
-            Parameter::new("gpdEndpoint", DataType::UINT8).with_conditions(vec![app(0b010)]),
-        ]
-    }
-
-    let mut cluster = Cluster::new("greenPower", 0x0021);
-
-    let mut notification = source_parameters(DataType::BITMAP16);
-    notification.push(Parameter::new("frameCounter", DataType::UINT32));
-    notification.push(Parameter::new("commandID", DataType::UINT8));
-    notification.push(Parameter::new("payloadSize", DataType::UINT8));
-    notification.push(
-        Parameter::new("commandFrame", DataType::UNKNOWN)
-            .with_buffalo_type(BuffaloZclDataType::GPD_FRAME)
-            .with_conditions(vec![mask_not(0xc0)]),
-    );
-    notification
-        .push(Parameter::new("gppNwkAddr", DataType::UINT16).with_conditions(vec![mask(0x4000)]));
-    notification
-        .push(Parameter::new("gppGpdLink", DataType::BITMAP8).with_conditions(vec![mask(0x4000)]));
-    cluster =
-        cluster.with_command(Command::new("notification", 0x00).with_parameters(notification));
-
-    cluster = cluster.with_command(
-        Command::new("pairingSearch", 0x01).with_parameters(source_parameters(DataType::BITMAP16)),
-    );
-
-    let mut tunneling_stop = source_parameters(DataType::BITMAP8);
-    tunneling_stop.push(Parameter::new("gpdSecurityFrameCounter", DataType::UINT32));
-    tunneling_stop.push(Parameter::new("gppShortAddress", DataType::UINT16));
-    tunneling_stop.push(Parameter::new("gppGpdLink", DataType::BITMAP8));
-    cluster =
-        cluster.with_command(Command::new("tunnelingStop", 0x03).with_parameters(tunneling_stop));
-
-    let mut commissioning_notification = source_parameters(DataType::BITMAP16);
-    commissioning_notification.push(Parameter::new("frameCounter", DataType::UINT32));
-    commissioning_notification.push(Parameter::new("commandID", DataType::UINT8));
-    commissioning_notification.push(Parameter::new("payloadSize", DataType::UINT8));
-    commissioning_notification.push(
-        Parameter::new("commandFrame", DataType::UNKNOWN)
-            .with_buffalo_type(BuffaloZclDataType::GPD_FRAME)
-            .with_conditions(vec![mask_not(0x30), mask_not(0x200)]),
-    );
-    commissioning_notification
-        .push(Parameter::new("gppNwkAddr", DataType::UINT16).with_conditions(vec![mask(0x800)]));
-    commissioning_notification
-        .push(Parameter::new("gppGpdLink", DataType::BITMAP8).with_conditions(vec![mask(0x800)]));
-    commissioning_notification
-        .push(Parameter::new("mic", DataType::UINT32).with_conditions(vec![mask(0x200)]));
-    cluster = cluster.with_command(
-        Command::new("commissioningNotification", 0x04).with_parameters(commissioning_notification),
-    );
-
-    let mut translation_table_update = source_parameters(DataType::BITMAP16);
-    translation_table_update.push(Parameter::new("reserved", DataType::UINT8));
-    cluster = cluster.with_command(
-        Command::new("translationTableUpdate", 0x07).with_parameters(translation_table_update),
-    );
-
-    cluster = cluster.with_command(
-        Command::new("translationTableReq", 0x08)
-            .with_parameters(vec![Parameter::new("startIndex", DataType::UINT8)])
-            .with_response(0x08),
-    );
-
-    let mut sink_table_req = source_parameters(DataType::BITMAP8);
-    sink_table_req.push(Parameter::new("index", DataType::UINT8));
-    cluster = cluster.with_command(
-        Command::new("sinkTableReq", 0x0a)
-            .with_parameters(sink_table_req)
-            .with_response(0x0a),
-    );
-
-    let mut notification_response = source_parameters(DataType::BITMAP8);
-    notification_response.push(Parameter::new("gpdSecurityFrameCounter", DataType::UINT32));
-    cluster = cluster.with_command_response(
-        Command::new("notificationResponse", 0x00).with_parameters(notification_response),
-    );
-
-    let mut pairing = source_parameters(DataType::BITMAP24);
-    pairing.push(
-        Parameter::new("sinkIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![sink(0b110)]),
-    );
-    pairing.push(
-        Parameter::new("sinkIEEEAddr", DataType::IEEE_ADDR).with_conditions(vec![sink(0b000)]),
-    );
-    pairing
-        .push(Parameter::new("sinkNwkAddr", DataType::UINT16).with_conditions(vec![sink(0b110)]));
-    pairing
-        .push(Parameter::new("sinkNwkAddr", DataType::UINT16).with_conditions(vec![sink(0b000)]));
-    pairing
-        .push(Parameter::new("sinkGroupID", DataType::UINT16).with_conditions(vec![sink(0b100)]));
-    pairing
-        .push(Parameter::new("sinkGroupID", DataType::UINT16).with_conditions(vec![sink(0b010)]));
-    pairing.push(Parameter::new("deviceID", DataType::UINT8).with_conditions(vec![mask(0x0008)]));
-    pairing
-        .push(Parameter::new("frameCounter", DataType::UINT32).with_conditions(vec![mask(0x4000)]));
-    pairing.push(Parameter::new("gpdKey", DataType::SEC_KEY).with_conditions(vec![mask(0x8000)]));
-    pairing.push(
-        Parameter::new("assignedAlias", DataType::UINT16).with_conditions(vec![mask(0x10000)]),
-    );
-    pairing.push(
-        Parameter::new("groupcastRadius", DataType::UINT8).with_conditions(vec![mask(0x20000)]),
-    );
-    cluster = cluster.with_command_response(Command::new("pairing", 0x01).with_parameters(pairing));
-
-    cluster = cluster.with_command_response(
-        Command::new("commisioningMode", 0x02).with_parameters(vec![
-            Parameter::new("options", DataType::BITMAP8),
-            Parameter::new("commisioningWindow", DataType::UINT16).with_conditions(vec![mask(0x2)]),
-            Parameter::new("channel", DataType::UINT8).with_conditions(vec![mask(0x10)]),
-        ]),
-    );
-
-    let mut response = source_parameters(DataType::UINT8);
-    response.insert(1, Parameter::new("tempMaster", DataType::UINT16));
-    response.insert(2, Parameter::new("tempMasterTx", DataType::BITMAP8));
-    response.push(Parameter::new("gpdCmd", DataType::UINT8));
-    response.push(
-        Parameter::new("gpdPayload", DataType::UNKNOWN)
-            .with_buffalo_type(BuffaloZclDataType::GPD_FRAME),
-    );
-    cluster =
-        cluster.with_command_response(Command::new("response", 0x06).with_parameters(response));
-
-    cluster = cluster.with_command_response(
-        Command::new("translationTableRsp", 0x08).with_parameters(vec![
-            Parameter::new("status", DataType::ENUM8),
-            Parameter::new("options", DataType::BITMAP8),
-            Parameter::new("totalNumberEntries", DataType::UINT8),
-            Parameter::new("startIndex", DataType::UINT8),
-            Parameter::new("entriesCount", DataType::UINT8),
-        ]),
-    );
-
     cluster
 }
 
-fn builtin_cluster_by_name(name: &str) -> Option<Cluster> {
-    match name {
-        "genBasic" => {
-            let mut cluster = Cluster::new("genBasic", 0x0000);
-            for attribute in gen_basic_attributes() {
-                cluster = cluster.with_attribute(attribute);
-            }
-            Some(cluster.with_command(Command::new("resetFactDefault", 0x00)))
-        }
-        "genDeviceTempCfg" => Some(Cluster::new("genDeviceTempCfg", 0x0002).with_attribute(
-            Attribute {
-                min: Some(-200.0),
-                max: Some(200.0),
-                ..Attribute::new("currentTemperature", 0x0000, DataType::INT16)
-            },
-        )),
-        "genIdentify" => Some(
-            Cluster::new("genIdentify", 0x0003).with_command_response(
-                Command::new("identifyQueryRsp", 0x00)
-                    .with_parameters(vec![Parameter::new("timeout", DataType::UINT16)]),
-            ),
-        ),
-        "genOnOff" => Some(
-            Cluster::new("genOnOff", 0x0006)
-                .with_attribute(
-                    Attribute {
-                        default: Some(ZclValue::num(0)),
-                        ..Attribute::new("onOff", 0x0000, DataType::BOOLEAN)
-                    }
-                    .writable(),
-                )
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(1)),
-                    ..Attribute::new("globalSceneCtrl", 0x4000, DataType::BOOLEAN)
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xffff.into()),
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("onTime", 0x4001, DataType::UINT16).writable()
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xffff.into()),
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("offWaitTime", 0x4002, DataType::UINT16).writable()
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xff.into()),
-                    special: vec![ZclValue::num(255)],
-                    ..Attribute::new("startUpOnOff", 0x4003, DataType::ENUM8).writable()
-                })
-                .with_command(Command::new("off", 0x00))
-                .with_command(Command::new("on", 0x01))
-                .with_command(Command::new("toggle", 0x02)),
-        ),
-        "genScenes" => Some(
-            Cluster::new("genScenes", 0x0005)
-                .with_attribute(Attribute {
-                    special: vec![ZclValue::text("0xffffffffffffffff")],
-                    ..Attribute::new("lastCfgBy", 0x0005, DataType::IEEE_ADDR)
-                })
-                .with_command_response(
-                    Command::new("getSceneMembershipRsp", 0x06).with_parameters(vec![
-                        Parameter::new("status", DataType::ENUM8),
-                        Parameter {
-                            min: Some(0.0),
-                            max: Some(255.0),
-                            special: vec![ZclValue::num(254), ZclValue::num(255)],
-                            ..Parameter::new("capacity", DataType::UINT8)
-                        },
-                    ]),
-                ),
-        ),
-        "genLevelCtrl" => Some(
-            Cluster::new("genLevelCtrl", 0x0008)
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(255)),
-                    ..Attribute::new("currentLevel", 0x0000, DataType::UINT8)
-                })
-                .with_attribute(
-                    Attribute::new("options", 0x000f, DataType::BITMAP8)
-                        .writable()
-                        .with_default(0),
-                )
-                .with_command(
-                    Command::new("moveToLevelWithOnOff", 0x04).with_parameters(vec![
-                        Parameter::new("level", DataType::UINT8),
-                        Parameter::new("transtime", DataType::UINT16),
-                        Parameter::new("optionsMask", DataType::BITMAP8).with_conditions(vec![
-                            ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(2),
-                        ]),
-                        Parameter::new("optionsOverride", DataType::BITMAP8).with_conditions(vec![
-                            ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(2),
-                        ]),
-                    ]),
-                ),
-        ),
-        "genAlarms" => Some(
-            Cluster::new("genAlarms", 0x0009)
-                .with_attribute(Attribute {
-                    max: Some(65535.0),
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("alarmCount", 0x0000, DataType::UINT16)
-                })
-                .with_command(Command::new("reset", 0x00).with_parameters(vec![
-                    Parameter::new("alarmcode", DataType::ENUM8),
-                    Parameter::new("clusterid", DataType::UINT16),
-                ]))
-                .with_command(Command::new("resetAll", 0x01))
-                .with_command(Command::new("getAlarm", 0x02))
-                .with_command(Command::new("resetLog", 0x03))
-                .with_command_response(Command::new("alarm", 0x00).with_parameters(vec![
-                    Parameter::new("alarmcode", DataType::ENUM8),
-                    Parameter::new("clusterid", DataType::CLUSTER_ID),
-                ]))
-                .with_command_response(Command::new("getRsp", 0x01).with_parameters(vec![
-                    Parameter::new("status", DataType::ENUM8),
-                    Parameter::new("alarmcode", DataType::ENUM8),
-                ])),
-        ),
-        "genRssiLocation" => Some(
-            Cluster::new("genRssiLocation", 0x000b)
-                .with_attribute(
-                    Attribute {
-                        min: Some(-32768.0),
-                        max: Some(32767.0),
-                        ..Attribute::new("coordinate1", 0x0010, DataType::INT16)
-                    }
-                    .writable(),
-                )
-                .with_attribute(
-                    Attribute::new("pathLossExponent", 0x0014, DataType::UINT16).writable(),
-                )
-                .with_command(Command::new("setAbsolute", 0x00).with_parameters(vec![
-                    Parameter::new("coordinate1", DataType::INT16),
-                    Parameter::new("coordinate2", DataType::INT16),
-                    Parameter::new("coordinate3", DataType::INT16),
-                    Parameter::new("power", DataType::INT16),
-                    Parameter::new("pathLossExponent", DataType::UINT16),
-                ]))
-                .with_command_response(
-                    Command::new("locationDataNotification", 0x02).with_parameters(vec![
-                        Parameter::new("type", DataType::DATA8),
-                        Parameter::new("coordinate1", DataType::INT16),
-                        Parameter::new("coordinate2", DataType::INT16),
-                        Parameter::new("coordinate3", DataType::INT16),
-                        Parameter::new("power", DataType::INT16),
-                        Parameter::new("pathLossExponent", DataType::UINT16),
-                    ]),
-                ),
-        ),
-        "lightingColorCtrl" => Some(Cluster::new("lightingColorCtrl", 0x0300).with_attribute(
-            Attribute {
-                max: Some(0xfeff as f64),
-                special: vec![ZclValue::num(65535)],
-                ..Attribute::new("startUpColorTemperature", 0x4010, DataType::UINT16).writable()
-            },
-        )),
-        "haDiagnostic" => Some(Cluster::new("haDiagnostic", 0x0b05)),
-        "manuSpecificAmazonWWAH" => Some(Cluster {
-            manufacturerCode: Some(manufacturer_code::AMAZON_LAB126),
-            ..Cluster::new("manuSpecificAmazonWWAH", 0xfc57)
-        }),
-        "genGroups" => Some(
-            Cluster::new("genGroups", 0x0004)
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("nameSupport", 0x0000, DataType::BITMAP8)
-                })
-                .with_command(
-                    Command::new("add", 0x00)
-                        .with_response(0x00)
-                        .with_parameters(vec![
-                            Parameter::new("groupid", DataType::UINT16),
-                            Parameter::new("groupname", DataType::CHAR_STR),
-                        ]),
-                )
-                .with_command(
-                    Command::new("view", 0x01)
-                        .with_response(0x01)
-                        .with_parameters(vec![Parameter::new("groupid", DataType::UINT16)]),
-                )
-                .with_command(
-                    Command::new("getMembership", 0x02)
-                        .with_response(2)
-                        .with_parameters(vec![
-                            Parameter::new("groupcount", DataType::UINT8),
-                            Parameter::new("grouplist", DataType::UNKNOWN),
-                        ]),
-                )
-                .with_command(
-                    Command::new("remove", 0x03)
-                        .with_response(0x03)
-                        .with_parameters(vec![Parameter::new("groupid", DataType::UINT16)]),
-                )
-                .with_command(Command::new("removeAll", 0x04))
-                .with_command(Command::new("addIfIdentifying", 0x05).with_parameters(vec![
-                    Parameter::new("groupid", DataType::UINT16),
-                    Parameter::new("groupname", DataType::CHAR_STR),
-                ]))
-                .with_command_response(Command::new("addRsp", 0x00).with_parameters(vec![
-                    Parameter::new("status", DataType::ENUM8),
-                    Parameter::new("groupid", DataType::UINT16),
-                ]))
-                .with_command_response(Command::new("viewRsp", 0x01).with_parameters(vec![
-                    Parameter::new("status", DataType::ENUM8),
-                    Parameter::new("groupid", DataType::UINT16),
-                    Parameter::new("groupname", DataType::CHAR_STR),
-                ]))
-                .with_command_response(Command::new("getMembershipRsp", 0x02).with_parameters(
-                    vec![
-                        Parameter::new("capacity", DataType::UINT8),
-                        Parameter::new("groupcount", DataType::UINT8),
-                        Parameter::new("grouplist", DataType::UNKNOWN),
-                    ],
-                ))
-                .with_command_response(Command::new("removeRsp", 0x03).with_parameters(vec![
-                    Parameter::new("status", DataType::ENUM8),
-                    Parameter::new("groupid", DataType::UINT16),
-                ])),
-        ),
-        "genTime" => Some(
-            Cluster::new("genTime", 0x000a)
-                .with_attribute(Attribute {
-                    max: Some(0xfffffffeu32 as f64),
-                    default: Some(ZclValue::num(0xffffffffu32)),
-                    ..Attribute::new("time", 0x0000, DataType::UTC).writable()
-                })
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("timeStatus", 0x0001, DataType::BITMAP8).writable()
-                })
-                .with_attribute(Attribute {
-                    min: Some(-86400.0),
-                    max: Some(86400.0),
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("timeZone", 0x0002, DataType::INT32).writable()
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xfffffffeu32 as f64),
-                    default: Some(ZclValue::num(0xffffffffu32)),
-                    ..Attribute::new("dstStart", 0x0003, DataType::UINT32).writable()
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xfffffffeu32 as f64),
-                    default: Some(ZclValue::num(0xffffffffu32)),
-                    ..Attribute::new("dstEnd", 0x0004, DataType::UINT32).writable()
-                })
-                .with_attribute(Attribute {
-                    min: Some(-86400.0),
-                    max: Some(86400.0),
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("dstShift", 0x0005, DataType::INT32).writable()
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xfffffffeu32 as f64),
-                    default: Some(ZclValue::num(0xffffffffu32)),
-                    ..Attribute::new("standardTime", 0x0006, DataType::UINT32)
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xfffffffeu32 as f64),
-                    default: Some(ZclValue::num(0xffffffffu32)),
-                    ..Attribute::new("localTime", 0x0007, DataType::UINT32)
-                })
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0xffffffffu32)),
-                    ..Attribute::new("lastSetTime", 0x0008, DataType::UTC)
-                })
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0xffffffffu32)),
-                    ..Attribute::new("validUntilTime", 0x0009, DataType::UTC).writable()
-                }),
-        ),
-        "ssIasZone" => Some(
-            Cluster::new("ssIasZone", 0x0500)
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("zoneState", 0x0000, DataType::ENUM8)
-                })
-                .with_attribute(Attribute::new("zoneType", 0x0001, DataType::ENUM16))
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("zoneStatus", 0x0002, DataType::BITMAP16)
-                })
-                .with_attribute(
-                    Attribute::new("iasCieAddr", 0x0010, DataType::IEEE_ADDR).writable(),
-                )
-                .with_attribute(Attribute {
-                    max: Some(0xff.into()),
-                    default: Some(ZclValue::num(0xff)),
-                    ..Attribute::new("zoneId", 0x0011, DataType::UINT8)
-                })
-                .with_attribute(Attribute {
-                    min: Some(2.0),
-                    max: Some(0xff.into()),
-                    default: Some(ZclValue::num(2)),
-                    ..Attribute::new("numZoneSensitivityLevelsSupported", 0x0012, DataType::UINT8)
-                })
-                .with_attribute(Attribute {
-                    max: Some(0xff.into()),
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("currentZoneSensitivityLevel", 0x0013, DataType::UINT8)
-                        .writable()
-                })
-                .with_command(Command::new("enrollRsp", 0x00).with_parameters(vec![
-                    Parameter::new("enrollrspcode", DataType::ENUM8),
-                    Parameter::new("zoneid", DataType::UINT8),
-                ]))
-                .with_command(Command::new("initNormalOpMode", 0x01))
-                .with_command(Command::new("initTestMode", 0x02).with_parameters(vec![
-                    Parameter::new("testModeDuration", DataType::UINT8),
-                    Parameter::new("currentZoneSensitivityLevel", DataType::UINT8),
-                ]))
-                .with_command_response(
-                    Command::new("statusChangeNotification", 0x00).with_parameters(vec![
-                        Parameter::new("zonestatus", DataType::BITMAP16),
-                        Parameter::new("extendedstatus", DataType::BITMAP8),
-                        Parameter::new("zoneID", DataType::UINT8),
-                        Parameter::new("delay", DataType::UINT16),
-                    ]),
-                )
-                .with_command_response(Command::new("enrollReq", 0x01).with_parameters(vec![
-                    Parameter::new("zonetype", DataType::ENUM16),
-                    Parameter::new("manucode", DataType::UINT16),
-                ])),
-        ),
-        "genPollCtrl" => Some(
-            Cluster::new("genPollCtrl", 0x0020)
-                .with_attribute(Attribute {
-                    max: Some(7208960.0),
-                    default: Some(ZclValue::num(14400)),
-                    ..Attribute::new("checkinInterval", 0x0000, DataType::UINT32).writable()
-                })
-                .with_attribute(Attribute {
-                    min: Some(4.0),
-                    max: Some(7208960.0),
-                    default: Some(ZclValue::num(20)),
-                    ..Attribute::new("longPollInterval", 0x0001, DataType::UINT32)
-                })
-                .with_attribute(Attribute {
-                    min: Some(1.0),
-                    max: Some(0xffff.into()),
-                    default: Some(ZclValue::num(2)),
-                    ..Attribute::new("shortPollInterval", 0x0002, DataType::UINT16)
-                })
-                .with_attribute(Attribute {
-                    min: Some(1.0),
-                    max: Some(0xffff.into()),
-                    default: Some(ZclValue::num(40)),
-                    ..Attribute::new("fastPollTimeout", 0x0003, DataType::UINT16).writable()
-                })
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("checkinIntervalMin", 0x0004, DataType::UINT32)
-                })
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("longPollIntervalMin", 0x0005, DataType::UINT32)
-                })
-                .with_attribute(Attribute {
-                    default: Some(ZclValue::num(0)),
-                    ..Attribute::new("fastPollTimeoutMax", 0x0006, DataType::UINT16)
-                })
-                .with_command(Command::new("checkinRsp", 0x00).with_parameters(vec![
-                    Parameter::new("startFastPolling", DataType::BOOLEAN),
-                    Parameter::new("fastPollTimeout", DataType::UINT16),
-                ]))
-                .with_command(Command::new("fastPollStop", 0x01))
-                .with_command(
-                    Command::new("setLongPollInterval", 0x02).with_parameters(vec![
-                        Parameter::new("newLongPollInterval", DataType::UINT32),
-                    ]),
-                )
-                .with_command(
-                    Command::new("setShortPollInterval", 0x03).with_parameters(vec![
-                        Parameter::new("newShortPollInterval", DataType::UINT16),
-                    ]),
-                )
-                .with_command_response(Command::new("checkin", 0x00)),
-        ),
-        "greenPower" => Some(green_power_cluster()),
-        "genOta" => Some(
-            Cluster::new("genOta", 0x0019)
-                .with_attribute(Attribute::new(
-                    "upgradeServerID",
-                    0x0000,
-                    DataType::IEEE_ADDR,
-                ))
-                .with_attribute(Attribute::new("fileOffset", 0x0001, DataType::UINT32))
-                .with_attribute(Attribute::new(
-                    "currentFileVersion",
-                    0x0002,
-                    DataType::UINT32,
-                ))
-                .with_attribute(Attribute::new(
-                    "currentZigbeeStackVersion",
-                    0x0003,
-                    DataType::UINT16,
-                ))
-                .with_attribute(Attribute::new(
-                    "downloadedFileVersion",
-                    0x0004,
-                    DataType::UINT32,
-                ))
-                .with_attribute(Attribute::new(
-                    "downloadedZigbeeStackVersion",
-                    0x0005,
-                    DataType::UINT16,
-                ))
-                .with_attribute(Attribute::new(
-                    "imageUpgradeStatus",
-                    0x0006,
-                    DataType::ENUM8,
-                ))
-                .with_attribute(Attribute::new("manufacturerId", 0x0007, DataType::UINT16))
-                .with_attribute(Attribute::new("imageTypeId", 0x0008, DataType::UINT16))
-                .with_attribute(Attribute::new(
-                    "minimumBlockPeriod",
-                    0x0009,
-                    DataType::UINT16,
-                ))
-                .with_attribute(Attribute::new("imageStamp", 0x000a, DataType::UINT32))
-                .with_command(
-                    Command::new("queryNextImageRequest", 0x01).with_parameters(vec![
-                        Parameter::new("fieldControl", DataType::BITMAP8),
-                        Parameter::new("manufacturerCode", DataType::UINT16),
-                        Parameter::new("imageType", DataType::UINT16),
-                        Parameter::new("fileVersion", DataType::UINT32),
-                    ]),
-                )
-                .with_command(
-                    Command::new("imageBlockRequest", 0x03).with_parameters(vec![
-                        Parameter::new("fieldControl", DataType::BITMAP8),
-                        Parameter::new("manufacturerCode", DataType::UINT16),
-                        Parameter::new("imageType", DataType::UINT16),
-                        Parameter::new("fileVersion", DataType::UINT32),
-                        Parameter::new("fileOffset", DataType::UINT32),
-                        Parameter::new("maximumDataSize", DataType::UINT8),
-                        Parameter::new("minimumBlockPeriod", DataType::UINT16),
-                    ]),
-                )
-                .with_command(Command::new("imagePageRequest", 0x04).with_parameters(vec![
-                    Parameter::new("fieldControl", DataType::BITMAP8),
-                    Parameter::new("manufacturerCode", DataType::UINT16),
-                    Parameter::new("imageType", DataType::UINT16),
-                    Parameter::new("fileVersion", DataType::UINT32),
-                    Parameter::new("fileOffset", DataType::UINT32),
-                    Parameter::new("maximumDataSize", DataType::UINT8),
-                    Parameter::new("pageSize", DataType::UINT16),
-                    Parameter::new("responseSpacing", DataType::UINT16),
-                ]))
-                .with_command(
-                    Command::new("upgradeEndRequest", 0x06).with_parameters(vec![
-                        Parameter::new("status", DataType::ENUM8),
-                        Parameter::new("manufacturerCode", DataType::UINT16),
-                        Parameter::new("imageType", DataType::UINT16),
-                        Parameter::new("fileVersion", DataType::UINT32),
-                    ]),
-                )
-                .with_command_response(Command::new("imageNotify", 0x00).with_parameters(vec![
-                    Parameter::new("payloadType", DataType::ENUM8),
-                    Parameter::new("queryJitter", DataType::UINT8),
-                    Parameter::new("manufacturerCode", DataType::UINT16),
-                    Parameter::new("imageType", DataType::UINT16),
-                    Parameter::new("fileVersion", DataType::UINT32),
-                ]))
-                .with_command_response(
-                    Command::new("queryNextImageResponse", 0x02).with_parameters(vec![
-                        Parameter::new("status", DataType::ENUM8),
-                        Parameter::new("manufacturerCode", DataType::UINT16).with_conditions(vec![
-                            ParameterCondition::FIELD_EQUAL {
-                                field: "status".to_string(),
-                                value: 0,
-                                reversed: false,
-                            },
-                        ]),
-                        Parameter {
-                            max: Some(65471.0),
-                            ..Parameter::new("imageType", DataType::UINT16).with_conditions(vec![
-                                ParameterCondition::FIELD_EQUAL {
-                                    field: "status".to_string(),
-                                    value: 0,
-                                    reversed: false,
-                                },
-                            ])
-                        },
-                        Parameter::new("fileVersion", DataType::UINT32).with_conditions(vec![
-                            ParameterCondition::FIELD_EQUAL {
-                                field: "status".to_string(),
-                                value: 0,
-                                reversed: false,
-                            },
-                        ]),
-                        Parameter::new("imageSize", DataType::UINT32).with_conditions(vec![
-                            ParameterCondition::FIELD_EQUAL {
-                                field: "status".to_string(),
-                                value: 0,
-                                reversed: false,
-                            },
-                        ]),
-                    ]),
-                )
-                .with_command_response(Command::new("imageBlockResponse", 0x05).with_parameters(
-                    vec![
-                        Parameter::new("status", DataType::ENUM8),
-                        Parameter::new("manufacturerCode", DataType::UINT16),
-                        Parameter::new("imageType", DataType::UINT16),
-                        Parameter::new("fileVersion", DataType::UINT32),
-                        Parameter::new("fileOffset", DataType::UINT32),
-                        Parameter::new("dataSize", DataType::UINT8),
-                        Parameter::new("imageData", DataType::UNKNOWN),
-                    ],
-                ))
-                .with_command_response(Command::new("upgradeEndResponse", 0x07).with_parameters(
-                    vec![
-                        Parameter::new("manufacturerCode", DataType::UINT16),
-                        Parameter::new("imageType", DataType::UINT16),
-                        Parameter::new("fileVersion", DataType::UINT32),
-                        Parameter::new("currentTime", DataType::UTC),
-                        Parameter::new("upgradeTime", DataType::UTC),
-                    ],
-                )),
-        ),
-        "touchlink" => Some(
-            Cluster::new("touchlink", 0x1000)
-                .with_command(
-                    Command::new("scanRequest", 0x00)
-                        .with_response(0x01)
-                        .with_parameters(vec![
-                            Parameter::new("transactionID", DataType::UINT32),
-                            Parameter::new("zigbeeInformation", DataType::BITMAP8),
-                            Parameter::new("touchlinkInformation", DataType::BITMAP8),
-                        ]),
-                )
-                .with_command(
-                    Command::new("deviceInformation", 0x02)
-                        .with_response(0x03)
-                        .with_parameters(vec![
-                            Parameter::new("transactionID", DataType::UINT32),
-                            Parameter::new("startIndex", DataType::UINT8),
-                        ]),
-                )
-                .with_command(Command::new("identifyRequest", 0x06).with_parameters(vec![
-                    Parameter::new("transactionID", DataType::UINT32),
-                    Parameter::new("duration", DataType::UINT16),
-                ]))
-                .with_command(
-                    Command::new("resetToFactoryNew", 0x07)
-                        .with_parameters(vec![Parameter::new("transactionID", DataType::UINT32)]),
-                )
-                .with_command_response(Command::new("scanResponse", 0x01).with_parameters(vec![
-                    Parameter::new("transactionID", DataType::UINT32),
-                    Parameter::new("rssiCorrection", DataType::UINT8),
-                    Parameter::new("zigbeeInformation", DataType::BITMAP8),
-                    Parameter::new("touchlinkInformation", DataType::BITMAP8),
-                    Parameter::new("keyBitmask", DataType::BITMAP16),
-                    Parameter::new("responseID", DataType::UINT32),
-                    Parameter::new("extendedPanID", DataType::IEEE_ADDR),
-                    Parameter::new("networkUpdateID", DataType::UINT8),
-                    Parameter::new("logicalChannel", DataType::UINT8),
-                    Parameter::new("panID", DataType::UINT16),
-                    Parameter::new("networkAddress", DataType::UINT16),
-                    Parameter::new("numberOfSubDevices", DataType::UINT8),
-                    Parameter::new("totalGroupIdentifiers", DataType::UINT8),
-                    Parameter::new("endpointID", DataType::UINT8).with_conditions(vec![
-                        ParameterCondition::FIELD_EQUAL {
-                            field: "numberOfSubDevices".to_string(),
-                            value: 1,
-                            reversed: false,
-                        },
-                    ]),
-                    Parameter::new("profileID", DataType::UINT16).with_conditions(vec![
-                        ParameterCondition::FIELD_EQUAL {
-                            field: "numberOfSubDevices".to_string(),
-                            value: 1,
-                            reversed: false,
-                        },
-                    ]),
-                    Parameter::new("deviceID", DataType::UINT16).with_conditions(vec![
-                        ParameterCondition::FIELD_EQUAL {
-                            field: "numberOfSubDevices".to_string(),
-                            value: 1,
-                            reversed: false,
-                        },
-                    ]),
-                    Parameter::new("version", DataType::UINT8).with_conditions(vec![
-                        ParameterCondition::FIELD_EQUAL {
-                            field: "numberOfSubDevices".to_string(),
-                            value: 1,
-                            reversed: false,
-                        },
-                    ]),
-                    Parameter::new("groupIDCount", DataType::UINT8).with_conditions(vec![
-                        ParameterCondition::FIELD_EQUAL {
-                            field: "numberOfSubDevices".to_string(),
-                            value: 1,
-                            reversed: false,
-                        },
-                    ]),
-                ])),
-        ),
-        _ => None,
+fn parse_attribute(name: &str, value: &serde_json::Value) -> Attribute {
+    let (data_type, _) = parse_parameter_type(value.get("type"));
+    let mut attribute = Attribute::new(name, value["ID"].as_u64().unwrap_or(0) as u16, data_type);
+    attribute.write = value
+        .get("write")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    attribute.read = value
+        .get("read")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true);
+    attribute.required = value
+        .get("required")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    attribute.default = value.get("default").map(ZclValue::from_json);
+    attribute.min = value.get("min").and_then(serde_json::Value::as_f64);
+    attribute.max = value.get("max").and_then(serde_json::Value::as_f64);
+    attribute.minExcl = value.get("minExcl").and_then(serde_json::Value::as_f64);
+    attribute.maxExcl = value.get("maxExcl").and_then(serde_json::Value::as_f64);
+    attribute.length = value
+        .get("length")
+        .and_then(serde_json::Value::as_u64)
+        .map(|length| length as usize);
+    attribute.minLen = value
+        .get("minLen")
+        .and_then(serde_json::Value::as_u64)
+        .map(|length| length as usize);
+    attribute.maxLen = value
+        .get("maxLen")
+        .and_then(serde_json::Value::as_u64)
+        .map(|length| length as usize);
+    attribute.special = parse_special(value.get("special"));
+    attribute
+}
+
+fn parse_command(name: &str, value: &serde_json::Value) -> Command {
+    let mut command = Command::new(name, value["ID"].as_u64().unwrap_or(0) as u8);
+    command.response = value
+        .get("response")
+        .and_then(serde_json::Value::as_u64)
+        .map(|response| response as u8);
+    command.required = value
+        .get("required")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    if let Some(parameters) = value.get("parameters").and_then(|v| v.as_array()) {
+        command.parameters = parameters.iter().map(parse_parameter).collect();
+    }
+    command
+}
+
+fn parse_parameter(value: &serde_json::Value) -> Parameter {
+    let name = value["name"].as_str().unwrap_or_default();
+    let (data_type, buffalo_type) = parse_parameter_type(value.get("type"));
+    let mut parameter = Parameter::new(name, data_type);
+    parameter.buffalo_type = buffalo_type;
+    parameter.min = value.get("min").and_then(serde_json::Value::as_f64);
+    parameter.max = value.get("max").and_then(serde_json::Value::as_f64);
+    parameter.minExcl = value.get("minExcl").and_then(serde_json::Value::as_f64);
+    parameter.maxExcl = value.get("maxExcl").and_then(serde_json::Value::as_f64);
+    parameter.length = value
+        .get("length")
+        .and_then(serde_json::Value::as_u64)
+        .map(|length| length as usize);
+    parameter.minLen = value
+        .get("minLen")
+        .and_then(serde_json::Value::as_u64)
+        .map(|length| length as usize);
+    parameter.maxLen = value
+        .get("maxLen")
+        .and_then(serde_json::Value::as_u64)
+        .map(|length| length as usize);
+    parameter.special = parse_special(value.get("special"));
+    if let Some(conditions) = value.get("conditions").and_then(|v| v.as_array()) {
+        parameter.conditions = conditions.iter().filter_map(parse_condition).collect();
+    }
+    parameter
+}
+
+fn parse_parameter_type(
+    value: Option<&serde_json::Value>,
+) -> (DataType, Option<BuffaloZclDataType>) {
+    let code = value
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(DataType::UNKNOWN as u64) as u32;
+    if let Some(buffalo_type) = buffalo_type_from_u32(code) {
+        (DataType::UNKNOWN, Some(buffalo_type))
+    } else {
+        (
+            DataType::from_u8(code as u8).unwrap_or(DataType::UNKNOWN),
+            None,
+        )
     }
 }
 
-impl Attribute {
-    fn with_default(mut self, value: i32) -> Self {
-        self.default = Some(ZclValue::num(value));
-        self
-    }
+fn buffalo_type_from_u32(value: u32) -> Option<BuffaloZclDataType> {
+    Some(match value {
+        1000 => BuffaloZclDataType::USE_DATA_TYPE,
+        1001 => BuffaloZclDataType::LIST_UINT8,
+        1002 => BuffaloZclDataType::LIST_UINT16,
+        1003 => BuffaloZclDataType::LIST_UINT24,
+        1004 => BuffaloZclDataType::LIST_UINT32,
+        1005 => BuffaloZclDataType::LIST_ZONEINFO,
+        1006 => BuffaloZclDataType::EXTENSION_FIELD_SETS,
+        1007 => BuffaloZclDataType::LIST_THERMO_TRANSITIONS,
+        1008 => BuffaloZclDataType::BUFFER,
+        1009 => BuffaloZclDataType::GPD_FRAME,
+        1010 => BuffaloZclDataType::STRUCTURED_SELECTOR,
+        1011 => BuffaloZclDataType::LIST_TUYA_DATAPOINT_VALUES,
+        1012 => BuffaloZclDataType::LIST_MIBOXER_ZONES,
+        1013 => BuffaloZclDataType::BIG_ENDIAN_UINT24,
+        1014 => BuffaloZclDataType::MI_STRUCT,
+        _ => return None,
+    })
+}
+
+fn parse_special(value: Option<&serde_json::Value>) -> Vec<ZclValue> {
+    value
+        .and_then(|value| value.as_object())
+        .map(|object| {
+            object
+                .keys()
+                .map(|key| {
+                    if let Some(hex) = key.strip_prefix("0x") {
+                        if hex.len() > 10 {
+                            return ZclValue::Text(key.clone());
+                        }
+                        if let Ok(number) = u64::from_str_radix(hex, 16) {
+                            return ZclValue::Number(number as f64);
+                        }
+                    }
+                    if let Ok(number) = key.parse::<f64>() {
+                        ZclValue::Number(number)
+                    } else {
+                        ZclValue::Text(key.clone())
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn parse_condition(value: &serde_json::Value) -> Option<ParameterCondition> {
+    Some(match value["type"].as_str()? {
+        "minimumRemainingBufferBytes" => ParameterCondition::MINIMUM_REMAINING_BUFFER_BYTES(
+            value["value"].as_u64().unwrap_or(0) as u32,
+        ),
+        "bitMaskSet" => ParameterCondition::BITMASK_SET {
+            field: value["param"].as_str().unwrap_or_default().to_string(),
+            value: value["mask"].as_u64().unwrap_or(0) as u32,
+            reversed: value
+                .get("reversed")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+        },
+        "bitFieldEnum" => ParameterCondition::BITFIELD_ENUM {
+            field: value["param"].as_str().unwrap_or_default().to_string(),
+            offset: value["offset"].as_u64().unwrap_or(0) as u8,
+            size: value["size"].as_u64().unwrap_or(0) as u8,
+            value: value["value"].as_u64().unwrap_or(0) as u32,
+        },
+        "fieldEquals" => ParameterCondition::FIELD_EQUAL {
+            field: value["field"].as_str().unwrap_or_default().to_string(),
+            value: value["value"].as_u64().unwrap_or(0) as u32,
+            reversed: value
+                .get("reversed")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+        },
+        "fieldGT" => ParameterCondition::FIELD_GT {
+            field: value["field"].as_str().unwrap_or_default().to_string(),
+            value: value["value"].as_u64().unwrap_or(0) as u32,
+        },
+        _ => return None,
+    })
 }

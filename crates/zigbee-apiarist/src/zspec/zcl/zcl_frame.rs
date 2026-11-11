@@ -100,6 +100,8 @@ pub fn try_from_buffer(
 
         if message == "INVALID_FIELD" {
             FrameParseError::Status(0x85)
+        } else if message == "UNSUPPORTED_CLUSTER" {
+            FrameParseError::Status(0xc3)
         } else if message.starts_with("Command ")
             || message.starts_with("Global command does not exist")
         {
@@ -210,6 +212,13 @@ impl Frame {
             panic!("Unsupported frameType '{frame_type}'");
         };
         let cluster = Utils::get_cluster(cluster_id, None, custom_clusters);
+        if cluster.name == cluster_id.to_string()
+            && cluster.commands.is_empty()
+            && cluster.commandsResponse.is_empty()
+            && cluster.attributes.is_empty()
+        {
+            panic!("UNSUPPORTED_CLUSTER");
+        }
         let server_to_client = header.frame_control.direction == Direction::SERVER_TO_CLIENT;
         let (command, payload) = if header.frame_control.frame_type == FrameType::SPECIFIC {
             let command = resolve_command(
@@ -324,6 +333,10 @@ impl Frame {
                         equal
                     }
                 }
+                ParameterCondition::FIELD_GT { field, value } => payload
+                    .get(field.as_str())
+                    .and_then(Value::as_u64)
+                    .is_some_and(|actual| actual > u64::from(*value)),
             })
     }
 }
@@ -1220,6 +1233,10 @@ fn parameter_to_string(parameter: &Parameter) -> String {
                         )
                     }
                 }
+                ParameterCondition::FIELD_GT { field, value } => format!(
+                    "{{\"type\":\"fieldGT\",\"field\":{},\"value\":{value}}}",
+                    json_string(&json!(field))
+                ),
             });
         }
         text.push(']');
@@ -1378,6 +1395,9 @@ fn parameter_to_json(parameter: &Parameter) -> Value {
                                     "value": value,
                                 })
                             }
+                        }
+                        ParameterCondition::FIELD_GT { field, value } => {
+                            json!({"type": "fieldGT", "field": field, "value": value})
                         }
                     })
                     .collect(),

@@ -22,7 +22,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Buffalo primitives | `buffalo/buffalo.ts` | PORTED | unit tests + `differential_buffalo` fixtures |
 | BuffaloZnp | `znp/buffaloZnp.ts` | PORTED | `differential_buffalo_znp` fixtures |
 | ZpiObject | `znp/zpiObject.ts` | PORTED | `differential_zpi_object` fixtures |
-| ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PARTIAL | `differential_zcl` fixtures for lookup/header; cluster catalog subset |
+| ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PORTED | `differential_zcl` fixtures for lookup/header/commands; generated catalog covers all 129 upstream clusters, attributes, commands and parameter conditions |
 | ZDO codecs | `zspec/zdo/*` | PORTED | full response catalog incl. status-only responses, non-success short-buffer guard, unknown-cluster panic parity |
 | `controller/database.ts` | `controller/database.ts` | PORTED | CRUD/order/clear semantics + reload/corruption tests |
 | Controller helpers (request/queue/install codes/zclFrameConverter/zclTSN) | `controller/helpers/*` | PORTED | upstream request-queue semantics, full install-code vectors, converter tests |
@@ -30,7 +30,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Controller Entity / ZigbeeEntity + ControllerAdapter boundary | `controller/model/entity.ts`, `zigbeeEntity.ts` | PORTED | injection roundtrip + trait-object test |
 | Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | PARTIAL | ported: CRUD/registries, ZCL read/write/command/report/config-reporting, interview, `onZclData`, binds, groups, DB round-trip; unit tests in each file. Gaps: OTA (omitted), device/model-specific HA discovery, no Node differential fixture or transcript yet |
 | Device OTA methods (`checkOta`/`updateOta`/`abortOta`/`scheduleOta`/`unscheduleOta`/`findMatchingOtaImage`/`#waitForOtaCommand`/`#notifyOta`) | `controller/model/device.ts:1495-1899` | OMITTED | R1 excludes OTA (user decision); `controller/helpers/ota.ts` needs HTTPS + SHA-512 and no HTTP/TLS/hash dependency may be added. Fields `#scheduledOta`/`#otaInProgress`/`#otaAbortController` and the `scheduledOta` DB field are omitted consistently |
-| ZCL catalog used by the controller layer (genBasic/genGroups/genTime/ssIasZone/genPollCtrl/genOnOff/greenPower) | `zspec/zcl/definition/cluster.ts` | PARTIAL | attributes/commands/defaults needed by the controller ported with `file.ts` anchors (including all Green Power commands/responses and the `GPD_FRAME` codec); the rest of the 200+ cluster catalog remains absent |
+| ZCL cluster catalog | `zspec/zcl/definition/cluster.ts` | PORTED | generated `definition/clusters.json` from upstream v11.2.0: all 129 clusters with attributes, commands, responses, defaults, limits and conditions; `differential_zcl::zcl_catalog_covers_all_upstream_clusters` checks every entry by name and ID |
 | `controller/events.ts` | `controller/events.ts` | PORTED | typed payloads + `ControllerEvent` enum |
 | `controller/controller.ts` | `controller/controller.ts` | PORTED | options validation, start/stop, adapter event pump, permit-join/timers, backup/database-save, `sendRaw`, install codes, ZDO/ZCL routing, unknown-device identification, Xiaomi re-transmit handling, green power device creation/removal, message/lastSeen events; runtime adapter boundary `ControllerRuntimeAdapter`; per-device event forwarding; `ZclStatusError` -> `defaultResponse`; 22 controller tests ported from controller.test.ts (ZCL report/default-rsp status/raw data, unknown cluster raw data, default-response disabled/broadcast/headerless, Xiaomi re-transmit, unknown-device identification + de-dupe, ZDO network/announce/no-op, sendRaw ZDO/group/broadcast/endpoint/custom cluster/inter-PAN, permitJoin, green power join/decommission/invalid/IEEE/response/channel-request edge cases) |
 | `controller/index.ts` | `controller/index.ts` | PORTED | re-exports `Controller` |
@@ -55,8 +55,7 @@ Ported in `crates/zigbee-apiarist/src/controller/model/{device,endpoint,group}.r
 against zigbee-herdsman v11.2.0 (c1a54e3d), with the ZCL/ZDO prerequisites:
 `Frame` stores owned `Cluster`/`Command` (custom clusters via
 `create_with_definitions`), parameters carry owned conditions, and the catalog
-now defines genBasic (all attributes + defaults), genGroups, genTime, ssIasZone,
-genPollCtrl, genOnOff and greenPower `pairing`.
+now covers all 129 upstream ZCL clusters generated from v11.2.0.
 
 Ownership model (AGENTS §3.4): upstream static maps translate to
 `RwLock<HashMap<...>>` registries with short synchronous access; models resolve
@@ -99,12 +98,11 @@ Known deviations:
 - `Frame::try_from_buffer` converts codec panics into `FrameParseError`
   (`Status` for `ZclStatusError` cases, `Other` otherwise). `INVALID_FIELD`
   (0x85) and unknown command/global-command lookups (0x81) map to the upstream
-  status, so `defaultResponse` is populated for those cases. `UNSUPPORTED_CLUSTER`
-  (0xc3) is not emitted because the Rust ZCL catalog is an explicit subset and
-  unknown numeric cluster ids resolve to placeholder clusters; those frames
-  surface as `UNSUP_COMMAND` or raw data instead. Other parse failures remain
-  non-status errors without a default response, matching upstream (only
-  `ZclStatusError` sets `defaultResponse`).
+  status, so `defaultResponse` is populated for those cases. With the full
+  129-cluster catalog, unknown numeric cluster ids now map to
+  `UNSUPPORTED_CLUSTER` (0xc3). Other parse failures remain non-status errors
+  without a default response, matching upstream (only `ZclStatusError` sets
+  `defaultResponse`).
 
 Coordinator-only HIL smoke with `ZStackRuntimeAdapter` is **not yet recorded**.
 Per AGENTS §1/§6 the test router currently runs the Node.js Zigbee2MQTT, so a

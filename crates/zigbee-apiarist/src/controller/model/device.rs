@@ -2494,7 +2494,7 @@ mod tests {
         endpoint
             .write(
                 Value::from("genOnOff"),
-                json!({"onOff": true}),
+                json!({"onTime": 5}),
                 Some(crate::controller::model::endpoint::Options {
                     disable_response: Some(true),
                     timeout: Some(1000),
@@ -2507,15 +2507,15 @@ mod tests {
         let written = frames.last().expect("frame");
         assert_eq!(written.cluster.name, "genOnOff");
         assert_eq!(written.command.name, "write");
-        assert_eq!(written.payload[0]["attrId"], json!(0));
-        assert_eq!(written.payload[0]["attrData"], json!(true));
+        assert_eq!(written.payload[0]["attrId"], json!(0x4001));
+        assert_eq!(written.payload[0]["attrData"], json!(5));
         drop(frames);
 
         let group = Group::create(10).expect("create group");
         group.add_member(&endpoint);
         assert!(group.has_member(&endpoint));
         group
-            .write(Value::from("genOnOff"), json!({"onOff": false}), None)
+            .write(Value::from("genOnOff"), json!({"onTime": 6}), None)
             .await
             .expect("group write");
         assert_eq!(group.members().len(), 1);

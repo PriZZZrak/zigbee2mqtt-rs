@@ -5,7 +5,7 @@
   "description": "Node oracle for differential tests against the pinned zigbee-herdsman checkout",
   "scripts": {
     "oracle": "tsx run.mjs",
-    "generate": "tsx generate.mjs && tsx gen-constants-rust.mjs && tsx gen-definition.mjs"
+    "generate": "tsx generate.mjs && tsx gen-constants-rust.mjs && tsx gen-definition.mjs && tsx gen-zcl-clusters.mjs"
   },
   "devDependencies": {
     "tsx": "^4.23.15"

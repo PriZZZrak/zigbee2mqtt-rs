@@ -39,6 +39,15 @@ crates/zigbee-apiarist/tests/fixtures/definition.json
 crates/zigbee-apiarist/tests/fixtures/structs.json
 ```
 
+It also regenerates the ZCL cluster catalog used by the Rust loader:
+
+```
+crates/zigbee-apiarist/src/zspec/zcl/definition/clusters.json
+```
+
+That file is produced by `gen-zcl-clusters.mjs` from the pinned installed
+`zigbee-herdsman@11.2.0` `definition/cluster.js` (129 clusters).
+
 The ZNP command catalog and constants modules are generated directly into
 `src/` by `gen-definition.mjs` / `gen-constants-rust.mjs` (also invoked by
 `npm run generate`).
