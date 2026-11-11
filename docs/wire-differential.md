@@ -107,6 +107,37 @@ cp /tmp/upstream-start.hex crates/zigbee-apiarist/tests/fixtures/controller_star
 cargo test -p zigbee-apiarist --lib adapter::z_stack::adapter::manager::tests::controller_start_with_fake_coordinator
 ```
 
+## Adapter suite harness (`adapter_zstack_suite`)
+
+`crates/zigbee-apiarist/tests/adapter_zstack_suite.rs` ports the upstream
+`test/adapter/z-stack/adapter.test.ts` suite against a serial-wire ZNP mock:
+
+- `tests/adapter_zstack_suite/support.rs` mirrors `ZnpRequestMockBuilder`
+  (request/response table, IN/OUT NV items, extended NV tables, data-confirm
+  scripting, ZDO response injection, `dataRetrieve` chunking).
+- `tests/adapter_zstack_suite/fixtures.rs` reproduces
+  `baseZnpRequestMock`, `empty/commissioned 1.2/3.0.x/3.x.0` builders.
+- `tests/adapter_zstack_suite/zdo_response.rs` encodes ZDO responses with the
+  same layouts as `BuffaloZdo::read_response`.
+- Backup JSON fixtures are extracted from upstream
+  (`tests/fixtures/adapter_backups/`).
+
+Coverage: 122 tests covering commissioning/backup restore/create errors,
+legacy backups, config-adapter mismatch diagnostics, LED/transmit-power,
+permit join, ZCL send/retry/route-discovery/timeout, group/all/inter-PAN,
+incoming messages (including chunked `dataRetrieve`), device events, `waitFor`
+and the ZDO payload table. Paired upstream cases (soft+hard reset, three
+`sendZclFrameToAll` broadcasts, default-response variants, announce/network
+address events, leave/rejoin, inter-PAN set/restore, 16/64-bit extended
+messages) are exercised in one Rust test with both variants.
+
+The suite exposed four port bugs fixed here: APS encryption used cluster
+`0x003b` instead of `zigbeeDirectConfiguration` (61), `writeIeeeAddr` emitted
+short buffers instead of upstream's two `uint32`s, raw non-ZCL
+`incomingMsg` was dropped instead of emitted with `header: None`, and a
+missing/zero backup version was reported as an unsupported version instead of
+`Unknown backup format`.
+
 ## Next slice
 
 - Add retry/route-discovery and incoming-message transcripts from

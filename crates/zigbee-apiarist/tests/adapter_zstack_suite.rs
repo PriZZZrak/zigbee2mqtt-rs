@@ -317,6 +317,7 @@ async fn permit_join_specific_network_address() {
 
 #[tokio::test]
 async fn soft_and_hard_reset_use_expected_reset_types() {
+    // Anchor: adapter.test.ts "Soft reset", "Hard reset".
     let mut harness = harness(default_network_options(), "backup.json");
     fixtures::commissioned_3x0_aligned(&harness.mock);
     harness.start().await.expect("start");
@@ -1024,6 +1025,7 @@ async fn send_zcl_frame_group_data_confirm_fails() {
 
 #[tokio::test]
 async fn send_zcl_frame_to_all_default_rx_on_when_idle_and_sleepy() {
+    // Anchor: adapter.test.ts "Send zcl frame to all - DEFAULT", "- RX_ON_WHEN_IDLE", "- SLEEPY".
     use zigbee_apiarist::zspec::enums::BroadcastAddress;
     let mut harness = started_3x0().await;
     for (destination, address) in [
@@ -1208,6 +1210,7 @@ async fn send_zcl_frame_network_address_matches_on_default_response() {
 
 #[tokio::test]
 async fn send_zcl_frame_network_address_data_confirm_fails_with_and_without_default_response() {
+    // Anchor: adapter.test.ts "Send zcl frame network address data confirm fails with default response", "... without default response".
     for disable_default_response in [false, true] {
         let mut harness = started_3x0().await;
         harness.mock.set_data_confirm_code(201, false);
@@ -1893,6 +1896,7 @@ fn touchlink_frame(
 
 #[tokio::test]
 async fn incoming_message_extended_interpan_16_and_64_bit_address() {
+    // Anchor: adapter.test.ts "Incoming message extended (inter PAN) - 16/64-bit address" (both cases).
     use zigbee_apiarist::adapter::events::ZclPayload;
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
     use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
@@ -2000,6 +2004,7 @@ async fn device_joined_event() {
 
 #[tokio::test]
 async fn device_announce_and_network_address_response_events() {
+    // Anchor: adapter.test.ts "Device announce", "Network address response".
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
     use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
 
@@ -2116,6 +2121,7 @@ async fn concentrator_callback_indication() {
 
 #[tokio::test]
 async fn device_leave_and_ignore_rejoin() {
+    // Anchor: adapter.test.ts "Device leave", "Ignore device leave with rejoin".
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
     use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
     let mut harness = started_3x0().await;
@@ -2185,6 +2191,7 @@ async fn get_network_parameters() {
 
 #[tokio::test]
 async fn set_interpan_channel_and_restore() {
+    // Anchor: adapter.test.ts "Set interpan channel", "Restore interpan channel".
     let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     harness
@@ -2659,14 +2666,11 @@ async fn refuse_to_start_when_ping_fails() {
 }
 
 #[tokio::test]
-async fn sends_proper_zdo_request_payloads() {
+async fn sends_proper_zdo_request_payload_for_permit_joining_request_to_target() {
     use zigbee_apiarist::zspec::consts::BLANK_EUI64;
     use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
     use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
-
     let mut harness = started_3x0().await;
-
-    // PERMIT_JOINING_REQUEST to target
     harness.mock.clear_requests();
     let payload = BuffaloZdo::build_request(
         false,
@@ -2695,9 +2699,24 @@ async fn sends_proper_zdo_request_payloads() {
         &request.frame[4..request.frame.len() - 1],
         expected.as_slice()
     );
+}
 
-    // PERMIT_JOINING_REQUEST broadcast
+#[tokio::test]
+async fn sends_proper_zdo_request_payload_for_permit_joining_request_broadcast() {
+    use zigbee_apiarist::zspec::consts::BLANK_EUI64;
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
+    let payload = BuffaloZdo::build_request(
+        false,
+        ClusterId::PERMIT_JOINING_REQUEST,
+        &[
+            serde_json::json!(250),
+            serde_json::json!(1),
+            serde_json::json!([]),
+        ],
+    );
     harness
         .adapter
         .send_zdo(
@@ -2716,8 +2735,14 @@ async fn sends_proper_zdo_request_payloads() {
         &request.frame[4..request.frame.len() - 1],
         expected.as_slice()
     );
+}
 
-    // NWK_UPDATE_REQUEST unicast
+#[tokio::test]
+async fn sends_proper_zdo_request_payload_for_nwk_update_request_unicast() {
+    use zigbee_apiarist::zspec::consts::BLANK_EUI64;
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     let payload = BuffaloZdo::build_request(
         false,
@@ -2749,9 +2774,26 @@ async fn sends_proper_zdo_request_payloads() {
         &request.frame[4..request.frame.len() - 1],
         expected.as_slice()
     );
+}
 
-    // NWK_UPDATE_REQUEST broadcast
+#[tokio::test]
+async fn sends_proper_zdo_request_payload_for_nwk_update_request_broadcast() {
+    use zigbee_apiarist::zspec::consts::BLANK_EUI64;
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
+    let payload = BuffaloZdo::build_request(
+        false,
+        ClusterId::NWK_UPDATE_REQUEST,
+        &[
+            serde_json::json!([15]),
+            serde_json::json!(0xfe),
+            serde_json::json!(0),
+            serde_json::Value::Null,
+            serde_json::json!(0),
+        ],
+    );
     harness
         .adapter
         .send_zdo(
@@ -2771,8 +2813,14 @@ async fn sends_proper_zdo_request_payloads() {
         &request.frame[4..request.frame.len() - 1],
         expected.as_slice()
     );
+}
 
-    // BIND_REQUEST unicast
+#[tokio::test]
+async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_unicast() {
+    use zigbee_apiarist::zspec::consts::BLANK_EUI64;
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     let payload = BuffaloZdo::build_request(
         false,
@@ -2799,8 +2847,14 @@ async fn sends_proper_zdo_request_payloads() {
         &request.frame[4..request.frame.len() - 1],
         expected.as_slice()
     );
+}
 
-    // BIND_REQUEST multicast pads to 21 bytes
+#[tokio::test]
+async fn sends_proper_zdo_request_payload_for_bind_request_unbind_request_multicast() {
+    use zigbee_apiarist::zspec::consts::BLANK_EUI64;
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     let payload = BuffaloZdo::build_request(
         false,
@@ -2828,8 +2882,14 @@ async fn sends_proper_zdo_request_payloads() {
         &request.frame[4..request.frame.len() - 1],
         expected.as_slice()
     );
+}
 
-    // NETWORK_ADDRESS_REQUEST has no prefix
+#[tokio::test]
+async fn sends_proper_zdo_request_payload_for_network_address_request() {
+    use zigbee_apiarist::zspec::consts::BLANK_EUI64;
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     let payload = BuffaloZdo::build_request(
         false,
@@ -2856,8 +2916,14 @@ async fn sends_proper_zdo_request_payloads() {
         &request.frame[4..request.frame.len() - 1],
         payload.as_slice()
     );
+}
 
-    // Generic request gets a 16-bit address prefix
+#[tokio::test]
+async fn sends_proper_zdo_request_payload_for_generic_logic_request() {
+    use zigbee_apiarist::zspec::consts::BLANK_EUI64;
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     let payload = BuffaloZdo::build_request(
         false,
@@ -3005,5 +3071,184 @@ async fn should_throw_error_when_register_endpoints_fails() {
     assert!(
         error.contains("133") || error.contains("NOT_ACTIVE"),
         "unexpected: {error}"
+    );
+}
+
+#[tokio::test]
+async fn should_commission_with_3_0_x_adapter_empty_mismatched_config_and_backup() {
+    let path = temp_backup("empty_mismatch", &backup_fixture("notMatching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Reset);
+}
+
+#[tokio::test]
+async fn should_commission_with_3_0_x_adapter_commissioned_mismatched_adapter_config_backup() {
+    let path = temp_backup("commissioned_mismatch", &backup_fixture("notMatching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::commissioned_3_aligned_config_mismatch(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Reset);
+}
+
+#[tokio::test]
+async fn should_fail_to_commission_when_bdb_commissioning_times_out() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::empty_3_aligned(&harness.mock);
+    harness.mock.handle(
+        zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem::APP_CNF,
+        "bdbStartCommissioning",
+        |_, _| support::Reply::empty(),
+    );
+    let error = harness.start().await.expect_err("commissioning timeout");
+    assert_eq!(
+        error,
+        "network commissioning timed out - most likely network with the same panId or extendedPanId already exists nearby"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_to_commission_when_nib_fails_to_settle() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::empty_3_aligned(&harness.mock);
+    harness.mock.handle(
+        zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem::APP_CNF,
+        "bdbStartCommissioning",
+        |_, _| {
+            support::Reply::empty().with_extra(
+                zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem::ZDO,
+                192,
+                vec![9],
+            )
+        },
+    );
+    let error = harness.start().await.expect_err("nib settle timeout");
+    assert_eq!(
+        error,
+        "network commissioning failed - timed out waiting for nib to settle"
+    );
+}
+
+#[test]
+fn call_znp_constructor() {
+    let transport = zigbee_apiarist::adapter::transport::AdapterTransport::new(
+        zigbee_apiarist::adapter::transport::TransportOptions::new("dummy"),
+    );
+    let _adapter = zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::ZStackAdapter::new(
+        transport,
+        default_network_options(),
+        "backup.json".to_string(),
+        AdapterOptions::default(),
+    );
+}
+
+#[tokio::test]
+async fn send_zcl_frame_network_address_timeout_should_discover_route_and_retry() {
+    use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
+    let mut harness = started_3x0().await;
+    harness.mock.set_assoc_node_relation(2);
+    harness.mock.clear_requests();
+    let mismatch = read_rsp_frame(102, 5);
+    let frame = read_frame(false);
+    let result = {
+        let request = harness.adapter.send_zcl_frame_to_endpoint(
+            "0x0000000000000002",
+            2,
+            20,
+            &frame,
+            1,
+            false,
+            false,
+            None,
+            None,
+        );
+        tokio::pin!(request);
+        harness.mock.inject_areq(
+            Subsystem::AF,
+            "incomingMsg",
+            serde_json::json!({
+                "clusterid": 0,
+                "srcendpoint": 20,
+                "srcaddr": 2,
+                "linkquality": 101,
+                "groupid": 12,
+                "len": mismatch.to_buffer().len(),
+                "data": mismatch.to_buffer(),
+            }),
+        );
+        request.await
+    };
+    let error = result.expect_err("response timeout");
+    assert!(error.contains("Timeout after"), "unexpected error: {error}");
+    let commands = harness
+        .mock
+        .requests()
+        .into_iter()
+        .map(|request| request.command)
+        .collect::<Vec<_>>();
+    assert!(
+        commands.contains(&"extRouteDisc".to_string()),
+        "commands: {commands:?}"
+    );
+    assert!(data_requests(&harness).len() >= 2, "commands: {commands:?}");
+}
+
+#[tokio::test]
+async fn send_zcl_frame_network_address_timeout_should_rewrite_child_entry_and_retry() {
+    use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
+    let mut harness = started_3x0().await;
+    harness.mock.set_assoc_node_relation(1);
+    harness.mock.clear_requests();
+    let mismatch = read_rsp_frame(102, 5);
+    let frame = read_frame(false);
+    let result = {
+        let request = harness.adapter.send_zcl_frame_to_endpoint(
+            "0x0000000000000002",
+            2,
+            20,
+            &frame,
+            1,
+            false,
+            false,
+            None,
+            None,
+        );
+        tokio::pin!(request);
+        harness.mock.inject_areq(
+            Subsystem::AF,
+            "incomingMsg",
+            serde_json::json!({
+                "clusterid": 0,
+                "srcendpoint": 20,
+                "srcaddr": 2,
+                "linkquality": 101,
+                "groupid": 12,
+                "len": mismatch.to_buffer().len(),
+                "data": mismatch.to_buffer(),
+            }),
+        );
+        request.await
+    };
+    assert!(result.is_err());
+    let commands = harness
+        .mock
+        .requests()
+        .into_iter()
+        .map(|request| request.command)
+        .collect::<Vec<_>>();
+    assert!(
+        commands.contains(&"assocGetWithAddress".to_string()),
+        "commands: {commands:?}"
+    );
+    assert!(
+        commands.contains(&"assocRemove".to_string()),
+        "commands: {commands:?}"
+    );
+    assert!(
+        commands.contains(&"assocAdd".to_string()),
+        "commands: {commands:?}"
+    );
+    assert!(
+        commands.contains(&"extRouteDisc".to_string()),
+        "commands: {commands:?}"
     );
 }
