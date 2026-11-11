@@ -122,7 +122,7 @@ cargo test -p zigbee-apiarist --lib adapter::z_stack::adapter::manager::tests::c
 - Backup JSON fixtures are extracted from upstream
   (`tests/fixtures/adapter_backups/`).
 
-Coverage: 129 tests covering commissioning/backup restore/create errors,
+Coverage: 130 tests covering commissioning/backup restore/create errors,
 legacy backups, config-adapter mismatch diagnostics, LED/transmit-power,
 permit join, ZCL send/retry/route-discovery/timeout, group/all/inter-PAN,
 incoming messages (including chunked `dataRetrieve`), device events, `waitFor`

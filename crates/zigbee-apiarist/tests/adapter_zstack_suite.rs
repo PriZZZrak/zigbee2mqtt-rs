@@ -1925,54 +1925,52 @@ fn touchlink_frame(
     )
 }
 
-#[tokio::test]
-async fn incoming_message_extended_interpan_16_and_64_bit_address() {
-    // Anchor: adapter.test.ts "Incoming message extended (inter PAN) - 16/64-bit address" (both cases).
-    use zigbee_apiarist::adapter::events::ZclPayload;
+async fn incoming_extended_interpan_case(src_addr_mode: u64, expected: serde_json::Value) {
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
     use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
+    let mut harness = started_3x0().await;
+    let mut events = harness.adapter.events.subscribe();
+    let response = read_rsp_frame(100, 2);
+    harness.mock.inject_areq(
+        Subsystem::AF,
+        "incomingMsgExt",
+        serde_json::json!({
+            "groupid": 12,
+            "clusterid": 0,
+            "srcaddrmode": src_addr_mode,
+            "srcaddr": "0x1234567812345678",
+            "srcendpoint": 20,
+            "dstendpoint": 1,
+            "linkquality": 101,
+            "timestamp": 0x12345678,
+            "len": response.to_buffer().len(),
+            "data": response.to_buffer(),
+        }),
+    );
+    let payload = loop {
+        match events.recv().await.expect("event") {
+            AdapterEvent::ZclPayload(payload) => break payload,
+            _ => continue,
+        }
+    };
+    assert_eq!(payload.endpoint, 20);
+    assert_eq!(payload.group_id, 12);
+    assert_eq!(payload.linkquality, 101);
+    assert_eq!(payload.address, expected);
+    assert_eq!(payload.data, vec![24, 100, 1, 0, 0, 0, 32, 2]);
+    assert_eq!(payload.header.expect("header").command_identifier, 1);
+}
 
-    for (src_addr_mode, addr, expected) in [
-        (2, "0x1234567812345678", serde_json::json!(0x5678)),
-        (
-            3,
-            "0x1234567812345678",
-            serde_json::json!("0x1234567812345678"),
-        ),
-    ] {
-        let mut harness = started_3x0().await;
-        let mut events = harness.adapter.events.subscribe();
-        let response = read_rsp_frame(100, 2);
-        harness.mock.inject_areq(
-            Subsystem::AF,
-            "incomingMsgExt",
-            serde_json::json!({
-                "groupid": 12,
-                "clusterid": 0,
-                "srcaddrmode": src_addr_mode,
-                "srcaddr": addr,
-                "srcendpoint": 20,
-                "dstendpoint": 1,
-                "linkquality": 101,
-                "timestamp": 0x12345678,
-                "len": response.to_buffer().len(),
-                "data": response.to_buffer(),
-            }),
-        );
-        let payload = loop {
-            match events.recv().await.expect("event") {
-                AdapterEvent::ZclPayload(payload) => break payload,
-                _ => continue,
-            }
-        };
-        assert_eq!(payload.endpoint, 20);
-        assert_eq!(payload.group_id, 12);
-        assert_eq!(payload.linkquality, 101);
-        assert_eq!(payload.address, expected);
-        assert_eq!(payload.data, vec![24, 100, 1, 0, 0, 0, 32, 2]);
-        assert_eq!(payload.header.expect("header").command_identifier, 1);
-        let _: ZclPayload = payload;
-    }
+#[tokio::test]
+async fn incoming_message_extended_interpan_16_bit_address() {
+    // Anchor: adapter.test.ts "Incoming message extended (inter PAN) - 16/64-bit address" (16-bit).
+    incoming_extended_interpan_case(2, serde_json::json!(0x5678)).await;
+}
+
+#[tokio::test]
+async fn incoming_message_extended_interpan_64_bit_address() {
+    // Anchor: adapter.test.ts "Incoming message extended (inter PAN) - 16/64-bit address" (64-bit).
+    incoming_extended_interpan_case(3, serde_json::json!("0x1234567812345678")).await;
 }
 
 #[tokio::test]
