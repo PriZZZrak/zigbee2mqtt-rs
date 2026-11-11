@@ -52,10 +52,15 @@ impl AdapterBackup {
         if data.pointer("/metadata/format").and_then(Value::as_str)
             == Some("zigpy/open-coordinator-backup")
         {
-            let version = data
+            // Upstream checks `data.metadata?.version` truthiness: a missing or
+            // zero version is an unknown format, not an unsupported version.
+            let Some(version) = data
                 .pointer("/metadata/version")
                 .and_then(Value::as_u64)
-                .unwrap_or(0);
+                .filter(|version| *version != 0)
+            else {
+                return Err("Unknown backup format".to_string());
+            };
             if version != 1 {
                 return Err(format!(
                     "Unsupported open coordinator backup version (version={version})"
@@ -83,7 +88,7 @@ impl AdapterBackup {
             .get("extaddress")
             .and_then(Value::as_str)
             .ok_or_else(|| "Failed to read adapter IEEE address".to_string())?;
-        let Some(ieee_hex) = extaddress.strip_prefix("0x") else {
+        let Some(ieee_hex) = extaddress.strip_prefix("0x").filter(|hex| !hex.is_empty()) else {
             return Err("Failed to read adapter IEEE address".to_string());
         };
         let ieee_address = hex_to_bytes(ieee_hex);
@@ -260,7 +265,12 @@ impl AdapterBackup {
             hashed_tclk: None,
         };
 
-        if let Ok(Some(old_backup)) = self.get_stored_backup() {
+        let stored = self.get_stored_backup();
+        eprintln!(
+            "MERGE stored={:?}",
+            stored.as_ref().map(|o| o.as_ref().map(|b| b.devices.len()))
+        );
+        if let Ok(Some(old_backup)) = stored {
             let missing = old_backup
                 .devices
                 .iter()
@@ -275,6 +285,11 @@ impl AdapterBackup {
                 })
                 .cloned()
                 .collect::<Vec<_>>();
+            eprintln!(
+                "MERGE missing={} db={:?}",
+                missing.len(),
+                ieee_addresses_in_database
+            );
             backup.devices.extend(missing);
         }
 
@@ -617,10 +632,15 @@ impl AdapterBackup {
                 )
                 .await;
         }
-        self.nv
+        let alignment = self
+            .nv
+            .memory_alignment
+            .unwrap_or(crate::adapter::z_stack::structs::r#struct::Alignment::Unaligned);
+        Ok(self
+            .nv
             .read_item_table(NvItemsIds::ADDRMGR, 0, address_manager_table)
             .await?
-            .ok_or_else(|| "Cannot read address manager table".to_string())
+            .unwrap_or_else(|| address_manager_table(TableData::Capacity(0), alignment)))
     }
 
     async fn get_security_manager_table(&mut self) -> Result<Table, String> {

@@ -37,6 +37,8 @@ pub struct Reply {
     /// the adapter request times out.
     pub respond: bool,
     pub payload: Value,
+    /// Raw SRSP payload bytes, bypassing parameter encoding.
+    pub raw: Option<Vec<u8>>,
     /// Extra AREQ frames emitted right after the SRSP.
     pub extra: Vec<(u8, u8, Vec<u8>)>,
 }
@@ -46,6 +48,7 @@ impl Reply {
         Self {
             respond: true,
             payload,
+            raw: None,
             extra: Vec::new(),
         }
     }
@@ -54,12 +57,24 @@ impl Reply {
         Self::payload(json!({}))
     }
 
+    /// Upstream handlers may return a payload object with missing fields;
+    /// the wire encoder cannot express that, so send raw bytes instead.
+    pub fn raw(data: Vec<u8>) -> Self {
+        Self {
+            respond: true,
+            payload: Value::Null,
+            raw: Some(data),
+            extra: Vec::new(),
+        }
+    }
+
     /// Upstream mock handlers signal errors by throwing; the harness stops
     /// answering so the adapter request expires.
     pub fn timeout() -> Self {
         Self {
             respond: false,
             payload: Value::Null,
+            raw: None,
             extra: Vec::new(),
         }
     }
@@ -354,9 +369,20 @@ impl MockCoordinator {
                     };
 
                     if reply.respond {
-                        let mut response =
-                            encode_srsp(object.subsystem, &object.command.name, &reply.payload)
-                                .to_buffer();
+                        let mut response = match reply.raw {
+                            Some(raw) => UnpiFrame::new(
+                                Type::SRSP,
+                                object.subsystem,
+                                frame.commandID,
+                                raw,
+                                0,
+                                0,
+                            ),
+                            None => {
+                                encode_srsp(object.subsystem, &object.command.name, &reply.payload)
+                            }
+                        }
+                        .to_buffer();
                         // SRSP echoes the request command byte (including any
                         // transaction bits in the low nibble).
                         response[3] = frame.commandID;
@@ -973,4 +999,48 @@ impl Harness {
     pub async fn start(&mut self) -> Result<StartResult, String> {
         self.adapter.start().await
     }
+}
+
+/// Captures logger output for tests that assert user-facing diagnostics.
+pub use zigbee_apiarist::utils::logger::Logger;
+
+pub struct RecordingLogger {
+    messages: Arc<StdMutex<Vec<String>>>,
+}
+
+impl Logger for RecordingLogger {
+    fn debug(&self, message: &str, _namespace: &str) {
+        self.messages.lock().unwrap().push(message.to_string());
+    }
+    fn info(&self, message: &str, _namespace: &str) {
+        self.messages.lock().unwrap().push(message.to_string());
+    }
+    fn warning(&self, message: &str, _namespace: &str) {
+        self.messages.lock().unwrap().push(message.to_string());
+    }
+    fn error(&self, message: &str, _namespace: &str) {
+        self.messages.lock().unwrap().push(message.to_string());
+    }
+}
+
+static RECORDED: std::sync::OnceLock<Arc<StdMutex<Vec<String>>>> = std::sync::OnceLock::new();
+
+pub fn recorded_logs() -> Arc<StdMutex<Vec<String>>> {
+    RECORDED
+        .get_or_init(|| {
+            let messages = Arc::new(StdMutex::new(Vec::new()));
+            zigbee_apiarist::utils::logger::set_logger(Arc::new(RecordingLogger {
+                messages: messages.clone(),
+            }));
+            messages
+        })
+        .clone()
+}
+
+pub fn clear_logs() {
+    recorded_logs().lock().unwrap().clear();
+}
+
+pub fn log_messages() -> Vec<String> {
+    recorded_logs().lock().unwrap().clone()
 }

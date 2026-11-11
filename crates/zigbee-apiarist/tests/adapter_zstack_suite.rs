@@ -1264,3 +1264,384 @@ async fn send_zcl_frame_network_address_with_default_response_timeout_shouldnt_c
     assert!(result.is_ok());
     assert_eq!(data_requests(&harness).len(), 1);
 }
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn backup_fixture(name: &str) -> serde_json::Value {
+    let raw = match name {
+        "matching" => include_str!("fixtures/adapter_backups/backupMatchingConfig.json"),
+        "matching12" => include_str!("fixtures/adapter_backups/backupMatchingConfig12.json"),
+        "notMatching" => include_str!("fixtures/adapter_backups/backupNotMatchingConfig.json"),
+        "legacy" => include_str!("fixtures/adapter_backups/legacyBackup.json"),
+        other => panic!("unknown fixture {other}"),
+    };
+    serde_json::from_str(raw).expect("backup fixture")
+}
+
+fn temp_backup(name: &str, value: &serde_json::Value) -> String {
+    let path = std::env::temp_dir().join(format!(
+        "zstack_adapter_{name}_{}_{}.json",
+        std::process::id(),
+        TEMP_FILE_COUNTER.fetch_add(1, Ordering::SeqCst)
+    ));
+    std::fs::write(&path, serde_json::to_string(value).expect("json")).expect("write backup");
+    path.to_string_lossy().to_string()
+}
+
+fn temp_backup_raw(name: &str, contents: &str) -> String {
+    let path = std::env::temp_dir().join(format!(
+        "zstack_adapter_{name}_{}_{}.json",
+        std::process::id(),
+        TEMP_FILE_COUNTER.fetch_add(1, Ordering::SeqCst)
+    ));
+    std::fs::write(&path, contents).expect("write backup");
+    path.to_string_lossy().to_string()
+}
+
+fn sec_material_entry(pan: [u8; 8], frame_counter: u32) -> Vec<u8> {
+    use zigbee_apiarist::adapter::z_stack::structs::entries::nwk_sec_material_descriptor_entry::nwk_sec_material_descriptor_entry;
+    use zigbee_apiarist::adapter::z_stack::structs::r#struct::Alignment;
+    use zigbee_apiarist::adapter::z_stack::structs::serializable_memory_object::SerializableMemoryObject;
+    let mut entry = nwk_sec_material_descriptor_entry(None);
+    entry.set_u32("FrameCounter", frame_counter);
+    entry.set_bytes("extendedPanID", &pan);
+    entry.serialize(Alignment::Aligned, true, 0)
+}
+
+#[tokio::test]
+async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_empty() {
+    let path = temp_backup("restore_empty", &backup_fixture("matching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Restored);
+    harness.adapter.backup(&[]).await.expect("backup");
+}
+
+#[tokio::test]
+async fn should_restore_unified_backup_with_3_0_x_adapter_and_create_backup_no_tclk_seed() {
+    let mut backup = backup_fixture("matching");
+    backup["stack_specific"] = serde_json::json!({});
+    let path = temp_backup("restore_no_tclk", &backup);
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Restored);
+    harness.adapter.backup(&[]).await.expect("backup");
+}
+
+#[tokio::test]
+async fn should_restore_unified_backup_with_3_x_0_adapter_and_create_backup_empty() {
+    let path = temp_backup("restore_3x0_empty", &backup_fixture("matching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3x0_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Restored);
+    harness.adapter.backup(&[]).await.expect("backup");
+}
+
+#[tokio::test]
+async fn should_recommission_restore_unified_backup_with_1_2_adapter_and_create_backup_empty() {
+    let path = temp_backup("restore_12_empty", &backup_fixture("matching12"));
+    let mut harness = Harness::new(
+        default_network_options(),
+        &path,
+        AdapterOptions {
+            concurrent: Some(1),
+            ..AdapterOptions::default()
+        },
+    );
+    fixtures::empty_12_unaligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Restored);
+    let backup = harness.adapter.backup(&[]).await.expect("backup");
+    assert_eq!(backup.network_key_info.frame_counter, 0);
+}
+
+#[tokio::test]
+async fn should_create_backup_with_3_0_x_adapter_default_security_material_table_entry() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::commissioned_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Resumed);
+    for index in 0..4 {
+        harness.mock.nv(
+            zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::LEGACY_NWK_SEC_MATERIAL_TABLE_START + index,
+            Some(vec![0u8; 12]),
+        );
+    }
+    harness.mock.nv(
+        zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::LEGACY_NWK_SEC_MATERIAL_TABLE_START,
+        Some(sec_material_entry([0xff; 8], 2800)),
+    );
+    let backup = harness.adapter.backup(&[]).await.expect("backup");
+    assert_eq!(backup.network_key_info.frame_counter, 2800);
+}
+
+#[tokio::test]
+async fn should_create_backup_with_3_0_x_adapter_empty_security_material_table() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::commissioned_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Resumed);
+    for index in 0..4 {
+        harness.mock.nv(
+            zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::LEGACY_NWK_SEC_MATERIAL_TABLE_START + index,
+            Some(vec![0u8; 12]),
+        );
+    }
+    let backup = harness.adapter.backup(&[]).await.expect("backup");
+    assert_eq!(backup.network_key_info.frame_counter, 1250);
+}
+
+#[tokio::test]
+async fn should_create_backup_with_3_0_x_adapter_security_material_table_with_generic_record() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::commissioned_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Resumed);
+    for index in 0..4 {
+        harness.mock.nv(
+            zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::LEGACY_NWK_SEC_MATERIAL_TABLE_START + index,
+            Some(vec![0u8; 12]),
+        );
+    }
+    harness.mock.nv(
+        zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::LEGACY_NWK_SEC_MATERIAL_TABLE_START + 3,
+        Some(sec_material_entry([0xff; 8], 8737)),
+    );
+    let backup = harness.adapter.backup(&[]).await.expect("backup");
+    assert_eq!(backup.network_key_info.frame_counter, 8737);
+}
+
+#[tokio::test]
+async fn should_create_backup_with_1_2_adapter() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::commissioned_12_unaligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Resumed);
+    let backup = harness.adapter.backup(&[]).await.expect("backup");
+    assert_eq!(backup.network_key_info.frame_counter, 0);
+}
+
+#[tokio::test]
+async fn should_keep_missing_devices_in_backup() {
+    let path = temp_backup("missing_devices", &backup_fixture("matching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    harness.start().await.expect("start");
+
+    let mut backup_with_missing = backup_fixture("matching");
+    backup_with_missing["devices"]
+        .as_array_mut()
+        .expect("devices")
+        .push(serde_json::json!({
+            "nwk_address": "20fa",
+            "ieee_address": "00128d11124fa80b",
+            "link_key": {
+                "key": "bff550908aa1529ee90eea3c3bdc26fc",
+                "rx_counter": 0,
+                "tx_counter": 2,
+            },
+        }));
+    std::fs::write(&path, serde_json::to_string(&backup_with_missing).unwrap()).expect("write");
+
+    let devices = backup_with_missing["devices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|device| format!("0x{}", device["ieee_address"].as_str().unwrap()))
+        .collect::<Vec<_>>();
+    eprintln!(
+        "FILE {:?}",
+        std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("00128d11124fa80b")
+    );
+    eprintln!(
+        "PARSED {:?}",
+        zigbee_apiarist::utils::backup::from_unified_backup(
+            &serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
+        )
+        .map(|b| b.devices.len())
+    );
+    let backup = harness.adapter.backup(&devices).await.expect("backup");
+    eprintln!(
+        "DEVICES {:?}",
+        backup
+            .devices
+            .iter()
+            .map(|d| (
+                d.ieee_address
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>(),
+                d.link_key.is_some()
+            ))
+            .collect::<Vec<_>>()
+    );
+    let missing = backup
+        .devices
+        .iter()
+        .find(|device| {
+            device
+                .ieee_address
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+                == "00128d11124fa80b"
+        })
+        .expect("missing device");
+    assert_eq!(
+        backup.devices.len(),
+        backup_with_missing["devices"].as_array().unwrap().len()
+    );
+    assert_eq!(
+        missing.link_key.as_ref().expect("link key").key,
+        fixtures::hex("bff550908aa1529ee90eea3c3bdc26fc")
+    );
+}
+
+#[tokio::test]
+async fn should_fail_when_backup_file_is_corrupted() {
+    let path = temp_backup_raw("corrupted", "{");
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    let error = harness.start().await.expect_err("corrupted backup");
+    assert!(
+        error.contains("Coordinator backup is corrupted"),
+        "unexpected: {error}"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_to_restore_unified_backup_with_invalid_backup_version() {
+    let mut backup = backup_fixture("matching");
+    backup["metadata"]["version"] = serde_json::json!(99);
+    let path = temp_backup("bad_version", &backup);
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    let error = harness.start().await.expect_err("invalid version");
+    assert_eq!(
+        error,
+        "Unsupported open coordinator backup version (version=99)"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_to_restore_unified_backup_with_unsupported_backup_format() {
+    let mut backup = backup_fixture("matching");
+    backup["metadata"]
+        .as_object_mut()
+        .unwrap()
+        .remove("version");
+    let path = temp_backup("bad_format", &backup);
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    let error = harness.start().await.expect_err("unknown format");
+    assert_eq!(error, "Unknown backup format");
+}
+
+#[tokio::test]
+async fn should_fail_to_restore_unified_backup_with_insufficient_tclk_table_size() {
+    let path = temp_backup("small_tclk", &backup_fixture("matching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    for index in 0..16 {
+        harness.mock.nv(
+            zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::LEGACY_TCLK_TABLE_START + index,
+            None,
+        );
+    }
+    harness.mock.nv(
+        zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::LEGACY_TCLK_TABLE_START,
+        Some(vec![0u8; 20]),
+    );
+    let error = harness.start().await.expect_err("tclk size");
+    assert_eq!(
+        error,
+        "target adapter tclk table size insufficient (size=1)"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_to_restore_unified_backup_with_insufficient_aps_link_key_data_table_size() {
+    let path = temp_backup("small_aps", &backup_fixture("matching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    for index in 0..16 {
+        harness.mock.nv(
+            zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::APS_LINK_KEY_DATA_START + index,
+            None,
+        );
+    }
+    harness.mock.nv(
+        zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::APS_LINK_KEY_DATA_START,
+        Some(vec![0u8; 24]),
+    );
+    let error = harness.start().await.expect_err("aps size");
+    assert_eq!(
+        error,
+        "target adapter aps link key data table size insufficient (size=1)"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_to_restore_unified_backup_with_insufficient_security_manager_table_size() {
+    let path = temp_backup("small_security", &backup_fixture("matching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_3_aligned(&harness.mock);
+    harness.mock.nv(
+        zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::APS_LINK_KEY_TABLE,
+        Some(fixtures::hex("0000feff00000000")),
+    );
+    let error = harness.start().await.expect_err("security size");
+    assert_eq!(
+        error,
+        "target adapter security manager table size insufficient (size=1)"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_to_restore_unified_backup_with_1_2_adapter_backup_from_newer_adapter() {
+    let path = temp_backup("newer_backup_12", &backup_fixture("matching"));
+    let mut harness = harness(default_network_options(), &path);
+    fixtures::empty_12_unaligned(&harness.mock);
+    let error = harness.start().await.expect_err("newer backup");
+    assert_eq!(
+        error,
+        "your backup is from newer platform version (Z-Stack 3.0.x+) and cannot be restored onto Z-Stack 1.2 adapter - please remove backup before proceeding"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_to_create_backup_when_unable_to_read_ieee_address() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::commissioned_3_aligned(&harness.mock);
+    harness.mock.handle(
+        zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem::SYS,
+        "getExtAddr",
+        |_, _| support::Reply::raw(Vec::new()),
+    );
+    assert_eq!(harness.start().await.expect("start"), StartResult::Resumed);
+    let error = harness.adapter.backup(&[]).await.expect_err("ieee");
+    assert_eq!(error, "Failed to read adapter IEEE address");
+}
+
+#[tokio::test]
+async fn should_fail_to_create_backup_when_adapter_not_commissioned_missing_nib() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::empty_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Reset);
+    harness
+        .mock
+        .remove_nv(zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::NIB);
+    let error = harness.adapter.backup(&[]).await.expect_err("missing nib");
+    assert_eq!(error, "Cannot backup - adapter not commissioned");
+}
+
+#[tokio::test]
+async fn should_fail_to_create_backup_when_missing_active_key_info() {
+    let mut harness = harness(default_network_options(), "backup.json");
+    fixtures::empty_3_aligned(&harness.mock);
+    assert_eq!(harness.start().await.expect("start"), StartResult::Reset);
+    harness.mock.remove_nv(
+        zigbee_apiarist::adapter::z_stack::constants::common::NvItemsIds::NWK_ACTIVE_KEY_INFO,
+    );
+    let error = harness.adapter.backup(&[]).await.expect_err("missing key");
+    assert_eq!(error, "Cannot backup - missing active key info");
+}

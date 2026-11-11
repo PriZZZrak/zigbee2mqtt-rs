@@ -256,14 +256,11 @@ pub fn empty_12_unaligned(mock: &MockCoordinator) {
     mock.nv(NvItemsIds::ZNP_HAS_CONFIGURED_ZSTACK1, Some(vec![0x00]));
     mock.nv(NvItemsIds::NWKKEY, Some(vec![0u8; 21]));
     mock.nv(NvItemsIds::NIB, Some(hex(NIB_EMPTY_3_UNALIGNED)));
-    mock.nv(NvItemsIds::ADDRMGR, Some(hex(ADDRMGR_EMPTY)));
     mock.nv(
         NvItemsIds::APS_LINK_KEY_TABLE,
         Some(hex(APS_LINK_KEY_TABLE_EMPTY_UNALIGNED)),
     );
     table(mock, NvItemsIds::LEGACY_NWK_SEC_MATERIAL_TABLE_START, 4, 12);
-    table(mock, NvItemsIds::LEGACY_TCLK_TABLE_START, 16, 20);
-    table(mock, NvItemsIds::APS_LINK_KEY_DATA_START, 16, 24);
 }
 
 pub fn commissioned_12_unaligned(mock: &MockCoordinator) {
