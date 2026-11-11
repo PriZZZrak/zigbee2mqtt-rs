@@ -2,8 +2,7 @@
 
 Source: `.upstream/zigbee-herdsman/test/controller.test.ts` (v11.2.0), 311 `it` cases.
 Status is `PORTED` only when a Rust test asserts the upstream behaviour; the
-remaining rows are explicitly `PENDING` (port in progress) and must not be
-counted as parity.
+remaining rows are explicitly `PENDING`.
 
 | # | line | Upstream case | Rust test | Status |
 |---:|---:|---|---|---|
@@ -94,14 +93,14 @@ counted as parity.
 | 85 | 2499 | Device joins and interview iAs enrollment fails | `device_joins_and_interview_fails` | PORTED |
 | 86 | 2513 | Device joins and interview iAs enrollment throws | — | PENDING |
 | 87 | 2527 | Device joins, shouldnt enroll when already enrolled | — | PENDING |
-| 88 | 2541 | Receive zclData occupancy report | — | PENDING |
-| 89 | 2585 | Receive raw data | — | PENDING |
-| 90 | 2621 | Receive raw data from unknown cluster | — | PENDING |
+| 88 | 2541 | Receive zclData occupancy report | `receive_zcldata_occupancy_report` | PORTED |
+| 89 | 2585 | Receive raw data | `receive_raw_data_and_unknown_cluster` | PORTED |
+| 90 | 2621 | Receive raw data from unknown cluster | `receive_raw_data_and_unknown_cluster` | PORTED |
 | 91 | 2873 | Receive zclData from unkonwn device shouldnt emit anything | — | PENDING |
 | 92 | 2892 | Receive zclData with device deleted during processing (prevent race condition) | — | PENDING |
 | 93 | 2937 | Receive readResponse from unknown endpoint | — | PENDING |
-| 94 | 2981 | Receive cluster command | — | PENDING |
-| 95 | 3035 | Receive cluster command from unknown cluster | — | PENDING |
+| 94 | 2981 | Receive cluster command | `receive_raw_data_and_unknown_cluster` | PORTED |
+| 95 | 3035 | Receive cluster command from unknown cluster | `receive_raw_data_and_unknown_cluster` | PORTED |
 | 96 | 3070 | Receive zclData send default response | — | PENDING |
 | 97 | 3118 | Receive zclData dont send default resopnse with skipDefaultResponse | — | PENDING |
 | 98 | 3158 | Receive zclData dont send default resopnse when broadcast | — | PENDING |
@@ -319,4 +318,4 @@ counted as parity.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **73 / 311**.
+Ported: **78 / 311**.

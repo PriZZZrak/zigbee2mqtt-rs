@@ -1579,3 +1579,142 @@ async fn device_joins_and_interview_fails() {
         zigbee_apiarist::controller::database::DeviceType::Unknown
     );
 }
+
+#[tokio::test]
+async fn receive_zcldata_occupancy_report() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    let buffer = vec![24, 169, 10, 0, 0, 24, 1];
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0406,
+        data: buffer.clone(),
+        header: Some(header),
+        address: json!("0x129"),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let events = harness.take_events();
+    let message = events
+        .iter()
+        .find_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::Message(payload) => {
+                Some(payload.clone())
+            }
+            _ => None,
+        })
+        .expect("message");
+    assert_eq!(message.data["occupancy"], 1);
+    assert_eq!(message.r#type, "attributeReport");
+    assert_eq!(message.linkquality, 50);
+    assert_eq!(message.group_id, 1);
+    assert_eq!(message.device.linkquality(), Some(50));
+}
+
+#[tokio::test]
+async fn receive_raw_data_and_unknown_cluster() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    let header = zigbee_apiarist::zspec::zcl::zcl_header::Header::new(
+        zigbee_apiarist::zspec::zcl::zcl_header::FrameControl {
+            reserved_bits: 0,
+            frame_type: zigbee_apiarist::zspec::zcl::zcl_header::FrameType::SPECIFIC,
+            direction: zigbee_apiarist::zspec::zcl::zcl_header::Direction::CLIENT_TO_SERVER,
+            disable_default_response: false,
+            manufacturer_specific: false,
+        },
+        Some(0),
+        1,
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 9,
+        data: vec![0, 1],
+        header: Some(header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let events = harness.take_events();
+    let message = events
+        .iter()
+        .find_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::Message(payload) => {
+                Some(payload.clone())
+            }
+            _ => None,
+        })
+        .expect("raw message");
+    assert_eq!(message.r#type, "raw");
+    assert_eq!(message.data, json!([0, 1]));
+
+    harness.events.lock().unwrap().clear();
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 65000,
+        data: vec![0, 1, 2, 3],
+        header: None,
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let events = harness.take_events();
+    let message = events
+        .iter()
+        .find_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::Message(payload) => {
+                Some(payload.clone())
+            }
+            _ => None,
+        })
+        .expect("unknown cluster message");
+    assert_eq!(message.r#type, "raw");
+    assert_eq!(message.data, json!([0, 1, 2, 3]));
+}
+
+#[tokio::test]
+async fn receive_zcldata_from_unknown_device_should_emit_nothing() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0406,
+        data: vec![0x18, 0xa9, 0x0a, 0, 0, 24, 1],
+        header: None,
+        address: json!(9999),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    assert!(!harness.take_events().iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::Message(_)
+    )));
+}
