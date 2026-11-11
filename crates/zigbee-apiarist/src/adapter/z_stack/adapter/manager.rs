@@ -1004,6 +1004,13 @@ mod tests {
 
     impl FakeCoordinator {
         fn spawn(items: BTreeMap<u16, Vec<u8>>) -> (AdapterTransport, Self) {
+            Self::spawn_with_incoming(items, None)
+        }
+
+        fn spawn_with_incoming(
+            items: BTreeMap<u16, Vec<u8>>,
+            mut incoming: Option<Vec<u8>>,
+        ) -> (AdapterTransport, Self) {
             let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
             let mut transport = AdapterTransport::new(TransportOptions::new("/dev/null"));
             transport.attach_serial(reader).expect("attach");
@@ -1118,6 +1125,26 @@ mod tests {
                         let response =
                             Frame::new(Type::SRSP, frame.subsystem, frame.commandID, data, 0, 0);
                         peer.write_all(&response.to_buffer()).await.expect("write");
+                        if object.command.name == "dataRequest"
+                            || object.command.name == "dataRequestExt"
+                        {
+                            let transid =
+                                payload.get("transid").and_then(Value::as_u64).unwrap_or(0) as u8;
+                            let confirm = Frame::new(
+                                Type::AREQ,
+                                Subsystem::AF,
+                                128,
+                                vec![0, 1, transid],
+                                0,
+                                0,
+                            );
+                            peer.write_all(&confirm.to_buffer()).await.expect("write");
+                            if let Some(data) = incoming.take() {
+                                let message =
+                                    Frame::new(Type::AREQ, Subsystem::AF, 129, data, 0, 0);
+                                peer.write_all(&message.to_buffer()).await.expect("write");
+                            }
+                        }
                         if let Some((subsystem, command_id, data)) = extra {
                             let areq = Frame::new(Type::AREQ, subsystem, command_id, data, 0, 0);
                             peer.write_all(&areq.to_buffer()).await.expect("write");
@@ -1299,6 +1326,83 @@ mod tests {
             .expect("network params");
         assert_eq!(np.pan_id, PAN_ID);
         assert_eq!(np.channel, CHANNEL);
+        adapter.stop().await.expect("adapter stop");
+    }
+
+    #[tokio::test]
+    async fn zcl_response_matches_by_tsn_with_fake_coordinator() {
+        use crate::zspec::zcl::zcl_frame::Frame as ZclFrame;
+        use crate::zspec::zcl::zcl_header::{Direction, FrameType};
+
+        let response_frame = ZclFrame::create(
+            FrameType::GLOBAL as u8,
+            Direction::SERVER_TO_CLIENT as u8,
+            true,
+            None,
+            100,
+            "readRsp",
+            0,
+            serde_json::json!([{"attrId": 0, "attrData": 2, "dataType": 32, "status": 0}]),
+            serde_json::json!({}),
+            0,
+        );
+        let response_data = response_frame.to_buffer();
+        let mut incoming = Vec::new();
+        incoming.extend_from_slice(&12u16.to_le_bytes());
+        incoming.extend_from_slice(&0u16.to_le_bytes());
+        incoming.extend_from_slice(&2u16.to_le_bytes());
+        incoming.push(20);
+        incoming.push(1);
+        incoming.push(0);
+        incoming.push(101);
+        incoming.push(0);
+        incoming.extend_from_slice(&0u32.to_le_bytes());
+        incoming.push(0);
+        incoming.push(response_data.len() as u8);
+        incoming.extend_from_slice(&response_data);
+
+        let (transport, _coordinator) = FakeCoordinator::spawn_with_incoming(
+            items(0x55, PAN_ID, CHANNEL, &EXTENDED_PAN_ID),
+            Some(incoming),
+        );
+        let mut adapter = ZStackAdapter::new(
+            transport,
+            ConfigNetworkOptions {
+                pan_id: PAN_ID,
+                extended_pan_id: Some(EXTENDED_PAN_ID.to_vec()),
+                network_key: Some(NETWORK_KEY.to_vec()),
+                channel_list: vec![CHANNEL],
+                network_key_distribute: Some(false),
+            },
+            "/tmp/opencode/does-not-exist.json".to_string(),
+            AdapterOptions::default(),
+        );
+        adapter.start().await.expect("adapter start");
+
+        let frame = ZclFrame::create(
+            FrameType::GLOBAL as u8,
+            Direction::CLIENT_TO_SERVER as u8,
+            true,
+            None,
+            100,
+            "read",
+            0,
+            serde_json::json!([{"attrId": 0}]),
+            serde_json::json!({}),
+            0,
+        );
+        let result = adapter
+            .send_zcl_frame_to_endpoint("0x02", 2, 20, &frame, 10000, false, false, None, None)
+            .await
+            .expect("read response")
+            .expect("payload");
+        assert_eq!(result.cluster_id, 0);
+        assert_eq!(result.data, response_data);
+        assert_eq!(result.address, serde_json::json!(2));
+        assert_eq!(result.endpoint, 20);
+        assert_eq!(result.linkquality, 101);
+        assert_eq!(result.group_id, 12);
+
         adapter.stop().await.expect("adapter stop");
     }
 

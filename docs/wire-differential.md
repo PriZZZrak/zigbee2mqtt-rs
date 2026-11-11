@@ -77,6 +77,14 @@ covering `ping`, `version`, NV reads, `getDeviceInfo`, active endpoints,
 simple descriptors, endpoint registration, group lookup, `mgmtPermitJoinReq`
 and stop.
 
+### Incoming responses
+
+The same scripted coordinator also sends `AF incomingMsg` responses. A ZCL
+`read` request is matched with its `readRsp` by transaction sequence number;
+the test asserts the returned `ZclPayload` (cluster, data, address, endpoint,
+linkquality, groupID). This covers the response waitress path that cannot be
+tested with `disableResponse`.
+
 The same script is executed on upstream `zigbee-herdsman` v11.2.0 with
 `tools/oracle/wire_controller.mjs` (installed `dist` build, TCP transport).
 Both runs produce the **identical 38-frame transcript**, so the controller start
