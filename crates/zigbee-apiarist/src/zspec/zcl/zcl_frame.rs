@@ -127,13 +127,42 @@ impl Frame {
         _custom_clusters: Value,
         reserved_bits: u8,
     ) -> Self {
+        Self::create_with_custom_clusters(
+            frame_type,
+            direction,
+            disable_default_response,
+            manufacturer_code,
+            transaction_sequence_number,
+            command,
+            cluster,
+            payload,
+            &CustomClusters::empty(),
+            reserved_bits,
+        )
+    }
+
+    /// Upstream `ZclFrame.create(..., customClusters)` with an explicit
+    /// custom-cluster map (arrays `{}` in the original signature are
+    /// represented by `CustomClusters`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_custom_clusters(
+        frame_type: u8,
+        direction: u8,
+        disable_default_response: bool,
+        manufacturer_code: Option<u16>,
+        transaction_sequence_number: u8,
+        command: impl Into<CommandRef>,
+        cluster: impl Into<ClusterRef>,
+        payload: Value,
+        custom_clusters: &CustomClusters,
+        reserved_bits: u8,
+    ) -> Self {
         if frame_type > 1 {
             panic!("Frametype '{frame_type}' not valid");
         }
-        let custom_clusters = CustomClusters::empty();
         let cluster = match cluster.into() {
-            ClusterRef::Id(id) => Utils::get_cluster(id, manufacturer_code, &custom_clusters),
-            ClusterRef::Name(name) => Utils::get_cluster(name, manufacturer_code, &custom_clusters),
+            ClusterRef::Id(id) => Utils::get_cluster(id, manufacturer_code, custom_clusters),
+            ClusterRef::Name(name) => Utils::get_cluster(name, manufacturer_code, custom_clusters),
         };
         let is_specific = frame_type == 1;
         let command = resolve_command(&cluster, command.into(), is_specific, direction == 1);
@@ -354,18 +383,22 @@ fn push_u16(buffer: &mut Vec<u8>, value: u16) {
 }
 
 fn push_selector(buffer: &mut Vec<u8>, selector: &Value) {
-    let indicator = selector
+    if selector.is_null() {
+        return;
+    }
+    let indexes = selector
+        .get("indexes")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let indicator_type = selector
         .get("indicatorType")
         .and_then(Value::as_u64)
         .unwrap_or(0) as u8;
+    let indicator = indexes.len() as u8 + indicator_type;
     buffer.push(indicator);
-    if indicator != 0 {
-        if let Some(index) = selector.get("index").and_then(Value::as_u64) {
-            push_u16(buffer, index as u16);
-        }
-        if let Some(field) = selector.get("fieldIndex").and_then(Value::as_u64) {
-            push_u16(buffer, field as u16);
-        }
+    for index in indexes {
+        push_u16(buffer, u16_value(&index));
     }
 }
 
@@ -416,15 +449,41 @@ pub(crate) fn write_data_type(buffer: &mut Vec<u8>, data_type: u8, value: &Value
             let number = value.as_f64().unwrap_or(0.0);
             buffer.extend_from_slice(&number.to_le_bytes());
         }
-        0x41 | 0x42 => {
-            let bytes = value.as_str().map(str::as_bytes).unwrap_or_default();
+        0x41 => {
+            let bytes = if let Some(text) = value.as_str() {
+                text.as_bytes().to_vec()
+            } else {
+                value
+                    .as_array()
+                    .map(|items| items.iter().map(|item| u8_value(item)).collect())
+                    .unwrap_or_default()
+            };
             buffer.push(bytes.len() as u8);
-            buffer.extend_from_slice(bytes);
+            buffer.extend_from_slice(&bytes);
+        }
+        0x42 => {
+            if let Some(text) = value.as_str() {
+                let bytes = text.as_bytes();
+                buffer.push(bytes.len() as u8);
+                buffer.extend_from_slice(bytes);
+            } else if let Some(bytes) = value.as_array() {
+                // Upstream writeCharStr(number[]) writes the bytes without a length.
+                buffer.extend(bytes.iter().map(|item| u8_value(item)));
+            } else {
+                buffer.push(0xff);
+            }
         }
         0x43 | 0x44 => {
-            let bytes = value.as_str().map(str::as_bytes).unwrap_or_default();
+            let bytes = if let Some(text) = value.as_str() {
+                text.as_bytes().to_vec()
+            } else {
+                value
+                    .as_array()
+                    .map(|items| items.iter().map(|item| u8_value(item)).collect())
+                    .unwrap_or_default()
+            };
             push_u16(buffer, bytes.len() as u16);
-            buffer.extend_from_slice(bytes);
+            buffer.extend_from_slice(&bytes);
         }
         0xe2 => buffer.extend_from_slice(&(u64_value(value) as u32).to_le_bytes()),
         0xf0 => {
@@ -523,13 +582,23 @@ pub(crate) fn read_data_type(buffer: &[u8], position: &mut usize, data_type: u8)
                 bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]
             ]))
         }
-        0x41 | 0x42 => {
-            let length = take(1, position).first().copied().unwrap_or(0) as usize;
-            json!(String::from_utf8_lossy(&take(length, position)).to_string())
+        0x41 | 0x43 => {
+            let length = if data_type == 0x41 {
+                take(1, position).first().copied().unwrap_or(0) as usize
+            } else {
+                let bytes = take(2, position);
+                u16::from_le_bytes([bytes[0], bytes[1]]) as usize
+            };
+            let bytes = take(length, position);
+            json!(bytes)
         }
-        0x43 | 0x44 => {
-            let bytes = take(2, position);
-            let length = u16::from_le_bytes([bytes[0], bytes[1]]) as usize;
+        0x42 | 0x44 => {
+            let length = if data_type == 0x42 {
+                take(1, position).first().copied().unwrap_or(0) as usize
+            } else {
+                let bytes = take(2, position);
+                u16::from_le_bytes([bytes[0], bytes[1]]) as usize
+            };
             json!(String::from_utf8_lossy(&take(length, position)).to_string())
         }
         0xe2 => json!(read_uint(&take(4, position))),
@@ -621,7 +690,11 @@ fn encode_payload(command: &str, payload: &Value, buffer: &mut Vec<u8>) {
             for item in items {
                 push_u16(buffer, u16_value(&item["attrId"]));
                 if command == "readRsp" {
-                    buffer.push(u8_value(&item["status"]));
+                    let status = u8_value(&item["status"]);
+                    buffer.push(status);
+                    if status != 0 {
+                        continue;
+                    }
                 }
                 let data_type = u8_value(&item["dataType"]);
                 buffer.push(data_type);
@@ -635,14 +708,20 @@ fn encode_payload(command: &str, payload: &Value, buffer: &mut Vec<u8>) {
                 if command == "writeStructured" {
                     push_selector(buffer, &item["selector"]);
                 }
-                let data_type = u8_value(&item["dataType"]);
-                buffer.push(data_type);
                 let value = if command == "writeStructured" {
                     &item["elementData"]
                 } else {
                     &item["attrData"]
                 };
-                write_data_type(buffer, data_type, value);
+                let data_type = u8_value(&item["dataType"]);
+                buffer.push(data_type);
+                if command == "writeStructured" && item.get("dataType").is_none() {
+                    if let Some(bytes) = value.as_array() {
+                        buffer.extend(bytes.iter().map(|value| u8_value(value)));
+                    }
+                } else {
+                    write_data_type(buffer, data_type, value);
+                }
             }
         }
         "writeRsp" => {
@@ -800,14 +879,16 @@ fn decode_payload(command: &str, buffer: &[u8], header_length: usize, cluster_na
     let read_selector = |position: &mut usize| -> Value {
         let indicator = read_u8(position);
         if indicator == 0 {
-            json!({"indicatorType": indicator})
-        } else {
-            json!({
-                "indicatorType": indicator,
-                "index": read_u16(position),
-                "fieldIndex": read_u16(position),
-            })
+            return json!({"indicatorType": 0});
         }
+        if indicator < 0x10 {
+            let mut indexes = Vec::new();
+            for _ in 0..indicator {
+                indexes.push(json!(read_u16(position)));
+            }
+            return json!({"indexes": indexes});
+        }
+        panic!("Read structured selector was outside [0-15] range.");
     };
     let mut items = Vec::new();
     match command {
@@ -830,14 +911,17 @@ fn decode_payload(command: &str, buffer: &[u8], header_length: usize, cluster_na
                 } else {
                     None
                 };
+                if command == "readRsp" && status != Some(0) {
+                    items.push(json!({"attrId": attr_id, "status": status.unwrap()}));
+                    continue;
+                }
                 let data_type = read_u8(&mut position);
                 let mut data = if attr_id == 0xff01 && data_type == 0x42 {
-                    let length = buffer.get(position).copied().unwrap_or(0) as usize;
-                    position += 1;
-                    let end = (position + length).min(buffer.len());
-                    let mut inner = position;
-                    let value = read_mi_struct(&buffer[..end], &mut inner);
-                    position = end;
+                    // Skip the length byte; upstream readMiStruct treats it as
+                    // a field-count bound and stops at the buffer end.
+                    let mut inner = position + 1;
+                    let value = read_mi_struct(buffer, &mut inner);
+                    position = buffer.len();
                     value
                 } else {
                     read_data_type(buffer, &mut position, data_type)
@@ -1080,6 +1164,14 @@ fn read_mi_struct(buffer: &[u8], position: &mut usize) -> Value {
         *position += 1;
         let value = read_data_type(buffer, position, data_type);
         output.insert(id.to_string(), value);
+        let remaining = buffer.len() - *position;
+        if remaining <= 1 {
+            if remaining == 1 {
+                // Some Xiaomi structs have a trailing byte, skip it.
+                *position += 1;
+            }
+            break;
+        }
     }
     Value::Object(output)
 }
@@ -1445,7 +1537,7 @@ fn encode_parameters(command: &Command, payload: &Value, buffer: &mut Vec<u8>) {
             for item in value.as_array().cloned().unwrap_or_default() {
                 push_u16(buffer, u16_value(&item));
             }
-        } else if parameter.buffalo_type == Some(BuffaloZclDataType::GPD_FRAME) {
+        } else if parameter.buffalo_type.is_some() {
             let mut buffalo = BuffaloZcl::new(Vec::new());
             buffalo.write(parameter_type_code(parameter), value, &json!({}));
             buffer.extend_from_slice(&buffalo.get_written());
@@ -1483,7 +1575,7 @@ fn decode_parameters(command: &Command, buffer: &[u8], header_length: usize) -> 
                 items.push(json!(u16::from_le_bytes([bytes[0], bytes[1]])));
             }
             Value::Array(items)
-        } else if parameter.buffalo_type == Some(BuffaloZclDataType::GPD_FRAME) {
+        } else if parameter.buffalo_type.is_some() {
             let mut buffalo = BuffaloZcl::new(buffer.to_vec());
             buffalo.set_position(position);
             let options = json!({"payload": current});
@@ -1500,12 +1592,24 @@ fn decode_parameters(command: &Command, buffer: &[u8], header_length: usize) -> 
             }
             read_data_type(buffer, &mut position, parameter.r#type as u8)
         };
+        let value = if matches!(value, Value::Array(_) | Value::Object(_)) {
+            value
+        } else {
+            crate::zspec::zcl::utils::Utils::process_parameter_read(
+                parameter,
+                crate::zspec::zcl::utils::ZclValue::from_json(&value),
+            )
+            .to_json()
+        };
         payload.insert(parameter.name.to_string(), value);
     }
     Value::Object(payload)
 }
 
 fn parameter_size(parameter: &Parameter, payload: &serde_json::Map<String, Value>) -> usize {
+    if parameter.buffalo_type.is_some() {
+        return 0;
+    }
     if parameter.name == "grouplist" {
         return payload
             .get("groupcount")

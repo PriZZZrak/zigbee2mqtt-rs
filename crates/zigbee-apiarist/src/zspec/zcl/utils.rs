@@ -633,7 +633,7 @@ impl Utils {
         match key {
             ClusterKey::Id(id) => builtin_cluster_by_id(id),
             ClusterKey::Name(name) => builtin_cluster_by_name(&name)
-                .unwrap_or_else(|| panic!("Cluster with name '{name}' does not exist")),
+                .unwrap_or_else(|| panic!("Status 'UNSUPPORTED_CLUSTER' {name}")),
         }
     }
 
@@ -665,6 +665,10 @@ impl Utils {
     /// Upstream `Utils.getClusterCommand(cluster, key)`.
     pub fn get_cluster_command(cluster: &Cluster, key: impl Into<CommandKey>) -> Command {
         let key = key.into();
+        let detail = match &key {
+            CommandKey::Id(id) => id.to_string(),
+            CommandKey::Name(name) => name.clone(),
+        };
         let command = match key {
             CommandKey::Id(id) => cluster
                 .commands
@@ -676,12 +680,16 @@ impl Utils {
 
         command
             .cloned()
-            .unwrap_or_else(|| panic!("Command does not exist"))
+            .unwrap_or_else(|| panic!("Status 'UNSUP_COMMAND' {}:{detail}", cluster.name))
     }
 
     /// Upstream `Utils.getClusterCommandResponse(cluster, key)`.
     pub fn get_cluster_command_response(cluster: &Cluster, key: impl Into<CommandKey>) -> Command {
         let key = key.into();
+        let detail = match &key {
+            CommandKey::Id(id) => id.to_string(),
+            CommandKey::Name(name) => name.clone(),
+        };
         let command = match key {
             CommandKey::Id(id) => cluster
                 .commandsResponse
@@ -693,13 +701,17 @@ impl Utils {
 
         command
             .cloned()
-            .unwrap_or_else(|| panic!("Command response does not exist"))
+            .unwrap_or_else(|| panic!("Status 'UNSUP_COMMAND' response {}:{detail}", cluster.name))
     }
 
     /// Upstream `Utils.getGlobalCommand(key)`.
     pub fn get_global_command(key: impl Into<CommandKey>) -> Command {
         use crate::zspec::zcl::definition::foundation::Foundation;
         let key = key.into();
+        let detail = match &key {
+            CommandKey::Id(id) => id.to_string(),
+            CommandKey::Name(name) => name.clone(),
+        };
         let name = match key {
             CommandKey::Id(id) => match id {
                 0x00 => "read",
@@ -725,7 +737,7 @@ impl Utils {
                 0x14 => "discoverCommandsGenRsp",
                 0x15 => "discoverExt",
                 0x16 => "discoverExtRsp",
-                _ => panic!("Global command does not exist"),
+                _ => panic!("Status 'UNSUP_COMMAND' foundation:{detail}"),
             },
             CommandKey::Name(name) => match name.as_str() {
                 "read" => "read",
@@ -751,7 +763,7 @@ impl Utils {
                 "discoverCommandsGenRsp" => "discoverCommandsGenRsp",
                 "discoverExt" => "discoverExt",
                 "discoverExtRsp" => "discoverExtRsp",
-                _ => panic!("Global command does not exist"),
+                _ => panic!("Status 'UNSUP_COMMAND' foundation:{detail}"),
             },
         };
         let (id, response) = match name {

@@ -52,7 +52,7 @@ impl BuffaloZcl {
             if let Some(bytes) = buffer_like(value) {
                 return self.write_bytes(&bytes);
             }
-            panic!("USE_DATA_TYPE requires dataType option");
+            panic!("Cannot write USE_DATA_TYPE without dataType option specified");
         }
         if data_type == BuffaloZclDataType::BUFFER as u32 {
             if let Some(bytes) = buffer_like(value) {
@@ -121,13 +121,18 @@ impl BuffaloZcl {
         }
         if data_type == BuffaloZclDataType::EXTENSION_FIELD_SETS as u32 {
             for item in value.as_array().cloned().unwrap_or_default() {
-                let field = buffer_like(&item["extField"]).unwrap_or_default();
-                self.write_u16(item["clstId"].as_u64().unwrap_or(0) as u16);
+                let cluster = item["clstId"].as_u64().unwrap_or(0) as u16;
+                self.write_u16(cluster);
                 self.write_bytes(&[item["len"].as_u64().unwrap_or(0) as u8]);
-                if field.len() == 8 && field.iter().copied().eq(1..=8u8) {
-                    self.write_bytes(&[1, 0, 2, 0, 3, 0, 4, 5, 6, 7, 0, 8, 0]);
-                } else {
-                    self.write_bytes(&field);
+                for (index, entry) in item["extField"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .iter()
+                    .enumerate()
+                {
+                    let dtype = extension_field_sets_data_type(cluster, index);
+                    self.write_dtype(dtype as u8, entry);
                 }
             }
             return;
@@ -169,7 +174,7 @@ impl BuffaloZcl {
                 self.write_bytes(&bytes);
                 return;
             }
-            panic!("Invalid data type {data_type}");
+            panic!("Write for '{data_type}' not available");
         };
         self.write_dtype(dtype, value);
     }
@@ -194,10 +199,17 @@ impl BuffaloZcl {
             || data_type == BuffaloZclDataType::LIST_UINT32 as u32
             || data_type == BuffaloZclDataType::LIST_ZONEINFO as u32
         {
+            let name = match data_type {
+                value if value == BuffaloZclDataType::LIST_UINT8 as u32 => "LIST_UINT8",
+                value if value == BuffaloZclDataType::LIST_UINT16 as u32 => "LIST_UINT16",
+                value if value == BuffaloZclDataType::LIST_UINT24 as u32 => "LIST_UINT24",
+                value if value == BuffaloZclDataType::LIST_UINT32 as u32 => "LIST_UINT32",
+                _ => "LIST_ZONEINFO",
+            };
             let length = options
                 .get("length")
                 .and_then(Value::as_u64)
-                .unwrap_or_else(|| panic!("length option required"))
+                .unwrap_or_else(|| panic!("Cannot read {name} without length option specified"))
                 as usize;
             let mut items = Vec::new();
             for _ in 0..length {
@@ -229,10 +241,9 @@ impl BuffaloZcl {
             );
         }
         if data_type == BuffaloZclDataType::LIST_MIBOXER_ZONES as u32 {
-            let length = options.get("length").and_then(Value::as_u64).unwrap_or(0) as usize;
-            let _count = self.read_u8();
+            let count = self.read_u8() as usize;
             let mut items = Vec::new();
-            for _ in 0..length {
+            for _ in 0..count {
                 let group = self.read_u16();
                 let zone = self.read_u8();
                 items.push(json!({"zoneNum": zone, "groupId": group}));
@@ -241,13 +252,14 @@ impl BuffaloZcl {
         }
         if data_type == BuffaloZclDataType::LIST_TUYA_DATAPOINT_VALUES as u32 {
             let mut items = Vec::new();
-            while self.is_more_by(4) {
+            while self.position < self.buffer.len() {
+                if !self.is_more_by(4) {
+                    self.position = self.buffer.len();
+                    break;
+                }
                 let dp = self.read_u8();
                 let datatype = self.read_u8();
                 let length = ((self.read_u8() as usize) << 8) | self.read_u8() as usize;
-                if !self.is_more_by(length) {
-                    break;
-                }
                 items.push(json!({
                     "dp": dp,
                     "datatype": datatype,
@@ -261,31 +273,34 @@ impl BuffaloZcl {
             while self.is_more_by(3) {
                 let cluster = self.read_u16();
                 let length = self.read_u8() as usize;
+                let end = self.position + length;
                 if !self.is_more_by(length) {
                     break;
                 }
-                let raw = self.read_bytes(length);
-                let ext_field = if length == 13 && raw == [1, 0, 2, 0, 3, 0, 4, 5, 6, 7, 0, 8, 0] {
-                    vec![1, 2, 3, 4, 5, 6, 7, 8]
-                } else {
-                    raw
-                };
+                let mut ext_field = Vec::new();
+                let mut index = 0usize;
+                while self.position < end {
+                    let dtype = extension_field_sets_data_type(cluster, index);
+                    ext_field.push(self.read_dtype(dtype as u8));
+                    index += 1;
+                }
                 items.push(json!({"clstId": cluster, "len": length, "extField": ext_field}));
             }
             return Value::Array(items);
         }
         if data_type == BuffaloZclDataType::LIST_THERMO_TRANSITIONS as u32 {
-            let payload = options
-                .get("payload")
-                .unwrap_or_else(|| panic!("payload option required"));
+            let error = || -> ! {
+                panic!("Cannot read LIST_THERMO_TRANSITIONS without required payload options specified")
+            };
+            let payload = options.get("payload").unwrap_or_else(|| error());
             let mode = payload
                 .get("mode")
                 .and_then(Value::as_u64)
-                .unwrap_or_else(|| panic!("mode option required"));
+                .unwrap_or_else(|| error());
             let count = payload
                 .get("numoftrans")
                 .and_then(Value::as_u64)
-                .unwrap_or_else(|| panic!("numoftrans option required"));
+                .unwrap_or_else(|| error());
             let mut items = Vec::new();
             for _ in 0..count {
                 let time = self.read_u16();
@@ -324,7 +339,7 @@ impl BuffaloZcl {
             return self.read_gpd_frame(options);
         }
         let Some(dtype) = data_type_to_dtype(data_type) else {
-            panic!("Invalid data type {data_type}");
+            panic!("Read for '{data_type}' not available");
         };
         self.read_dtype(dtype)
     }
@@ -412,9 +427,13 @@ impl BuffaloZcl {
         let Some(payload) = options.get("payload") else {
             panic!("Cannot read GPD_FRAME without required payload options specified");
         };
-        let Some(size) = payload.get("payloadSize").and_then(Value::as_u64) else {
+        let Some(payload_size) = payload.get("payloadSize") else {
             panic!("Cannot read GPD_FRAME without required payload options specified");
         };
+        if payload_size.is_null() {
+            return json!({});
+        }
+        let size = payload_size.as_u64().unwrap_or(0);
         if size == 0 {
             return json!({});
         }
@@ -1009,8 +1028,11 @@ impl BuffaloZcl {
     }
 
     fn read_bytes(&mut self, length: usize) -> Vec<u8> {
-        let end = (self.position + length).min(self.buffer.len());
-        let values = self.buffer[self.position..end].to_vec();
+        // Upstream readBuffer advances by the requested length and returns a
+        // shorter slice when the buffer ends early.
+        let end = self.position + length;
+        let available = end.min(self.buffer.len());
+        let values = self.buffer[self.position..available].to_vec();
         self.position = end;
         values
     }
@@ -1077,20 +1099,74 @@ fn buffer_like(value: &Value) -> Option<Vec<u8>> {
                 .collect(),
         );
     }
-    if let Some(text) = value.as_str() {
-        return Some(text.as_bytes().to_vec());
-    }
     None
 }
 
 fn element_type(value: Value) -> u8 {
     match value {
         Value::Number(number) => number.as_u64().unwrap_or(0) as u8,
-        Value::String(name) => match name.as_str() {
-            "UINT16" => 0x21,
-            "CHAR_STR" => 0x42,
-            _ => 0,
-        },
+        Value::String(name) => {
+            use crate::zspec::zcl::definition::enums::DataType;
+            match name.as_str() {
+                "NO_DATA" => DataType::NO_DATA as u8,
+                "DATA8" => DataType::DATA8 as u8,
+                "DATA16" => DataType::DATA16 as u8,
+                "DATA24" => DataType::DATA24 as u8,
+                "DATA32" => DataType::DATA32 as u8,
+                "DATA40" => DataType::DATA40 as u8,
+                "DATA48" => DataType::DATA48 as u8,
+                "DATA56" => DataType::DATA56 as u8,
+                "DATA64" => DataType::DATA64 as u8,
+                "BOOLEAN" => DataType::BOOLEAN as u8,
+                "BITMAP8" => DataType::BITMAP8 as u8,
+                "BITMAP16" => DataType::BITMAP16 as u8,
+                "BITMAP24" => DataType::BITMAP24 as u8,
+                "BITMAP32" => DataType::BITMAP32 as u8,
+                "BITMAP40" => DataType::BITMAP40 as u8,
+                "BITMAP48" => DataType::BITMAP48 as u8,
+                "BITMAP56" => DataType::BITMAP56 as u8,
+                "BITMAP64" => DataType::BITMAP64 as u8,
+                "UINT8" => DataType::UINT8 as u8,
+                "UINT16" => DataType::UINT16 as u8,
+                "UINT24" => DataType::UINT24 as u8,
+                "UINT32" => DataType::UINT32 as u8,
+                "UINT40" => DataType::UINT40 as u8,
+                "UINT48" => DataType::UINT48 as u8,
+                "UINT56" => DataType::UINT56 as u8,
+                "UINT64" => DataType::UINT64 as u8,
+                "INT8" => DataType::INT8 as u8,
+                "INT16" => DataType::INT16 as u8,
+                "INT24" => DataType::INT24 as u8,
+                "INT32" => DataType::INT32 as u8,
+                "INT40" => DataType::INT40 as u8,
+                "INT48" => DataType::INT48 as u8,
+                "INT56" => DataType::INT56 as u8,
+                "INT64" => DataType::INT64 as u8,
+                "ENUM8" => DataType::ENUM8 as u8,
+                "ENUM16" => DataType::ENUM16 as u8,
+                "SEMI_PREC" => DataType::SEMI_PREC as u8,
+                "SINGLE_PREC" => DataType::SINGLE_PREC as u8,
+                "DOUBLE_PREC" => DataType::DOUBLE_PREC as u8,
+                "OCTET_STR" => DataType::OCTET_STR as u8,
+                "CHAR_STR" => DataType::CHAR_STR as u8,
+                "LONG_OCTET_STR" => DataType::LONG_OCTET_STR as u8,
+                "LONG_CHAR_STR" => DataType::LONG_CHAR_STR as u8,
+                "ARRAY" => DataType::ARRAY as u8,
+                "STRUCT" => DataType::STRUCT as u8,
+                "SET" => DataType::SET as u8,
+                "BAG" => DataType::BAG as u8,
+                "TOD" => DataType::TOD as u8,
+                "DATE" => DataType::DATE as u8,
+                "UTC" => DataType::UTC as u8,
+                "CLUSTER_ID" => DataType::CLUSTER_ID as u8,
+                "ATTR_ID" => DataType::ATTR_ID as u8,
+                "BAC_OID" => DataType::BAC_OID as u8,
+                "IEEE_ADDR" => DataType::IEEE_ADDR as u8,
+                "SEC_KEY" => DataType::SEC_KEY as u8,
+                "UNKNOWN" => DataType::UNKNOWN as u8,
+                _ => 0,
+            }
+        }
         _ => 0,
     }
 }
@@ -1221,4 +1297,21 @@ fn attribute_value(cluster: u16, attr: u16) -> Value {
     } else {
         json!(attr)
     }
+}
+
+/// Upstream `EXTENSION_FIELD_SETS_DATA_TYPE`.
+fn extension_field_sets_data_type(
+    cluster: u16,
+    index: usize,
+) -> crate::zspec::zcl::definition::enums::DataType {
+    use crate::zspec::zcl::definition::enums::DataType::{UINT16, UINT8};
+    let types: &[crate::zspec::zcl::definition::enums::DataType] = match cluster {
+        6 | 8 => &[UINT8],
+        258 => &[UINT8, UINT8],
+        768 => &[UINT16, UINT16, UINT16, UINT8, UINT8, UINT8, UINT16, UINT16],
+        other => panic!("No extension field set data types for cluster '{other}'"),
+    };
+    *types.get(index).unwrap_or_else(|| {
+        panic!("No extension field set data type for cluster '{cluster}' index '{index}'")
+    })
 }
