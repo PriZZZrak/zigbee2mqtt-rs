@@ -70,16 +70,38 @@ info). The fake answers `SYS version/ping`, `osalNvLength/ReadExt/WriteExt`,
 `extFindGroup`, `AF register/dataRequest/dataRequestExt` and
 `mgmtPermitJoinReq`.
 
-The test records every outgoing UNPI frame to a file and asserts the ordered
-presence of the startup stages: `ping`, `version`, `getDeviceInfo`,
-`osalNvLength`, `activeEpReq`, `simpleDescReq`, `mgmtPermitJoinReq`.
+The test records every outgoing UNPI frame and compares the complete ordered
+transcript byte-for-byte with
+`crates/zigbee-apiarist/tests/fixtures/controller_start_wire.hex` — 38 frames
+covering `ping`, `version`, NV reads, `getDeviceInfo`, active endpoints,
+simple descriptors, endpoint registration, group lookup, `mgmtPermitJoinReq`
+and stop.
+
+The same script is executed on upstream `zigbee-herdsman` v11.2.0 with
+`tools/oracle/wire_controller.mjs` (installed `dist` build, TCP transport).
+Both runs produce the **identical 38-frame transcript**, so the controller start
+and stop path is now verified against upstream without hardware.
+
+This differential exposed and fixed two real port bugs:
+
+- `Zdo.Buffalo.buildRequest` was adding an extra leading zero to most ZDO
+  request payloads; upstream reserves that byte only for `hasZdoMessageOverhead`.
+- the green-power group was configured as `242` instead of `GP_GROUP_ID`
+  (`0x0b84`).
+
 This is the coordinator-only smoke that HIL would otherwise provide.
+
+## Regenerate the fixture
+
+```bash
+/config/.local/bin/tsx tools/oracle/wire_controller.mjs /tmp/upstream-start.hex
+cp /tmp/upstream-start.hex crates/zigbee-apiarist/tests/fixtures/controller_start_wire.hex
+cargo test -p zigbee-apiarist --lib adapter::z_stack::adapter::manager::tests::controller_start_with_fake_coordinator
+```
 
 ## Next slice
 
-- Run the upstream Node `Controller` against the same script and commit both
-  transcripts as a fixture.
-- Compare the full ordered frame sequence (start, coordinator creation,
-  `permitJoin`, ZCL endpoint/broadcast, stop).
 - Add retry/route-discovery and incoming-message transcripts from
   `znp.test.ts` / `adapter.test.ts`.
+- Extend the scripted coordinator to the remaining R1 bridge surfaces
+  (database/state/config, HA discovery, Windfront).

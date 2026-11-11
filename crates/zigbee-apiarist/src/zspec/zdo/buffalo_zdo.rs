@@ -321,13 +321,14 @@ fn push_eui64(buffer: &mut Vec<u8>, value: &Value, be: bool) {
 
 fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: bool) -> Vec<u8> {
     let mut buffer = Vec::new();
+    if overhead {
+        buffer.push(0);
+    }
     match cluster_id {
         ClusterId::ACTIVE_ENDPOINTS_REQUEST | ClusterId::POWER_DESCRIPTOR_REQUEST => {
-            buffer.push(0);
             push_u16(&mut buffer, u16_arg(&args[0]), be);
         }
         ClusterId::NODE_DESCRIPTOR_REQUEST => {
-            buffer.push(0);
             push_u16(&mut buffer, u16_arg(&args[0]), be);
             if let Some(tlv) = args.get(1).filter(|value| value.is_object()) {
                 let mut writer = BuffaloZdo::new(Vec::new());
@@ -339,12 +340,10 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
             }
         }
         ClusterId::SIMPLE_DESCRIPTOR_REQUEST => {
-            buffer.push(0);
             push_u16(&mut buffer, u16_arg(&args[0]), be);
             buffer.push(u64_arg(&args[1]) as u8);
         }
         ClusterId::MATCH_DESCRIPTORS_REQUEST => {
-            buffer.push(0);
             push_u16(&mut buffer, u16_arg(&args[0]), be);
             push_u16(&mut buffer, u16_arg(&args[1]), be);
             for list in &args[2..4] {
@@ -356,7 +355,6 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
             }
         }
         ClusterId::BIND_REQUEST | ClusterId::UNBIND_REQUEST => {
-            buffer.push(0);
             push_eui64(&mut buffer, &args[0], be);
             buffer.push(u64_arg(&args[1]) as u8);
             push_u16(&mut buffer, u16_arg(&args[2]), be);
@@ -378,11 +376,9 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
         | ClusterId::LQI_TABLE_REQUEST
         | ClusterId::ROUTING_TABLE_REQUEST
         | ClusterId::NWK_IEEE_JOINING_LIST_REQUEST => {
-            buffer.push(0);
             buffer.push(u64_arg(&args[0]) as u8);
         }
         ClusterId::LEAVE_REQUEST => {
-            buffer.push(0);
             push_eui64(&mut buffer, &args[0], be);
             buffer.push(u64_arg(&args[1]) as u8);
             if be {
@@ -390,7 +386,6 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
             }
         }
         ClusterId::PERMIT_JOINING_REQUEST => {
-            buffer.push(0);
             buffer.push(u64_arg(&args[0]) as u8);
             if args.len() > 1 && !args[1].is_null() {
                 buffer.push(u64_arg(&args[1]) as u8);
@@ -404,25 +399,16 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
             }
         }
         ClusterId::NETWORK_ADDRESS_REQUEST => {
-            if overhead {
-                buffer.push(0);
-            }
             push_eui64(&mut buffer, &args[0], be);
             buffer.push(bool_arg(&args[1]));
             buffer.push(u64_arg(&args[2]) as u8);
         }
         ClusterId::IEEE_ADDRESS_REQUEST => {
-            if overhead {
-                buffer.push(0);
-            }
             push_u16(&mut buffer, u16_arg(&args[0]), be);
             buffer.push(bool_arg(&args[1]));
             buffer.push(u64_arg(&args[2]) as u8);
         }
         ClusterId::NWK_UPDATE_REQUEST => {
-            if overhead {
-                buffer.push(0);
-            }
             let mask = crate::zspec::utils::channels_to_uint32_mask(&bytes_arg(&args[0]));
             push_u32(&mut buffer, mask, be);
             if u64_arg(&args[1]) == 0xfe {
@@ -445,7 +431,6 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
         }
         ClusterId::NWK_ENHANCED_UPDATE_REQUEST => {
             if let Some(pages) = args[0].as_array() {
-                buffer.push(0);
                 buffer.push(pages.len() as u8);
                 for page in pages {
                     push_u32(&mut buffer, u64_arg(page) as u32, be);
@@ -466,7 +451,6 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
                     buffer.push(u64_arg(&args[5]) as u8);
                 }
             } else {
-                buffer.push(0);
                 buffer.push(1);
                 push_u32(&mut buffer, u64_arg(&args[0]) as u32, be);
                 buffer.push(0xfe);
@@ -477,7 +461,6 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
         ClusterId::CLEAR_ALL_BINDINGS_REQUEST | ClusterId::DECOMMISSION_REQUEST => {
             let list = args[0]["eui64List"].as_array().cloned().unwrap_or_default();
             buffer.push(0);
-            buffer.push(0);
             buffer.push((8 * list.len() + 1 - 1) as u8);
             buffer.push(list.len() as u8);
             for eui in list {
@@ -486,7 +469,6 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
         }
         ClusterId::PARENT_ANNOUNCE => {
             let list = args[0].as_array().cloned().unwrap_or_default();
-            buffer.push(0);
             buffer.push(list.len() as u8);
             for eui in list {
                 push_eui64(&mut buffer, &eui, be);
@@ -494,20 +476,17 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
         }
         ClusterId::CHALLENGE_REQUEST => {
             buffer.push(0);
-            buffer.push(0);
             buffer.push(8 + 8 - 1);
             push_eui64(&mut buffer, &args[0]["senderEui64"], be);
             buffer.extend_from_slice(&bytes_arg(&args[0]["challengeValue"]));
         }
         ClusterId::START_KEY_NEGOTIATION_REQUEST => {
             buffer.push(0);
-            buffer.push(0);
             buffer.push(8 + 32 - 1);
             push_eui64(&mut buffer, &args[0]["eui64"], be);
             buffer.extend_from_slice(&bytes_arg(&args[0]["publicPoint"]));
         }
         ClusterId::START_KEY_UPDATE_REQUEST => {
-            buffer.push(0);
             buffer.push(0);
             buffer.push(8 + 2 - 1);
             buffer.push(u64_arg(&args[0]["protocol"]) as u8);
@@ -523,25 +502,21 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
         ClusterId::RETRIEVE_AUTHENTICATION_TOKEN_REQUEST => {
             buffer.push(0);
             buffer.push(0);
-            buffer.push(0);
             buffer.push(u64_arg(&args[0]["tlvTypeTagId"]) as u8);
         }
         ClusterId::GET_AUTHENTICATION_LEVEL_REQUEST => {
-            buffer.push(0);
             buffer.push(0);
             buffer.push(8 - 1);
             push_eui64(&mut buffer, &args[0]["ieee"], be);
         }
         ClusterId::GET_CONFIGURATION_REQUEST => {
             let list = args[0].as_array().cloned().unwrap_or_default();
-            buffer.push(0);
             buffer.push(list.len() as u8);
             for item in list {
                 buffer.push(u64_arg(&item) as u8);
             }
         }
         ClusterId::SYSTEM_SERVER_DISCOVERY_REQUEST => {
-            buffer.push(0);
             let mask = server_mask_from_value(&args[0]);
             push_u16(&mut buffer, mask, be);
         }
@@ -550,7 +525,6 @@ fn build_request_internal(overhead: bool, cluster_id: u16, args: &[Value], be: b
                 .as_array()
                 .cloned()
                 .unwrap_or_default();
-            buffer.push(0);
             buffer.push(0);
             buffer.push((1 + 4 * pages.len()) as u8);
             buffer.push(pages.len() as u8);

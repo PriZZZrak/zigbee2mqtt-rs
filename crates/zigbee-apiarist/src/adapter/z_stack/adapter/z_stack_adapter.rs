@@ -366,7 +366,7 @@ impl ZStackAdapter {
         let manager_options = StartupOptions {
             version: version_enum,
             network_options: self.network_options.clone(),
-            green_power_group: 242,
+            green_power_group: crate::zspec::consts::GP_GROUP_ID,
             backup_path: self.backup_path.clone(),
             adapter_options: self.adapter_options.clone(),
         };

@@ -1182,7 +1182,7 @@ mod tests {
                 channel_list: vec![channel],
                 network_key_distribute: Some(false),
             },
-            green_power_group: 242,
+            green_power_group: crate::zspec::consts::GP_GROUP_ID,
             backup_path: path.to_string(),
             adapter_options: AdapterOptions::default(),
         }
@@ -1364,40 +1364,29 @@ mod tests {
         controller.stop().await.expect("controller stop");
 
         let frames = coordinator.frames();
-        assert!(frames.len() > 5);
-        let names: Vec<String> = frames
-            .iter()
-            .filter_map(|hex| {
-                let bytes = (0..hex.len())
-                    .step_by(2)
-                    .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).unwrap())
-                    .collect::<Vec<u8>>();
-                let length = bytes[1] as usize;
-                let frame = Frame::from_buffer(length as u8, 4 + length, &bytes)?;
-                Some(ZpiObject::from_unpi_frame(&frame).command.name)
-            })
-            .collect();
-        for expected in [
-            "ping",
-            "version",
-            "getDeviceInfo",
-            "osalNvLength",
-            "activeEpReq",
-            "simpleDescReq",
-            "mgmtPermitJoinReq",
-        ] {
-            assert!(
-                names.iter().any(|name| name == expected),
-                "missing startup frame {expected}: {names:?}"
-            );
-        }
-        let capture_path = std::env::temp_dir().join(format!(
-            "z2m-controller-start-{}.hex",
-            crate::utils::datetime::now_ms()
-        ));
-        std::fs::write(&capture_path, frames.join("\n")).expect("write wire capture");
+        let expected = include_str!("../../../../tests/fixtures/controller_start_wire.hex")
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            frames, expected,
+            "controller start wire transcript differs from upstream oracle"
+        );
+        let capture_path = std::env::var("Z2M_WIRE_OUT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                std::env::temp_dir().join(format!(
+                    "z2m-controller-start-{}.hex",
+                    crate::utils::datetime::now_ms()
+                ))
+            });
+        std::fs::write(&capture_path, format!("{}\n", frames.join("\n")))
+            .expect("write wire capture");
 
-        let _ = std::fs::remove_file(capture_path);
+        if std::env::var("Z2M_WIRE_OUT").is_err() {
+            let _ = std::fs::remove_file(capture_path);
+        }
         let _ = std::fs::remove_file(db_path);
     }
 
