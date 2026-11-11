@@ -1786,3 +1786,24 @@ async fn device_joins_with_endpoints_2_and_1_reads_model_id_from_2() {
         Some("myDevice9124")
     );
 }
+
+fn report_header(
+    disable_default_response: bool,
+) -> zigbee_apiarist::zspec::zcl::zcl_header::Header {
+    zigbee_apiarist::zspec::zcl::zcl_header::Header::new(
+        zigbee_apiarist::zspec::zcl::zcl_header::FrameControl {
+            reserved_bits: 0,
+            frame_type: zigbee_apiarist::zspec::zcl::zcl_header::FrameType::GLOBAL,
+            direction: zigbee_apiarist::zspec::zcl::zcl_header::Direction::SERVER_TO_CLIENT,
+            disable_default_response,
+            manufacturer_specific: false,
+        },
+        None,
+        84,
+        10,
+    )
+}
+
+fn ts011f_payload() -> Vec<u8> {
+    vec![0x02, 0xd0, 0x48, 0x02, 0x00, 0x0a]
+}
