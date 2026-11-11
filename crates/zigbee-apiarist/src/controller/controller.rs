@@ -341,9 +341,13 @@ impl Controller {
     ) -> Result<StartResult, String> {
         Utils::warm_cluster_catalog();
 
-        // Database (create and inject)
-        let database = Arc::new(Mutex::new(Database::open(&self.options.database_path)));
-        let _ = self.database.set(database.clone());
+        // Database (create once and inject; a restart must reuse the same
+        // instance or a stale in-memory copy would survive a reset).
+        let database = self.database.get().cloned().unwrap_or_else(|| {
+            let database = Arc::new(Mutex::new(Database::open(&self.options.database_path)));
+            let _ = self.database.set(database.clone());
+            database
+        });
         Entity::inject_database(database);
 
         // Adapter (inject before starting so timers can use it)
@@ -749,7 +753,20 @@ impl Controller {
 
     /// Upstream `addInstallCode(installCode)` — controller.ts:362.
     pub async fn add_install_code(&self, install_code: &str) -> Result<(), String> {
-        let (ieee_addr, key_str) = parse_install_code(install_code);
+        fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+            payload
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| {
+                    payload
+                        .downcast_ref::<&str>()
+                        .map(|value| value.to_string())
+                })
+                .unwrap_or_else(|| "Invalid install code".to_string())
+        }
+
+        let (ieee_addr, key_str) =
+            std::panic::catch_unwind(|| parse_install_code(install_code)).map_err(panic_message)?;
         if ieee_addr.is_empty() || key_str.is_empty() {
             return Err(format!("Failed to parse install code '{install_code}'"));
         }
@@ -760,8 +777,8 @@ impl Controller {
                 u8::from_str_radix(std::str::from_utf8(chunk).unwrap_or("0"), 16).unwrap_or(0)
             })
             .collect();
-        let (adjusted_key, adjusted) = std::panic::catch_unwind(|| check_install_code(&key, true))
-            .map_err(|_| format!("Invalid install code '{install_code}'"))?;
+        let (adjusted_key, adjusted) =
+            std::panic::catch_unwind(|| check_install_code(&key, true)).map_err(panic_message)?;
 
         if let Some(adjusted) = adjusted {
             logger().info(
