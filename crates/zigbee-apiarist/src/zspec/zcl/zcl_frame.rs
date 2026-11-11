@@ -1132,8 +1132,14 @@ fn resolve_command(
     let found = match key {
         CommandRef::Id(id) => primary
             .values()
-            .chain(secondary.values())
-            .find(|command| command.ID == id),
+            .filter(|command| command.ID == id)
+            .min_by_key(|command| command.order)
+            .or_else(|| {
+                secondary
+                    .values()
+                    .filter(|command| command.ID == id)
+                    .min_by_key(|command| command.order)
+            }),
         CommandRef::Name(name) => primary.get(name).or_else(|| secondary.get(name)),
     };
     found.cloned().unwrap_or_else(|| {

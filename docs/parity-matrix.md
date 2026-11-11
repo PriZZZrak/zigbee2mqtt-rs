@@ -22,7 +22,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Buffalo primitives | `buffalo/buffalo.ts` | PORTED | unit tests + `differential_buffalo` fixtures |
 | BuffaloZnp | `znp/buffaloZnp.ts` | PORTED | `differential_buffalo_znp` fixtures |
 | ZpiObject | `znp/zpiObject.ts` | PORTED | `differential_zpi_object` fixtures |
-| ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PORTED | `differential_zcl` fixtures for lookup/header/commands; generated catalog covers all 129 upstream clusters, attributes, commands and parameter conditions |
+| ZCL codecs (Buffalo/Foundation/Frame/Utils) | `zspec/zcl/*` | PORTED | `differential_zcl` fixtures for lookup/header/commands; generated catalog covers all 129 upstream clusters, attributes, commands and parameter conditions; `Arc<ClusterInner>` handles + startup warmup keep lookups cheap (router measurements in `docs/zcl-catalog-performance.md`) |
 | ZDO codecs | `zspec/zdo/*` | PORTED | full response catalog incl. status-only responses, non-success short-buffer guard, unknown-cluster panic parity |
 | `controller/database.ts` | `controller/database.ts` | PORTED | CRUD/order/clear semantics + reload/corruption tests |
 | Controller helpers (request/queue/install codes/zclFrameConverter/zclTSN) | `controller/helpers/*` | PORTED | upstream request-queue semantics, full install-code vectors, converter tests |

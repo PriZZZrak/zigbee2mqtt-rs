@@ -339,6 +339,8 @@ impl Controller {
         self: &Arc<Self>,
         adapter: Arc<dyn ControllerRuntimeAdapter>,
     ) -> Result<StartResult, String> {
+        Utils::warm_cluster_catalog();
+
         // Database (create and inject)
         let database = Arc::new(Mutex::new(Database::open(&self.options.database_path)));
         let _ = self.database.set(database.clone());

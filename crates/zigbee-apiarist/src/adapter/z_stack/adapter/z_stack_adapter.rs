@@ -302,6 +302,7 @@ impl ZStackAdapter {
 
     /// Upstream `start()`.
     pub async fn start(&mut self) -> Result<StartResult, String> {
+        crate::zspec::zcl::utils::Utils::warm_cluster_catalog();
         {
             let mut znp = self.znp.lock().await;
             znp.open().await?;

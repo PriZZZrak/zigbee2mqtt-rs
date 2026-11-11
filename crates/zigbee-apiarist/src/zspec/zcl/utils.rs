@@ -5,7 +5,8 @@
 // `CustomClusters`) and only cover what the ported tests exercise.
 
 use std::collections::HashMap;
-use std::sync::OnceLock;
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, OnceLock};
 
 use crate::zspec::zcl::definition::enums::{BuffaloZclDataType, DataType};
 
@@ -140,6 +141,8 @@ pub struct Attribute {
     pub manufacturerCode: Option<u16>,
     /// Upstream `special` map values that bypass restrictions / sentinel handling.
     pub special: Vec<ZclValue>,
+    /// Definition order (upstream object insertion order) for duplicate-ID lookup.
+    pub order: usize,
 }
 
 impl Attribute {
@@ -161,6 +164,7 @@ impl Attribute {
             maxLen: None,
             manufacturerCode: None,
             special: Vec::new(),
+            order: 0,
         }
     }
 
@@ -318,6 +322,8 @@ pub struct Command {
     pub response: Option<u8>,
     pub parameters: Vec<Parameter>,
     pub required: bool,
+    /// Definition order (upstream object insertion order) for duplicate-ID lookup.
+    pub order: usize,
 }
 
 impl Command {
@@ -328,6 +334,7 @@ impl Command {
             response: None,
             parameters: Vec::new(),
             required: true,
+            order: 0,
         }
     }
 
@@ -343,8 +350,18 @@ impl Command {
 }
 
 /// Upstream `Cluster`.
+///
+/// The catalog is immutable and shared; `Cluster` is a cheap `Arc` handle.
+/// Mutating a custom cluster goes through copy-on-write.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cluster {
+    inner: Arc<ClusterInner>,
+}
+
+/// Fields of `Cluster`; exposed through `Deref` so call sites keep using
+/// `cluster.name` / `cluster.attributes`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterInner {
     pub name: String,
     /// Upstream camelCase: `ID`.
     pub ID: u32,
@@ -354,15 +371,31 @@ pub struct Cluster {
     pub commandsResponse: HashMap<String, Command>,
 }
 
+impl Deref for Cluster {
+    type Target = ClusterInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for Cluster {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        Arc::make_mut(&mut self.inner)
+    }
+}
+
 impl Cluster {
     pub fn new(name: &str, ID: u32) -> Self {
         Self {
-            name: name.to_string(),
-            ID,
-            manufacturerCode: None,
-            attributes: HashMap::new(),
-            commands: HashMap::new(),
-            commandsResponse: HashMap::new(),
+            inner: Arc::new(ClusterInner {
+                name: name.to_string(),
+                ID,
+                manufacturerCode: None,
+                attributes: HashMap::new(),
+                commands: HashMap::new(),
+                commandsResponse: HashMap::new(),
+            }),
         }
     }
 
@@ -371,12 +404,14 @@ impl Cluster {
         self
     }
 
-    fn with_command(mut self, command: Command) -> Self {
+    fn with_command(mut self, mut command: Command) -> Self {
+        command.order = self.commands.len();
         self.commands.insert(command.name.clone(), command);
         self
     }
 
-    fn with_command_response(mut self, command: Command) -> Self {
+    fn with_command_response(mut self, mut command: Command) -> Self {
+        command.order = self.commandsResponse.len();
         self.commandsResponse.insert(command.name.clone(), command);
         self
     }
@@ -548,6 +583,12 @@ impl From<&str> for CommandKey {
 pub struct Utils;
 
 impl Utils {
+    /// Parse and cache the generated cluster catalog. Call during startup so
+    /// the one-time JSON parse is not paid by the first ZCL frame.
+    pub fn warm_cluster_catalog() {
+        let _ = catalog();
+    }
+
     /// Upstream `Utils.isAnalogDataType(type)`.
     pub fn is_analog_data_type(r#type: DataType) -> bool {
         matches!(
@@ -607,7 +648,8 @@ impl Utils {
             AttributeKey::Id(id) => cluster
                 .attributes
                 .values()
-                .find(|attr| attr.ID as u32 == id),
+                .filter(|attr| attr.ID as u32 == id)
+                .min_by_key(|attr| attr.order),
             AttributeKey::Name(name) => cluster.attributes.get(&name),
         }?;
 
@@ -627,7 +669,8 @@ impl Utils {
             CommandKey::Id(id) => cluster
                 .commands
                 .values()
-                .find(|command| command.ID as u32 == id),
+                .filter(|command| command.ID as u32 == id)
+                .min_by_key(|command| command.order),
             CommandKey::Name(name) => cluster.commands.get(&name),
         };
 
@@ -643,7 +686,8 @@ impl Utils {
             CommandKey::Id(id) => cluster
                 .commandsResponse
                 .values()
-                .find(|command| command.ID as u32 == id),
+                .filter(|command| command.ID as u32 == id)
+                .min_by_key(|command| command.order),
             CommandKey::Name(name) => cluster.commandsResponse.get(&name),
         };
 
@@ -1027,7 +1071,11 @@ fn parse_cluster(name: &str, value: &serde_json::Value) -> Cluster {
         for (attribute_name, attribute_value) in attributes {
             cluster.attributes.insert(
                 attribute_name.clone(),
-                parse_attribute(attribute_name, attribute_value),
+                parse_attribute(
+                    attribute_name,
+                    attribute_value,
+                    attribute_value["__order"].as_u64().unwrap_or(0) as usize,
+                ),
             );
         }
     }
@@ -1035,7 +1083,11 @@ fn parse_cluster(name: &str, value: &serde_json::Value) -> Cluster {
         for (command_name, command_value) in commands {
             cluster.commands.insert(
                 command_name.clone(),
-                parse_command(command_name, command_value),
+                parse_command(
+                    command_name,
+                    command_value,
+                    command_value["__order"].as_u64().unwrap_or(0) as usize,
+                ),
             );
         }
     }
@@ -1043,14 +1095,18 @@ fn parse_cluster(name: &str, value: &serde_json::Value) -> Cluster {
         for (command_name, command_value) in commands {
             cluster.commands_response_mut().insert(
                 command_name.clone(),
-                parse_command(command_name, command_value),
+                parse_command(
+                    command_name,
+                    command_value,
+                    command_value["__order"].as_u64().unwrap_or(0) as usize,
+                ),
             );
         }
     }
     cluster
 }
 
-fn parse_attribute(name: &str, value: &serde_json::Value) -> Attribute {
+fn parse_attribute(name: &str, value: &serde_json::Value, order: usize) -> Attribute {
     let (data_type, _) = parse_parameter_type(value.get("type"));
     let mut attribute = Attribute::new(name, value["ID"].as_u64().unwrap_or(0) as u16, data_type);
     attribute.write = value
@@ -1083,10 +1139,11 @@ fn parse_attribute(name: &str, value: &serde_json::Value) -> Attribute {
         .and_then(serde_json::Value::as_u64)
         .map(|length| length as usize);
     attribute.special = parse_special(value.get("special"));
+    attribute.order = order;
     attribute
 }
 
-fn parse_command(name: &str, value: &serde_json::Value) -> Command {
+fn parse_command(name: &str, value: &serde_json::Value, order: usize) -> Command {
     let mut command = Command::new(name, value["ID"].as_u64().unwrap_or(0) as u8);
     command.response = value
         .get("response")
@@ -1099,6 +1156,7 @@ fn parse_command(name: &str, value: &serde_json::Value) -> Command {
     if let Some(parameters) = value.get("parameters").and_then(|v| v.as_array()) {
         command.parameters = parameters.iter().map(parse_parameter).collect();
     }
+    command.order = order;
     command
 }
 
