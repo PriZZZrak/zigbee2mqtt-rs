@@ -1372,7 +1372,14 @@ impl ZStackAdapter {
                 Some(timeout),
             )
             .await;
-        let options = if cluster_id == 0x003b {
+        // Upstream `clusterID === Zcl.Clusters.zigbeeDirectConfiguration.ID`.
+        let zigbee_direct_cluster_id = crate::zspec::zcl::utils::Utils::get_cluster(
+            "zigbeeDirectConfiguration",
+            None,
+            &crate::zspec::zcl::utils::CustomClusters::empty(),
+        )
+        .ID as u16;
+        let options = if cluster_id == zigbee_direct_cluster_id {
             crate::adapter::z_stack::constants::af::options::EN_SECURITY as u8
         } else {
             0

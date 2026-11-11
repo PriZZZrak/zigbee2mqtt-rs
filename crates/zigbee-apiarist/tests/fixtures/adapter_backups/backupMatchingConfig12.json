@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "format": "zigpy/open-coordinator-backup",
+    "version": 1,
+    "source": "zigbee-herdsman@0.13.65",
+    "internal": {
+      "date": "2021-03-03T19:15:40.524Z",
+      "znpVersion": 0
+    }
+  },
+  "stack_specific": {
+    "zstack": {}
+  },
+  "coordinator_ieee": "00124b0009d80ba7",
+  "pan_id": "007b",
+  "extended_pan_id": "00124b0009d69f77",
+  "nwk_update_id": 0,
+  "security_level": 5,
+  "channel": 21,
+  "channel_mask": [
+    21
+  ],
+  "network_key": {
+    "key": "01030507090b0d0f00020406080a0c0d",
+    "sequence_number": 0,
+    "frame_counter": 0
+  },
+  "devices": [
+    {
+      "nwk_address": "ddf6",
+      "ieee_address": "00124b002226ef87"
+    }
+  ]
+}
