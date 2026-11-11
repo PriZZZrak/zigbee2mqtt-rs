@@ -87,7 +87,7 @@ remaining rows are explicitly `PENDING`.
 | 79 | 2375 | Device joins another time with different network address | `device_joins_another_time_with_different_network_address` | PORTED |
 | 80 | 2391 | Device joins and interview succeeds | `device_joins_and_interview_succeeds` | PORTED |
 | 81 | 2403 | Device joins and interview fails | `device_joins_and_interview_fails` | PORTED |
-| 82 | 2416 | Device joins with endpoints [4,1], should read modelID from 1 | — | PENDING |
+| 82 | 2416 | Device joins with endpoints [4,1], should read modelID from 1 | `device_joins_with_endpoints_4_and_1_reads_model_id_from_1` | PORTED |
 | 83 | 2429 | Device joins with endpoints [2,1], as 2 is the only endpoint supporting genBasic it should read modelID from that | — | PENDING |
 | 84 | 2442 | Device joins and interview iAs enrollment succeeds | `device_joins_and_interview_succeeds` | PORTED |
 | 85 | 2499 | Device joins and interview iAs enrollment fails | `device_joins_and_interview_fails` | PORTED |
@@ -318,4 +318,4 @@ remaining rows are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **78 / 311**.
+Ported: **79 / 311**.

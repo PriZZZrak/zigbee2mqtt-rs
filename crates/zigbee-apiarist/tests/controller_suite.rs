@@ -1718,3 +1718,71 @@ async fn receive_zcldata_from_unknown_device_should_emit_nothing() {
         zigbee_apiarist::controller::events::ControllerEvent::Message(_)
     )));
 }
+
+#[tokio::test]
+async fn device_joins_with_endpoints_4_and_1_reads_model_id_from_1() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 161, "0x161");
+    settle().await;
+    let events = harness.take_events();
+    let statuses = events
+        .iter()
+        .filter_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::DeviceInterview(payload) => {
+                Some(payload.status.clone())
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statuses,
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x161")
+            .unwrap()
+            .model_id()
+            .as_deref(),
+        Some("myDevice9123")
+    );
+}
+
+#[tokio::test]
+async fn device_joins_with_endpoints_2_and_1_reads_model_id_from_2() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 162, "0x162");
+    settle().await;
+    let events = harness.take_events();
+    let statuses = events
+        .iter()
+        .filter_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::DeviceInterview(payload) => {
+                Some(payload.status.clone())
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statuses,
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x162")
+            .unwrap()
+            .model_id()
+            .as_deref(),
+        Some("myDevice9124")
+    );
+}

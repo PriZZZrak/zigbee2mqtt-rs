@@ -778,6 +778,65 @@ pub fn install_default_devices(adapter: &MockAdapter) {
             ..MockDevice::default()
         },
     );
+
+    adapter.add_device(
+        161,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(161, 1, 1213)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 161, "endpointList": [4, 1]}])),
+            simple_descriptor: HashMap::from([
+                (1, simple_descriptor(161, 1, 99, 5, vec![0, 1], vec![2])),
+                (4, simple_descriptor(161, 4, 99, 5, vec![1], vec![2])),
+            ]),
+            attributes: HashMap::from([
+                (
+                    1,
+                    HashMap::from([
+                        ("modelId".to_string(), json!("myDevice9123")),
+                        ("manufacturerName".to_string(), json!("Boef")),
+                        ("zclVersion".to_string(), json!(1)),
+                        ("appVersion".to_string(), json!(2)),
+                        ("hwVersion".to_string(), json!(3)),
+                        ("dateCode".to_string(), json!("201901")),
+                        ("swBuildId".to_string(), json!("1.01")),
+                        ("powerSource".to_string(), json!(1)),
+                        ("stackVersion".to_string(), json!(101)),
+                    ]),
+                ),
+                (4, HashMap::new()),
+            ]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        162,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(162, 1, 1213)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 162, "endpointList": [2, 1]}])),
+            simple_descriptor: HashMap::from([
+                (1, simple_descriptor(162, 1, 99, 5, vec![1], vec![2])),
+                (2, simple_descriptor(162, 2, 99, 5, vec![0, 1], vec![2])),
+            ]),
+            attributes: HashMap::from([
+                (
+                    2,
+                    HashMap::from([
+                        ("modelId".to_string(), json!("myDevice9124")),
+                        ("manufacturerName".to_string(), json!("Boef")),
+                        ("zclVersion".to_string(), json!(1)),
+                        ("appVersion".to_string(), json!(2)),
+                        ("hwVersion".to_string(), json!(3)),
+                        ("dateCode".to_string(), json!("201901")),
+                        ("swBuildId".to_string(), json!("1.01")),
+                        ("powerSource".to_string(), json!(1)),
+                        ("stackVersion".to_string(), json!(101)),
+                    ]),
+                ),
+                (1, HashMap::new()),
+            ]),
+            ..MockDevice::default()
+        },
+    );
     adapter.add_device(
         129,
         MockDevice {
