@@ -21,7 +21,7 @@ network.
 - Captured bytes are also written to a temporary `.hex` file, proving the file
   sink path.
 
-Four transcript cases, taken from upstream `test/adapter/z-stack/adapter.test.ts`:
+Seven transcript cases, taken from upstream `test/adapter/z-stack/adapter.test.ts`:
 
 1. `ZStackAdapter::send_zcl_frame_to_all` → `AF dataRequestExt`
    (upstream "Send zcl frame to all").
@@ -33,6 +33,16 @@ Four transcript cases, taken from upstream `test/adapter/z-stack/adapter.test.ts
 4. `ZStackAdapter::permit_join` → ZDO `mgmtPermitJoinReq` +
    `mgmtPermitJoinRsp` (upstream "Sends proper ZDO request payload for
    PERMIT_JOINING_REQUEST to target").
+5. `ZStackAdapter::send_zcl_frame_inter_pan_to_ieee_addr` → `AF
+   dataRequestExt` with `dstaddrmode=3` (upstream "Send zcl frame interpan").
+6. Retry on `MAC_CHANNEL_ACCESS_FAILURE`: first dataConfirm status 225, retry
+   with a new transaction id, both frames compared with upstream goldens.
+7. ZDO payloads: `NETWORK_ADDRESS_REQUEST` and `NWK_UPDATE_REQUEST` UNICAST
+   (upstream "Sends proper ZDO request payload ...").
+
+The permit-join case exposed a real port bug: `getResponseClusterId` only
+knew six responses, so permit join never created its ZDO waiter. It now follows
+upstream's request→response map.
 
 Goldens are produced with the committed oracle:
 
