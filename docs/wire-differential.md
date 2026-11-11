@@ -60,13 +60,26 @@ printf '%s\n' \
 The test asserts the captured frame equals that string, so the Rust path is
 checked against upstream `ZpiObject.createRequest`, not against itself.
 
+## Controller start/stop transcript
+
+`adapter/z_stack/adapter/manager.rs` tests now run the real
+`ZStackAdapter.start` + `Controller.start` + `Controller.stop` against a
+scripted PTY coordinator with an in-memory NV store (NIB, network key, key
+info). The fake answers `SYS version/ping`, `osalNvLength/ReadExt/WriteExt`,
+`UTIL getDeviceInfo`, `ZDO activeEpReq/simpleDescReq/extNwkInfo`,
+`extFindGroup`, `AF register/dataRequest/dataRequestExt` and
+`mgmtPermitJoinReq`.
+
+The test records every outgoing UNPI frame to a file and asserts the ordered
+presence of the startup stages: `ping`, `version`, `getDeviceInfo`,
+`osalNvLength`, `activeEpReq`, `simpleDescReq`, `mgmtPermitJoinReq`.
+This is the coordinator-only smoke that HIL would otherwise provide.
+
 ## Next slice
 
-- Script the remaining `ZnpAdapterManager` / `ZStackAdapter.start` requests so
-  `Controller.start` can run without hardware.
-- Run the upstream Node `Controller` against the same TCP script and commit
-  both transcripts as a fixture.
+- Run the upstream Node `Controller` against the same script and commit both
+  transcripts as a fixture.
 - Compare the full ordered frame sequence (start, coordinator creation,
   `permitJoin`, ZCL endpoint/broadcast, stop).
-- Then the ZStack runtime wrapper and the controller can move from
-  `PARTIAL`/HIL-pending to `PORTED` without a router redeploy.
+- Add retry/route-discovery and incoming-message transcripts from
+  `znp.test.ts` / `adapter.test.ts`.

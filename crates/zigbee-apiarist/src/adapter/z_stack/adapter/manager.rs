@@ -980,12 +980,13 @@ mod tests {
     use super::*;
     use crate::adapter::transport::{AdapterTransport, TransportOptions};
     use crate::adapter::z_stack::adapter::adapter_nv_memory::AdapterNvMemory;
-    use crate::adapter::z_stack::adapter::z_stack_adapter::ZStackZdo;
+    use crate::adapter::z_stack::adapter::z_stack_adapter::{ZStackAdapter, ZStackZdo};
     use crate::adapter::z_stack::structs::entries::nib::nib;
     use crate::adapter::z_stack::structs::r#struct::Alignment;
     use crate::adapter::z_stack::unpi::frame::Frame;
     use crate::adapter::z_stack::znp::zpi_object::ZpiObject;
     use std::collections::BTreeMap;
+    use std::sync::Arc;
     use tokio::io::AsyncWriteExt;
 
     const NETWORK_KEY: [u8; 16] = [
@@ -998,6 +999,7 @@ mod tests {
 
     struct FakeCoordinator {
         server: tokio::task::JoinHandle<()>,
+        frames: Arc<std::sync::Mutex<Vec<String>>>,
     }
 
     impl FakeCoordinator {
@@ -1005,6 +1007,8 @@ mod tests {
             let (reader, mut peer) = serial2_tokio::SerialPort::pair().expect("pair");
             let mut transport = AdapterTransport::new(TransportOptions::new("/dev/null"));
             transport.attach_serial(reader).expect("attach");
+            let frames = Arc::new(std::sync::Mutex::new(Vec::new()));
+            let captured_frames = frames.clone();
             let server = tokio::spawn(async move {
                 let mut buffer = [0u8; 512];
                 let mut pending = Vec::new();
@@ -1026,16 +1030,32 @@ mod tests {
                         }
                         let raw = pending[..frame_length].to_vec();
                         pending.drain(..frame_length);
+                        captured_frames.lock().unwrap().push(
+                            raw.iter()
+                                .map(|byte| format!("{byte:02x}"))
+                                .collect::<String>(),
+                        );
                         let frame =
                             Frame::from_buffer(length as u8, 4 + length, &raw).expect("frame");
                         let object = ZpiObject::from_unpi_frame(&frame);
                         let payload = &object.payload;
-                        let data = match object.command.name.as_str() {
-                            "ping" => vec![0x01, 0x00],
+                        let (data, extra) = match object.command.name.as_str() {
+                            "ping" => (vec![0x01, 0x00], None),
+                            "version" => (vec![2, 1, 2, 7, 1, 0x51, 0x0b, 0x35, 0x01], None),
+                            "getDeviceInfo" => {
+                                let mut data = vec![0x00];
+                                data.extend_from_slice(&[
+                                    0x00, 0xd4, 0xc2, 0x24, 0x00, 0x4b, 0x12, 0x00,
+                                ]);
+                                data.extend_from_slice(&[0x00, 0x00, 0x05]);
+                                data.push(9); // DevStates.ZB_COORD
+                                data.push(0); // numassocdevices
+                                (data, None)
+                            }
                             "osalNvLength" => {
                                 let id = payload["id"].as_u64().unwrap() as u16;
                                 let length = items.get(&id).map(Vec::len).unwrap_or(0) as u16;
-                                length.to_le_bytes().to_vec()
+                                (length.to_le_bytes().to_vec(), None)
                             }
                             "osalNvReadExt" => {
                                 let id = payload["id"].as_u64().unwrap() as u16;
@@ -1045,17 +1065,71 @@ mod tests {
                                 let chunk = &value[offset..end];
                                 let mut data = vec![0x00, chunk.len() as u8];
                                 data.extend_from_slice(chunk);
-                                data
+                                (data, None)
                             }
+                            "osalNvWriteExt" => (vec![0x00], None),
+                            "activeEpReq" => (
+                                vec![0x00],
+                                Some((
+                                    Subsystem::ZDO,
+                                    133,
+                                    vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 1, 242],
+                                )),
+                            ),
+                            "simpleDescReq" => (
+                                vec![0x00],
+                                Some((
+                                    Subsystem::ZDO,
+                                    132,
+                                    vec![
+                                        0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x01, 0x04, 0x01, 0x05,
+                                        0x00, 0x00, 0x00, 0x00,
+                                    ],
+                                )),
+                            ),
+                            "extNwkInfo" => {
+                                let mut data = vec![0x00, 0x00, 0x09, 0x62, 0x1a, 0x00, 0x00];
+                                data.extend_from_slice(&[
+                                    0x00, 0x12, 0x4b, 0x00, 0x24, 0xc2, 0xd4, 0x00,
+                                ]);
+                                data.extend_from_slice(&[0u8; 8]);
+                                data.push(11);
+                                (data, None)
+                            }
+                            "extFindGroup" => {
+                                let group_id = payload["groupid"].as_u64().unwrap_or(0) as u16;
+                                (
+                                    vec![
+                                        0x00,
+                                        (group_id & 0xff) as u8,
+                                        (group_id >> 8) as u8,
+                                        0x00,
+                                    ],
+                                    None,
+                                )
+                            }
+                            "register" => (vec![0x00], None),
+                            "dataRequestExt" => (vec![0x00], None),
+                            "dataRequest" => (vec![0x00], None),
+                            "mgmtPermitJoinReq" => (vec![0x00], None),
+                            "ledControl" => (vec![0x00], None),
                             other => panic!("unexpected NV command '{other}'"),
                         };
                         let response =
                             Frame::new(Type::SRSP, frame.subsystem, frame.commandID, data, 0, 0);
                         peer.write_all(&response.to_buffer()).await.expect("write");
+                        if let Some((subsystem, command_id, data)) = extra {
+                            let areq = Frame::new(Type::AREQ, subsystem, command_id, data, 0, 0);
+                            peer.write_all(&areq.to_buffer()).await.expect("write");
+                        }
                     }
                 }
             });
-            (transport, Self { server })
+            (transport, Self { server, frames })
+        }
+
+        fn frames(&self) -> Vec<String> {
+            self.frames.lock().unwrap().clone()
         }
     }
 
@@ -1184,6 +1258,147 @@ mod tests {
             manager.determine_strategy().await.expect("strategy"),
             StartupStrategy::RestoreBackup
         );
+    }
+
+    #[tokio::test]
+    async fn zstack_adapter_start_with_fake_coordinator() {
+        let (transport, _coordinator) =
+            FakeCoordinator::spawn(items(0x55, PAN_ID, CHANNEL, &EXTENDED_PAN_ID));
+        let mut adapter = ZStackAdapter::new(
+            transport,
+            ConfigNetworkOptions {
+                pan_id: PAN_ID,
+                extended_pan_id: Some(EXTENDED_PAN_ID.to_vec()),
+                network_key: Some(NETWORK_KEY.to_vec()),
+                channel_list: vec![CHANNEL],
+                network_key_distribute: Some(false),
+            },
+            "/tmp/opencode/does-not-exist.json".to_string(),
+            AdapterOptions::default(),
+        );
+
+        let result = adapter.start().await.expect("adapter start");
+        assert_eq!(result, StartResult::Resumed);
+        assert_eq!(
+            adapter
+                .get_coordinator_ieee()
+                .await
+                .expect("coordinator ieee"),
+            "0x00124b0024c2d400"
+        );
+        assert_eq!(
+            adapter
+                .get_coordinator_version()
+                .expect("coordinator version")
+                .type_name,
+            "ZStack3x0"
+        );
+        let np = adapter
+            .get_network_parameters()
+            .await
+            .expect("network params");
+        assert_eq!(np.pan_id, PAN_ID);
+        assert_eq!(np.channel, CHANNEL);
+        adapter.stop().await.expect("adapter stop");
+    }
+
+    #[tokio::test]
+    async fn controller_start_with_fake_coordinator() {
+        use crate::adapter::z_stack::runtime_adapter::ZStackRuntimeAdapter;
+        use crate::controller::controller::{Controller, ControllerOptions};
+        use crate::controller::database::{Database, DeviceType};
+        use crate::controller::model::device::{Device, InterviewState};
+        use crate::controller::model::entity::Entity;
+        use crate::controller::model::group::Group;
+        use crate::models::network_options::NetworkOptions;
+        use std::sync::Arc;
+        let _guard = crate::controller::model::test_support::serial();
+
+        let (transport, coordinator) =
+            FakeCoordinator::spawn(items(0x55, PAN_ID, CHANNEL, &EXTENDED_PAN_ID));
+        let adapter = Arc::new(tokio::sync::Mutex::new(ZStackAdapter::new(
+            transport,
+            ConfigNetworkOptions {
+                pan_id: PAN_ID,
+                extended_pan_id: Some(EXTENDED_PAN_ID.to_vec()),
+                network_key: Some(NETWORK_KEY.to_vec()),
+                channel_list: vec![CHANNEL],
+                network_key_distribute: Some(false),
+            },
+            "/tmp/opencode/does-not-exist.json".to_string(),
+            AdapterOptions::default(),
+        )));
+        let runtime = Arc::new(ZStackRuntimeAdapter::new(adapter).await);
+
+        let db_path = std::env::temp_dir().join(format!(
+            "z2m-controller-fake-{}.db",
+            crate::utils::datetime::now_ms()
+        ));
+        Entity::inject_database(Arc::new(std::sync::Mutex::new(Database::open(&db_path))));
+        Device::reset_cache();
+        Group::reset_cache();
+
+        let controller = Arc::new(
+            Controller::new(ControllerOptions {
+                network: NetworkOptions {
+                    pan_id: PAN_ID,
+                    extended_pan_id: EXTENDED_PAN_ID.to_vec(),
+                    channel_list: vec![CHANNEL],
+                    network_key: NETWORK_KEY.to_vec(),
+                    network_key_distribute: false,
+                    has_default_extended_pan_id: false,
+                },
+                transport: serde_json::json!({}),
+                database_path: db_path.to_string_lossy().to_string(),
+                database_backup_path: None,
+                backup_path: None,
+                adapter: serde_json::json!({}),
+                accept_joining_device_handler: None,
+            })
+            .expect("controller options"),
+        );
+
+        let result = controller.start(runtime).await.expect("controller start");
+        assert_eq!(result, crate::controller::controller::StartResult::Resumed);
+        assert_eq!(Device::by_type(DeviceType::Coordinator).len(), 1);
+        controller.stop().await.expect("controller stop");
+
+        let frames = coordinator.frames();
+        assert!(frames.len() > 5);
+        let names: Vec<String> = frames
+            .iter()
+            .filter_map(|hex| {
+                let bytes = (0..hex.len())
+                    .step_by(2)
+                    .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).unwrap())
+                    .collect::<Vec<u8>>();
+                let length = bytes[1] as usize;
+                let frame = Frame::from_buffer(length as u8, 4 + length, &bytes)?;
+                Some(ZpiObject::from_unpi_frame(&frame).command.name)
+            })
+            .collect();
+        for expected in [
+            "ping",
+            "version",
+            "getDeviceInfo",
+            "osalNvLength",
+            "activeEpReq",
+            "simpleDescReq",
+            "mgmtPermitJoinReq",
+        ] {
+            assert!(
+                names.iter().any(|name| name == expected),
+                "missing startup frame {expected}: {names:?}"
+            );
+        }
+        let capture_path = std::env::temp_dir().join(format!(
+            "z2m-controller-start-{}.hex",
+            crate::utils::datetime::now_ms()
+        ));
+        std::fs::write(&capture_path, frames.join("\n")).expect("write wire capture");
+
+        let _ = std::fs::remove_file(capture_path);
+        let _ = std::fs::remove_file(db_path);
     }
 
     #[tokio::test]
