@@ -122,7 +122,7 @@ cargo test -p zigbee-apiarist --lib adapter::z_stack::adapter::manager::tests::c
 - Backup JSON fixtures are extracted from upstream
   (`tests/fixtures/adapter_backups/`).
 
-Coverage: 122 tests covering commissioning/backup restore/create errors,
+Coverage: 129 tests covering commissioning/backup restore/create errors,
 legacy backups, config-adapter mismatch diagnostics, LED/transmit-power,
 permit join, ZCL send/retry/route-discovery/timeout, group/all/inter-PAN,
 incoming messages (including chunked `dataRetrieve`), device events, `waitFor`
@@ -136,7 +136,8 @@ The suite exposed four port bugs fixed here: APS encryption used cluster
 short buffers instead of upstream's two `uint32`s, raw non-ZCL
 `incomingMsg` was dropped instead of emitted with `header: None`, and a
 missing/zero backup version was reported as an unsupported version instead of
-`Unknown backup format`.
+`Unknown backup format`, and `leaveInd` only honored a boolean `rejoin` while
+the wire carries UINT8 (numeric non-zero is now treated as rejoin).
 
 ## Next slice
 

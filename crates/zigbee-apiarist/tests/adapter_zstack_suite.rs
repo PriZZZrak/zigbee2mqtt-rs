@@ -316,18 +316,20 @@ async fn permit_join_specific_network_address() {
 }
 
 #[tokio::test]
-async fn soft_and_hard_reset_use_expected_reset_types() {
-    // Anchor: adapter.test.ts "Soft reset", "Hard reset".
-    let mut harness = harness(default_network_options(), "backup.json");
-    fixtures::commissioned_3x0_aligned(&harness.mock);
-    harness.start().await.expect("start");
-
+async fn soft_reset_uses_reset_type_one() {
+    // Anchor: adapter.test.ts "Soft reset".
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     harness.adapter.reset("soft").await.expect("soft reset");
     let requests = harness.mock.requests_named("resetReq");
     assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].payload()["type"], 1);
+}
 
+#[tokio::test]
+async fn hard_reset_uses_reset_type_zero() {
+    // Anchor: adapter.test.ts "Hard reset".
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     harness.adapter.reset("hard").await.expect("hard reset");
     let requests = harness.mock.requests_named("resetReq");
@@ -1023,32 +1025,53 @@ async fn send_zcl_frame_group_data_confirm_fails() {
     assert_eq!(harness.mock.requests_named("dataRequestExt").len(), 1);
 }
 
-#[tokio::test]
-async fn send_zcl_frame_to_all_default_rx_on_when_idle_and_sleepy() {
-    // Anchor: adapter.test.ts "Send zcl frame to all - DEFAULT", "- RX_ON_WHEN_IDLE", "- SLEEPY".
-    use zigbee_apiarist::zspec::enums::BroadcastAddress;
+async fn send_to_all(destination: u16, address: &str) {
     let mut harness = started_3x0().await;
-    for (destination, address) in [
-        (BroadcastAddress::DEFAULT, "0x000000000000fffc"),
-        (BroadcastAddress::RX_ON_WHEN_IDLE, "0x000000000000fffd"),
-        (BroadcastAddress::SLEEPY, "0x000000000000ffff"),
-    ] {
-        harness.mock.clear_requests();
-        let frame = read_frame(true);
-        harness
-            .adapter
-            .send_zcl_frame_to_all(255, &frame, 1, destination as u16, None)
-            .await
-            .expect("send to all");
-        let requests = harness.mock.requests_named("dataRequestExt");
-        assert_eq!(requests.len(), 1);
-        let payload = requests[0].payload();
-        assert_eq!(payload["dstaddrmode"], 2);
-        assert_eq!(payload["dstaddr"], address);
-        assert_eq!(payload["destendpoint"], 255);
-        assert_eq!(payload["srcendpoint"], 1);
-        assert_eq!(payload["len"], 5);
-    }
+    harness.mock.clear_requests();
+    let frame = read_frame(true);
+    harness
+        .adapter
+        .send_zcl_frame_to_all(255, &frame, 1, destination, None)
+        .await
+        .expect("send to all");
+    let requests = harness.mock.requests_named("dataRequestExt");
+    assert_eq!(requests.len(), 1);
+    let payload = requests[0].payload();
+    assert_eq!(payload["dstaddrmode"], 2);
+    assert_eq!(payload["dstaddr"], address);
+    assert_eq!(payload["destendpoint"], 255);
+    assert_eq!(payload["srcendpoint"], 1);
+    assert_eq!(payload["len"], 5);
+}
+
+#[tokio::test]
+async fn send_zcl_frame_to_all_default() {
+    // Anchor: adapter.test.ts "Send zcl frame to all - DEFAULT".
+    send_to_all(
+        zigbee_apiarist::zspec::enums::BroadcastAddress::DEFAULT as u16,
+        "0x000000000000fffc",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn send_zcl_frame_to_all_rx_on_when_idle() {
+    // Anchor: adapter.test.ts "Send zcl frame to all - RX_ON_WHEN_IDLE".
+    send_to_all(
+        zigbee_apiarist::zspec::enums::BroadcastAddress::RX_ON_WHEN_IDLE as u16,
+        "0x000000000000fffd",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn send_zcl_frame_to_all_sleepy() {
+    // Anchor: adapter.test.ts "Send zcl frame to all - SLEEPY".
+    send_to_all(
+        zigbee_apiarist::zspec::enums::BroadcastAddress::SLEEPY as u16,
+        "0x000000000000ffff",
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -1208,20 +1231,28 @@ async fn send_zcl_frame_network_address_matches_on_default_response() {
     assert_eq!(payload.data, vec![24, 100, 11, 0, 126]);
 }
 
+async fn data_confirm_fails_case(disable_default_response: bool) {
+    let mut harness = started_3x0().await;
+    harness.mock.set_data_confirm_code(201, false);
+    let frame = read_frame(disable_default_response);
+    let error = harness
+        .adapter
+        .send_zcl_frame_to_endpoint("0x02", 2, 20, &frame, 10000, false, false, None, None)
+        .await
+        .expect_err("data confirm");
+    assert!(error.contains("201"), "unexpected error: {error}");
+}
+
 #[tokio::test]
-async fn send_zcl_frame_network_address_data_confirm_fails_with_and_without_default_response() {
-    // Anchor: adapter.test.ts "Send zcl frame network address data confirm fails with default response", "... without default response".
-    for disable_default_response in [false, true] {
-        let mut harness = started_3x0().await;
-        harness.mock.set_data_confirm_code(201, false);
-        let frame = read_frame(disable_default_response);
-        let error = harness
-            .adapter
-            .send_zcl_frame_to_endpoint("0x02", 2, 20, &frame, 10000, false, false, None, None)
-            .await
-            .expect_err("data confirm");
-        assert!(error.contains("201"), "unexpected error: {error}");
-    }
+async fn send_zcl_frame_network_address_data_confirm_fails_with_default_response() {
+    // Anchor: adapter.test.ts "... data confirm fails with default response".
+    data_confirm_fails_case(false).await;
+}
+
+#[tokio::test]
+async fn send_zcl_frame_network_address_data_confirm_fails_without_default_response() {
+    // Anchor: adapter.test.ts "... data confirm fails without default response".
+    data_confirm_fails_case(true).await;
 }
 
 #[tokio::test]
@@ -2003,11 +2034,10 @@ async fn device_joined_event() {
 }
 
 #[tokio::test]
-async fn device_announce_and_network_address_response_events() {
-    // Anchor: adapter.test.ts "Device announce", "Network address response".
+async fn device_announce_event() {
+    // Anchor: adapter.test.ts "Device announce".
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
     use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
-
     let mut harness = started_3x0().await;
     let mut events = harness.adapter.events.subscribe();
     harness.mock.inject_zdo(
@@ -2036,7 +2066,15 @@ async fn device_announce_and_network_address_response_events() {
     assert_eq!(response.1[1]["eui64"], "0x0000000000000123");
     assert_eq!(response.1[1]["nwkAddress"], 123);
     assert_eq!(response.1[1]["capabilities"], dummy_capabilities());
+}
 
+#[tokio::test]
+async fn network_address_response_event() {
+    // Anchor: adapter.test.ts "Network address response".
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+    let mut harness = started_3x0().await;
+    let mut events = harness.adapter.events.subscribe();
     harness.mock.inject_zdo(
         ClusterId::NETWORK_ADDRESS_RESPONSE,
         Some(124),
@@ -2120,8 +2158,8 @@ async fn concentrator_callback_indication() {
 }
 
 #[tokio::test]
-async fn device_leave_and_ignore_rejoin() {
-    // Anchor: adapter.test.ts "Device leave", "Ignore device leave with rejoin".
+async fn device_leave_event() {
+    // Anchor: adapter.test.ts "Device leave".
     use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
     use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
     let mut harness = started_3x0().await;
@@ -2142,17 +2180,24 @@ async fn device_leave_and_ignore_rejoin() {
     };
     assert_eq!(network_address, 123);
     assert_eq!(ieee, serde_json::json!("0x0000000000000123"));
+}
 
+#[tokio::test]
+async fn ignore_device_leave_with_rejoin() {
+    // Anchor: adapter.test.ts "Ignore device leave with rejoin".
+    use zigbee_apiarist::adapter::z_stack::adapter::z_stack_adapter::AdapterEvent;
+    use zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem;
+    let mut harness = started_3x0().await;
+    let mut events = harness.adapter.events.subscribe();
     harness.mock.inject_areq(
         Subsystem::ZDO,
         "leaveInd",
-        serde_json::json!({"srcaddr": 123, "extaddr": "0x0000000000000123", "rejoin": true}),
+        serde_json::json!({"srcaddr": 123, "extaddr": "0x0000000000000123", "rejoin": 1}),
     );
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    assert!(
-        events.try_recv().is_err()
-            || !matches!(events.try_recv(), Ok(AdapterEvent::DeviceLeave { .. }))
-    );
+    while let Ok(event) = events.try_recv() {
+        assert!(!matches!(event, AdapterEvent::DeviceLeave { .. }));
+    }
 }
 
 #[tokio::test]
@@ -2190,8 +2235,8 @@ async fn get_network_parameters() {
 }
 
 #[tokio::test]
-async fn set_interpan_channel_and_restore() {
-    // Anchor: adapter.test.ts "Set interpan channel", "Restore interpan channel".
+async fn set_interpan_channel() {
+    // Anchor: adapter.test.ts "Set interpan channel".
     let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     harness
@@ -2215,7 +2260,12 @@ async fn set_interpan_channel_and_restore() {
     let requests = harness.mock.requests_named("interPanCtl");
     assert_eq!(requests.len(), 1);
     assert_eq!(support::bytes(&requests[0].payload()["data"]), vec![15]);
+}
 
+#[tokio::test]
+async fn restore_interpan_channel() {
+    // Anchor: adapter.test.ts "Restore interpan channel".
+    let mut harness = started_3x0().await;
     harness.mock.clear_requests();
     harness
         .adapter

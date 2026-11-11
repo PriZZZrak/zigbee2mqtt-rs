@@ -783,7 +783,12 @@ async fn dispatch_znp_object(
                     });
             }
             "leaveInd" => {
-                if object.payload.get("rejoin").and_then(Value::as_bool) != Some(true) {
+                // Upstream checks truthiness: on the wire `rejoin` is UINT8,
+                // while mocked payloads use a boolean.
+                let rejoin = object.payload.get("rejoin").is_some_and(|value| {
+                    value.as_bool() == Some(true) || value.as_u64().is_some_and(|value| value != 0)
+                });
+                if !rejoin {
                     let _ = events.send(AdapterEvent::DeviceLeave {
                         network_address: object
                             .payload
