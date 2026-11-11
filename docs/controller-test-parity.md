@@ -1,8 +1,9 @@
 # `controller.test.ts` parity checklist
 
 Source: `.upstream/zigbee-herdsman/test/controller.test.ts` (v11.2.0), 311 `it` cases.
-Status is `PORTED` only when a Rust test asserts the upstream behaviour; the
-remaining rows are explicitly `PENDING`.
+Status is `PORTED` when a Rust test (`tests/controller_suite.rs` or a unit
+test under `src/controller/`) asserts the upstream behaviour; remaining rows
+are explicitly `PENDING`.
 
 | # | line | Upstream case | Rust test | Status |
 |---:|---:|---|---|---|
@@ -89,8 +90,8 @@ remaining rows are explicitly `PENDING`.
 | 81 | 2403 | Device joins and interview fails | `device_joins_and_interview_fails` | PORTED |
 | 82 | 2416 | Device joins with endpoints [4,1], should read modelID from 1 | `device_joins_with_endpoints_4_and_1_reads_model_id_from_1` | PORTED |
 | 83 | 2429 | Device joins with endpoints [2,1], as 2 is the only endpoint supporting genBasic it should read modelID from that | — | PENDING |
-| 84 | 2442 | Device joins and interview iAs enrollment succeeds | `device_joins_and_interview_succeeds` | PORTED |
-| 85 | 2499 | Device joins and interview iAs enrollment fails | `device_joins_and_interview_fails` | PORTED |
+| 84 | 2442 | Device joins and interview iAs enrollment succeeds | — | PENDING |
+| 85 | 2499 | Device joins and interview iAs enrollment fails | — | PENDING |
 | 86 | 2513 | Device joins and interview iAs enrollment throws | — | PENDING |
 | 87 | 2527 | Device joins, shouldnt enroll when already enrolled | — | PENDING |
 | 88 | 2541 | Receive zclData occupancy report | `receive_zcldata_occupancy_report` | PORTED |
@@ -178,27 +179,27 @@ remaining rows are explicitly `PENDING`.
 | 170 | 5567 | Endpoint manuf-spec read reporting config | — | PENDING |
 | 171 | 5710 | Return group from databse when not in lookup | — | PENDING |
 | 172 | 5717 | Throw error when creating group already exists | — | PENDING |
-| 173 | 5729 | Add endpoint to group | — | PENDING |
+| 173 | 5729 | Add endpoint to group | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 174 | 5769 | Adds endpoint to group when Add Group response reports duplicate | — | PENDING |
 | 175 | 5796 | Does not add endpoint to group when Add Group response reports failure | — | PENDING |
-| 176 | 5821 | Remove endpoint from group | — | PENDING |
+| 176 | 5821 | Remove endpoint from group | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 177 | 5840 | Does not remove endpoint from group when Remove Group response reports failure | — | PENDING |
 | 178 | 5866 | Removes endpoint from group database when Remove Group response reports NOT_FOUND | — | PENDING |
 | 179 | 5893 | Remove endpoint from group by number | — | PENDING |
 | 180 | 5909 | Try to get deleted device from endpoint | — | PENDING |
-| 181 | 5925 | Command response | — | PENDING |
+| 181 | 5925 | Command response | `green_power_response_without_command_id_is_handled_gracefully` | PORTED |
 | 182 | 5934 | Group command | — | PENDING |
-| 183 | 5956 | Endpoint command with options | — | PENDING |
+| 183 | 5956 | Endpoint command with options | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
 | 184 | 5983 | Endpoint command with duplicate cluster ID | — | PENDING |
 | 185 | 6005 | Endpoint command with duplicate identifier | — | PENDING |
-| 186 | 6019 | Endpoint commandResponse | — | PENDING |
+| 186 | 6019 | Endpoint commandResponse | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
 | 187 | 6046 | Device without meta should set meta to {} | — | PENDING |
 | 188 | 6125 | Read from group | — | PENDING |
 | 189 | 6139 | Read from group ignores unknown attributes | — | PENDING |
 | 190 | 6154 | Read from group fails | — | PENDING |
-| 191 | 6167 | Write to group | — | PENDING |
+| 191 | 6167 | Write to group | `device_endpoint_group_roundtrip_and_write_frame` | PORTED |
 | 192 | 6194 | Write to group with unknown attribute should fail | — | PENDING |
-| 193 | 6206 | Write to group fails | — | PENDING |
+| 193 | 6206 | Write to group fails | `device_endpoint_group_roundtrip_and_write_frame` | PORTED |
 | 194 | 6219 | Write to endpoint custom attributes | — | PENDING |
 | 195 | 6250 | Write to endpoint custom attributes without specifying manufacturerCode | — | PENDING |
 | 196 | 6283 | WriteUndiv to endpoint custom attributes without response | — | PENDING |
@@ -208,7 +209,7 @@ remaining rows are explicitly `PENDING`.
 | 200 | 6383 | Write response to endpoint throw when transaction sequence number provided through options | — | PENDING |
 | 201 | 6399 | Write response to endpoint with no status attribute specified | — | PENDING |
 | 202 | 6415 | Write response to endpoint with ZCL attribute | — | PENDING |
-| 203 | 6445 | WriteResponse error | — | PENDING |
+| 203 | 6445 | WriteResponse error | `parse_error_sends_default_response_with_status` | PORTED |
 | 204 | 6464 | Write response to endpoint with options | — | PENDING |
 | 205 | 6494 | Read from endpoint with string | — | PENDING |
 | 206 | 6512 | Read from endpoint with string ignores unknown | — | PENDING |
@@ -226,20 +227,20 @@ remaining rows are explicitly `PENDING`.
 | 218 | 7113 | Should save received attributes | — | PENDING |
 | 219 | 7149 | Emit read from device | — | PENDING |
 | 220 | 7191 | Emit write from device | — | PENDING |
-| 221 | 7235 | Endpoint command error | — | PENDING |
-| 222 | 7254 | Endpoint commandResponse error | — | PENDING |
+| 221 | 7235 | Endpoint command error | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
+| 222 | 7254 | Endpoint commandResponse error | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
 | 223 | 7273 | Endpoint commandResponse error when transactionSequenceNumber provided through options | — | PENDING |
 | 224 | 7288 | ConfigureReporting error | — | PENDING |
-| 225 | 7309 | DefaultResponse error | — | PENDING |
+| 225 | 7309 | DefaultResponse error | `parse_error_sends_default_response_with_status` | PORTED |
 | 226 | 7328 | DefaultResponse error when transactionSequenceNumber provided through options | — | PENDING |
 | 227 | 7343 | Skip unbind if not bound | — | PENDING |
 | 228 | 7354 | Handle unbind with number not matching any group | — | PENDING |
 | 229 | 7367 | Unbind against unbound cluster | — | PENDING |
 | 230 | 7395 | Unbind error | — | PENDING |
 | 231 | 7422 | Bind error | — | PENDING |
-| 232 | 7448 | ReadResponse error | — | PENDING |
+| 232 | 7448 | ReadResponse error | `parse_error_sends_default_response_with_status` | PORTED |
 | 233 | 7467 | Read error | — | PENDING |
-| 234 | 7486 | Read with disable response | — | PENDING |
+| 234 | 7486 | Read with disable response | `skips_non_success_read_response_records` | PORTED |
 | 235 | 7496 | Write error | — | PENDING |
 | 236 | 7515 | Write with disable response | — | PENDING |
 | 237 | 7525 | Group command error | — | PENDING |
@@ -247,17 +248,17 @@ remaining rows are explicitly `PENDING`.
 | 239 | 7548 | Write structured with disable response | — | PENDING |
 | 240 | 7558 | Write structured error | — | PENDING |
 | 241 | 7577 | Write with custom payload | — | PENDING |
-| 242 | 7631 | Green power | — | PENDING |
+| 242 | 7631 | Green power | `green_power_commissioning_creates_device_and_emits_join` | PORTED |
 | 243 | 7875 | Should handle green power responses gracefully | — | PENDING |
 | 244 | 7916 | Should handle green power broadcast commissioning | — | PENDING |
 | 245 | 7954 | Should handle green power unicast commissioning success | — | PENDING |
 | 246 | 8010 | Should handle green power unicast commissioning failure | — | PENDING |
 | 247 | 8065 | Should handle green power commissioning frame with IEEE addressing gracefully | — | PENDING |
 | 248 | 8091 | Should handle green power commissioning frame with switch info | — | PENDING |
-| 249 | 8120 | Should ignore invalid green power frame | — | PENDING |
-| 250 | 8146 | Green power channel request | — | PENDING |
+| 249 | 8120 | Should ignore invalid green power frame | `invalid_green_power_frame_is_ignored` | PORTED |
+| 250 | 8146 | Green power channel request | `green_power_channel_request_sends_response` | PORTED |
 | 251 | 8199 | Green power rxOnCap | — | PENDING |
-| 252 | 8304 | Green power unicast | — | PENDING |
+| 252 | 8304 | Green power unicast | `green_power_commissioning_creates_device_and_emits_join` | PORTED |
 | 253 | 8624 | Get input/ouptut clusters | — | PENDING |
 | 254 | 8642 | Report to endpoint custom attributes | — | PENDING |
 | 255 | 8673 | Report to endpoint with unknown string attribute | — | PENDING |
@@ -274,7 +275,7 @@ remaining rows are explicitly `PENDING`.
 | 266 | 9342 | Handle retransmitted Xiaomi messages | — | PENDING |
 | 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | — | PENDING |
 | 268 | 9388 | Should do a coordinator check | — | PENDING |
-| 269 | 9667 | zclCommand | — | PENDING |
+| 269 | 9667 | zclCommand | `green_power_response_without_command_id_is_handled_gracefully` | PORTED |
 | 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
 | 271 | 9689 | zclCommand with error | — | PENDING |
 | 272 | 9709 | Interview on coordinator | — | PENDING |
@@ -308,14 +309,14 @@ remaining rows are explicitly `PENDING`.
 | 300 | 10572 | sends & receives command to group with custom cluster when common to all members | — | PENDING |
 | 301 | 10704 | sends one group command with an explicit custom cluster supported by one member | — | PENDING |
 | 302 | 10760 | Updates a device genBasic properties | — | PENDING |
-| 303 | 10808 | triggers sendZdo on sendRaw | — | PENDING |
+| 303 | 10808 | triggers sendZdo on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 304 | 10825 | triggers sendZclFrameInterPANToIeeeAddr on sendRaw | — | PENDING |
-| 305 | 10857 | triggers sendZclFrameInterPANBroadcast on sendRaw | — | PENDING |
-| 306 | 10886 | triggers sendZclFrameToGroup on sendRaw | — | PENDING |
+| 305 | 10857 | triggers sendZclFrameInterPANBroadcast on sendRaw | `send_raw_inter_pan_dispatches_to_touchlink` | PORTED |
+| 306 | 10886 | triggers sendZclFrameToGroup on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 307 | 10920 | triggers sendZclFrameToAll on sendRaw | — | PENDING |
-| 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | — | PENDING |
-| 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | — | PENDING |
+| 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | `send_raw_uses_custom_cluster_definitions` | PORTED |
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **79 / 311**.
+Ported: **100 / 311**.
