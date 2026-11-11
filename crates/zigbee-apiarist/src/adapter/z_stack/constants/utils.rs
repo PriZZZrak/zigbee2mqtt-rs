@@ -20,3 +20,18 @@ pub fn get_channel_mask(channels: &[u8]) -> Vec<u8> {
 pub fn status_description(status: u8) -> String {
     format!("(0x{status:02x}: {})", ZnpCommandStatus::name(status))
 }
+
+/// Upstream `DataConfirmError` message.
+///
+/// Anchor: src/adapter/z-stack/adapter/zStackAdapter.ts:29-39.
+pub fn data_confirm_error(status: u16) -> String {
+    if status == 9999 {
+        "Data request failed with error: 'TIMEOUT'".to_string()
+    } else {
+        format!(
+            "Data request failed with error: '{}' (0x{:x})",
+            ZnpCommandStatus::name(status as u8),
+            status
+        )
+    }
+}

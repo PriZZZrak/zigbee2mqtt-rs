@@ -126,22 +126,25 @@ Coverage: 130 tests covering commissioning/backup restore/create errors,
 legacy backups, config-adapter mismatch diagnostics, LED/transmit-power,
 permit join, ZCL send/retry/route-discovery/timeout, group/all/inter-PAN,
 incoming messages (including chunked `dataRetrieve`), device events, `waitFor`
-and the ZDO payload table. Paired upstream cases (soft+hard reset, three
-`sendZclFrameToAll` broadcasts, default-response variants, announce/network
-address events, leave/rejoin, inter-PAN set/restore, 16/64-bit extended
-messages) are exercised in one Rust test with both variants.
+and the ZDO payload table. Every upstream `it`/`it.each` case has a named Rust test; see
+`docs/adapter-test-parity.md` for the 130-row checklist.
 
-The suite exposed four port bugs fixed here: APS encryption used cluster
+The suite exposed six port bugs fixed here: APS encryption used cluster
 `0x003b` instead of `zigbeeDirectConfiguration` (61), `writeIeeeAddr` emitted
 short buffers instead of upstream's two `uint32`s, raw non-ZCL
-`incomingMsg` was dropped instead of emitted with `header: None`, and a
+`incomingMsg` was dropped instead of emitted with `header: None`, a
 missing/zero backup version was reported as an unsupported version instead of
-`Unknown backup format`, and `leaveInd` only honored a boolean `rejoin` while
-the wire carries UINT8 (numeric non-zero is now treated as rejoin).
+`Unknown backup format`, `leaveInd` only honored a boolean `rejoin` while the
+wire carries UINT8 (numeric non-zero is now treated as rejoin), and the
+observable error strings diverged from upstream. Error strings are now
+exact: `Data request failed with error: '<STATUS>' (0x..)` for data confirms
+(including `TIMEOUT`), `Data request failed with code '<n>'` for
+`dataRequestExt` SRSP failures, `Status '<name>'` for `registerEndpoints`,
+the upstream `dataRetrieve ... error status` / `length mismatch` logs, and the
+`Timeout after ... [address=... endpoint=... clusterId=... cmdId=... tsn=...]`
+formatter.
 
 ## Next slice
 
-- Add retry/route-discovery and incoming-message transcripts from
-  `znp.test.ts` / `adapter.test.ts`.
 - Extend the scripted coordinator to the remaining R1 bridge surfaces
   (database/state/config, HA discovery, Windfront).

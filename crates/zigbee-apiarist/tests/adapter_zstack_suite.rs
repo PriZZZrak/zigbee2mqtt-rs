@@ -711,7 +711,10 @@ async fn send_zcl_frame_network_address_data_confirm_fails() {
         .send_zcl_frame_to_endpoint("0x02", 2, 20, &frame, 10000, false, false, None, None)
         .await
         .expect_err("data confirm failure");
-    assert!(error.contains("201"), "unexpected error: {error}");
+    assert_eq!(
+        error,
+        "Data request failed with error: 'NWK_UNSUPPORTED_ATTRIBUTE' (0xc9)"
+    );
 }
 
 #[tokio::test]
@@ -777,7 +780,10 @@ async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_sho
         )
         .await
         .expect_err("transaction expired");
-    assert!(error.contains("240"), "unexpected error: {error}");
+    assert_eq!(
+        error,
+        "Data request failed with error: 'MAC_TRANSACTION_EXPIRED' (0xf0)"
+    );
     let commands = harness
         .mock
         .requests()
@@ -819,7 +825,10 @@ async fn send_zcl_frame_network_address_fails_because_mac_transaction_expire_whe
         )
         .await
         .expect_err("transaction expired");
-    assert!(error.contains("240"), "unexpected error: {error}");
+    assert_eq!(
+        error,
+        "Data request failed with error: 'MAC_TRANSACTION_EXPIRED' (0xf0)"
+    );
     let commands = harness
         .mock
         .requests()
@@ -857,7 +866,7 @@ async fn send_zcl_frame_network_address_fails_because_mac_no_ack_should_retry() 
         )
         .await
         .expect_err("no ack");
-    assert!(error.contains("233"), "unexpected error: {error}");
+    assert_eq!(error, "Data request failed with error: 'MAC_NO_ACK' (0xe9)");
     let requests = data_requests(&harness);
     assert!(requests.len() >= 3, "requests: {}", requests.len());
     let commands = harness
@@ -893,7 +902,7 @@ async fn send_zcl_frame_network_address_with_network_address_change_should_retry
         )
         .await
         .expect_err("no ack");
-    assert!(error.contains("233"), "unexpected error: {error}");
+    assert_eq!(error, "Data request failed with error: 'MAC_NO_ACK' (0xe9)");
     let requests = data_requests(&harness);
     assert!(requests.len() >= 4, "requests: {}", requests.len());
     let last = requests.last().expect("last request");
@@ -918,7 +927,7 @@ async fn send_zcl_frame_network_address_with_network_address_change_without_reco
         .send_zcl_frame_to_endpoint("0x03", 2, 20, &frame, 10000, false, true, None, None)
         .await
         .expect_err("no ack");
-    assert!(error.contains("233"), "unexpected error: {error}");
+    assert_eq!(error, "Data request failed with error: 'MAC_NO_ACK' (0xe9)");
     assert_eq!(data_requests(&harness).len(), 1);
 }
 
@@ -970,7 +979,7 @@ async fn send_zcl_frame_network_address_should_retry_on_dataconfirm_timeout() {
         .send_zcl_frame_to_endpoint("0x02", 2, 20, &frame, 10000, false, false, None, None)
         .await
         .expect_err("timeout");
-    assert!(error.contains("9999"), "unexpected error: {error}");
+    assert_eq!(error, "Data request failed with error: 'TIMEOUT'");
     assert_eq!(data_requests(&harness).len(), 1);
 }
 
@@ -1021,7 +1030,10 @@ async fn send_zcl_frame_group_data_confirm_fails() {
         .send_zcl_frame_to_group(25, &frame, None, None)
         .await
         .expect_err("group data confirm");
-    assert!(error.contains("184"), "unexpected error: {error}");
+    assert_eq!(
+        error,
+        "Data request failed with error: 'APS_DUPLICATE_ENTRY' (0xb8)"
+    );
     assert_eq!(harness.mock.requests_named("dataRequestExt").len(), 1);
 }
 
@@ -1240,7 +1252,10 @@ async fn data_confirm_fails_case(disable_default_response: bool) {
         .send_zcl_frame_to_endpoint("0x02", 2, 20, &frame, 10000, false, false, None, None)
         .await
         .expect_err("data confirm");
-    assert!(error.contains("201"), "unexpected error: {error}");
+    assert_eq!(
+        error,
+        "Data request failed with error: 'NWK_UNSUPPORTED_ATTRIBUTE' (0xc9)"
+    );
 }
 
 #[tokio::test]
@@ -2410,10 +2425,7 @@ async fn send_zcl_frame_interpan_throws_when_data_request_fails() {
         .send_zcl_frame_inter_pan_broadcast(&frame, 1000, false)
         .await
         .expect_err("data request failure");
-    assert!(
-        error.contains("99") || error.contains("0x63"),
-        "unexpected error: {error}"
-    );
+    assert_eq!(error, "Data request failed with code '99'");
 }
 
 #[tokio::test]
@@ -2647,12 +2659,20 @@ async fn incoming_huge_data_case(
 
 #[tokio::test]
 async fn incoming_message_extended_huge_data_retrieve_error_status() {
-    incoming_huge_data_error_case(1, "286331153").await;
+    incoming_huge_data_error_case(
+        1,
+        "dataRetrieve [timestamp: 286331153, index: 0, chunkSize: 240] error status: 1",
+    )
+    .await;
 }
 
 #[tokio::test]
 async fn incoming_message_extended_huge_data_retrieve_length_mismatch() {
-    incoming_huge_data_error_case(2, "length mismatch").await;
+    incoming_huge_data_error_case(
+        2,
+        "dataRetrieve length mismatch [240 requested, 241 returned",
+    )
+    .await;
 }
 
 async fn incoming_huge_data_error_case(mock_error: u64, expected: &str) {
@@ -2692,7 +2712,7 @@ async fn incoming_huge_data_error_case(mock_error: u64, expected: &str) {
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     let messages = support::log_messages();
     assert!(
-        messages.iter().any(|message| message.contains(expected)),
+        messages.iter().any(|message| message == expected),
         "logs: {messages:#?}"
     );
 }
@@ -2707,9 +2727,9 @@ async fn refuse_to_start_when_ping_fails() {
         |_, _| support::Reply::timeout(),
     );
     let error = harness.start().await.expect_err("ping failure");
-    assert!(
-        error.contains("Failed to connect to the adapter"),
-        "unexpected error: {error}"
+    assert_eq!(
+        error,
+        "Failed to connect to the adapter (SRSP - SYS - ping after 6000ms)"
     );
 }
 
@@ -3079,7 +3099,11 @@ async fn should_throw_error_when_zdo_call_fails() {
     harness.mock.handle(
         zigbee_apiarist::adapter::z_stack::unpi::constants::Subsystem::ZDO,
         "simpleDescReq",
-        |_, _| support::Reply::timeout(),
+        |_, _| {
+            let mut reply = support::Reply::payload(serde_json::json!({"status": 0x83}));
+            reply.respond = true;
+            reply
+        },
     );
     let payload = BuffaloZdo::build_request(
         false,
@@ -3097,7 +3121,12 @@ async fn should_throw_error_when_zdo_call_fails() {
         )
         .await
         .expect_err("zdo failure");
-    assert!(!error.is_empty());
+    // The upstream mock rejects with a literal "Failed"; through the wire the
+    // equivalent failure is the ZNP SRSP status error, asserted in full.
+    assert_eq!(
+        error,
+        "--> 'SREQ: ZDO - SIMPLE_DESCRIPTOR_REQUEST - d2047b0000' failed with status '(0x83: UNKNOWN)'"
+    );
 }
 
 #[tokio::test]
@@ -3111,15 +3140,12 @@ async fn should_throw_error_when_register_endpoints_fails() {
             support::Reply::empty().with_zdo(
                 zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::ACTIVE_ENDPOINTS_RESPONSE,
                 Some(0),
-                &[serde_json::json!(133), serde_json::Value::Null],
+                &[serde_json::json!(131), serde_json::Value::Null],
             )
         },
     );
     let error = harness.start().await.expect_err("endpoint registration");
-    assert!(
-        error.contains("133") || error.contains("NOT_ACTIVE"),
-        "unexpected: {error}"
-    );
+    assert_eq!(error, "Status 'NOT_ACTIVE'");
 }
 
 #[tokio::test]
@@ -3226,7 +3252,10 @@ async fn send_zcl_frame_network_address_timeout_should_discover_route_and_retry(
         request.await
     };
     let error = result.expect_err("response timeout");
-    assert!(error.contains("Timeout after"), "unexpected error: {error}");
+    assert_eq!(
+        error,
+        "Timeout after 1ms [address=2 endpoint=20 clusterId=0 cmdId=1 tsn=100]"
+    );
     let commands = harness
         .mock
         .requests()

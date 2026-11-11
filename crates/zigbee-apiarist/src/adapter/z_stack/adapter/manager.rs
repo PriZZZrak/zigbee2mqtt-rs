@@ -799,7 +799,10 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
             .await?;
         let status = response.get(0).and_then(Value::as_u64).unwrap_or(1);
         if status != 0 {
-            return Err(format!("ZDO status error: {status}"));
+            let name = crate::zspec::zdo::definition::status::Status::from_u8(status as u8)
+                .map(|status| status.name())
+                .unwrap_or("undefined");
+            return Err(format!("Status '{name}'"));
         }
         let active_endpoints = response
             .get(1)

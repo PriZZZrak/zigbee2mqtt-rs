@@ -314,7 +314,32 @@ impl Znp {
         let queue = self.queue.clone();
         queue
             .run(|| async {
-                self.request_locked(object, waiter_id, timeout, expected_statuses)
+                self.request_locked(object, waiter_id, timeout, expected_statuses, true)
+                    .await
+            })
+            .await
+    }
+
+    /// Like `request`, but returns the reply even when its status is non-zero.
+    /// Used where the caller must map the raw status into an upstream error
+    /// message instead of relying on the generic status check.
+    pub async fn request_any_status(
+        &mut self,
+        subsystem: Subsystem,
+        command: &str,
+        payload: Value,
+        waiter_id: Option<u64>,
+        timeout: Option<u64>,
+    ) -> Result<Option<ZpiObject>, String> {
+        if !self.transport.is_open() {
+            return Err("Cannot request when znp has not been initialized yet".to_string());
+        }
+
+        let object = Self::create_request(subsystem, command, payload)?;
+        let queue = self.queue.clone();
+        queue
+            .run(|| async {
+                self.request_locked(object, waiter_id, timeout, &[], false)
                     .await
             })
             .await
@@ -335,6 +360,7 @@ impl Znp {
         waiter_id: Option<u64>,
         timeout: Option<u64>,
         expected_statuses: &[u8],
+        check_status: bool,
     ) -> Result<Option<ZpiObject>, String> {
         if object.r#type == Type::SREQ {
             let default_timeout = if object.command.name == "bdbStartCommissioning"
@@ -364,25 +390,29 @@ impl Znp {
                 .await?;
             let result = receiver.await.map_err(|_| "Waiter dropped".to_string())??;
 
-            if let Some(status) = result.payload.get("status").and_then(Value::as_u64) {
-                if !expected_statuses.contains(&(status as u8)) {
-                    if let Some(waiter_id) = waiter_id {
-                        self.waitress.remove(waiter_id).await;
+            if check_status {
+                if let Some(status) = result.payload.get("status").and_then(Value::as_u64) {
+                    if !expected_statuses.contains(&(status as u8)) {
+                        if let Some(waiter_id) = waiter_id {
+                            self.waitress.remove(waiter_id).await;
+                        }
+                        return Err(format!(
+                            "--> '{}' failed with status '{}' (expected '{}')",
+                            object.to_string(),
+                            crate::adapter::z_stack::constants::utils::status_description(
+                                status as u8
+                            ),
+                            expected_statuses
+                                .iter()
+                                .map(|status| {
+                                    crate::adapter::z_stack::constants::utils::status_description(
+                                        *status,
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        ));
                     }
-                    return Err(format!(
-                        "--> '{}' failed with status '{}' (expected '{}')",
-                        object.to_string(),
-                        crate::adapter::z_stack::constants::utils::status_description(status as u8),
-                        expected_statuses
-                            .iter()
-                            .map(|status| {
-                                crate::adapter::z_stack::constants::utils::status_description(
-                                    *status,
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    ));
                 }
             }
 

@@ -285,9 +285,28 @@ impl ZStackAdapter {
                                 && header.command_identifier == 0x0b))
                 },
                 |matcher: &ClusterWaitressMatcher, timeout: u64| {
+                    // Upstream `adapter.ts:124` formats raw JS values
+                    // (`undefined` when not part of the matcher).
+                    let address = match &matcher.address {
+                        None => "undefined".to_string(),
+                        Some(Value::String(value)) => value.clone(),
+                        Some(value) => value.to_string(),
+                    };
+                    let endpoint = matcher
+                        .endpoint
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "undefined".to_string());
+                    let command_id = matcher
+                        .command_id
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "undefined".to_string());
+                    let tsn = matcher
+                        .transaction_sequence_number
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "undefined".to_string());
                     format!(
-                        "Timeout after {timeout}ms [address={:?} endpoint={:?} clusterId={} cmdId={:?} tsn={:?}]",
-                        matcher.address, matcher.endpoint, matcher.cluster_id, matcher.command_id, matcher.transaction_sequence_number
+                        "Timeout after {timeout}ms [address={address} endpoint={endpoint} clusterId={} cmdId={command_id} tsn={tsn}]",
+                        matcher.cluster_id
                     )
                 },
             )),
@@ -974,7 +993,7 @@ async fn data_retrieve_all(znp: &mut Znp, timestamp: u64, length: usize) -> Opti
     while index < length {
         let chunk_size = block_size.min(length - index);
         let response = match znp
-            .request_with_reply(
+            .request_any_status(
                 Subsystem::AF,
                 "dataRetrieve",
                 json!({
@@ -982,12 +1001,20 @@ async fn data_retrieve_all(znp: &mut Znp, timestamp: u64, length: usize) -> Opti
                     "index": index,
                     "length": chunk_size,
                 }),
+                None,
+                None,
             )
             .await
         {
-            Ok(response) => response,
+            Ok(Some(response)) => response,
+            Ok(None) => {
+                logger().error("dataRetrieve returned no reply", NS);
+                free_ext_message(znp, timestamp).await;
+                return None;
+            }
             Err(error) => {
                 logger().error(&format!("dataRetrieve failed: {error}"), NS);
+                free_ext_message(znp, timestamp).await;
                 return None;
             }
         };
@@ -1455,27 +1482,39 @@ impl ZStackAdapter {
         } else {
             None
         };
-        znp.request(
-            Subsystem::AF,
-            "dataRequestExt",
-            json!({
-                "dstaddrmode": address_mode as u8,
-                "dstaddr": Self::to_address_string(&destination_address_or_group_id),
-                "destendpoint": destination_endpoint,
-                "dstpanid": pan_id,
-                "srcendpoint": source_endpoint,
-                "clusterid": cluster_id,
-                "transid": transaction_id,
-                "options": 0,
-                "radius": radius,
-                "len": data.len(),
-                "data": data,
-            }),
-            waiter.as_ref().map(|(id, _)| *id),
-            None,
-            &[0],
-        )
-        .await?;
+        let result = znp
+            .request_any_status(
+                Subsystem::AF,
+                "dataRequestExt",
+                json!({
+                    "dstaddrmode": address_mode as u8,
+                    "dstaddr": Self::to_address_string(&destination_address_or_group_id),
+                    "destendpoint": destination_endpoint,
+                    "dstpanid": pan_id,
+                    "srcendpoint": source_endpoint,
+                    "clusterid": cluster_id,
+                    "transid": transaction_id,
+                    "options": 0,
+                    "radius": radius,
+                    "len": data.len(),
+                    "data": data,
+                }),
+                waiter.as_ref().map(|(id, _)| *id),
+                None,
+            )
+            .await?;
+        if let Some(status) = result
+            .as_ref()
+            .and_then(|reply| reply.payload.get("status"))
+            .and_then(Value::as_u64)
+        {
+            if status != 0 {
+                if let Some((waiter_id, _)) = waiter.as_ref() {
+                    znp.waitress.remove(*waiter_id).await;
+                }
+                return Err(format!("Data request failed with code '{status}'"));
+            }
+        }
 
         if let Some((_, receiver)) = waiter {
             let confirm = receiver.await.map_err(|_| "Waiter dropped".to_string())??;
@@ -1506,7 +1545,9 @@ impl ZStackAdapter {
                     ))
                     .await;
                 }
-                return Err(format!("Data request failed with error: '{status}'"));
+                return Err(
+                    crate::adapter::z_stack::constants::utils::data_confirm_error(status as u16),
+                );
             }
             return Ok(Some(confirm));
         }
@@ -1831,7 +1872,9 @@ impl ZStackAdapter {
             ];
             if data_request_attempt >= 4 || !recoverable.contains(&data_confirm) || disable_recovery
             {
-                return Err(format!("Data request failed with error: '{data_confirm}'"));
+                return Err(
+                    crate::adapter::z_stack::constants::utils::data_confirm_error(data_confirm),
+                );
             }
             if data_confirm == ZnpCommandStatus::MAC_CHANNEL_ACCESS_FAILURE as u16
                 || data_confirm == ZnpCommandStatus::BUFFER_FULL as u16
