@@ -44,6 +44,7 @@ pub struct MockAdapter {
     pub zdo_handler: Mutex<Option<ZdoHandler>>,
     pub zcl_handler: Mutex<Option<ZclHandler>>,
     pub devices: Mutex<HashMap<u16, MockDevice>>,
+    pub zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
     pub sent_endpoint: Mutex<Vec<Frame>>,
     pub sent_group: Mutex<Vec<Frame>>,
     pub sent_all: Mutex<Vec<Frame>>,
@@ -76,6 +77,7 @@ impl MockAdapter {
             zdo_handler: Mutex::new(None),
             zcl_handler: Mutex::new(None),
             devices: Mutex::new(HashMap::new()),
+            zdo_calls: Mutex::new(Vec::new()),
             sent_endpoint: Mutex::new(Vec::new()),
             sent_group: Mutex::new(Vec::new()),
             sent_all: Mutex::new(Vec::new()),
@@ -140,6 +142,13 @@ impl ControllerAdapter for MockAdapter {
         payload: &[u8],
         disable_response: bool,
     ) -> ControllerFuture<'_, Value> {
+        self.zdo_calls.lock().unwrap().push((
+            ieee_address.to_string(),
+            network_address,
+            cluster_id,
+            payload.to_vec(),
+            disable_response,
+        ));
         let handler = self.zdo_handler.lock().unwrap().clone();
         let devices = self.devices.lock().unwrap().clone();
         let ieee = ieee_address.to_string();
@@ -535,6 +544,9 @@ fn default_zdo(
     cluster_id: u16,
     payload: &[u8],
 ) -> Result<Value, String> {
+    if matches!(network_address, 0xfffb..=0xffff) {
+        return Ok(json!([0, Value::Null]));
+    }
     let Some(device) = devices.get(&network_address) else {
         return Err(format!("Mock device {network_address} not found"));
     };
@@ -756,6 +768,13 @@ pub fn install_default_devices(adapter: &MockAdapter) {
                 (1, simple_descriptor(0, 1, 2, 3, vec![10], vec![11])),
                 (2, simple_descriptor(0, 2, 3, 5, vec![1], vec![0])),
             ]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        140,
+        MockDevice {
+            node_descriptor: None,
             ..MockDevice::default()
         },
     );

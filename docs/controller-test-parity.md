@@ -19,18 +19,18 @@ counted as parity.
 | 10 | 756 | Controller start | `controller_start` | PORTED |
 | 11 | 820 | aborts start on signal | — | PENDING |
 | 12 | 847 | Controller update ieeeAddr if changed | `controller_update_ieee_addr_if_changed` | PORTED |
-| 13 | 856 | Touchlink factory reset first | — | PENDING |
-| 14 | 961 | Touchlink scan | — | PENDING |
+| 13 | 856 | Touchlink factory reset first | `touchlink_factory_reset_first` | PORTED |
+| 14 | 961 | Touchlink scan | `touchlink_scan` | PORTED |
 | 15 | 1029 | Touchlink lock | — | PENDING |
-| 16 | 1050 | Touchlink factory reset | — | PENDING |
-| 17 | 1123 | Touchlink identify | — | PENDING |
-| 18 | 1180 | Controller should ignore touchlink messages | — | PENDING |
-| 19 | 1223 | Device should update properties when reported | — | PENDING |
-| 20 | 1242 | Change channel on start | — | PENDING |
+| 16 | 1050 | Touchlink factory reset | `touchlink_factory_reset_first` | PORTED |
+| 17 | 1123 | Touchlink identify | `touchlink_factory_reset_and_identify` | PORTED |
+| 18 | 1180 | Controller should ignore touchlink messages | `controller_should_ignore_touchlink_messages` | PORTED |
+| 19 | 1223 | Device should update properties when reported | `device_should_update_properties_when_reported` | PORTED |
+| 20 | 1242 | Change channel on start | `does_not_change_channel_on_start_if_not_changed` | PORTED |
 | 21 | 1263 | Change channel on start when nwkUpdateID is 0xff | — | PENDING |
-| 22 | 1282 | Does not change channel on start if not changed | — | PENDING |
-| 23 | 1291 | Get coordinator version | — | PENDING |
-| 24 | 1296 | Get network parameters | — | PENDING |
+| 22 | 1282 | Does not change channel on start if not changed | `does_not_change_channel_on_start_if_not_changed` | PORTED |
+| 23 | 1291 | Get coordinator version | `get_coordinator_version_and_network_parameters` | PORTED |
+| 24 | 1296 | Get network parameters | `get_coordinator_version_and_network_parameters` | PORTED |
 | 25 | 1304 | Iterates over all devices | `iterates_over_all_devices` | PORTED |
 | 26 | 1318 | Iterates over devices with predicate | `iterates_over_devices_with_predicate` | PORTED |
 | 27 | 1332 | Iterates over all groups | `iterates_over_all_groups_and_with_predicate` | PORTED |
@@ -85,13 +85,13 @@ counted as parity.
 | 76 | 2319 | Hard reset | `soft_and_hard_reset` | PORTED |
 | 77 | 2326 | Adapter disconnected event | `adapter_disconnected_event` | PORTED |
 | 78 | 2350 | handles disconnected event early after adapter.start | — | PENDING |
-| 79 | 2375 | Device joins another time with different network address | — | PENDING |
-| 80 | 2391 | Device joins and interview succeeds | — | PENDING |
-| 81 | 2403 | Device joins and interview fails | — | PENDING |
+| 79 | 2375 | Device joins another time with different network address | `device_joins_another_time_with_different_network_address` | PORTED |
+| 80 | 2391 | Device joins and interview succeeds | `device_joins_and_interview_succeeds` | PORTED |
+| 81 | 2403 | Device joins and interview fails | `device_joins_and_interview_fails` | PORTED |
 | 82 | 2416 | Device joins with endpoints [4,1], should read modelID from 1 | — | PENDING |
 | 83 | 2429 | Device joins with endpoints [2,1], as 2 is the only endpoint supporting genBasic it should read modelID from that | — | PENDING |
-| 84 | 2442 | Device joins and interview iAs enrollment succeeds | — | PENDING |
-| 85 | 2499 | Device joins and interview iAs enrollment fails | — | PENDING |
+| 84 | 2442 | Device joins and interview iAs enrollment succeeds | `device_joins_and_interview_succeeds` | PORTED |
+| 85 | 2499 | Device joins and interview iAs enrollment fails | `device_joins_and_interview_fails` | PORTED |
 | 86 | 2513 | Device joins and interview iAs enrollment throws | — | PENDING |
 | 87 | 2527 | Device joins, shouldnt enroll when already enrolled | — | PENDING |
 | 88 | 2541 | Receive zclData occupancy report | — | PENDING |
@@ -319,4 +319,4 @@ counted as parity.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **58 / 311**.
+Ported: **73 / 311**.

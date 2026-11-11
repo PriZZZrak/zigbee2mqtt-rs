@@ -1211,3 +1211,371 @@ async fn controller_permit_joining_for_too_long_time_throws() {
     assert!(adapter.permit_joins.lock().unwrap().is_empty());
     assert!(permit_join_events(&harness).is_empty());
 }
+
+fn touchlink_payload_from_frame(
+    frame: &zigbee_apiarist::zspec::zcl::zcl_frame::Frame,
+    address: &str,
+) -> zigbee_apiarist::adapter::events::ZclPayload {
+    zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: frame.cluster.ID as u16,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(address),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 0,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    }
+}
+
+#[tokio::test]
+async fn touchlink_factory_reset_first() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_clone = counter.clone();
+    adapter.set_interpan_broadcast_handler(move |frame| {
+        let call = counter_clone.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(touchlink_payload_from_frame(
+                frame,
+                "0x0000012300000000",
+            )))
+        }
+    });
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let mut touchlink = harness.controller.touchlink();
+    let mut guard = touchlink.lock().await;
+    let result = guard
+        .as_mut()
+        .unwrap()
+        .factory_reset_first()
+        .await
+        .expect("reset");
+    assert!(result);
+    assert_eq!(*adapter.interpan_channels.lock().unwrap(), vec![11, 15]);
+    assert_eq!(adapter.interpan_broadcast.lock().unwrap().len(), 2);
+    assert_eq!(adapter.interpan_to_ieee.lock().unwrap().len(), 2);
+    let calls = adapter.interpan_to_ieee.lock().unwrap();
+    assert_eq!(calls[0].0.command.name, "identifyRequest");
+    assert_eq!(calls[1].0.command.name, "resetToFactoryNew");
+}
+
+#[tokio::test]
+async fn touchlink_scan() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_clone = counter.clone();
+    adapter.set_interpan_broadcast_handler(move |frame| {
+        let call = counter_clone.fetch_add(1, Ordering::SeqCst);
+        if call == 1 {
+            Ok(Some(touchlink_payload_from_frame(
+                frame,
+                "0x0000012300000000",
+            )))
+        } else if call == 0 {
+            Err("no response".to_string())
+        } else {
+            Ok(None)
+        }
+    });
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let mut touchlink = harness.controller.touchlink();
+    let mut guard = touchlink.lock().await;
+    let result = guard.as_mut().unwrap().scan().await.expect("scan");
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].ieee_addr, "0x0000012300000000");
+    assert_eq!(adapter.interpan_channels.lock().unwrap().len(), 16);
+    assert_eq!(adapter.interpan_broadcast.lock().unwrap().len(), 16);
+    assert_eq!(adapter.interpan_to_ieee.lock().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn touchlink_factory_reset_and_identify() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    adapter.set_interpan_broadcast_handler(|frame| {
+        Ok(Some(touchlink_payload_from_frame(
+            frame,
+            "0x0000012300000000",
+        )))
+    });
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let mut touchlink = harness.controller.touchlink();
+    let mut guard = touchlink.lock().await;
+    guard
+        .as_mut()
+        .unwrap()
+        .factory_reset("0x0000012300000000", 15)
+        .await
+        .expect("factory reset");
+    assert_eq!(*adapter.interpan_channels.lock().unwrap(), vec![15]);
+    assert_eq!(adapter.interpan_to_ieee.lock().unwrap().len(), 2);
+
+    adapter.interpan_channels.lock().unwrap().clear();
+    adapter.interpan_to_ieee.lock().unwrap().clear();
+    guard
+        .as_mut()
+        .unwrap()
+        .identify("0x0000012300000000", 11)
+        .await
+        .expect("identify");
+    assert_eq!(*adapter.interpan_channels.lock().unwrap(), vec![11]);
+    let calls = adapter.interpan_to_ieee.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].0.command.name, "identifyRequest");
+}
+
+#[tokio::test]
+async fn controller_should_ignore_touchlink_messages() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        zigbee_apiarist::zspec::zcl::zcl_header::FrameType::SPECIFIC as u8,
+        zigbee_apiarist::zspec::zcl::zcl_header::Direction::SERVER_TO_CLIENT as u8,
+        false,
+        None,
+        1,
+        "scanResponse",
+        "touchlink",
+        json!({
+            "transactionID": 1, "rssiCorrection": 1, "zigbeeInformation": 1,
+            "touchlinkInformation": 1, "keyBitmask": 1, "responseID": 1,
+            "extendedPanID": "0x001788010de23e6e", "networkUpdateID": 1,
+            "logicalChannel": 1, "panID": 1, "networkAddress": 1,
+            "numberOfSubDevices": 0, "totalGroupIdentifiers": 1
+        }),
+        json!({}),
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: frame.cluster.ID as u16,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    assert!(!harness.take_events().iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::Message(_)
+    )));
+}
+
+#[tokio::test]
+async fn device_should_update_properties_when_reported() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x129")
+            .unwrap()
+            .model_id()
+            .as_deref(),
+        Some("myModelID")
+    );
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        0,
+        1,
+        true,
+        None,
+        10,
+        "readRsp",
+        0,
+        json!([{"attrId": 5, "status": 0, "dataType": 66, "attrData": "new.model.id"}]),
+        json!({}),
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: frame.cluster.ID as u16,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x129")
+            .unwrap()
+            .model_id()
+            .as_deref(),
+        Some("new.model.id")
+    );
+}
+
+#[tokio::test]
+async fn get_coordinator_version_and_network_parameters() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let version = harness
+        .controller
+        .get_coordinator_version()
+        .await
+        .expect("version");
+    assert_eq!(version.r#type, "zStack");
+    assert_eq!(version.meta["version"], 1);
+    let params = harness
+        .controller
+        .get_network_parameters()
+        .await
+        .expect("network");
+    assert_eq!(params.pan_id, 1);
+    assert_eq!(params.channel, 15);
+    assert_eq!(params.extended_pan_id, "0x64c5fd698daf0c00");
+    assert_eq!(params.nwk_update_id, 0);
+}
+
+#[tokio::test]
+async fn does_not_change_channel_on_start_if_not_changed() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    assert!(adapter.zdo_calls.lock().unwrap().iter().all(|call| call.2
+        != zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NWK_UPDATE_REQUEST));
+}
+
+#[tokio::test]
+async fn change_channel_on_start() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    adapter.network_parameters.lock().unwrap().channel = 25;
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let calls = adapter.zdo_calls.lock().unwrap();
+    let update = calls
+        .iter()
+        .find(|call| {
+            call.2
+                == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NWK_UPDATE_REQUEST
+        })
+        .expect("nwk update");
+    assert_eq!(
+        update.1,
+        zigbee_apiarist::zspec::enums::BroadcastAddress::SLEEPY as u16
+    );
+    assert!(update.4);
+    assert_eq!(adapter.network_parameters.lock().unwrap().channel, 25);
+}
+
+#[tokio::test]
+async fn device_joins_another_time_with_different_network_address() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 129, "0x129");
+    settle().await;
+    assert!(!harness.take_events().iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::DeviceJoined(_)
+    )));
+    join(&adapter, 130, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    assert_eq!(device.network_address(), 130);
+    assert!(harness
+        .controller
+        .get_device_by_network_address(129)
+        .is_none());
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_network_address(130)
+            .unwrap()
+            .ieee_addr(),
+        "0x129"
+    );
+}
+
+#[tokio::test]
+async fn device_joins_and_interview_succeeds() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let statuses = harness
+        .take_events()
+        .iter()
+        .filter_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::DeviceInterview(payload) => {
+                Some((payload.status.clone(), payload.device.ieee_addr()))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statuses,
+        vec![
+            ("started".to_string(), "0x129".to_string()),
+            ("successful".to_string(), "0x129".to_string())
+        ]
+    );
+}
+
+#[tokio::test]
+async fn device_joins_and_interview_fails() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 140, "0x140");
+    settle().await;
+    let statuses = harness
+        .take_events()
+        .iter()
+        .filter_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::DeviceInterview(payload) => {
+                Some(payload.status.clone())
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(statuses, vec!["started".to_string(), "failed".to_string()]);
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x140")
+            .unwrap()
+            .r#type(),
+        zigbee_apiarist::controller::database::DeviceType::Unknown
+    );
+}
