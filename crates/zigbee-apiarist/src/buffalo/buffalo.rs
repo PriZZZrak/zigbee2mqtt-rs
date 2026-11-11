@@ -188,17 +188,15 @@ impl Buffalo {
         f64::from_le_bytes(array)
     }
 
+    /// Upstream `writeIeeeAddr`: always eight bytes. Upstream writes
+    /// `parseInt(value.slice(10))` then `parseInt(value.slice(2, 10))`, so a
+    /// short value is zero-padded instead of producing a shorter buffer.
     pub fn write_ieee_addr(&mut self, value: &str) {
-        let hex = value.trim_start_matches("0x");
-        let mut bytes = Vec::with_capacity(hex.len() / 2);
-        let chars: Vec<char> = hex.chars().collect();
-        let mut index = chars.len();
-        while index >= 2 {
-            let pair: String = chars[index - 2..index].iter().collect();
-            bytes.push(u8::from_str_radix(&pair, 16).unwrap_or(0));
-            index -= 2;
-        }
-        self.write_slice(&bytes);
+        let hex = value.strip_prefix("0x").unwrap_or(value);
+        let high = u32::from_str_radix(hex.get(0..8).unwrap_or(""), 16).unwrap_or(0);
+        let low = u32::from_str_radix(hex.get(8..).unwrap_or(""), 16).unwrap_or(0);
+        self.write_uint32(u64::from(low));
+        self.write_uint32(u64::from(high));
     }
 
     pub fn read_ieee_addr(&mut self) -> String {

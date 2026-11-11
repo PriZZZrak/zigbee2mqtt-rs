@@ -665,6 +665,7 @@ impl MockCoordinator {
             (Subsystem::APP_CNF, "bdbSetChannel"),
             (Subsystem::APP_CNF, "bdbStartCommissioning"),
             (Subsystem::AF, "register"),
+            (Subsystem::AF, "interPanCtl"),
         ] {
             state.responders.push((
                 subsystem as u8,
@@ -943,6 +944,19 @@ impl MockCoordinator {
         self.inject(encode_areq(subsystem, command_name, &payload));
     }
 
+    /// Inject an event with an explicit UNPI type.
+    pub fn inject_typed(
+        &self,
+        r#type: Type,
+        subsystem: Subsystem,
+        command_name: &str,
+        payload: Value,
+    ) {
+        let mut bytes = encode_areq(subsystem, command_name, &payload);
+        bytes[2] = ((r#type as u8) << 5) | (subsystem as u8);
+        self.inject(bytes);
+    }
+
     /// Inject a ZDO AREQ response (`mockZdoZpiObject`).
     pub fn inject_zdo(&self, cluster_id: u16, srcaddr: Option<u16>, args: &[Value]) {
         let command = definition::for_subsystem(Subsystem::ZDO)
@@ -985,6 +999,8 @@ impl Harness {
         backup_path: &str,
         adapter_options: AdapterOptions,
     ) -> Self {
+        // Install the recording logger before the adapter can log anything.
+        let _ = recorded_logs();
         let mut mock = MockCoordinator::spawn();
         let transport = mock.take_transport();
         let adapter = ZStackAdapter::new(

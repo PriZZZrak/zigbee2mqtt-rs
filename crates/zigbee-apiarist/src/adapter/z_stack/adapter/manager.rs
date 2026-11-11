@@ -421,18 +421,27 @@ impl<A: ZdoAdapter> ZnpAdapterManager<A> {
                 );
                 logger().error(
                     &format!(
-                        "- Channel List: configured={:?}, adapter={:?}",
-                        nwk_options.channel_list,
+                        "- Channel List: configured={}, adapter={}",
+                        nwk_options
+                            .channel_list
+                            .iter()
+                            .map(u8::to_string)
+                            .collect::<Vec<_>>()
+                            .join(","),
                         crate::adapter::z_stack::utils::channel_list::unpack_channel_list(
                             nib_value.get_u32("channelList").unwrap_or(0)
                         )
+                        .iter()
+                        .map(u8::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",")
                     ),
                     NS,
                 );
                 logger().error("Please update configuration to prevent further issues.", NS);
                 logger().error(
                     &format!(
-                        "If you wish to re-commission your network, please remove coordinator backup at {}.",
+                        "If you wish to re-commission your network, please remove coordinator backup at {}",
                         self.options.backup_path
                     ),
                     NS,

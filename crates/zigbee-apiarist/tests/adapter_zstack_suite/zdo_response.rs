@@ -35,13 +35,33 @@ fn value_u16(value: &Value) -> u16 {
 /// Encode a ZDO response payload (status byte included).
 pub fn build_zdo_response(cluster_id: u16, args: &[Value]) -> Vec<u8> {
     let mut buffer = Vec::new();
-    let status = args.first().and_then(Value::as_u64).unwrap_or(0) as u8;
-    buffer.push(status);
-    if status != 0 {
-        return buffer;
+    if cluster_id != ClusterId::END_DEVICE_ANNOUNCE {
+        let status = args.first().and_then(Value::as_u64).unwrap_or(0) as u8;
+        buffer.push(status);
+        if status != 0 {
+            return buffer;
+        }
     }
     let payload = args.get(1).cloned().unwrap_or(Value::Null);
     match cluster_id {
+        ClusterId::END_DEVICE_ANNOUNCE => {
+            push_u16(&mut buffer, value_u16(&payload["nwkAddress"]));
+            push_eui64(&mut buffer, &payload["eui64"]);
+            let capabilities = &payload["capabilities"];
+            buffer.push(
+                ((capabilities["alternatePANCoordinator"]
+                    .as_u64()
+                    .unwrap_or(0) as u8)
+                    & 1)
+                    | (((capabilities["deviceType"].as_u64().unwrap_or(0) as u8) & 0x03) << 1)
+                    | (((capabilities["powerSource"].as_u64().unwrap_or(0) as u8) & 1) << 2)
+                    | (((capabilities["rxOnWhenIdle"].as_u64().unwrap_or(0) as u8) & 1) << 3)
+                    | (((capabilities["reserved1"].as_u64().unwrap_or(0) as u8) & 1) << 4)
+                    | (((capabilities["reserved2"].as_u64().unwrap_or(0) as u8) & 1) << 5)
+                    | (((capabilities["securityCapability"].as_u64().unwrap_or(0) as u8) & 1) << 6)
+                    | (((capabilities["allocateAddress"].as_u64().unwrap_or(0) as u8) & 1) << 7),
+            );
+        }
         ClusterId::ACTIVE_ENDPOINTS_RESPONSE | ClusterId::MATCH_DESCRIPTORS_RESPONSE => {
             push_u16(&mut buffer, value_u16(&payload["nwkAddress"]));
             let endpoints = payload["endpointList"]
@@ -76,11 +96,17 @@ pub fn build_zdo_response(cluster_id: u16, args: &[Value]) -> Vec<u8> {
             buffer.push(logical_type | (frequency << 3));
             buffer.push(payload["apsFlags"].as_u64().unwrap_or(0) as u8);
             let capabilities = &payload["capabilities"];
-            let capability_bits = (capabilities["allocateAddress"].as_u64().unwrap_or(0) as u8)
-                | ((capabilities["deviceType"].as_u64().unwrap_or(0) as u8) << 1)
-                | ((capabilities["powerSource"].as_u64().unwrap_or(0) as u8) << 3)
-                | ((capabilities["rxOnWhenIdle"].as_u64().unwrap_or(0) as u8) << 4)
-                | ((capabilities["securityCapability"].as_u64().unwrap_or(0) as u8) << 6);
+            let capability_bits = ((capabilities["alternatePANCoordinator"]
+                .as_u64()
+                .unwrap_or(0) as u8)
+                & 1)
+                | (((capabilities["deviceType"].as_u64().unwrap_or(0) as u8) & 0x03) << 1)
+                | (((capabilities["powerSource"].as_u64().unwrap_or(0) as u8) & 1) << 2)
+                | (((capabilities["rxOnWhenIdle"].as_u64().unwrap_or(0) as u8) & 1) << 3)
+                | (((capabilities["reserved1"].as_u64().unwrap_or(0) as u8) & 1) << 4)
+                | (((capabilities["reserved2"].as_u64().unwrap_or(0) as u8) & 1) << 5)
+                | (((capabilities["securityCapability"].as_u64().unwrap_or(0) as u8) & 1) << 6)
+                | (((capabilities["allocateAddress"].as_u64().unwrap_or(0) as u8) & 1) << 7);
             buffer.push(capability_bits);
             push_u16(&mut buffer, value_u16(&payload["manufacturerCode"]));
             buffer.push(payload["maxBufSize"].as_u64().unwrap_or(0) as u8);

@@ -929,13 +929,11 @@ async fn dispatch_znp_object(
             return;
         }
 
-        let Some(header) = crate::zspec::zcl::zcl_header::Header::from_buffer(&data) else {
-            return;
-        };
+        let header = crate::zspec::zcl::zcl_header::Header::from_buffer(&data);
         let payload = ZclPayload {
             cluster_id,
             data,
-            header: Some(header),
+            header: header.clone(),
             address,
             endpoint,
             linkquality,
@@ -943,7 +941,9 @@ async fn dispatch_znp_object(
             was_broadcast,
             destination_endpoint,
         };
-        waitress.resolve(&payload).await;
+        if header.is_some() {
+            waitress.resolve(&payload).await;
+        }
         let _ = events.send(AdapterEvent::ZclPayload(payload));
     }
 }
