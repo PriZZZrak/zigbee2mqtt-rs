@@ -48,6 +48,7 @@ async fn run_coordinator(
     listener: TcpListener,
     captured: mpsc::UnboundedSender<Vec<u8>>,
     fail_first_confirm: bool,
+    forced_confirm_status: Option<u8>,
 ) {
     let mut first_confirm = true;
     let (mut socket, _) = listener.accept().await.expect("accept");
@@ -106,7 +107,9 @@ async fn run_coordinator(
                         .get("transid")
                         .and_then(serde_json::Value::as_u64)
                         .unwrap_or(0) as u8;
-                    let status = if fail_first_confirm && first_confirm {
+                    let status = if let Some(status) = forced_confirm_status {
+                        status
+                    } else if fail_first_confirm && first_confirm {
                         first_confirm = false;
                         225u8
                     } else {
@@ -126,10 +129,33 @@ async fn run_coordinator(
                         .expect("write dataConfirm");
                 }
 
+                if object.command.name == "resetReq" {
+                    let reset_ind = UnpiFrame::new(
+                        Type::AREQ,
+                        Subsystem::SYS,
+                        128,
+                        vec![0, 0, 2, 7, 1, 0, 0],
+                        0,
+                        0,
+                    );
+                    socket
+                        .write_all(&reset_ind.to_buffer())
+                        .await
+                        .expect("write resetInd");
+                }
+
                 if object.command.name == "mgmtPermitJoinReq" {
                     // `mgmtPermitJoinRsp`: srcaddr (2 bytes) + status.
-                    let response =
-                        UnpiFrame::new(Type::AREQ, Subsystem::ZDO, 182, vec![0xd2, 0x04, 0], 0, 0);
+                    let src_lo = frame.data.get(1).copied().unwrap_or(0);
+                    let src_hi = frame.data.get(2).copied().unwrap_or(0);
+                    let response = UnpiFrame::new(
+                        Type::AREQ,
+                        Subsystem::ZDO,
+                        182,
+                        vec![src_lo, src_hi, 0],
+                        0,
+                        0,
+                    );
                     socket
                         .write_all(&response.to_buffer())
                         .await
@@ -140,12 +166,54 @@ async fn run_coordinator(
     }
 }
 
+async fn test_adapter(
+    forced_confirm_status: Option<u8>,
+) -> (
+    Arc<Mutex<ZStackAdapter>>,
+    mpsc::UnboundedReceiver<Vec<u8>>,
+    tokio::task::JoinHandle<()>,
+) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let (captured_tx, captured_rx) = mpsc::unbounded_channel();
+    let server = tokio::spawn(run_coordinator(
+        listener,
+        captured_tx,
+        false,
+        forced_confirm_status,
+    ));
+
+    let transport = AdapterTransport::new(TransportOptions {
+        path: format!("tcp://127.0.0.1:{port}"),
+        baud_rate: None,
+        rtscts: Some(false),
+    });
+    let adapter = Arc::new(Mutex::new(ZStackAdapter::new(
+        transport,
+        ConfigNetworkOptions {
+            pan_id: 0x1a62,
+            extended_pan_id: Some(vec![0xdd; 8]),
+            network_key: Some(vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13]),
+            channel_list: vec![11],
+            network_key_distribute: Some(false),
+        },
+        String::new(),
+        AdapterOptions::default(),
+    )));
+    {
+        let mut adapter = adapter.lock().await;
+        adapter.znp.lock().await.open().await.expect("open znp");
+        adapter.queue = Some(Queue::new(1));
+    }
+    (adapter, captured_rx, server)
+}
+
 #[tokio::test]
 async fn zcl_broadcast_is_captured_to_file_and_matches_upstream() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
-    let server = tokio::spawn(run_coordinator(listener, captured_tx, false));
+    let server = tokio::spawn(run_coordinator(listener, captured_tx, false, None));
 
     let transport = AdapterTransport::new(TransportOptions {
         path: format!("tcp://127.0.0.1:{port}"),
@@ -235,7 +303,7 @@ async fn endpoint_command_is_captured_to_file_and_matches_upstream() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
-    let server = tokio::spawn(run_coordinator(listener, captured_tx, false));
+    let server = tokio::spawn(run_coordinator(listener, captured_tx, false, None));
 
     let transport = AdapterTransport::new(TransportOptions {
         path: format!("tcp://127.0.0.1:{port}"),
@@ -328,7 +396,7 @@ async fn group_send_matches_upstream_adapter_test() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
-    let server = tokio::spawn(run_coordinator(listener, captured_tx, false));
+    let server = tokio::spawn(run_coordinator(listener, captured_tx, false, None));
 
     let transport = AdapterTransport::new(TransportOptions {
         path: format!("tcp://127.0.0.1:{port}"),
@@ -393,7 +461,7 @@ async fn permit_join_zdo_frame_matches_upstream_adapter_test() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
-    let server = tokio::spawn(run_coordinator(listener, captured_tx, false));
+    let server = tokio::spawn(run_coordinator(listener, captured_tx, false, None));
 
     let transport = AdapterTransport::new(TransportOptions {
         path: format!("tcp://127.0.0.1:{port}"),
@@ -471,7 +539,7 @@ async fn interpan_to_ieee_matches_upstream_adapter_test() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
-    let server = tokio::spawn(run_coordinator(listener, captured_tx, false));
+    let server = tokio::spawn(run_coordinator(listener, captured_tx, false, None));
 
     let transport = AdapterTransport::new(TransportOptions {
         path: format!("tcp://127.0.0.1:{port}"),
@@ -538,7 +606,7 @@ async fn mac_channel_access_failure_retries_with_new_transaction_id() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
-    let server = tokio::spawn(run_coordinator(listener, captured_tx, true));
+    let server = tokio::spawn(run_coordinator(listener, captured_tx, true, None));
 
     let transport = AdapterTransport::new(TransportOptions {
         path: format!("tcp://127.0.0.1:{port}"),
@@ -611,7 +679,7 @@ async fn zdo_request_payloads_match_upstream_adapter_tests() {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let (captured_tx, mut captured_rx) = mpsc::unbounded_channel();
-    let server = tokio::spawn(run_coordinator(listener, captured_tx, false));
+    let server = tokio::spawn(run_coordinator(listener, captured_tx, false, None));
 
     let transport = AdapterTransport::new(TransportOptions {
         path: format!("tcp://127.0.0.1:{port}"),
@@ -687,6 +755,185 @@ async fn zdo_request_payloads_match_upstream_adapter_tests() {
     expected.extend_from_slice(&zdo_payload);
     expected.extend_from_slice(&[0, 0, 0]);
     assert_eq!(captured.data, expected);
+
+    adapter.lock().await.znp.lock().await.close().await.ok();
+    server.abort();
+}
+
+#[tokio::test]
+async fn to_all_default_and_sleepy_match_upstream_adapter_test() {
+    use zigbee_apiarist::zspec::enums::BroadcastAddress;
+
+    let (adapter, mut captured_rx, server) = test_adapter(None).await;
+    let frame = Frame::create(
+        0,
+        Direction::CLIENT_TO_SERVER as u8,
+        true,
+        None,
+        100,
+        "read",
+        0,
+        json!([{"attrId": 0}]),
+        json!({}),
+        0,
+    );
+
+    adapter
+        .lock()
+        .await
+        .send_zcl_frame_to_all(242, &frame, 250, BroadcastAddress::DEFAULT as u16, None)
+        .await
+        .expect("default broadcast");
+    let first = recv_subsystem(&mut captured_rx, Subsystem::AF).await;
+    let first_hex: String = first
+        .to_buffer()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        first_hex,
+        "fe19240202fcff000000000000f20000fa000001001e0500106400000058"
+    );
+
+    adapter
+        .lock()
+        .await
+        .send_zcl_frame_to_all(242, &frame, 250, BroadcastAddress::SLEEPY as u16, None)
+        .await
+        .expect("sleepy broadcast");
+    let second = recv_subsystem(&mut captured_rx, Subsystem::AF).await;
+    let second_hex: String = second
+        .to_buffer()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        second_hex,
+        "fe19240202ffff000000000000f20000fa000002001e0500106400000058"
+    );
+
+    adapter.lock().await.znp.lock().await.close().await.ok();
+    server.abort();
+}
+
+#[tokio::test]
+async fn data_confirm_failure_errors_for_endpoint_and_group() {
+    let (adapter, _captured_rx, server) = test_adapter(Some(201)).await;
+    let frame = Frame::create(
+        0,
+        Direction::CLIENT_TO_SERVER as u8,
+        true,
+        None,
+        100,
+        "read",
+        0,
+        json!([{"attrId": 0}]),
+        json!({}),
+        0,
+    );
+
+    let endpoint_error = adapter
+        .lock()
+        .await
+        .send_zcl_frame_to_endpoint("0x02", 2, 20, &frame, 1000, true, false, None, None)
+        .await
+        .expect_err("endpoint dataConfirm failure");
+    assert!(
+        endpoint_error.contains("201")
+            || endpoint_error.contains("0xc9")
+            || endpoint_error.contains("Data request failed")
+    );
+
+    let group_error = adapter
+        .lock()
+        .await
+        .send_zcl_frame_to_group(25, &frame, Some(1), Some(HA_PROFILE_ID))
+        .await
+        .expect_err("group dataConfirm failure");
+    assert!(
+        group_error.contains("201")
+            || group_error.contains("0xc9")
+            || group_error.contains("Data request failed")
+    );
+
+    adapter.lock().await.znp.lock().await.close().await.ok();
+    server.abort();
+}
+
+#[tokio::test]
+async fn permit_join_all_and_coordinator_match_upstream_adapter_test() {
+    use zigbee_apiarist::zspec::zdo::buffalo_zdo::BuffaloZdo;
+    use zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId;
+
+    let (adapter, mut captured_rx, server) = test_adapter(None).await;
+
+    adapter
+        .lock()
+        .await
+        .permit_join(100, None)
+        .await
+        .expect("permit join all");
+    let frame = recv_subsystem(&mut captured_rx, Subsystem::ZDO).await;
+    let zdo_payload = BuffaloZdo::build_request(
+        false,
+        ClusterId::PERMIT_JOINING_REQUEST,
+        &[json!(100), json!(1), json!([])],
+    );
+    let mut expected = vec![15, 0xfc, 0xff];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(frame.data, expected);
+
+    adapter
+        .lock()
+        .await
+        .permit_join(254, Some(0))
+        .await
+        .expect("permit join coordinator");
+    let frame = recv_subsystem(&mut captured_rx, Subsystem::ZDO).await;
+    let zdo_payload = BuffaloZdo::build_request(
+        false,
+        ClusterId::PERMIT_JOINING_REQUEST,
+        &[json!(254), json!(1), json!([])],
+    );
+    let mut expected = vec![2, 0, 0];
+    expected.extend_from_slice(&zdo_payload);
+    assert_eq!(frame.data, expected);
+
+    adapter.lock().await.znp.lock().await.close().await.ok();
+    server.abort();
+}
+
+#[tokio::test]
+async fn reset_soft_and_hard_match_upstream_adapter_test() {
+    let (adapter, mut captured_rx, server) = test_adapter(None).await;
+
+    adapter
+        .lock()
+        .await
+        .reset("soft")
+        .await
+        .expect("soft reset");
+    let soft = loop {
+        let frame = recv_subsystem(&mut captured_rx, Subsystem::SYS).await;
+        if ZpiObject::from_unpi_frame(&frame).command.name == "resetReq" {
+            break frame;
+        }
+    };
+    assert_eq!(soft.data, vec![1]);
+
+    adapter
+        .lock()
+        .await
+        .reset("hard")
+        .await
+        .expect("hard reset");
+    let hard = loop {
+        let frame = recv_subsystem(&mut captured_rx, Subsystem::SYS).await;
+        if ZpiObject::from_unpi_frame(&frame).command.name == "resetReq" {
+            break frame;
+        }
+    };
+    assert_eq!(hard.data, vec![0]);
 
     adapter.lock().await.znp.lock().await.close().await.ok();
     server.abort();
