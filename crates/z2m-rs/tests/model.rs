@@ -180,9 +180,7 @@ fn endpoint_resolves_numeric_and_default_keys() {
 
     assert_eq!(device.endpoint(None).map(|endpoint| endpoint.ID), Some(1));
     assert_eq!(
-        device
-            .endpoint(Some("default"))
-            .map(|endpoint| endpoint.ID),
+        device.endpoint(Some("default")).map(|endpoint| endpoint.ID),
         Some(1)
     );
     assert_eq!(

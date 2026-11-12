@@ -201,29 +201,51 @@ impl Settings {
         applied
     }
 
+    /// Upstream `getDevice(IDorName)` (`settings.ts:430`): ID first, then
+    /// `friendly_name`.
     pub fn get_device(&self, id: &str) -> Option<Value> {
         let devices = self.entities("devices");
-        devices.get(id).map(|device| {
-            let mut value = json!({"ID": id});
+        let with_id = |key: &str, device: &Value| {
+            let mut value = json!({"ID": key});
             if let Value::Object(entry) = device {
                 for (key, entry) in entry {
                     value[key] = entry.clone();
                 }
             }
             value
+        };
+
+        if let Some(device) = devices.get(id) {
+            return Some(with_id(id, device));
+        }
+
+        devices.iter().find_map(|(key, device)| {
+            (device.get("friendly_name").and_then(Value::as_str) == Some(id))
+                .then(|| with_id(key, device))
         })
     }
 
+    /// Upstream `getGroup(IDorName)` (`settings.ts:512`): ID first, then
+    /// `friendly_name`.
     pub fn get_group(&self, id: &str) -> Option<Value> {
         let groups = self.entities("groups");
-        groups.get(id).map(|group| {
-            let mut value = json!({"ID": id.parse::<u64>().unwrap_or(0)});
+        let with_id = |key: &str, group: &Value| {
+            let mut value = json!({"ID": key.parse::<u64>().unwrap_or(0)});
             if let Value::Object(entry) = group {
                 for (key, entry) in entry {
                     value[key] = entry.clone();
                 }
             }
             value
+        };
+
+        if let Some(group) = groups.get(id) {
+            return Some(with_id(id, group));
+        }
+
+        groups.iter().find_map(|(key, group)| {
+            (group.get("friendly_name").and_then(Value::as_str) == Some(id))
+                .then(|| with_id(key, group))
         })
     }
 

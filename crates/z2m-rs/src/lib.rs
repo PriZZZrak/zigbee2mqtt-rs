@@ -6,3 +6,4 @@ pub mod model;
 pub mod mqtt;
 pub mod state;
 pub mod util;
+pub mod zigbee;

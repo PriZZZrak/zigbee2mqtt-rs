@@ -1323,3 +1323,31 @@ fn validate_non_required_ignores_the_missing_mqtt_property() {
         vec![" must have required property 'mqtt'".to_string()]
     );
 }
+
+#[test]
+fn get_device_and_group_accept_friendly_names() {
+    let settings = Settings::from_config(json!({
+        "mqtt": {"server": "localhost"},
+        "devices": {"0x0017880104e45519": {"friendly_name": "lamp"}},
+        "groups": {"1": {"friendly_name": "kitchen"}},
+    }));
+
+    assert_eq!(
+        settings.get_device("lamp"),
+        Some(json!({"ID": "0x0017880104e45519", "friendly_name": "lamp"}))
+    );
+    assert_eq!(
+        settings.get_device("0x0017880104e45519"),
+        Some(json!({"ID": "0x0017880104e45519", "friendly_name": "lamp"}))
+    );
+    assert_eq!(
+        settings.get_group("kitchen"),
+        Some(json!({"ID": 1, "friendly_name": "kitchen"}))
+    );
+    assert_eq!(
+        settings.get_group("1"),
+        Some(json!({"ID": 1, "friendly_name": "kitchen"}))
+    );
+    assert_eq!(settings.get_device("missing"), None);
+    assert_eq!(settings.get_group("missing"), None);
+}
