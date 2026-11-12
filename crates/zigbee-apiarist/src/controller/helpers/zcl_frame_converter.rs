@@ -71,9 +71,21 @@ pub fn attribute_key_value(
                 Ok(value) => {
                     payload.insert(attribute.name.clone(), value.to_json());
                 }
-                Err(_) => {
+                Err(payload) => {
+                    let message = payload
+                        .downcast_ref::<String>()
+                        .cloned()
+                        .or_else(|| {
+                            payload
+                                .downcast_ref::<&str>()
+                                .map(|value| value.to_string())
+                        })
+                        .unwrap_or_default();
                     logger().debug(
-                        &format!("Ignoring attribute {} from response", attribute.name),
+                        &format!(
+                            "Ignoring attribute {} from response: Error: {message}",
+                            attribute.name
+                        ),
                         NS,
                     );
                 }

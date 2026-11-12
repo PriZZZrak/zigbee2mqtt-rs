@@ -986,43 +986,64 @@ fn process_restrictions(entry: &EntryFields<'_>, value: &ZclValue) {
 
     if let (Some(min), Some(number)) = (entry.min, number) {
         if number < min {
-            panic!("{} requires min of {min}", entry.name);
+            panic!(
+                "Status 'INVALID_VALUE' {} requires min of {min}",
+                entry.name
+            );
         }
     }
 
     if let (Some(min_excl), Some(number)) = (entry.minExcl, number) {
         if number <= min_excl {
-            panic!("{} requires min exclusive of {min_excl}", entry.name);
+            panic!(
+                "Status 'INVALID_VALUE' {} requires min exclusive of {min_excl}",
+                entry.name
+            );
         }
     }
 
     if let (Some(max), Some(number)) = (entry.max, number) {
         if number > max {
-            panic!("{} requires max of {max}", entry.name);
+            panic!(
+                "Status 'INVALID_VALUE' {} requires max of {max}",
+                entry.name
+            );
         }
     }
 
     if let (Some(max_excl), Some(number)) = (entry.maxExcl, number) {
         if number >= max_excl {
-            panic!("{} requires max exclusive of {max_excl}", entry.name);
+            panic!(
+                "Status 'INVALID_VALUE' {} requires max exclusive of {max_excl}",
+                entry.name
+            );
         }
     }
 
     if let Some(length) = entry.length {
         if !value.is_len(length) {
-            panic!("{} requires length of {length}", entry.name);
+            panic!(
+                "Status 'INVALID_VALUE' {} requires length of {length}",
+                entry.name
+            );
         }
     }
 
     if let Some(min_len) = entry.minLen {
         if value.len() < min_len {
-            panic!("{} requires min length of {min_len}", entry.name);
+            panic!(
+                "Status 'INVALID_VALUE' {} requires min length of {min_len}",
+                entry.name
+            );
         }
     }
 
     if let Some(max_len) = entry.maxLen {
         if value.len() > max_len {
-            panic!("{} requires max length of {max_len}", entry.name);
+            panic!(
+                "Status 'INVALID_VALUE' {} requires max length of {max_len}",
+                entry.name
+            );
         }
     }
 }

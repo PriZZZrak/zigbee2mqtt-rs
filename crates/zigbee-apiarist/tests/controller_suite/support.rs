@@ -994,6 +994,15 @@ fn default_zcl(
 }
 
 pub fn node_descriptor(network_address: u16, logical_type: u8, manufacturer_code: u16) -> Value {
+    node_descriptor_with_mask(network_address, logical_type, manufacturer_code, 0x2c43)
+}
+
+pub fn node_descriptor_with_mask(
+    network_address: u16,
+    logical_type: u8,
+    manufacturer_code: u16,
+    server_mask: u16,
+) -> Value {
     json!([
         0,
         {
@@ -1015,16 +1024,16 @@ pub fn node_descriptor(network_address: u16, logical_type: u8, manufacturer_code
             "maxBufSize": 0xaa,
             "maxIncTxSize": 0xac,
             "serverMask": {
-                "primaryTrustCenter": 0,
-                "backupTrustCenter": 1,
-                "deprecated1": 0,
-                "deprecated2": 0,
-                "deprecated3": 0,
-                "deprecated4": 0,
-                "networkManager": 0,
-                "reserved1": 0,
-                "reserved2": 0,
-                "stackComplianceRevision": 1
+                "primaryTrustCenter": server_mask & 0x01,
+                "backupTrustCenter": (server_mask & 0x02) >> 1,
+                "deprecated1": (server_mask & 0x04) >> 2,
+                "deprecated2": (server_mask & 0x08) >> 3,
+                "deprecated3": (server_mask & 0x10) >> 4,
+                "deprecated4": (server_mask & 0x20) >> 5,
+                "networkManager": (server_mask & 0x40) >> 6,
+                "reserved1": (server_mask & 0x80) >> 7,
+                "reserved2": (server_mask & 0x100) >> 8,
+                "stackComplianceRevision": (server_mask & 0xfe00) >> 9
             },
             "maxOutTxSize": 0xdc,
             "deprecated1": 0,
@@ -1245,6 +1254,52 @@ pub fn install_default_devices(adapter: &MockAdapter) {
         },
     );
     adapter.add_device(
+        178,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(178, 1, 0x1021)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 178, "endpointList": [1, 2]}])),
+            simple_descriptor: HashMap::from([
+                (
+                    1,
+                    simple_descriptor(
+                        178,
+                        1,
+                        260,
+                        514,
+                        vec![0, 3, 258, 4, 5, 15, 64513],
+                        vec![258, 0, 64513, 5, 25],
+                    ),
+                ),
+                (
+                    2,
+                    simple_descriptor(
+                        178,
+                        2,
+                        260,
+                        514,
+                        vec![0, 3, 258, 4, 5, 15],
+                        vec![258, 0, 64513, 5, 25],
+                    ),
+                ),
+            ]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([
+                    ("modelId".to_string(), json!(" other multi-endpoint device")),
+                    ("manufacturerName".to_string(), json!("Legrand")),
+                    ("zclVersion".to_string(), json!(2)),
+                    ("appVersion".to_string(), json!(0)),
+                    ("hwVersion".to_string(), json!(8)),
+                    ("dateCode".to_string(), json!("241030")),
+                    ("swBuildId".to_string(), json!("0039")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(67)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
         180,
         MockDevice {
             node_descriptor: Some(node_descriptor(180, 1, 0xabcd)),
@@ -1260,7 +1315,7 @@ pub fn install_default_devices(adapter: &MockAdapter) {
     adapter.add_device(
         161,
         MockDevice {
-            node_descriptor: Some(node_descriptor(161, 1, 1213)),
+            node_descriptor: Some(node_descriptor_with_mask(161, 1, 1213, 0)),
             active_endpoints: Some(json!([0, {"nwkAddress": 161, "endpointList": [4, 1]}])),
             simple_descriptor: HashMap::from([
                 (1, simple_descriptor(161, 1, 99, 5, vec![0, 1], vec![2])),
@@ -1289,7 +1344,7 @@ pub fn install_default_devices(adapter: &MockAdapter) {
     adapter.add_device(
         162,
         MockDevice {
-            node_descriptor: Some(node_descriptor(162, 1, 1213)),
+            node_descriptor: Some(node_descriptor_with_mask(162, 1, 1213, 0x2a00)),
             active_endpoints: Some(json!([0, {"nwkAddress": 162, "endpointList": [2, 1]}])),
             simple_descriptor: HashMap::from([
                 (1, simple_descriptor(162, 1, 99, 5, vec![1], vec![2])),
@@ -1341,4 +1396,66 @@ pub fn install_default_devices(adapter: &MockAdapter) {
             ..MockDevice::default()
         },
     );
+}
+
+/// Installs a logger that records `(level, message, namespace)` and restores
+/// the console logger on drop (upstream tests spy on `mockLogger`).
+pub struct LogCapture {
+    pub messages: Arc<Mutex<Vec<(String, String, String)>>>,
+}
+
+struct CaptureLogger {
+    messages: Arc<Mutex<Vec<(String, String, String)>>>,
+}
+
+impl CaptureLogger {
+    fn push(&self, level: &str, message: &str, namespace: &str) {
+        self.messages.lock().unwrap().push((
+            level.to_string(),
+            message.to_string(),
+            namespace.to_string(),
+        ));
+    }
+}
+
+impl zigbee_apiarist::utils::logger::Logger for CaptureLogger {
+    fn debug(&self, message: &str, namespace: &str) {
+        self.push("debug", message, namespace);
+    }
+
+    fn info(&self, message: &str, namespace: &str) {
+        self.push("info", message, namespace);
+    }
+
+    fn warning(&self, message: &str, namespace: &str) {
+        self.push("warning", message, namespace);
+    }
+
+    fn error(&self, message: &str, namespace: &str) {
+        self.push("error", message, namespace);
+    }
+}
+
+impl LogCapture {
+    pub fn has(&self, level: &str, message: &str, namespace: &str) -> bool {
+        self.messages
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|entry| entry.0 == level && entry.1 == message && entry.2 == namespace)
+    }
+}
+
+impl Drop for LogCapture {
+    fn drop(&mut self) {
+        zigbee_apiarist::utils::logger::set_logger(zigbee_apiarist::utils::logger::console_logger());
+    }
+}
+
+pub fn capture_logs() -> LogCapture {
+    let messages = Arc::new(Mutex::new(Vec::new()));
+    zigbee_apiarist::utils::logger::set_logger(Arc::new(CaptureLogger {
+        messages: messages.clone(),
+    }));
+    LogCapture { messages }
 }

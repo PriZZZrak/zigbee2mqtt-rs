@@ -278,12 +278,12 @@ are explicitly `PENDING`.
 | 269 | 9667 | zclCommand | — | PENDING |
 | 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
 | 271 | 9689 | zclCommand with error | `group_command_error` | PORTED |
-| 272 | 9709 | Interview on coordinator | — | PENDING |
-| 273 | 9721 | Device node descriptor fails | — | PENDING |
-| 274 | 9731 | Device active endpoints fails | — | PENDING |
-| 275 | 9741 | Endpoint simple descriptor fails | — | PENDING |
-| 276 | 9752 | Node Descriptor on R21 device | — | PENDING |
-| 277 | 9762 | Node Descriptor on R pre-21 device | — | PENDING |
+| 272 | 9709 | Interview on coordinator | `interview_on_coordinator` | PORTED |
+| 273 | 9721 | Device node descriptor fails | `interview_descriptor_requests_fail` | PORTED |
+| 274 | 9731 | Device active endpoints fails | `interview_descriptor_requests_fail` | PORTED |
+| 275 | 9741 | Endpoint simple descriptor fails | `interview_descriptor_requests_fail` | PORTED |
+| 276 | 9752 | Node Descriptor on R21 device | `node_descriptor_revision_logs` | PORTED |
+| 277 | 9762 | Node Descriptor on R pre-21 device | `node_descriptor_revision_logs` | PORTED |
 | 278 | 9772 | Device requests network address - unchanged | — | PENDING |
 | 279 | 9809 | Device requests network address - changed | — | PENDING |
 | 280 | 9849 | Device remove from network fails | `zdo_table_and_remove_errors` | PORTED |
@@ -308,7 +308,7 @@ are explicitly `PENDING`.
 | 299 | 10540 | does not read/write to group with non-common custom clusters | — | PENDING |
 | 300 | 10572 | sends & receives command to group with custom cluster when common to all members | — | PENDING |
 | 301 | 10704 | sends one group command with an explicit custom cluster supported by one member | — | PENDING |
-| 302 | 10760 | Updates a device genBasic properties | — | PENDING |
+| 302 | 10760 | Updates a device genBasic properties | `updates_device_gen_basic_properties` | PORTED |
 | 303 | 10808 | triggers sendZdo on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 304 | 10825 | triggers sendZclFrameInterPANToIeeeAddr on sendRaw | `send_raw_inter_pan_dispatches_to_touchlink` | PORTED |
 | 305 | 10857 | triggers sendZclFrameInterPANBroadcast on sendRaw | `send_raw_inter_pan_dispatches_to_touchlink` | PORTED |
@@ -316,7 +316,7 @@ are explicitly `PENDING`.
 | 307 | 10920 | triggers sendZclFrameToAll on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | `send_raw_uses_custom_cluster_definitions` | PORTED |
-| 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
+| 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **242 / 311**.
+Ported: **250 / 311**.

@@ -5388,3 +5388,225 @@ async fn tables_with_more_than_one_request() {
     assert_eq!(binding.len(), 3);
     assert_eq!(binding[2]["sourceEui64"], "0xc1c2c3c5c6c7c8");
 }
+
+#[tokio::test]
+async fn node_descriptor_revision_logs() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 162, "0x162");
+    wait_interviews(&harness, 2).await;
+    assert!(logs.has(
+        "info",
+        &format!(
+            "Device '0x162' is only compliant to revision '21' of the Zigbee specification (current revision: {}).",
+            zigbee_apiarist::zspec::consts::ZIGBEE_REVISION
+        ),
+        "zh:controller:device"
+    ));
+
+    join(&adapter, 161, "0x161");
+    wait_interviews(&harness, 4).await;
+    assert!(logs.has(
+        "info",
+        &format!(
+            "Device '0x161' is only compliant to revision 'pre-21' of the Zigbee specification (current revision: {}).",
+            zigbee_apiarist::zspec::consts::ZIGBEE_REVISION
+        ),
+        "zh:controller:device"
+    ));
+}
+
+#[tokio::test]
+async fn ignores_invalid_attributes_when_processing_zcl_attribute() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 178, "0x178");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x178").unwrap();
+    assert_eq!(
+        device.model_id().as_deref(),
+        Some(" other multi-endpoint device")
+    );
+    logs.messages.lock().unwrap().clear();
+
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        0,
+        0,
+        true,
+        None,
+        10,
+        "readRsp",
+        0,
+        json!([{
+            "attrId": 0x0005,
+            "status": 0,
+            "dataType": 66,
+            "attrData": "a model id that is too long for spec"
+        }]),
+        json!({}),
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!("0x178"),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 0,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    assert!(logs.has(
+        "debug",
+        "Ignoring attribute modelId from response: Error: Status 'INVALID_VALUE' modelId requires max length of 32",
+        "zh:controller:zcl"
+    ));
+    assert_eq!(
+        device.model_id().as_deref(),
+        Some(" other multi-endpoint device")
+    );
+}
+
+#[tokio::test]
+async fn interview_on_coordinator() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    adapter.zdo_calls.lock().unwrap().clear();
+    let coordinator = harness
+        .controller
+        .get_device_by_network_address(0)
+        .expect("coordinator");
+    coordinator.interview(true).await.expect("interview");
+    let calls = adapter.zdo_calls.lock().unwrap();
+    assert_eq!(calls.len(), 4);
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| call.2
+                == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NODE_DESCRIPTOR_REQUEST)
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| call.2
+                == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::ACTIVE_ENDPOINTS_REQUEST)
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| call.2
+                == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::SIMPLE_DESCRIPTOR_REQUEST)
+            .count(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn interview_descriptor_requests_fail() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let coordinator = harness
+        .controller
+        .get_device_by_network_address(0)
+        .expect("coordinator");
+    let endpoint = coordinator.get_endpoint(1).unwrap();
+
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Ok(json!([0x8a, Value::Null])));
+    assert_eq!(
+        coordinator
+            .update_node_descriptor()
+            .await
+            .expect_err("node descriptor"),
+        "Status 'INSUFFICIENT_SPACE'"
+    );
+    assert_eq!(
+        coordinator
+            .update_active_endpoints()
+            .await
+            .expect_err("active endpoints"),
+        "Status 'INSUFFICIENT_SPACE'"
+    );
+    assert_eq!(
+        endpoint
+            .update_simple_descriptor()
+            .await
+            .expect_err("simple descriptor"),
+        "Status 'INSUFFICIENT_SPACE'"
+    );
+}
+
+#[tokio::test]
+async fn updates_device_gen_basic_properties() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    assert!(!std::fs::read_to_string(&harness.database_path)
+        .unwrap_or_default()
+        .contains("0x129"));
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    assert_eq!(device.application_version(), Some(2));
+    assert_eq!(device.date_code().as_deref(), Some("201901"));
+    assert_eq!(device.hardware_version(), Some(3));
+    assert_eq!(device.manufacturer_name().as_deref(), Some("KoenAndCo"));
+    assert_eq!(device.model_id().as_deref(), Some("myModelID"));
+    assert_eq!(
+        device.power_source().as_deref(),
+        Some("Mains (single phase)")
+    );
+    assert_eq!(device.software_build_id().as_deref(), Some("1.01"));
+    assert_eq!(device.stack_version(), Some(101));
+    assert_eq!(device.zcl_version(), Some(1));
+
+    device.set_application_version(3);
+    device.set_date_code("202501".to_string());
+    device.set_hardware_version(4);
+    device.set_manufacturer_name(Some("Test".to_string()));
+    device.set_model_id("Me".to_string());
+    device.set_power_source(json!("DC Source"));
+    device.set_software_build_id("2.01".to_string());
+    device.set_stack_version(202);
+    device.set_zcl_version(2);
+
+    assert_eq!(device.application_version(), Some(3));
+    assert_eq!(device.date_code().as_deref(), Some("202501"));
+    assert_eq!(device.hardware_version(), Some(4));
+    assert_eq!(device.manufacturer_name().as_deref(), Some("Test"));
+    assert_eq!(device.model_id().as_deref(), Some("Me"));
+    assert_eq!(device.power_source().as_deref(), Some("DC Source"));
+    assert_eq!(device.software_build_id().as_deref(), Some("2.01"));
+    assert_eq!(device.stack_version(), Some(202));
+    assert_eq!(device.zcl_version(), Some(2));
+    assert_eq!(
+        device.gen_basic(),
+        json!({
+            "appVersion": 3,
+            "dateCode": "202501",
+            "hwVersion": 4,
+            "manufacturerName": "Test",
+            "modelId": "Me",
+            "powerSource": 4,
+            "swBuildId": "2.01",
+            "stackVersion": 202,
+            "zclVersion": 2
+        })
+    );
+}
