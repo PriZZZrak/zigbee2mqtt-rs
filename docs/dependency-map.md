@@ -14,6 +14,7 @@ Last verified against crates.io: **2026-11-09**.
 | `serde_yaml_ng` | `0.10` | 0.10.0 | 0.10.0 | current; replaced deprecated `serde_yaml` |
 | `tokio` | `1` | 1.54.1 | 1.54.1 | current |
 | `rumqttc` | `0.25` | 0.25.1 | 0.25.1 | current |
+| `regex` | `1` | 1.13.1 | 1.13.1 | current; imported only by `z2m_rs::util::settings_schema` (Ajv wrapper) |
 | `socket2` | `0.6` | 0.6.5 | 0.6.5 | current |
 | `serial2-tokio` | `0.1` | 0.1.26 | 0.1.26 | current |
 
@@ -51,7 +52,7 @@ Notes:
 | `mqtt` | MQTT client | `rumqttc` | `z2m_rs::mqtt::Mqtt` | wrapper exists; bridge topics missing |
 | `js-yaml` | YAML read/write | `serde_yaml_ng` | `z2m_rs::util::yaml` | PORTED |
 | `winston`, `winston-transport`, `winston-syslog` | logging, file/console/syslog | custom | `z2m_rs::util::logger`, `zigbee_apiarist::utils::logger` | PARTIAL (syslog/timestamp format) |
-| `ajv` | JSON-schema settings validation | none yet; planned `jsonschema` 0.61.0 | `z2m_rs::util::settings` (validation) | PARTIAL |
+| `ajv` | JSON-schema settings validation | custom schema subset on `regex` (no `jsonschema` crate) | `z2m_rs::util::settings_schema` (`validate`, `validate_non_required`, `restart_required`), used by `z2m_rs::util::settings` | PORTED for the pinned schema: type/enum/required/properties/pattern(Properties)/propertyNames/items/oneOf/$ref/minimum/maximum; `requiresRestart` computed for overrides; Ajv message text reproduced |
 | `semver` | version checks | none yet; planned `semver` 1.0.28 | `z2m_rs::util::settings_migration` | PARTIAL |
 | `fflate` | gzip | none yet; planned `flate2` 1.1.11 (`miniz_oxide`) | frontend/assets | BLOCKED |
 | `humanize-duration` | uptime strings | none yet; planned `humantime` 2.4.0 or custom | `bridge/info` | BLOCKED |

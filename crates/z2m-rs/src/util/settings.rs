@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 use serde_json::{json, Map, Value};
 
+use crate::util::settings_schema;
+
 pub const CURRENT_VERSION: u32 = 5;
 pub const LOG_LEVELS: [&str; 4] = ["debug", "info", "warning", "error"];
 pub const CONFIGURATION_FILE: &str = "configuration.yaml";
@@ -48,7 +50,13 @@ impl Settings {
         }
     }
 
-    pub fn re_read(&mut self) {}
+    /// Upstream `reRead()` (`settings.ts:705-711`): drop the cached settings and
+    /// re-read `configuration.yaml`. The parsed file store is this port's disk.
+    pub fn re_read(&mut self) {
+        if let Some(configuration) = self.files.get(CONFIGURATION_FILE) {
+            self.configuration = configuration.clone();
+        }
+    }
 
     pub fn read_file(&self, name: &str) -> Value {
         if name == CONFIGURATION_FILE {
@@ -105,7 +113,25 @@ impl Settings {
     }
 
     fn entities(&self, key: &str) -> Map<String, Value> {
-        if let Some(files) = self.entity_files(key) {
+        self.entities_in(&self.configuration, key)
+    }
+
+    /// Upstream `readDevicesOrGroups()` (`settings.ts:369-379`) for an
+    /// arbitrary settings document.
+    fn entities_in(&self, settings: &Value, key: &str) -> Map<String, Value> {
+        let files = match settings.get(key) {
+            Some(Value::String(file)) => Some(vec![file.clone()]),
+            Some(Value::Array(files)) => Some(
+                files
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect(),
+            ),
+            _ => None,
+        };
+
+        if let Some(files) = files {
             let mut merged = Map::new();
             for file in files {
                 if let Some(Value::Object(entries)) = self.files.get(&file) {
@@ -116,7 +142,7 @@ impl Settings {
             }
             merged
         } else {
-            match self.configuration.get(key) {
+            match settings.get(key) {
                 Some(Value::Object(entries)) => entries.clone(),
                 _ => Map::new(),
             }
@@ -372,9 +398,45 @@ impl Settings {
         Ok(())
     }
 
-    pub fn apply(&mut self, _overrides: Value) {}
+    /// Upstream `apply(settings, throwOnError = true)` (`settings.ts:487-510`).
+    pub fn apply(&mut self, overrides: Value) -> Result<bool, String> {
+        self.apply_with(overrides, true)
+    }
 
-    pub fn testing_write(&mut self) {}
+    /// Upstream `apply(settings, throwOnError)`; with `throwOnError = false`
+    /// invalid settings are persisted without reporting an error, exactly like
+    /// upstream (`settings.ts:492-501`).
+    pub fn apply_with(&mut self, overrides: Value, throw_on_error: bool) -> Result<bool, String> {
+        // `objectAssignDeep({}, getPersistedSettings(), settings)` — the
+        // persisted settings stay the merge base so separate `devices`/`groups`
+        // file references survive in this storage model.
+        let mut new_settings = deep_merge(self.configuration.clone(), &overrides);
+
+        crate::util::utils::remove_null_properties_from_object(
+            &mut new_settings,
+            &["homeassistant"],
+        );
+
+        let candidate = self.normalized_for(&new_settings);
+        let errors = settings_schema::validate_non_required(&candidate);
+        if let Some(error) = errors.first() {
+            if throw_on_error {
+                return Err(error.render());
+            }
+        }
+
+        self.configuration = new_settings;
+        self.write();
+
+        // Upstream compiles `ajvRestartRequired` against the *override*
+        // document (`settings.ts:505-507`), not against the merged settings.
+        Ok(settings_schema::restart_required(&overrides))
+    }
+
+    /// Upstream `testing.write` (`settings.ts:713`).
+    pub fn testing_write(&mut self) -> bool {
+        self.write()
+    }
 
     pub fn write(&mut self) -> bool {
         let before = self.configuration.clone();
@@ -390,8 +452,11 @@ impl Settings {
             set_path(&mut applied, &path, parsed);
         }
 
+        let changed = !self.env.is_empty() || applied != before;
         self.configuration = applied;
-        !self.env.is_empty() || self.configuration != before
+        self.files
+            .insert(CONFIGURATION_FILE.to_string(), self.configuration.clone());
+        changed
     }
 
     fn find_entity(&self, id: &str) -> Option<(String, String)> {
@@ -438,73 +503,112 @@ impl Settings {
         }
     }
 
-    pub fn validate(&self) -> Vec<String> {
-        let mut errors = Vec::new();
-        let applied = self.get();
+    /// Upstream `getPersistedSettings()` view after `read()`
+    /// (`settings.ts:335-385`): separate device/group files are merged and
+    /// `!secret` references are resolved before validation.
+    fn normalized_for(&self, settings: &Value) -> Value {
+        let mut persisted = settings.clone();
 
-        if applied
-            .get("advanced")
-            .is_some_and(|value| !value.is_object())
-        {
-            errors.push("advanced must be object".to_string());
-        }
-        if let Some(serial) = applied.get("serial") {
-            if !serial.is_object() && serial != &Value::Null {
-                errors.push("serial must be object".to_string());
+        for key in ["devices", "groups"] {
+            let points_at_files = match persisted.get(key) {
+                Some(Value::String(_)) => true,
+                Some(Value::Array(files)) => !files.is_empty(),
+                _ => false,
+            };
+            if points_at_files {
+                persisted[key] = Value::Object(self.entities_in(settings, key));
             }
         }
 
-        let mqtt_version = applied
-            .get("mqtt")
-            .and_then(|mqtt| mqtt.get("version"))
-            .and_then(Value::as_u64);
+        let secrets = self.files.get(SECRET_FILE);
+        Self::resolve_secrets(&mut persisted, secrets);
+        persisted
+    }
 
+    fn normalized_persisted(&self) -> Value {
+        self.normalized_for(&self.configuration)
+    }
+
+    /// Upstream `validateNonRequired()` (`settings.ts:322-333`).
+    pub fn validate_non_required(&self) -> Vec<String> {
+        settings_schema::validate_non_required(&self.normalized_persisted())
+            .iter()
+            .map(|error| error.render())
+            .collect()
+    }
+
+    /// Upstream `validate()` (`settings.ts:268-320`): schema errors first, then
+    /// the custom network-key and friendly-name checks.
+    pub fn validate(&self) -> Vec<String> {
+        let persisted = self.normalized_persisted();
+        let schema_errors = settings_schema::validate(&persisted);
+        if !schema_errors.is_empty() {
+            return schema_errors.iter().map(|error| error.render()).collect();
+        }
+
+        let mut errors = Vec::new();
+        let applied = self.get();
+
+        for (key, message) in [
+            (
+                "network_key",
+                "advanced.network_key: should be array or 'GENERATE'",
+            ),
+            ("pan_id", "advanced.pan_id: should be number or 'GENERATE'"),
+            (
+                "ext_pan_id",
+                "advanced.ext_pan_id: should be array or 'GENERATE'",
+            ),
+        ] {
+            if let Some(Value::String(value)) = applied
+                .get("advanced")
+                .and_then(|advanced| advanced.get(key))
+            {
+                if value != "GENERATE" {
+                    errors.push(format!("{message} (is '{value}')"));
+                }
+            }
+        }
+
+        // Upstream `utils.validateFriendlyName` order is preserved.
         let mut seen = std::collections::HashSet::new();
         for (entity_type, entities) in [
             ("devices", self.entities("devices")),
             ("groups", self.entities("groups")),
         ] {
-            for (id, entity) in entities {
+            for (_id, entity) in entities {
                 let Some(name) = entity.get("friendly_name").and_then(Value::as_str) else {
                     continue;
                 };
-
+                if !seen.insert(name.to_string()) {
+                    errors.push(format!("Duplicate friendly_name '{name}' found"));
+                }
                 if name.is_empty() {
                     errors.push("friendly_name must be at least 1 char long".to_string());
+                }
+                if name.starts_with('/') || name.ends_with('/') {
+                    errors.push("friendly_name is not allowed to end or start with /".to_string());
                 }
                 if name.chars().any(|c| c.is_control()) {
                     errors.push("friendly_name is not allowed to contain control char".to_string());
                 }
-                if name.starts_with('/') || name.ends_with('/') {
-                    errors.push("friendly_name is not allowed to end or start with /".to_string());
+                if let Some(position) = name.rfind('/') {
+                    if name[position + 1..]
+                        .chars()
+                        .all(|character| character.is_ascii_digit())
+                    {
+                        errors.push(format!(
+                            "Friendly name cannot end with a \"/DIGIT\" ('{name}')"
+                        ));
+                    }
                 }
                 if name.contains('+') || name.contains('#') {
                     errors.push(format!(
                         "MQTT wildcard (+ and #) not allowed in friendly_name ('{name}')"
                     ));
                 }
-                if let Some((_, digit)) = name.rsplit_once('/') {
-                    if !digit.is_empty() && digit.chars().all(|c| c.is_ascii_digit()) {
-                        errors.push(format!(
-                            "Friendly name cannot end with a \"/DIGIT\" ('{name}')"
-                        ));
-                    }
-                }
-                if !seen.insert(name.to_string()) {
-                    errors.push(format!("Duplicate friendly_name '{name}' found"));
-                }
 
                 if entity_type == "devices" {
-                    if let Some(qos) = entity.get("qos").and_then(Value::as_u64) {
-                        if qos > 2 {
-                            errors.push(format!(
-                                "devices/{id}/qos must be equal to one of the allowed values"
-                            ));
-                        }
-                    }
-                    if entity.get("retention").is_some() && mqtt_version != Some(5) {
-                        errors.push("MQTT retention requires protocol version 5".to_string());
-                    }
                     if let Some(icon) = entity.get("icon").and_then(Value::as_str) {
                         if !icon.starts_with("device_icons/")
                             && !icon.starts_with("http://")
@@ -519,39 +623,31 @@ impl Settings {
             }
         }
 
-        for (key, kind, message) in [
-            (
-                "network_key",
-                "array or 'GENERATE'",
-                "advanced.network_key: should be array or 'GENERATE'",
-            ),
-            (
-                "pan_id",
-                "number or 'GENERATE'",
-                "advanced.pan_id: should be number or 'GENERATE'",
-            ),
-            (
-                "ext_pan_id",
-                "array or 'GENERATE'",
-                "advanced.ext_pan_id: should be array or 'GENERATE'",
-            ),
-        ] {
-            if let Some(value) = applied
-                .get("advanced")
-                .and_then(|advanced| advanced.get(key))
-            {
-                let invalid = value.is_string() && value != &Value::String("GENERATE".to_string());
-                if invalid {
-                    errors.push(format!(
-                        "{message} (is '{value}')",
-                        value = value.as_str().unwrap_or("")
-                    ));
+        let mqtt_version = applied
+            .get("mqtt")
+            .and_then(|mqtt| mqtt.get("version"))
+            .and_then(Value::as_u64);
+        if mqtt_version != Some(5) {
+            for device in self.entities("devices").values() {
+                if device.get("retention").is_some_and(js_truthy) {
+                    errors.push("MQTT retention requires protocol version 5".to_string());
                 }
-                let _ = kind;
             }
         }
 
         errors
+    }
+}
+
+/// JavaScript truthiness for JSON values (`if (device.retention)`).
+fn js_truthy(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(value) => *value,
+        Value::Number(number) => number.as_f64().is_some_and(|value| value != 0.0),
+        Value::String(text) => !text.is_empty(),
+        Value::Array(items) => !items.is_empty(),
+        Value::Object(map) => !map.is_empty(),
     }
 }
 

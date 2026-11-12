@@ -1,5 +1,6 @@
 // Original: .upstream/zigbee2mqtt/test/settings.test.ts
-// Upstream test titles (ported as #[test] #[ignore] stubs):
+// Upstream revision: zigbee2mqtt 2.14.3 (3c841fdf).
+// Upstream test titles covered by this file:
 //   - Combine everything! groups and devices from separate file :)
 //   - Configuration friendly name cannot be empty
 //   - Configuration friendly name cannot contain control char
@@ -652,7 +653,7 @@ fn should_keep_homeassistant_null_properties_on_apply() {
         },
     }));
     settings.re_read();
-    settings.apply(json!({"external_converters": []}));
+    settings.apply(json!({"external_converters": []})).unwrap();
 
     assert_eq!(
         settings.get()["device_options"]["homeassistant"],
@@ -1153,4 +1154,172 @@ fn device_icons_should_be_in_device_icons_directory_or_a_url() {
             assert_eq!(settings.validate(), Vec::<String>::new());
         }
     }
+}
+
+// `apply()` (`lib/util/settings.ts:487`) and `reRead()` (`settings.ts:705`)
+// have no direct upstream unit tests; upstream exercises them through
+// `test/extensions/bridge.test.ts` ("Change options ...") and through every
+// `settings.reRead()` call in `test/settings.test.ts`.
+
+#[test]
+fn should_apply_settings_deep_merged_with_persisted_settings() {
+    let mut settings = Settings::from_config(json!({
+        "mqtt": {"server": "localhost"},
+        "advanced": {"log_level": "info", "log_namespaced_levels": {"zh:zstack": "warning"}},
+        "serial": {"port": "/dev/dummy"},
+    }));
+
+    let restart = settings
+        .apply(json!({
+            "advanced": {"log_level": "debug"},
+            "serial": {"port": "/dev/newport"},
+        }))
+        .unwrap();
+
+    assert!(restart);
+    assert_eq!(settings.get()["advanced"]["log_level"], json!("debug"));
+    assert_eq!(
+        settings.get()["advanced"]["log_namespaced_levels"],
+        json!({"zh:zstack": "warning"})
+    );
+    assert_eq!(settings.get()["serial"]["port"], json!("/dev/newport"));
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE)["serial"]["port"],
+        json!("/dev/newport")
+    );
+}
+
+#[test]
+fn should_report_no_restart_required_for_runtime_options() {
+    let mut settings = Settings::from_config(json!({"mqtt": {"server": "localhost"}}));
+
+    assert!(!settings
+        .apply(json!({"advanced": {"log_level": "debug"}}))
+        .unwrap());
+    assert_eq!(settings.get()["advanced"]["log_level"], json!("debug"));
+}
+
+#[test]
+fn should_apply_null_options_by_removing_them() {
+    let mut settings = Settings::from_config(json!({
+        "mqtt": {"server": "localhost"},
+        "serial": {"disable_led": false, "port": "/dev/dummy"},
+    }));
+
+    let restart = settings
+        .apply(json!({"serial": {"disable_led": false, "port": null}}))
+        .unwrap();
+
+    assert!(restart);
+    assert_eq!(settings.get()["serial"], json!({"disable_led": false}));
+}
+
+#[test]
+fn should_reject_options_that_do_not_conform_to_the_schema() {
+    let mut settings = Settings::from_config(json!({"mqtt": {"server": "localhost"}}));
+
+    let error = settings
+        .apply(json!({"advanced": {"log_level": 123}}))
+        .unwrap_err();
+
+    assert_eq!(error, "advanced/log_level must be string");
+    assert_eq!(settings.get()["advanced"]["log_level"], json!("info"));
+}
+
+#[test]
+fn should_persist_invalid_options_when_throw_on_error_is_disabled() {
+    let mut settings = Settings::from_config(json!({"mqtt": {"server": "localhost"}}));
+
+    assert!(!settings
+        .apply_with(json!({"advanced": {"log_level": 123}}), false)
+        .unwrap());
+    assert_eq!(settings.get()["advanced"]["log_level"], json!(123));
+}
+
+#[test]
+fn should_keep_separate_devices_file_reference_on_apply() {
+    let mut settings = Settings::with_files(BTreeMap::from([
+        (
+            CONFIGURATION_FILE.to_string(),
+            json!({"mqtt": {"server": "localhost"}, "devices": "devices.yaml"}),
+        ),
+        (
+            DEVICES_FILE.to_string(),
+            json!({"0x0017880104e45519": {"friendly_name": "lamp"}}),
+        ),
+    ]));
+
+    settings.apply(json!({"external_converters": []})).unwrap();
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE)["devices"],
+        json!("devices.yaml")
+    );
+    assert_eq!(
+        settings.get()["devices"]["0x0017880104e45519"],
+        json!({"friendly_name": "lamp"})
+    );
+}
+
+#[test]
+fn testing_write_applies_environment_overrides() {
+    let mut settings = Settings::from_config(json!({"mqtt": {"server": "localhost"}}));
+    settings.env = BTreeMap::from([(
+        "ZIGBEE2MQTT_CONFIG_MQTT_BASE_TOPIC".to_string(),
+        "testtopic".to_string(),
+    )]);
+
+    assert!(settings.testing_write());
+    assert_eq!(settings.get()["mqtt"]["base_topic"], json!("testtopic"));
+}
+
+#[test]
+fn should_reread_configuration_file() {
+    let mut settings = Settings::with_files(BTreeMap::from([(
+        CONFIGURATION_FILE.to_string(),
+        json!({"mqtt": {"server": "old"}}),
+    )]));
+    assert_eq!(settings.get()["mqtt"]["server"], json!("old"));
+
+    settings.files.insert(
+        CONFIGURATION_FILE.to_string(),
+        json!({"mqtt": {"server": "new"}}),
+    );
+    settings.re_read();
+
+    assert_eq!(settings.get()["mqtt"]["server"], json!("new"));
+}
+
+#[test]
+fn re_read_keeps_configuration_when_no_configuration_file_was_loaded() {
+    let mut settings = Settings::from_config(json!({"mqtt": {"server": "localhost"}}));
+
+    settings.re_read();
+
+    assert_eq!(settings.get()["mqtt"]["server"], json!("localhost"));
+}
+
+#[test]
+fn re_read_after_write_observes_the_written_configuration() {
+    let mut settings = Settings::with_files(BTreeMap::from([(
+        CONFIGURATION_FILE.to_string(),
+        json!({"mqtt": {"server": "localhost"}}),
+    )]));
+
+    settings.set(&["mqtt", "server"], json!("written"));
+    settings.write();
+    settings.re_read();
+
+    assert_eq!(settings.get()["mqtt"]["server"], json!("written"));
+}
+
+#[test]
+fn validate_non_required_ignores_the_missing_mqtt_property() {
+    let settings = Settings::new(json!({}));
+
+    assert_eq!(settings.validate_non_required(), Vec::<String>::new());
+    assert_eq!(
+        settings.validate(),
+        vec![" must have required property 'mqtt'".to_string()]
+    );
 }

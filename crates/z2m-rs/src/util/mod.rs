@@ -4,6 +4,7 @@ pub mod object_assign_deep;
 pub mod sd_notify;
 pub mod settings;
 pub mod settings_migration;
+pub mod settings_schema;
 pub mod static_file_server;
 pub mod stringify;
 pub mod utils;
