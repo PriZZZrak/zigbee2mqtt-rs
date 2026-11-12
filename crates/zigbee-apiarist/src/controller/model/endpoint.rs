@@ -1284,7 +1284,20 @@ impl Endpoint {
                 0xff,
             ),
         };
-        logger().debug(&action, NS);
+        let log = format!(
+            "{action} from '{}'",
+            match &target {
+                BindTarget::Endpoint(endpoint) => {
+                    format!(
+                        "{}/{}",
+                        endpoint.device_ieee_address.lock().unwrap(),
+                        endpoint.ID
+                    )
+                }
+                BindTarget::Group(group) => group.group_id.to_string(),
+            }
+        );
+        logger().debug(&log, NS);
         let cluster_id = ClusterId::UNBIND_REQUEST;
         let payload = BuffaloZdo::build_request(
             Entity::adapter().has_zdo_message_overhead(),
@@ -1308,10 +1321,10 @@ impl Endpoint {
                 let name = crate::zspec::zdo::definition::status::Status::from_u8(code)
                     .map(crate::zspec::zdo::definition::status::Status::name)
                     .unwrap_or("UNKNOWN");
-                return Err(format!("{action} failed (Status '{name}')"));
+                return Err(format!("{log} failed (Status '{name}')"));
             }
             logger().debug(
-                &format!("{action} no entry on device, removing entry from database."),
+                &format!("{log} no entry on device, removing entry from database."),
                 NS,
             );
         }

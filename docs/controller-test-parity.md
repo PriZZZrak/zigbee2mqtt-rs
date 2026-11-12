@@ -233,11 +233,11 @@ are explicitly `PENDING`.
 | 224 | 7288 | ConfigureReporting error | `configure_reporting_and_default_response_errors` | PORTED |
 | 225 | 7309 | DefaultResponse error | `configure_reporting_and_default_response_errors` | PORTED |
 | 226 | 7328 | DefaultResponse error when transactionSequenceNumber provided through options | `configure_reporting_and_default_response_errors` | PORTED |
-| 227 | 7343 | Skip unbind if not bound | — | PENDING |
+| 227 | 7343 | Skip unbind if not bound | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
 | 228 | 7354 | Handle unbind with number not matching any group | — | PENDING |
-| 229 | 7367 | Unbind against unbound cluster | — | PENDING |
-| 230 | 7395 | Unbind error | — | PENDING |
-| 231 | 7422 | Bind error | — | PENDING |
+| 229 | 7367 | Unbind against unbound cluster | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
+| 230 | 7395 | Unbind error | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
+| 231 | 7422 | Bind error | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
 | 232 | 7448 | ReadResponse error | `write_and_read_response_errors` | PORTED |
 | 233 | 7467 | Read error | `read_and_write_errors_and_disable_response` | PORTED |
 | 234 | 7486 | Read with disable response | `read_and_write_errors_and_disable_response` | PORTED |
@@ -259,7 +259,7 @@ are explicitly `PENDING`.
 | 250 | 8146 | Green power channel request | `green_power_channel_request_sends_response` | PORTED |
 | 251 | 8199 | Green power rxOnCap | — | PENDING |
 | 252 | 8304 | Green power unicast | — | PENDING |
-| 253 | 8624 | Get input/ouptut clusters | — | PENDING |
+| 253 | 8624 | Get input/ouptut clusters | `get_input_and_output_clusters` | PORTED |
 | 254 | 8642 | Report to endpoint custom attributes | `write_to_endpoint_custom_attributes` | PORTED |
 | 255 | 8673 | Report to endpoint with unknown string attribute | `write_to_endpoint_with_unknown_string_attribute_fails` | PORTED |
 | 256 | 8689 | Report error | `report_error` | PORTED |
@@ -286,14 +286,14 @@ are explicitly `PENDING`.
 | 277 | 9762 | Node Descriptor on R pre-21 device | — | PENDING |
 | 278 | 9772 | Device requests network address - unchanged | — | PENDING |
 | 279 | 9809 | Device requests network address - changed | — | PENDING |
-| 280 | 9849 | Device remove from network fails | — | PENDING |
-| 281 | 9862 | Device LQI table fails | — | PENDING |
-| 282 | 9875 | Device routing table fails | — | PENDING |
-| 283 | 9888 | Device binding table fails | — | PENDING |
-| 284 | 9901 | Device clear all bindings fails | — | PENDING |
-| 285 | 9914 | Device LQI table with more than 1 request | — | PENDING |
-| 286 | 9951 | Device routing table with more than 1 request | — | PENDING |
-| 287 | 9988 | Device binding table with more than 1 request | — | PENDING |
+| 280 | 9849 | Device remove from network fails | `zdo_table_and_remove_errors` | PORTED |
+| 281 | 9862 | Device LQI table fails | `zdo_table_and_remove_errors` | PORTED |
+| 282 | 9875 | Device routing table fails | `zdo_table_and_remove_errors` | PORTED |
+| 283 | 9888 | Device binding table fails | `zdo_table_and_remove_errors` | PORTED |
+| 284 | 9901 | Device clear all bindings fails | `zdo_table_and_remove_errors` | PORTED |
+| 285 | 9914 | Device LQI table with more than 1 request | `tables_with_more_than_one_request` | PORTED |
+| 286 | 9951 | Device routing table with more than 1 request | `tables_with_more_than_one_request` | PORTED |
+| 287 | 9988 | Device binding table with more than 1 request | `tables_with_more_than_one_request` | PORTED |
 | 288 | 10067 | Touchlink stops during stop | — | PENDING |
 | 289 | 10075 | Touchlink fails to stop during stop | — | PENDING |
 | 290 | 10083 | Adapter permitJoin fails during stop | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **229 / 311**.
+Ported: **242 / 311**.

@@ -5112,3 +5112,279 @@ async fn report_error() {
         )
     );
 }
+
+#[tokio::test]
+async fn skip_unbind_if_not_bound_and_bind_unbind_errors() {
+    use zigbee_apiarist::controller::model::endpoint::BindTarget;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    join(&adapter, 170, "0x170");
+    wait_interviews(&harness, 4).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let target_device = harness.controller.get_device_by_ieee_addr("0x170").unwrap();
+    let target = target_device.get_endpoint(1).unwrap();
+
+    adapter.zdo_calls.lock().unwrap().clear();
+    endpoint
+        .unbind(
+            json!("genOnOff"),
+            BindTarget::Endpoint(target.clone()),
+            false,
+        )
+        .await
+        .expect("skip unbind");
+    assert!(adapter.zdo_calls.lock().unwrap().is_empty());
+
+    // Bind succeeds against a permissive adapter.
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Ok(json!([0, Value::Null])));
+    endpoint
+        .bind(json!("genOnOff"), BindTarget::Endpoint(target.clone()))
+        .await
+        .expect("bind");
+    assert_eq!(endpoint.binds().len(), 1);
+
+    // NO_ENTRY on unbind removes the local binding without failing.
+    adapter.set_zdo(|_ieee, _nwk, cluster_id, _payload, _disable| {
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::UNBIND_REQUEST
+        {
+            Ok(json!([0x88, Value::Null]))
+        } else {
+            Ok(json!([0, Value::Null]))
+        }
+    });
+    endpoint
+        .unbind(
+            json!("genOnOff"),
+            BindTarget::Endpoint(target.clone()),
+            false,
+        )
+        .await
+        .expect("unbind no entry");
+    assert!(endpoint.binds().is_empty());
+
+    // Bind error is wrapped with the upstream message.
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Ok(json!([0x8f, Value::Null])));
+    let error = endpoint
+        .bind(json!("genOnOff"), BindTarget::Endpoint(target.clone()))
+        .await
+        .expect_err("bind error");
+    assert_eq!(
+        error,
+        "Bind 0x129/1 genOnOff from '0x170/1' failed (Status 'INVALID_INDEX')"
+    );
+
+    // Unbind error uses the same message shape.
+    endpoint
+        .add_binding(json!("genOnOff"), BindTarget::Endpoint(target.clone()))
+        .expect("add binding");
+    let error = endpoint
+        .unbind(json!("genOnOff"), BindTarget::Endpoint(target), false)
+        .await
+        .expect_err("unbind error");
+    assert_eq!(
+        error,
+        "Unbind 0x129/1 genOnOff from '0x170/1' failed (Status 'INVALID_INDEX')"
+    );
+}
+
+#[tokio::test]
+async fn get_input_and_output_clusters() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    assert_eq!(
+        endpoint
+            .get_input_clusters()
+            .iter()
+            .map(|cluster| cluster.ID)
+            .collect::<Vec<_>>(),
+        vec![0, 1]
+    );
+    assert_eq!(
+        endpoint
+            .get_output_clusters()
+            .iter()
+            .map(|cluster| cluster.ID)
+            .collect::<Vec<_>>(),
+        vec![2]
+    );
+    assert!(endpoint.supports_input_cluster(json!("genBasic")));
+    assert!(endpoint.supports_output_cluster(json!("genDeviceTempCfg")));
+    assert!(!endpoint.supports_output_cluster(json!("genBasic")));
+}
+
+#[tokio::test]
+async fn zdo_table_and_remove_errors() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 140, "0x140");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x140").unwrap();
+
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Ok(json!([0x8f, Value::Null])));
+    assert_eq!(
+        device.lqi().await.expect_err("lqi"),
+        "Status 'INVALID_INDEX'"
+    );
+    assert_eq!(
+        device.routing_table().await.expect_err("routing"),
+        "Status 'INVALID_INDEX'"
+    );
+    assert_eq!(
+        device.binding_table().await.expect_err("binding"),
+        "Status 'INVALID_INDEX'"
+    );
+    assert_eq!(
+        device
+            .remove_from_network(false)
+            .await
+            .expect_err("remove network"),
+        "Status 'INVALID_INDEX'"
+    );
+    assert!(harness
+        .controller
+        .get_device_by_ieee_addr("0x140")
+        .is_some());
+
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Ok(json!([0x80, Value::Null])));
+    assert_eq!(
+        device
+            .clear_all_bindings(vec!["0xffffffffffffffff".to_string()])
+            .await
+            .expect_err("clear bindings"),
+        "Status 'INV_REQUESTTYPE'"
+    );
+}
+
+fn lqi_entry(eui64: &str, nwk: u16, lqi: u8, relationship: u8, depth: u8) -> Value {
+    json!({
+        "extendedPanId": [1,2,3,4,5,6,7,8],
+        "eui64": eui64,
+        "nwkAddress": nwk,
+        "deviceType": 1,
+        "rxOnWhenIdle": 0,
+        "relationship": relationship,
+        "reserved1": 0,
+        "permitJoining": 0,
+        "reserved2": 0,
+        "depth": depth,
+        "lqi": lqi
+    })
+}
+
+fn routing_entry(destination: u16, status: &str, next_hop: u16) -> Value {
+    json!({
+        "destinationAddress": destination,
+        "status": status,
+        "memoryConstrained": 0,
+        "manyToOne": 0,
+        "routeRecordRequired": 0,
+        "reserved1": 0,
+        "nextHopAddress": next_hop
+    })
+}
+
+#[tokio::test]
+async fn tables_with_more_than_one_request() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 140, "0x140");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x140").unwrap();
+
+    // LQI: two pages.
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    adapter.set_zdo(move |_ieee, _nwk, _cluster, _payload, _disable| {
+        let call = counter.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            Ok(json!([0, {
+                "neighborTableEntries": 3, "startIndex": 0,
+                "entryList": [lqi_entry("0x160", 160, 20, 2, 5), lqi_entry("0x170", 170, 21, 4, 8)]
+            }]))
+        } else {
+            Ok(json!([0, {
+                "neighborTableEntries": 3, "startIndex": 2,
+                "entryList": [lqi_entry("0x180", 180, 200, 4, 2)]
+            }]))
+        }
+    });
+    let lqi = device.lqi().await.expect("lqi");
+    assert_eq!(lqi.len(), 3);
+    assert_eq!(lqi[2]["eui64"], "0x180");
+    assert_eq!(lqi[2]["lqi"], 200);
+
+    // Routing: two pages.
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    adapter.set_zdo(move |_ieee, _nwk, _cluster, _payload, _disable| {
+        let call = counter.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            Ok(json!([0, {
+                "routingTableEntries": 3, "startIndex": 0,
+                "entryList": [
+                    routing_entry(120, "ACTIVE", 1),
+                    routing_entry(130, "DISCOVERY_FAILED", 2)
+                ]
+            }]))
+        } else {
+            Ok(json!([0, {
+                "routingTableEntries": 3, "startIndex": 2,
+                "entryList": [routing_entry(140, "INACTIVE", 3)]
+            }]))
+        }
+    });
+    let routing = device.routing_table().await.expect("routing");
+    assert_eq!(routing.len(), 3);
+    assert_eq!(routing[2]["status"], "INACTIVE");
+
+    // Binding: two pages.
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    adapter.set_zdo(move |_ieee, _nwk, _cluster, _payload, _disable| {
+        let call = counter.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            Ok(json!([0, {
+                "bindingTableEntries": 3, "startIndex": 0,
+                "entryList": [
+                    {
+                        "sourceEui64": "0xf1f2f3f5f6f7f8", "sourceEndpoint": 1,
+                        "clusterId": 0, "destAddrMode": 3,
+                        "dest": "0xa1a2a3a4a5a6a7a8", "destEndpoint": 2
+                    },
+                    {
+                        "sourceEui64": "0xe1e2e3e5e6e7e8", "sourceEndpoint": 3,
+                        "clusterId": 9, "destAddrMode": 1, "dest": 4660
+                    }
+                ]
+            }]))
+        } else {
+            Ok(json!([0, {
+                "bindingTableEntries": 3, "startIndex": 2,
+                "entryList": [{
+                    "sourceEui64": "0xc1c2c3c5c6c7c8", "sourceEndpoint": 2,
+                    "clusterId": 8, "destAddrMode": 3,
+                    "dest": "0xa1a2a3a4a5a6a7a8", "destEndpoint": 3
+                }]
+            }]))
+        }
+    });
+    let binding = device.binding_table().await.expect("binding");
+    assert_eq!(binding.len(), 3);
+    assert_eq!(binding[2]["sourceEui64"], "0xc1c2c3c5c6c7c8");
+}
