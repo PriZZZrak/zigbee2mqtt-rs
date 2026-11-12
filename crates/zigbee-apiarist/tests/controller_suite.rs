@@ -4348,3 +4348,254 @@ async fn device_updates_existing_endpoint_bindings_from_binding_table() {
     device.binding_table().await.expect("binding table");
     assert!(endpoint.binds().is_empty());
 }
+
+#[tokio::test]
+async fn device_clears_all_and_selective_bindings() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 161, "0x00000000000161");
+    wait_interviews(&harness, 2).await;
+    let group = harness.controller.create_group(0x1234).expect("group");
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x00000000000161")
+        .unwrap();
+    let ep1 = device.get_endpoint(1).unwrap();
+    ep1.add_binding(
+        json!("genAlarms"),
+        zigbee_apiarist::controller::model::endpoint::BindTarget::Group(group.clone()),
+    )
+    .expect("add binding");
+    assert_eq!(ep1.binds().len(), 1);
+
+    device
+        .clear_all_bindings(vec!["0xf1f1f1f1f1f1f1f1".to_string()])
+        .await
+        .expect("selective clear");
+    assert_eq!(ep1.binds().len(), 1);
+
+    device
+        .clear_all_bindings(vec![
+            "0xf1f1f1f1f1f1f1f1".to_string(),
+            "0xa9a9a9a9a9a9a9a9".to_string(),
+        ])
+        .await
+        .expect("multi-target clear");
+    assert_eq!(ep1.binds().len(), 1);
+
+    device
+        .clear_all_bindings(vec!["0xffffffffffffffff".to_string()])
+        .await
+        .expect("clear all");
+    assert!(ep1.binds().is_empty());
+}
+
+#[tokio::test]
+async fn device_and_group_lookup_errors() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    assert!(harness.controller.get_group_by_id(9).is_none());
+    assert!(harness
+        .controller
+        .get_device_by_ieee_addr("0x9999999999999999")
+        .is_none());
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.remove_from_network(false).await.expect("remove");
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x129", false).is_none()
+    );
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x129", true).is_some()
+    );
+}
+
+#[tokio::test]
+async fn endpoint_get_binds_non_existing_device() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 161, "0x00000000000161");
+    join(&adapter, 162, "0x00000000000162");
+    wait_interviews(&harness, 4).await;
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x00000000000161")
+        .unwrap();
+    let target = harness
+        .controller
+        .get_device_by_ieee_addr("0x00000000000162")
+        .unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    endpoint
+        .add_binding(
+            json!("genBasic"),
+            zigbee_apiarist::controller::model::endpoint::BindTarget::Endpoint(
+                target.get_endpoint(2).unwrap(),
+            ),
+        )
+        .expect("binding");
+    assert_eq!(endpoint.binds().len(), 1);
+    target.remove_from_database(true);
+    assert!(endpoint.binds().is_empty());
+}
+
+#[tokio::test]
+async fn read_reporting_config_no_response_errors() {
+    use zigbee_apiarist::controller::model::endpoint::ReadReportConfigItem;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    *adapter.no_response_command.lock().unwrap() = Some("readReportConfig".to_string());
+    let error = endpoint
+        .read_reporting_config(
+            json!("genPowerCfg"),
+            vec![ReadReportConfigItem {
+                direction: None,
+                attribute: json!("mainsVoltage"),
+            }],
+            None,
+        )
+        .await
+        .expect_err("no response");
+    assert_eq!(error, "No response received");
+}
+
+#[tokio::test]
+async fn read_reporting_config_ignores_unknown_attributes() {
+    use zigbee_apiarist::controller::model::endpoint::ReadReportConfigItem;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    *adapter.read_report_config_payload.lock().unwrap() = Some(json!([
+        {"status": 0x8c, "direction": 0, "attrId": 0}
+    ]));
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .read_reporting_config(
+            json!("genBasic"),
+            vec![
+                ReadReportConfigItem {
+                    direction: None,
+                    attribute: json!("zclVersion"),
+                },
+                ReadReportConfigItem {
+                    direction: None,
+                    attribute: json!("notanattr"),
+                },
+            ],
+            None,
+        )
+        .await
+        .expect("read reporting config");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    assert_eq!(frames[0].payload, json!([{"direction": 0, "attrId": 0}]));
+}
+
+#[tokio::test]
+async fn read_reporting_config_manufacturer_specific() {
+    use zigbee_apiarist::controller::model::endpoint::ReadReportConfigItem;
+    use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
+    use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let mut cluster = Cluster::new("genBasic", 0x0000);
+    let mut attribute = Attribute::new("schneiderMeterRadioPower", 0xe200, DataType::INT8);
+    attribute.manufacturerCode = Some(0x105e);
+    attribute.write = true;
+    cluster
+        .attributes
+        .insert("schneiderMeterRadioPower".to_string(), attribute);
+    device
+        .add_custom_cluster("genBasic", cluster)
+        .expect("custom cluster");
+    let endpoint = device.get_endpoint(1).unwrap();
+    *adapter.read_report_config_payload.lock().unwrap() = Some(json!([
+        {"status": 0, "direction": 0, "attrId": 0xe200, "dataType": 0x28, "minRepIntval": 15, "maxRepIntval": 213, "repChange": 1}
+    ]));
+    adapter.sent_endpoint.lock().unwrap().clear();
+    let response = endpoint
+        .read_reporting_config(
+            json!("genBasic"),
+            vec![ReadReportConfigItem {
+                direction: None,
+                attribute: json!("schneiderMeterRadioPower"),
+            }],
+            None,
+        )
+        .await
+        .expect("manufacturer specific");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    assert_eq!(frames[0].header.manufacturer_code, Some(0x105e));
+    assert_eq!(
+        frames[0].payload,
+        json!([{"direction": 0, "attrId": 57856}])
+    );
+    assert_eq!(response[0]["attrId"], 0xe200);
+}
+
+#[tokio::test]
+async fn load_database_interview_state_migration() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    let failed = json!({
+        "id": 3, "type": "Router", "ieeeAddr": "0x000b57fffec6a5b2", "nwkAddr": 40369,
+        "manufId": 4476, "manufName": "IKEA of Sweden", "powerSource": "Mains (single phase)",
+        "modelId": "TRADFRI bulb E27 WS opal 980lm", "epList": [1],
+        "endpoints": {"1": {"profId": 49246, "epId": 1, "devId": 544,
+            "inClusterList": [0], "meta": {}, "outClusterList": [5], "clusters": {}}},
+        "appVersion": 17, "stackVersion": 87, "hwVersion": 1, "dateCode": "20170331",
+        "swBuildId": "1.2.217", "zclVersion": 1, "interviewCompleted": false,
+        "meta": {"reporting": 1}, "_id": "a"
+    });
+    let successful = json!({
+        "id": 4, "type": "Router", "ieeeAddr": "0x000b57fffec6a5b3", "nwkAddr": 40370,
+        "manufId": 4476, "manufName": "IKEA of Sweden", "powerSource": "Mains (single phase)",
+        "modelId": "TRADFRI bulb E27 WS opal 980lm", "epList": [1],
+        "endpoints": {"1": {"profId": 49246, "epId": 1, "devId": 544,
+            "inClusterList": [0], "meta": {}, "outClusterList": [5], "clusters": {}}},
+        "appVersion": 17, "stackVersion": 87, "hwVersion": 1, "dateCode": "20170331",
+        "swBuildId": "1.2.217", "zclVersion": 1, "interviewCompleted": true,
+        "meta": {"reporting": 1}, "_id": "b"
+    });
+    std::fs::write(&harness.database_path, format!("{failed}\n{successful}\n")).expect("database");
+    harness.start().await.expect("start");
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x000b57fffec6a5b2")
+            .unwrap()
+            .interview_state(),
+        zigbee_apiarist::controller::model::device::InterviewState::Failed
+    );
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x000b57fffec6a5b3")
+            .unwrap()
+            .interview_state(),
+        zigbee_apiarist::controller::model::device::InterviewState::Successful
+    );
+}

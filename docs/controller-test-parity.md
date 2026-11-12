@@ -144,9 +144,9 @@ are explicitly `PENDING`.
 | 135 | 4398 | Device binding table | `device_lqi_routing_and_binding_table` | PORTED |
 | 136 | 4422 | Device updates endpoint bindings from binding table | `device_updates_endpoint_bindings_from_binding_table` | PORTED |
 | 137 | 4485 | Device updates existing endpoint bindings from binding table | `device_updates_existing_endpoint_bindings_from_binding_table` | PORTED |
-| 138 | 4552 | Device clears all bindings | — | PENDING |
-| 139 | 4568 | Device selectively clears target bindings | — | PENDING |
-| 140 | 4584 | Device selectively clears multi-target bindings | — | PENDING |
+| 138 | 4552 | Device clears all bindings | `device_clears_all_and_selective_bindings` | PORTED |
+| 139 | 4568 | Device selectively clears target bindings | `device_clears_all_and_selective_bindings` | PORTED |
+| 140 | 4584 | Device selectively clears multi-target bindings | `device_clears_all_and_selective_bindings` | PORTED |
 | 141 | 4600 | Device ping | `device_ping` | PORTED |
 | 142 | 4620 | Poll control supported | `poll_control_supported` | PORTED |
 | 143 | 4739 | Poll control unsupported | `poll_control_unsupported` | PORTED |
@@ -154,7 +154,7 @@ are explicitly `PENDING`.
 | 145 | 4755 | Endpoint get id by endpoint device type | `endpoint_get_id_by_endpoint_device_type` | PORTED |
 | 146 | 4763 | Endpoint bind | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 147 | 4783 | Endpoint addBinding | `endpoint_bind_add_binding_and_unbind` | PORTED |
-| 148 | 4798 | Endpoint get binds non-existing device | — | PENDING |
+| 148 | 4798 | Endpoint get binds non-existing device | `endpoint_get_binds_non_existing_device` | PORTED |
 | 149 | 4813 | Group bind | — | PENDING |
 | 150 | 4835 | Group addBinding | — | PENDING |
 | 151 | 4845 | Group bind by number (should create group) | — | PENDING |
@@ -174,9 +174,9 @@ are explicitly `PENDING`.
 | 165 | 5291 | Endpoint configure reporting fails when status code is not 0 default rsp | — | PENDING |
 | 166 | 5319 | Endpoint configure reporting with disable response | `configure_reporting_non_analog_and_disable_response` | PORTED |
 | 167 | 5341 | Endpoint read reporting config | `endpoint_configure_reporting_and_read_config` | PORTED |
-| 168 | 5500 | Endpoint throws without response to read reporting config | — | PENDING |
-| 169 | 5510 | Endpoint ignores unknown attributes for read reporting config | — | PENDING |
-| 170 | 5567 | Endpoint manuf-spec read reporting config | — | PENDING |
+| 168 | 5500 | Endpoint throws without response to read reporting config | `read_reporting_config_no_response_errors` | PORTED |
+| 169 | 5510 | Endpoint ignores unknown attributes for read reporting config | `read_reporting_config_ignores_unknown_attributes` | PORTED |
+| 170 | 5567 | Endpoint manuf-spec read reporting config | `read_reporting_config_manufacturer_specific` | PORTED |
 | 171 | 5710 | Return group from databse when not in lookup | — | PENDING |
 | 172 | 5717 | Throw error when creating group already exists | `throw_error_creating_duplicate_entities` | PORTED |
 | 173 | 5729 | Add endpoint to group | `endpoint_add_and_remove_from_group` | PORTED |
@@ -221,7 +221,7 @@ are explicitly `PENDING`.
 | 212 | 6643 | Configure reporting endpoint custom attributes | `configure_reporting_custom_attribute_by_id` | PORTED |
 | 213 | 6692 | Remove endpoint from all groups | `remove_endpoint_from_all_groups` | PORTED |
 | 214 | 6720 | Load database | — | PENDING |
-| 215 | 7060 | Load database: interviewState migration and reset IN_PROGRESS | — | PENDING |
+| 215 | 7060 | Load database: interviewState migration and reset IN_PROGRESS | `load_database_interview_state_migration` | PORTED |
 | 216 | 7087 | Shouldnt load device from group databaseentry | — | PENDING |
 | 217 | 7094 | Should throw datbase basic crud errors | `database_basic_crud_errors` | PORTED |
 | 218 | 7113 | Should save received attributes | `should_save_received_attributes` | PORTED |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **180 / 311**.
+Ported: **188 / 311**.

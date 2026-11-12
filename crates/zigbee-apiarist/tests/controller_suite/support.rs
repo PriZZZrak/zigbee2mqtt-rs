@@ -58,6 +58,8 @@ pub struct MockAdapter {
     pub fail_group_send: AtomicBool,
     /// Payload returned for `readReportConfig`.
     pub read_report_config_payload: Mutex<Option<Value>>,
+    /// Command name answered with no response (upstream mock returning undefined).
+    pub no_response_command: Mutex<Option<String>>,
     pub zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
     pub sent_endpoint: Mutex<Vec<Frame>>,
     pub sent_group: Mutex<Vec<Frame>>,
@@ -98,6 +100,7 @@ impl MockAdapter {
             group_status: AtomicU64::new(0),
             fail_group_send: AtomicBool::new(false),
             read_report_config_payload: Mutex::new(None),
+            no_response_command: Mutex::new(None),
             zdo_calls: Mutex::new(Vec::new()),
             sent_endpoint: Mutex::new(Vec::new()),
             sent_group: Mutex::new(Vec::new()),
@@ -247,6 +250,14 @@ impl ControllerAdapter for MockAdapter {
                 None
             }
         };
+        let no_response = {
+            let mut slot = self.no_response_command.lock().unwrap();
+            if slot.as_deref() == Some(frame.command.name.as_str()) {
+                slot.take()
+            } else {
+                None
+            }
+        };
         let ieee = ieee_address.to_string();
         let frame = frame.clone();
         Box::pin(async move {
@@ -255,6 +266,9 @@ impl ControllerAdapter for MockAdapter {
             }
             if fail_command.as_deref() == Some(frame.command.name.as_str()) {
                 return Err("timeout".to_string());
+            }
+            if no_response.as_deref() == Some(frame.command.name.as_str()) {
+                return Ok(None);
             }
             default_zcl(&state, network_address, endpoint, &frame)
         })

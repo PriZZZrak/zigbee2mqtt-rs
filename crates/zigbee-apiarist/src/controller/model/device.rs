@@ -2240,7 +2240,8 @@ impl Device {
         if !BuffaloZdo::check_status(&response) {
             return Err(zdo_status_error(&response));
         }
-        if (eui64_list.len() == 1 && eui64_list[0].to_lowercase() == "0x0000000000000000")
+        if (eui64_list.len() == 1
+            && eui64_list[0].to_lowercase() == crate::zspec::consts::BLANK_EUI64)
             || eui64_list
                 .iter()
                 .any(|eui| eui.to_lowercase() == self.ieee_addr())
