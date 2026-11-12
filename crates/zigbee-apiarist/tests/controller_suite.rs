@@ -4797,3 +4797,318 @@ async fn read_from_endpoint_custom_attribute() {
     assert_eq!(frames[0].header.manufacturer_code, Some(0x1221));
     assert_eq!(frames[0].payload, json!([{"attrId": 16384}]));
 }
+
+fn fail_next(adapter: &MockAdapter, command: &str) {
+    adapter
+        .fail_zcl_command
+        .lock()
+        .unwrap()
+        .replace(command.to_string());
+}
+
+fn no_response_next(adapter: &MockAdapter, command: &str) {
+    adapter
+        .no_response_command
+        .lock()
+        .unwrap()
+        .replace(command.to_string());
+}
+
+const DEFAULT_OPTIONS_JSON: &str = r#"{"timeout":10000,"disableResponse":false,"disableRecovery":false,"disableDefaultResponse":false,"direction":0,"reservedBits":0,"writeUndiv":false}"#;
+const DEFAULT_OPTIONS_JSON_DDR: &str = r#"{"timeout":10000,"disableResponse":false,"disableRecovery":false,"disableDefaultResponse":true,"direction":0,"reservedBits":0,"writeUndiv":false}"#;
+
+#[tokio::test]
+async fn endpoint_command_and_command_response_errors() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+
+    fail_next(&adapter, "toggle");
+    let error = endpoint
+        .command(json!("genOnOff"), json!("toggle"), json!({}), None)
+        .await
+        .expect_err("command error");
+    assert_eq!(
+        error,
+        format!(
+            "ZCL command 0x129/1 genOnOff.toggle({{}}, {DEFAULT_OPTIONS_JSON}) failed (timeout occurred)"
+        )
+    );
+
+    fail_next(&adapter, "imageNotify");
+    let error = endpoint
+        .command_response(
+            json!("genOta"),
+            json!("imageNotify"),
+            json!({"payloadType": 0, "queryJitter": 1}),
+            None,
+            None,
+        )
+        .await
+        .expect_err("command response error");
+    assert_eq!(
+        error,
+        r#"CommandResponse 0x129/1 genOta.imageNotify({"payloadType":0,"queryJitter":1}, {"timeout":10000,"disableResponse":false,"disableRecovery":false,"disableDefaultResponse":true,"direction":1,"reservedBits":0,"writeUndiv":false}) failed (timeout occurred)"#
+    );
+
+    let error = endpoint
+        .command_response(
+            json!("genOta"),
+            json!("imageNotify"),
+            json!({"payloadType": 0, "queryJitter": 1}),
+            Some(zigbee_apiarist::controller::model::endpoint::Options {
+                transaction_sequence_number: Some(10),
+                ..Default::default()
+            }),
+            None,
+        )
+        .await
+        .expect_err("tsn option");
+    assert_eq!(error, "Use parameter");
+}
+
+#[tokio::test]
+async fn write_and_read_response_errors() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+
+    fail_next(&adapter, "writeRsp");
+    let error = endpoint
+        .write_response(
+            json!("genBasic"),
+            99,
+            json!({"zclVersion": {"status": 1}}),
+            None,
+        )
+        .await
+        .expect_err("write response error");
+    assert_eq!(
+        error,
+        r#"ZCL command 0x129/1 genBasic.writeRsp({"zclVersion":{"status":1}}, {"timeout":10000,"disableResponse":false,"disableRecovery":false,"disableDefaultResponse":true,"direction":1,"reservedBits":0,"transactionSequenceNumber":99,"writeUndiv":false}) failed (timeout occurred)"#
+    );
+
+    fail_next(&adapter, "readRsp");
+    let error = endpoint
+        .read_response(json!("genOnOff"), 1, json!({"onOff": 1}), None)
+        .await
+        .expect_err("read response error");
+    assert_eq!(
+        error,
+        r#"ZCL command 0x129/1 genOnOff.readRsp({"onOff":1}, {"timeout":10000,"disableResponse":false,"disableRecovery":false,"disableDefaultResponse":true,"direction":1,"reservedBits":0,"transactionSequenceNumber":1,"writeUndiv":false}) failed (timeout occurred)"#
+    );
+}
+
+#[tokio::test]
+async fn read_and_write_errors_and_disable_response() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+
+    fail_next(&adapter, "read");
+    let error = endpoint
+        .read(json!("genOnOff"), json!(["onOff"]), None)
+        .await
+        .expect_err("read error");
+    assert_eq!(
+        error,
+        format!(
+            r#"ZCL command 0x129/1 genOnOff.read(["onOff"], {DEFAULT_OPTIONS_JSON_DDR}) failed (timeout occurred)"#
+        )
+    );
+
+    fail_next(&adapter, "write");
+    let error = endpoint
+        .write(json!("genOnOff"), json!({"onTime": 1}), None)
+        .await
+        .expect_err("write error");
+    assert_eq!(
+        error,
+        format!(
+            r#"ZCL command 0x129/1 genOnOff.write({{"onTime":1}}, {DEFAULT_OPTIONS_JSON_DDR}) failed (timeout occurred)"#
+        )
+    );
+
+    no_response_next(&adapter, "read");
+    endpoint
+        .read(
+            json!("genOnOff"),
+            json!(["onOff"]),
+            Some(zigbee_apiarist::controller::model::endpoint::Options {
+                disable_response: Some(true),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("read with disable response");
+
+    no_response_next(&adapter, "write");
+    endpoint
+        .write(
+            json!("genOnOff"),
+            json!({"onTime": 1}),
+            Some(zigbee_apiarist::controller::model::endpoint::Options {
+                disable_response: Some(true),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("write with disable response");
+}
+
+#[tokio::test]
+async fn configure_reporting_and_default_response_errors() {
+    use zigbee_apiarist::controller::model::endpoint::ConfigureReportingItem;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+
+    fail_next(&adapter, "configReport");
+    let error = endpoint
+        .configure_reporting(
+            json!("genOnOff"),
+            vec![ConfigureReportingItem {
+                attribute: json!("onOff"),
+                minimum_report_interval: 0,
+                maximum_report_interval: 2,
+                reportable_change: Some(10.0),
+            }],
+            None,
+        )
+        .await
+        .expect_err("configure reporting error");
+    assert_eq!(
+        error,
+        format!(
+            r#"ZCL command 0x129/1 genOnOff.configReport([{{"attribute":"onOff","minimumReportInterval":0,"maximumReportInterval":2,"reportableChange":10}}], {DEFAULT_OPTIONS_JSON_DDR}) failed (timeout occurred)"#
+        )
+    );
+
+    fail_next(&adapter, "defaultRsp");
+    let error = endpoint
+        .default_response(1, 0, 1, 3, None)
+        .await
+        .expect_err("default response error");
+    assert_eq!(
+        error,
+        r#"ZCL command 0x129/1 genPowerCfg.defaultRsp({"cmdId":1,"statusCode":0}, {"timeout":10000,"disableResponse":false,"disableRecovery":false,"disableDefaultResponse":true,"direction":1,"reservedBits":0,"transactionSequenceNumber":3,"writeUndiv":false}) failed (timeout occurred)"#
+    );
+
+    let error = endpoint
+        .default_response(
+            1,
+            0,
+            1,
+            3,
+            Some(zigbee_apiarist::controller::model::endpoint::Options {
+                transaction_sequence_number: Some(10),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect_err("tsn option");
+    assert_eq!(error, "Use parameter");
+}
+
+#[tokio::test]
+async fn group_command_error() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let group = harness.controller.create_group(2).expect("group");
+    adapter
+        .fail_group_send
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let error = group
+        .command(json!("genOnOff"), json!("toggle"), json!({}), None)
+        .await
+        .expect_err("group command error");
+    assert_eq!(error, "Command 2 genOnOff.toggle({}) failed (timeout)");
+}
+
+#[tokio::test]
+async fn write_structured_and_custom_payload() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+
+    no_response_next(&adapter, "writeStructured");
+    endpoint
+        .write_structured(json!("genPowerCfg"), json!([]), None)
+        .await
+        .expect("write structured");
+
+    no_response_next(&adapter, "writeStructured");
+    endpoint
+        .write_structured(
+            json!("genPowerCfg"),
+            json!([]),
+            Some(zigbee_apiarist::controller::model::endpoint::Options {
+                disable_response: Some(true),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("write structured disable response");
+
+    fail_next(&adapter, "writeStructured");
+    let error = endpoint
+        .write_structured(json!("genPowerCfg"), json!([]), None)
+        .await
+        .expect_err("write structured error");
+    assert_eq!(
+        error,
+        format!(
+            r#"ZCL command 0x129/1 genPowerCfg.writeStructured([], {DEFAULT_OPTIONS_JSON_DDR}) failed (timeout occurred)"#
+        )
+    );
+}
+
+#[tokio::test]
+async fn report_error() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    fail_next(&adapter, "report");
+    let error = endpoint
+        .report(json!("genOnOff"), json!({"onOff": 1}), None)
+        .await
+        .expect_err("report error");
+    assert_eq!(
+        error,
+        format!(
+            r#"ZCL command 0x129/1 genOnOff.report({{"onOff":1}}, {DEFAULT_OPTIONS_JSON_DDR}) failed (timeout occurred)"#
+        )
+    );
+}

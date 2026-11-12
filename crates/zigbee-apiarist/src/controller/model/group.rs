@@ -382,16 +382,18 @@ impl Group {
             Value::Array(payload),
             options.reserved_bits,
         );
-        logger().debug(
-            &format!(
-                "Write {} {}({attributes}, {options:?})",
-                self.group_id, cluster.name
-            ),
-            NS,
+        let log = format!(
+            "Write {} {}({}, {})",
+            self.group_id,
+            cluster.name,
+            serde_json::to_string(&attributes).unwrap_or_else(|_| "null".to_string()),
+            options_to_upstream_json(&options)
         );
+        logger().debug(&log, NS);
         Entity::adapter()
             .send_zcl_frame_to_group(self.group_id, &frame, options.src_endpoint, None)
             .await
+            .map_err(|error| format!("{log} failed ({error})"))
     }
 
     /// Upstream `read(clusterKey, attributes, options?)`.
@@ -448,16 +450,18 @@ impl Group {
             Value::Array(payload),
             options.reserved_bits,
         );
-        logger().debug(
-            &format!(
-                "Read {} {}({attributes}, {options:?})",
-                self.group_id, cluster.name
-            ),
-            NS,
+        let log = format!(
+            "Read {} {}({}, {})",
+            self.group_id,
+            cluster.name,
+            serde_json::to_string(&attributes).unwrap_or_else(|_| "null".to_string()),
+            options_to_upstream_json(&options)
         );
+        logger().debug(&log, NS);
         Entity::adapter()
             .send_zcl_frame_to_group(self.group_id, &frame, options.src_endpoint, None)
             .await
+            .map_err(|error| format!("{log} failed ({error})"))
     }
 
     /// Upstream `command(clusterKey, commandKey, payload, options?)`.
@@ -481,13 +485,14 @@ impl Group {
             custom_clusters,
         );
         let command = Utils::get_cluster_command(&cluster, key_from_command(&command_key));
-        logger().debug(
-            &format!(
-                "Command {} {}.{}({payload})",
-                self.group_id, cluster.name, command.name
-            ),
-            NS,
+        let log = format!(
+            "Command {} {}.{}({})",
+            self.group_id,
+            cluster.name,
+            command.name,
+            serde_json::to_string(&payload).unwrap_or_else(|_| "null".to_string())
         );
+        logger().debug(&log, NS);
         let frame = Frame::create_with_definitions(
             cluster,
             command,
@@ -504,6 +509,7 @@ impl Group {
         Entity::adapter()
             .send_zcl_frame_to_group(self.group_id, &frame, options.src_endpoint, None)
             .await
+            .map_err(|error| format!("{log} failed ({error})"))
     }
 
     fn get_options_with_defaults(
@@ -520,6 +526,26 @@ impl Group {
             transaction_sequence_number: options.transaction_sequence_number,
         }
     }
+}
+
+/// Serializes group options like upstream `JSON.stringify(optionsWithDefaults)`.
+fn options_to_upstream_json(options: &OptionsWithDefaults) -> String {
+    let mut object = serde_json::Map::new();
+    object.insert("direction".to_string(), json!(options.direction));
+    if let Some(src_endpoint) = options.src_endpoint {
+        object.insert("srcEndpoint".to_string(), json!(src_endpoint));
+    }
+    object.insert("reservedBits".to_string(), json!(options.reserved_bits));
+    if let Some(manufacturer_code) = options.manufacturer_code {
+        object.insert("manufacturerCode".to_string(), json!(manufacturer_code));
+    }
+    if let Some(transaction_sequence_number) = options.transaction_sequence_number {
+        object.insert(
+            "transactionSequenceNumber".to_string(),
+            json!(transaction_sequence_number),
+        );
+    }
+    serde_json::to_string(&Value::Object(object)).unwrap_or_else(|_| "{}".to_string())
 }
 
 fn command_by_name(cluster: &Cluster, name: &str) -> Command {

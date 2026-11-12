@@ -209,7 +209,7 @@ are explicitly `PENDING`.
 | 200 | 6383 | Write response to endpoint throw when transaction sequence number provided through options | `write_response_to_endpoint_variants` | PORTED |
 | 201 | 6399 | Write response to endpoint with no status attribute specified | `write_response_to_endpoint_variants` | PORTED |
 | 202 | 6415 | Write response to endpoint with ZCL attribute | `write_response_to_endpoint_variants` | PORTED |
-| 203 | 6445 | WriteResponse error | — | PENDING |
+| 203 | 6445 | WriteResponse error | `write_and_read_response_errors` | PORTED |
 | 204 | 6464 | Write response to endpoint with options | `write_response_to_endpoint_variants` | PORTED |
 | 205 | 6494 | Read from endpoint with string | `read_from_endpoint_variants` | PORTED |
 | 206 | 6512 | Read from endpoint with string ignores unknown | `read_from_endpoint_variants` | PORTED |
@@ -227,27 +227,27 @@ are explicitly `PENDING`.
 | 218 | 7113 | Should save received attributes | `should_save_received_attributes` | PORTED |
 | 219 | 7149 | Emit read from device | `emit_read_from_device` | PORTED |
 | 220 | 7191 | Emit write from device | `emit_write_from_device` | PORTED |
-| 221 | 7235 | Endpoint command error | — | PENDING |
-| 222 | 7254 | Endpoint commandResponse error | — | PENDING |
-| 223 | 7273 | Endpoint commandResponse error when transactionSequenceNumber provided through options | — | PENDING |
-| 224 | 7288 | ConfigureReporting error | — | PENDING |
-| 225 | 7309 | DefaultResponse error | — | PENDING |
-| 226 | 7328 | DefaultResponse error when transactionSequenceNumber provided through options | — | PENDING |
+| 221 | 7235 | Endpoint command error | `endpoint_command_and_command_response_errors` | PORTED |
+| 222 | 7254 | Endpoint commandResponse error | `endpoint_command_and_command_response_errors` | PORTED |
+| 223 | 7273 | Endpoint commandResponse error when transactionSequenceNumber provided through options | `endpoint_command_and_command_response_errors` | PORTED |
+| 224 | 7288 | ConfigureReporting error | `configure_reporting_and_default_response_errors` | PORTED |
+| 225 | 7309 | DefaultResponse error | `configure_reporting_and_default_response_errors` | PORTED |
+| 226 | 7328 | DefaultResponse error when transactionSequenceNumber provided through options | `configure_reporting_and_default_response_errors` | PORTED |
 | 227 | 7343 | Skip unbind if not bound | — | PENDING |
 | 228 | 7354 | Handle unbind with number not matching any group | — | PENDING |
 | 229 | 7367 | Unbind against unbound cluster | — | PENDING |
 | 230 | 7395 | Unbind error | — | PENDING |
 | 231 | 7422 | Bind error | — | PENDING |
-| 232 | 7448 | ReadResponse error | — | PENDING |
-| 233 | 7467 | Read error | — | PENDING |
-| 234 | 7486 | Read with disable response | — | PENDING |
-| 235 | 7496 | Write error | — | PENDING |
-| 236 | 7515 | Write with disable response | — | PENDING |
-| 237 | 7525 | Group command error | — | PENDING |
-| 238 | 7538 | Write structured | — | PENDING |
-| 239 | 7548 | Write structured with disable response | — | PENDING |
-| 240 | 7558 | Write structured error | — | PENDING |
-| 241 | 7577 | Write with custom payload | — | PENDING |
+| 232 | 7448 | ReadResponse error | `write_and_read_response_errors` | PORTED |
+| 233 | 7467 | Read error | `read_and_write_errors_and_disable_response` | PORTED |
+| 234 | 7486 | Read with disable response | `read_and_write_errors_and_disable_response` | PORTED |
+| 235 | 7496 | Write error | `read_and_write_errors_and_disable_response` | PORTED |
+| 236 | 7515 | Write with disable response | `read_and_write_errors_and_disable_response` | PORTED |
+| 237 | 7525 | Group command error | `group_command_error` | PORTED |
+| 238 | 7538 | Write structured | `write_structured_and_custom_payload` | PORTED |
+| 239 | 7548 | Write structured with disable response | `write_structured_and_custom_payload` | PORTED |
+| 240 | 7558 | Write structured error | `write_structured_and_custom_payload` | PORTED |
+| 241 | 7577 | Write with custom payload | `write_structured_and_custom_payload` | PORTED |
 | 242 | 7631 | Green power | `green_power_commissioning_creates_device_and_emits_join` | PORTED |
 | 243 | 7875 | Should handle green power responses gracefully | `green_power_response_without_command_id_is_handled_gracefully` | PORTED |
 | 244 | 7916 | Should handle green power broadcast commissioning | — | PENDING |
@@ -262,7 +262,7 @@ are explicitly `PENDING`.
 | 253 | 8624 | Get input/ouptut clusters | — | PENDING |
 | 254 | 8642 | Report to endpoint custom attributes | `write_to_endpoint_custom_attributes` | PORTED |
 | 255 | 8673 | Report to endpoint with unknown string attribute | `write_to_endpoint_with_unknown_string_attribute_fails` | PORTED |
-| 256 | 8689 | Report error | — | PENDING |
+| 256 | 8689 | Report error | `report_error` | PORTED |
 | 257 | 8708 | Write to device with pendingRequestTimeout > 0 | — | PENDING |
 | 258 | 8754 | Write to device with pendingRequestTimeout > 0, override default sendPolicy | — | PENDING |
 | 259 | 8781 | Write to device with pendingRequestTimeout > 0, error | — | PENDING |
@@ -277,7 +277,7 @@ are explicitly `PENDING`.
 | 268 | 9388 | Should do a coordinator check | `coordinator_check_with_supported_backup` | PORTED |
 | 269 | 9667 | zclCommand | — | PENDING |
 | 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
-| 271 | 9689 | zclCommand with error | — | PENDING |
+| 271 | 9689 | zclCommand with error | `group_command_error` | PORTED |
 | 272 | 9709 | Interview on coordinator | — | PENDING |
 | 273 | 9721 | Device node descriptor fails | — | PENDING |
 | 274 | 9731 | Device active endpoints fails | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **210 / 311**.
+Ported: **229 / 311**.

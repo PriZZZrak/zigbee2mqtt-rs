@@ -265,7 +265,7 @@ impl ControllerAdapter for MockAdapter {
                 return handler(&ieee, network_address, endpoint, &frame);
             }
             if fail_command.as_deref() == Some(frame.command.name.as_str()) {
-                return Err("timeout".to_string());
+                return Err("timeout occurred".to_string());
             }
             if no_response.as_deref() == Some(frame.command.name.as_str()) {
                 return Ok(None);

@@ -1434,10 +1434,31 @@ impl Endpoint {
             Value::from("configReport"),
             Value::Array(payload.clone()),
             Some(options.clone().into()),
-            Some(json!(items
-                .iter()
-                .map(|item| item.attribute.clone())
-                .collect::<Vec<_>>())),
+            Some(Value::Array(
+                items
+                    .iter()
+                    .map(|item| {
+                        let mut entry = serde_json::Map::new();
+                        entry.insert("attribute".to_string(), item.attribute.clone());
+                        entry.insert(
+                            "minimumReportInterval".to_string(),
+                            json!(item.minimum_report_interval),
+                        );
+                        entry.insert(
+                            "maximumReportInterval".to_string(),
+                            json!(item.maximum_report_interval),
+                        );
+                        if let Some(change) = item.reportable_change {
+                            entry.insert(
+                                "reportableChange".to_string(),
+                                crate::zspec::zcl::utils::ZclValue::from_json(&json!(change))
+                                    .to_json(),
+                            );
+                        }
+                        Value::Object(entry)
+                    })
+                    .collect::<Vec<_>>(),
+            )),
             true,
             FrameType::GLOBAL as u8,
             Some(cluster.clone()),
@@ -1541,7 +1562,19 @@ impl Endpoint {
                 Value::from("readReportConfig"),
                 Value::Array(payload),
                 Some(options.clone().into()),
-                Some(json!(keys)),
+                Some(Value::Array(
+                    items
+                        .iter()
+                        .map(|item| {
+                            let mut entry = serde_json::Map::new();
+                            if let Some(direction) = item.direction {
+                                entry.insert("direction".to_string(), json!(direction));
+                            }
+                            entry.insert("attribute".to_string(), item.attribute.clone());
+                            Value::Object(entry)
+                        })
+                        .collect::<Vec<_>>(),
+                )),
                 false,
                 FrameType::GLOBAL as u8,
                 Some(cluster.clone()),
@@ -1647,18 +1680,17 @@ impl Endpoint {
             payload.clone(),
             options.reserved_bits,
         );
-        logger().debug(
-            &format!(
-                "CommandResponse {}/{} {}.{}({payload}, {:?})",
-                self.device_ieee_address.lock().unwrap(),
-                self.ID,
-                cluster.name,
-                command.name,
-                options
-            ),
-            NS,
+        let log = format!(
+            "CommandResponse {}/{} {}.{}({}, {})",
+            self.device_ieee_address.lock().unwrap(),
+            self.ID,
+            cluster.name,
+            command.name,
+            serde_json::to_string(&payload).unwrap_or_else(|_| "null".to_string()),
+            options_to_upstream_json(&options)
         );
-        if self.ID == 242 {
+        logger().debug(&log, NS);
+        let outcome = if self.ID == 242 {
             self.send_request_with(frame, &options, {
                 let cluster = cluster.clone();
                 let command = command.clone();
@@ -1695,11 +1727,15 @@ impl Endpoint {
                     })
                 }
             })
-            .await?;
+            .await
+            .map(|_| ())
         } else {
-            self.send_request(frame, &options).await?;
+            self.send_request(frame, &options).await.map(|_| ())
+        };
+        match outcome {
+            Ok(()) => Ok(()),
+            Err(error) => Err(format!("{log} failed ({error})")),
         }
-        Ok(())
     }
 
     fn get_options_with_defaults(
@@ -1954,19 +1990,21 @@ impl Endpoint {
             payload.clone(),
             options.reserved_bits,
         );
-        logger().debug(
-            &format!(
-                "ZCL command {}/{} {}.{}({}, {:?})",
-                self.device_ieee_address.lock().unwrap(),
-                self.ID,
-                cluster.name,
-                command.name,
-                log_payload.unwrap_or_else(|| payload.clone()),
-                options
-            ),
-            NS,
+        let log = format!(
+            "ZCL command {}/{} {}.{}({}, {})",
+            self.device_ieee_address.lock().unwrap(),
+            self.ID,
+            cluster.name,
+            command.name,
+            serde_json::to_string(log_payload.as_ref().unwrap_or(&payload))
+                .unwrap_or_else(|_| "null".to_string()),
+            options_to_upstream_json(&options)
         );
-        let result = self.send_request(frame, &options).await?;
+        logger().debug(&log, NS);
+        let result = match self.send_request(frame, &options).await {
+            Ok(result) => result,
+            Err(error) => return Err(format!("{log} failed ({error})")),
+        };
         let EndpointRequestResult::Payload(result) = result else {
             return Ok(None);
         };
@@ -1977,7 +2015,9 @@ impl Endpoint {
             &device.custom_clusters(),
         );
         if check_status && !options.disable_response {
-            self.check_status(&frame.payload)?;
+            if let Err(error) = self.check_status(&frame.payload) {
+                return Err(format!("{log} failed ({error})"));
+            }
         }
         Ok(Some(frame))
     }
@@ -2062,6 +2102,41 @@ impl From<OptionsWithDefaults> for Options {
             send_policy: options.send_policy,
         }
     }
+}
+
+/// Serializes options the way upstream `JSON.stringify(optionsWithDefaults)`
+/// does: fixed key order, `undefined` values omitted.
+fn options_to_upstream_json(options: &OptionsWithDefaults) -> String {
+    let mut object = serde_json::Map::new();
+    object.insert("timeout".to_string(), json!(options.timeout));
+    object.insert(
+        "disableResponse".to_string(),
+        json!(options.disable_response),
+    );
+    object.insert(
+        "disableRecovery".to_string(),
+        json!(options.disable_recovery),
+    );
+    object.insert(
+        "disableDefaultResponse".to_string(),
+        json!(options.disable_default_response),
+    );
+    object.insert("direction".to_string(), json!(options.direction));
+    if let Some(src_endpoint) = options.src_endpoint {
+        object.insert("srcEndpoint".to_string(), json!(src_endpoint));
+    }
+    object.insert("reservedBits".to_string(), json!(options.reserved_bits));
+    if let Some(manufacturer_code) = options.manufacturer_code {
+        object.insert("manufacturerCode".to_string(), json!(manufacturer_code));
+    }
+    if let Some(transaction_sequence_number) = options.transaction_sequence_number {
+        object.insert(
+            "transactionSequenceNumber".to_string(),
+            json!(transaction_sequence_number),
+        );
+    }
+    object.insert("writeUndiv".to_string(), json!(options.write_undiv));
+    serde_json::to_string(&Value::Object(object)).unwrap_or_else(|_| "{}".to_string())
 }
 
 fn key_from_value(value: &Value) -> crate::zspec::zcl::utils::ClusterKey {
