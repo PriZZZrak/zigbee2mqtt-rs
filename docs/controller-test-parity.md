@@ -304,10 +304,10 @@ are explicitly `PENDING`.
 | 295 | 10268 | Device network address changed while Z2M was offline, no duplicate triggering of IEEE request | — | PENDING |
 | 296 | 10326 | Device network address changed while Z2M was offline, no spamming of IEEE request when device doesnt respond | — | PENDING |
 | 297 | 10368 | does not try to identify unknown device when deleted | `does_not_identify_deleted_device` | PORTED |
-| 298 | 10414 | reads/writes to group with custom cluster when common to all members | — | PENDING |
-| 299 | 10540 | does not read/write to group with non-common custom clusters | — | PENDING |
-| 300 | 10572 | sends & receives command to group with custom cluster when common to all members | — | PENDING |
-| 301 | 10704 | sends one group command with an explicit custom cluster supported by one member | — | PENDING |
+| 298 | 10414 | reads/writes to group with custom cluster when common to all members | `reads_writes_group_custom_cluster_common_to_all_members` | PORTED |
+| 299 | 10540 | does not read/write to group with non-common custom clusters | `does_not_read_write_group_with_non_common_custom_clusters` | PORTED |
+| 300 | 10572 | sends & receives command to group with custom cluster when common to all members | `sends_receives_group_command_with_custom_cluster` | PORTED |
+| 301 | 10704 | sends one group command with an explicit custom cluster supported by one member | `sends_one_group_command_with_explicit_custom_cluster` | PORTED |
 | 302 | 10760 | Updates a device genBasic properties | `updates_device_gen_basic_properties` | PORTED |
 | 303 | 10808 | triggers sendZdo on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 304 | 10825 | triggers sendZclFrameInterPANToIeeeAddr on sendRaw | `send_raw_inter_pan_dispatches_to_touchlink` | PORTED |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **280 / 311**.
+Ported: **284 / 311**.

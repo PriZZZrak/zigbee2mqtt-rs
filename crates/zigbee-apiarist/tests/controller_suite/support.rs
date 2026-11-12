@@ -1312,6 +1312,93 @@ pub fn install_default_devices(adapter: &MockAdapter) {
         },
     );
     adapter.add_device(
+        176,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(176, 1, 1212)),
+            active_endpoints: Some(
+                json!([0, {"nwkAddress": 176, "endpointList": [1, 2, 3, 4, 5, 6]}]),
+            ),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(176, 1, 99, 5, vec![1, 2], vec![2]),
+            )]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([
+                    ("modelId".to_string(), json!("lumi.plug")),
+                    ("manufacturerName".to_string(), json!("LUMI")),
+                    ("zclVersion".to_string(), json!(1)),
+                    ("appVersion".to_string(), json!(2)),
+                    ("hwVersion".to_string(), json!(3)),
+                    ("dateCode".to_string(), json!("201901")),
+                    ("swBuildId".to_string(), json!("1.01")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(101)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        177,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(177, 1, 0x1021)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 177, "endpointList": [1]}])),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(
+                    177,
+                    1,
+                    260,
+                    514,
+                    vec![0, 3, 258, 4, 5, 15, 64513],
+                    vec![258, 0, 64513, 5, 25],
+                ),
+            )]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([
+                    ("modelId".to_string(), json!(" Shutter switch with neutral")),
+                    ("manufacturerName".to_string(), json!("Legrand")),
+                    ("zclVersion".to_string(), json!(2)),
+                    ("appVersion".to_string(), json!(0)),
+                    ("hwVersion".to_string(), json!(8)),
+                    ("dateCode".to_string(), json!("231030")),
+                    ("swBuildId".to_string(), json!("0038")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(67)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        179,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(179, 1, 0x1165)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 179, "endpointList": [1, 2, 3, 4]}])),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(179, 1, 260, 514, vec![0, 64561], vec![64561]),
+            )]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([
+                    ("modelId".to_string(), json!("VZM30-SN")),
+                    ("manufacturerName".to_string(), json!("Inovelli")),
+                    ("zclVersion".to_string(), json!(3)),
+                    ("appVersion".to_string(), json!(0)),
+                    ("hwVersion".to_string(), json!(8)),
+                    ("dateCode".to_string(), json!("2025")),
+                    ("swBuildId".to_string(), json!("0001")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(67)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
         178,
         MockDevice {
             node_descriptor: Some(node_descriptor(178, 1, 0x1021)),

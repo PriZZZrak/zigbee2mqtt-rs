@@ -6607,3 +6607,380 @@ async fn shouldnt_load_device_from_group_database_entry() {
         .unwrap_or_default();
     assert_eq!(message, "Cannot load device from group");
 }
+
+fn manu_herdsman_cluster(write: bool) -> zigbee_apiarist::zspec::zcl::utils::Cluster {
+    use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
+    use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
+    let mut cluster = Cluster::new("manuHerdsman", 64513);
+    let mut attribute = Attribute::new("customAttr", 0, DataType::UINT8);
+    attribute.write = write;
+    cluster
+        .attributes
+        .insert("customAttr".to_string(), attribute);
+    cluster
+}
+
+fn inovelli_cluster_value() -> Value {
+    json!({
+        "name": "manuSpecificInovelli",
+        "ID": 64561,
+        "manufacturerCode": 0x122f,
+        "attributes": {},
+        "commands": {
+            "ledEffect": {
+                "name": "ledEffect",
+                "ID": 1,
+                "parameters": [
+                    {"name": "effect", "type": 32},
+                    {"name": "color", "type": 32},
+                    {"name": "level", "type": 32},
+                    {"name": "duration", "type": 32}
+                ]
+            },
+            "individualLedEffect": {
+                "name": "individualLedEffect",
+                "ID": 3,
+                "parameters": [
+                    {"name": "led", "type": 32},
+                    {"name": "effect", "type": 32},
+                    {"name": "color", "type": 32},
+                    {"name": "level", "type": 32},
+                    {"name": "duration", "type": 32}
+                ]
+            }
+        },
+        "commandsResponse": {
+            "bogus": {"name": "bogus", "ID": 1, "parameters": [{"name": "xyz", "type": 32}]}
+        }
+    })
+}
+
+fn inovelli_cluster() -> zigbee_apiarist::zspec::zcl::utils::Cluster {
+    zigbee_apiarist::zspec::zcl::utils::Utils::cluster_from_value(
+        "manuSpecificInovelli",
+        &inovelli_cluster_value(),
+    )
+}
+
+#[tokio::test]
+async fn reads_writes_group_custom_cluster_common_to_all_members() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 177, "0x177");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x177").unwrap();
+    device
+        .add_custom_cluster("manuHerdsman", manu_herdsman_cluster(true))
+        .expect("custom cluster");
+    let group = harness.controller.create_group(34).expect("group");
+    group.add_member(&device.get_endpoint(1).unwrap());
+
+    adapter.sent_group.lock().unwrap().clear();
+    group
+        .write(json!("manuHerdsman"), json!({"customAttr": 15}), None)
+        .await
+        .expect("group write");
+    group
+        .read(json!("manuHerdsman"), json!(["customAttr"]), None)
+        .await
+        .expect("group read");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames.len(), 2);
+    assert_eq!(
+        frames[0].payload,
+        json!([{"attrData": 15, "attrId": 0, "dataType": 32}])
+    );
+    assert_eq!(frames[0].cluster.ID, 64513);
+    assert_eq!(frames[1].payload, json!([{"attrId": 0}]));
+    drop(frames);
+    assert!(group.custom_clusters().0.get("manuHerdsman").is_some());
+    assert!(group.custom_clusters().1.get("manuHerdsman").is_some());
+
+    // A member whose endpoint does not support the cluster input removes it
+    // from the group's common input clusters.
+    join(&adapter, 178, "0x178");
+    wait_interviews(&harness, 4).await;
+    let device2 = harness.controller.get_device_by_ieee_addr("0x178").unwrap();
+    device2
+        .add_custom_cluster("manuHerdsman", manu_herdsman_cluster(false))
+        .expect("custom cluster 2");
+    group.add_member(&device2.get_endpoint(2).unwrap());
+    assert!(group.custom_clusters().0.get("manuHerdsman").is_none());
+    assert!(group.custom_clusters().1.get("manuHerdsman").is_some());
+
+    let g = group.clone();
+    let outcome = tokio::spawn(async move {
+        g.write(json!("manuHerdsman"), json!({"customAttr": 14}), None)
+            .await
+    })
+    .await;
+    assert!(outcome.expect_err("must panic").is_panic());
+    let g = group.clone();
+    let outcome = tokio::spawn(async move {
+        g.read(json!("manuHerdsman"), json!(["customAttr"]), None)
+            .await
+    })
+    .await;
+    assert!(outcome.expect_err("must panic").is_panic());
+
+    // Output clusters are common, so the same operations work server-to-client.
+    group
+        .write(
+            json!("manuHerdsman"),
+            json!({"customAttr": 14}),
+            Some(zigbee_apiarist::controller::model::group::Options {
+                direction: Some(1),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("write server to client");
+    group
+        .read(
+            json!("manuHerdsman"),
+            json!(["customAttr"]),
+            Some(zigbee_apiarist::controller::model::group::Options {
+                direction: Some(1),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("read server to client");
+
+    group.remove_member(&device2.get_endpoint(2).unwrap());
+    group
+        .write(json!("manuHerdsman"), json!({"customAttr": 16}), None)
+        .await
+        .expect("write after remove");
+
+    group.add_member(&device2.get_endpoint(1).unwrap());
+    group
+        .write(json!("manuHerdsman"), json!({"customAttr": 8}), None)
+        .await
+        .expect("write after add ep1");
+
+    // A member without any endpoint supporting the cluster removes it again.
+    join(&adapter, 176, "0x176");
+    wait_interviews(&harness, 6).await;
+    let device3 = harness.controller.get_device_by_ieee_addr("0x176").unwrap();
+    device3
+        .add_custom_cluster("manuHerdsman", manu_herdsman_cluster(false))
+        .expect("custom cluster 3");
+    group.add_member(&device3.get_endpoint(1).unwrap());
+    let g = group.clone();
+    let outcome = tokio::spawn(async move {
+        g.write(json!("manuHerdsman"), json!({"customAttr": 56}), None)
+            .await
+    })
+    .await;
+    assert!(outcome.expect_err("must panic").is_panic());
+}
+
+#[tokio::test]
+async fn does_not_read_write_group_with_non_common_custom_clusters() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 177, "0x177");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x177").unwrap();
+    device
+        .add_custom_cluster("manuHerdsman", manu_herdsman_cluster(false))
+        .expect("custom cluster");
+    let group = harness.controller.create_group(34).expect("group");
+    group.add_member(&device.get_endpoint(1).unwrap());
+
+    join(&adapter, 178, "0x178");
+    wait_interviews(&harness, 4).await;
+    let device2 = harness.controller.get_device_by_ieee_addr("0x178").unwrap();
+    group.add_member(&device2.get_endpoint(1).unwrap());
+
+    let g = group.clone();
+    let outcome = tokio::spawn(async move {
+        g.write(json!("manuHerdsman"), json!({"customAttr": 34}), None)
+            .await
+    })
+    .await;
+    assert!(outcome.expect_err("must panic").is_panic());
+    let g = group.clone();
+    let outcome = tokio::spawn(async move {
+        g.read(json!("manuHerdsman"), json!(["customAttr"]), None)
+            .await
+    })
+    .await;
+    assert!(outcome.expect_err("must panic").is_panic());
+}
+
+#[tokio::test]
+async fn sends_receives_group_command_with_custom_cluster() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 179, "0x179");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x179").unwrap();
+    device
+        .add_custom_cluster("manuSpecificInovelli", inovelli_cluster())
+        .expect("custom cluster");
+    let group = harness.controller.create_group(33).expect("group");
+    group.add_member(&device.get_endpoint(1).unwrap());
+
+    adapter.sent_group.lock().unwrap().clear();
+    group
+        .command(
+            json!("manuSpecificInovelli"),
+            json!("individualLedEffect"),
+            json!({"led": 3, "effect": 8, "color": 100, "level": 200, "duration": 15}),
+            None,
+        )
+        .await
+        .expect("group command");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].cluster.ID, 64561);
+    assert_eq!(frames[0].command.name, "individualLedEffect");
+    assert_eq!(frames[0].header.manufacturer_code, Some(0x122f));
+    assert_eq!(
+        frames[0].payload,
+        json!({"led": 3, "effect": 8, "color": 100, "level": 200, "duration": 15})
+    );
+    drop(frames);
+
+    group
+        .command(
+            json!("manuSpecificInovelli"),
+            json!("bogus"),
+            json!({"xyz": 12}),
+            Some(zigbee_apiarist::controller::model::group::Options {
+                direction: Some(1),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("group command response");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames.len(), 2);
+    assert_eq!(frames[1].command.name, "bogus");
+    assert_eq!(frames[1].header.manufacturer_code, Some(0x122f));
+    assert_eq!(frames[1].payload, json!({"xyz": 12}));
+    drop(frames);
+
+    harness.events.lock().unwrap().clear();
+    let buffer = vec![0x11, 0x8a, 0x03, 0x05, 0x01, 0x00, 0x64, 0xff];
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 64561,
+        data: buffer,
+        header: Some(header),
+        address: json!(179),
+        endpoint: 1,
+        linkquality: 200,
+        group_id: 33,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let events = messages(&harness);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].cluster, json!("manuSpecificInovelli"));
+    assert_eq!(events[0].r#type, "commandIndividualLedEffect");
+    assert_eq!(events[0].group_id, 33);
+    assert_eq!(
+        events[0].data,
+        json!({"color": 0, "duration": Value::Null, "effect": 1, "led": 5, "level": 100})
+    );
+
+    join(&adapter, 178, "0x178");
+    wait_interviews(&harness, 4).await;
+    let device2 = harness.controller.get_device_by_ieee_addr("0x178").unwrap();
+    group.add_member(&device2.get_endpoint(1).unwrap());
+    let g = group.clone();
+    let outcome = tokio::spawn(async move {
+        g.command(
+            json!("manuSpecificInovelli"),
+            json!("individualLedEffect"),
+            json!({"led": 3, "effect": 8, "color": 100, "level": 200, "duration": 15}),
+            None,
+        )
+        .await
+    })
+    .await;
+    assert!(outcome.expect_err("must panic").is_panic());
+}
+
+#[tokio::test]
+async fn sends_one_group_command_with_explicit_custom_cluster() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 179, "0x179");
+    join(&adapter, 178, "0x178");
+    wait_interviews(&harness, 4).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x179").unwrap();
+    let device2 = harness.controller.get_device_by_ieee_addr("0x178").unwrap();
+    device
+        .add_custom_cluster("manuSpecificInovelli", inovelli_cluster())
+        .expect("custom cluster");
+    let group = harness.controller.create_group(33).expect("group");
+    group.add_member(&device.get_endpoint(1).unwrap());
+    group.add_member(&device2.get_endpoint(1).unwrap());
+    assert!(group
+        .custom_clusters()
+        .0
+        .get("manuSpecificInovelli")
+        .is_none());
+
+    let cluster = inovelli_cluster_value();
+    let payload = json!({"led": 3, "effect": 8, "color": 100, "level": 200, "duration": 15});
+    adapter.sent_group.lock().unwrap().clear();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    group
+        .command(
+            cluster.clone(),
+            json!("individualLedEffect"),
+            payload,
+            Some(zigbee_apiarist::controller::model::group::Options {
+                direction: Some(0),
+                transaction_sequence_number: Some(123),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("explicit cluster command");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].cluster.ID, 64561);
+    assert_eq!(
+        frames[0].to_buffer(),
+        vec![0x15, 0x2f, 0x12, 0x7b, 0x03, 0x03, 0x08, 0x64, 0xc8, 0x0f]
+    );
+    drop(frames);
+
+    group
+        .command(
+            cluster,
+            json!("bogus"),
+            json!({"xyz": 12}),
+            Some(zigbee_apiarist::controller::model::group::Options {
+                direction: Some(1),
+                transaction_sequence_number: Some(123),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("explicit cluster response command");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames.len(), 2);
+    assert_eq!(
+        frames[1].to_buffer(),
+        vec![0x1d, 0x2f, 0x12, 0x7b, 0x01, 0x0c]
+    );
+    assert!(adapter.sent_endpoint.lock().unwrap().is_empty());
+}

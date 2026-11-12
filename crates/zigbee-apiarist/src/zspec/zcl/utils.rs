@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, OnceLock};
 
+use serde_json::Value;
+
 use crate::zspec::zcl::definition::enums::{BuffaloZclDataType, DataType};
 
 /// Upstream runtime value (JS number/string/null, including `NaN`).
@@ -608,6 +610,12 @@ impl Utils {
     }
 
     /// Upstream `Utils.getCluster(key, manufacturerCode, customClusters)`.
+    /// Parses a cluster definition object (upstream APIs accept a `Cluster`
+    /// instance as the cluster key).
+    pub fn cluster_from_value(name: &str, value: &Value) -> Cluster {
+        parse_cluster(name, value)
+    }
+
     pub fn get_cluster(
         key: impl Into<ClusterKey>,
         _manufacturer_code: Option<u16>,

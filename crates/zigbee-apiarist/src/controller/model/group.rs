@@ -345,6 +345,10 @@ impl Group {
             options.manufacturer_code,
             custom_clusters,
         );
+        let mut options = options;
+        if options.manufacturer_code.is_none() {
+            options.manufacturer_code = cluster.manufacturerCode;
+        }
         let mut payload = Vec::new();
         for (name_or_id, value) in attributes.as_object().cloned().unwrap_or_default() {
             if let Some(attribute) = Utils::get_cluster_attribute(
@@ -420,6 +424,10 @@ impl Group {
             options.manufacturer_code,
             custom_clusters,
         );
+        let mut options = options;
+        if options.manufacturer_code.is_none() {
+            options.manufacturer_code = cluster.manufacturerCode;
+        }
         let mut payload = Vec::new();
         for attribute in attributes.as_array().cloned().unwrap_or_default() {
             if let Some(id) = attribute.as_u64() {
@@ -484,12 +492,31 @@ impl Group {
         } else {
             &input_clusters
         };
-        let cluster = Utils::get_cluster(
-            key_from_value(&cluster_key),
-            options.manufacturer_code,
-            custom_clusters,
-        );
-        let command = Utils::get_cluster_command(&cluster, key_from_command(&command_key));
+        let cluster = match &cluster_key {
+            // Upstream allows passing a Cluster object explicitly (e.g. a
+            // custom cluster that not every member has registered).
+            Value::Object(object) => {
+                let name = object
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                Utils::cluster_from_value(name, &cluster_key)
+            }
+            other => Utils::get_cluster(
+                key_from_value(other),
+                options.manufacturer_code,
+                custom_clusters,
+            ),
+        };
+        let command = if options.direction == Direction::SERVER_TO_CLIENT as u8 {
+            Utils::get_cluster_command_response(&cluster, key_from_command(&command_key))
+        } else {
+            Utils::get_cluster_command(&cluster, key_from_command(&command_key))
+        };
+        let mut options = options;
+        if options.manufacturer_code.is_none() {
+            options.manufacturer_code = cluster.manufacturerCode;
+        }
         let log = format!(
             "Command {} {}.{}({})",
             self.group_id,
