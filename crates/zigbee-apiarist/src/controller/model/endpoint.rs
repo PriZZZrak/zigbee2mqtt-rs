@@ -282,11 +282,11 @@ impl Endpoint {
             .collect()
     }
 
-    /// Upstream `getDevice()`.
-    pub fn get_device(&self) -> Arc<Device> {
+    /// Upstream `getDevice()` — returns `undefined` for an unknown/deleted device.
+    pub fn try_get_device(&self) -> Option<Arc<Device>> {
         let ieee = self.device_ieee_address.lock().unwrap().clone();
         match Device::by_ieee_addr(&ieee, false) {
-            Some(device) => device,
+            Some(device) => Some(device),
             None => {
                 logger().error(
                     &format!(
@@ -295,9 +295,17 @@ impl Endpoint {
                     ),
                     NS,
                 );
-                panic!("Unknown/deleted device {ieee}");
+                None
             }
         }
+    }
+
+    /// Convenience wrapper around `try_get_device` for call sites that require
+    /// a device (upstream code would dereference and throw in that case).
+    pub fn get_device(&self) -> Arc<Device> {
+        let ieee = self.device_ieee_address.lock().unwrap().clone();
+        self.try_get_device()
+            .unwrap_or_else(|| panic!("Unknown/deleted device {ieee}"))
     }
 
     /// Upstream `supportsInputCluster(clusterKey)`.
@@ -628,9 +636,34 @@ impl Endpoint {
         self.pending_request_count.load(Ordering::SeqCst) > 0
     }
 
+    /// Test support: queued request count (upstream `pendingRequests.size`).
+    pub fn pending_request_count(&self) -> usize {
+        self.pending_request_count.load(Ordering::SeqCst)
+    }
+
     /// Upstream `sendPendingRequests(fastPolling)`.
     pub async fn send_pending_requests(&self, fast_polling: bool) {
-        self.pending_requests.lock().await.send(fast_polling).await;
+        // Release the queue lock while requests are in flight; upstream has no
+        // lock and tests rely on a check-in arriving during an active send.
+        let Some((to_send, mut expired)) = ({
+            let mut queue = self.pending_requests.lock().await;
+            queue.take_for_send(fast_polling)
+        }) else {
+            return;
+        };
+        for request in &mut expired {
+            request.reject(None);
+        }
+        for mut request in to_send {
+            match request.send().await {
+                Ok(result) => request.resolve(result),
+                Err(_error) => {
+                    let mut queue = self.pending_requests.lock().await;
+                    queue.requeue(request);
+                }
+            }
+        }
+        self.pending_requests.lock().await.finish_send();
     }
 
     /// Upstream `sendRequest(frame, options)`.
@@ -711,7 +744,15 @@ impl Endpoint {
         }
 
         if policy == Some(SendPolicy::Bulk) {
-            return self.pending_requests.lock().await.queue(request).await;
+            // Upstream queues the request without holding a lock; release it
+            // before awaiting the queued response.
+            let receiver = {
+                let mut queue = self.pending_requests.lock().await;
+                queue.enqueue(request)
+            };
+            return receiver
+                .await
+                .unwrap_or_else(|_| Err("Request dropped".to_string()));
         }
 
         match request.send().await {
@@ -725,7 +766,13 @@ impl Endpoint {
                     ),
                     NS,
                 );
-                self.pending_requests.lock().await.queue(request).await
+                let receiver = {
+                    let mut queue = self.pending_requests.lock().await;
+                    queue.enqueue(request)
+                };
+                receiver
+                    .await
+                    .unwrap_or_else(|_| Err("Request dropped".to_string()))
             }
         }
     }
@@ -2236,6 +2283,9 @@ fn options_to_upstream_json(options: &OptionsWithDefaults) -> String {
         );
     }
     object.insert("writeUndiv".to_string(), json!(options.write_undiv));
+    if let Some(send_policy) = options.send_policy {
+        object.insert("sendPolicy".to_string(), json!(send_policy.as_str()));
+    }
     serde_json::to_string(&Value::Object(object)).unwrap_or_else(|_| "{}".to_string())
 }
 

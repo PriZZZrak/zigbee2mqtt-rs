@@ -67,6 +67,10 @@ pub struct MockAdapter {
     pub network_address_response: Mutex<Option<u16>>,
     /// `(eui64, nwkAddress, status)` answered and emitted for IEEE_ADDRESS_REQUEST.
     pub ieee_address_response: Mutex<Option<(String, u16, u8)>>,
+    /// Artificial per-send delay (upstream mock `advanceTimersByTime`).
+    pub zcl_delay_ms: AtomicU64,
+    /// Artificial adapter.start delay.
+    pub start_delay_ms: AtomicU64,
     pub zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
     pub sent_endpoint: Mutex<Vec<Frame>>,
     pub sent_group: Mutex<Vec<Frame>>,
@@ -114,6 +118,8 @@ impl MockAdapter {
             fail_stop: AtomicBool::new(false),
             network_address_response: Mutex::new(None),
             ieee_address_response: Mutex::new(None),
+            zcl_delay_ms: AtomicU64::new(0),
+            start_delay_ms: AtomicU64::new(0),
             zdo_calls: Mutex::new(Vec::new()),
             sent_endpoint: Mutex::new(Vec::new()),
             sent_group: Mutex::new(Vec::new()),
@@ -322,9 +328,13 @@ impl ControllerAdapter for MockAdapter {
                 None
             }
         };
+        let delay_ms = self.zcl_delay_ms.load(Ordering::SeqCst);
         let ieee = ieee_address.to_string();
         let frame = frame.clone();
         Box::pin(async move {
+            if delay_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            }
             if let Some(handler) = handler {
                 return handler(&ieee, network_address, endpoint, &frame);
             }
@@ -476,7 +486,13 @@ impl ControllerRuntimeAdapter for MockAdapter {
     fn start(&self) -> ControllerFuture<'_, StartResult> {
         self.started.fetch_add(1, Ordering::SeqCst);
         let result = *self.start_result.lock().unwrap();
-        Box::pin(async move { Ok(result) })
+        let delay = self.start_delay_ms.load(Ordering::SeqCst);
+        Box::pin(async move {
+            if delay > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+            }
+            Ok(result)
+        })
     }
 
     fn stop(&self) -> ControllerFuture<'_, ()> {

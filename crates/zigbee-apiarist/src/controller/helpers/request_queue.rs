@@ -224,9 +224,16 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
     }
 
     /// Upstream `send(fastPolling)` — requestQueue.ts:23.
-    pub async fn send(&mut self, fast_polling: bool) {
+    ///
+    /// Split so callers can release the queue lock while requests are in
+    /// flight (upstream does not hold a lock at all). Returns `None` when the
+    /// call was skipped (empty queue or a send already in progress).
+    pub fn take_for_send(
+        &mut self,
+        fast_polling: bool,
+    ) -> Option<(Vec<Request<T>>, Vec<Request<T>>)> {
         if self.requests.is_empty() {
-            return;
+            return None;
         }
         if !fast_polling && self.send_in_progress {
             logger().debug(
@@ -236,27 +243,27 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
                 ),
                 NS,
             );
-            return;
+            return None;
         }
         self.send_in_progress = true;
 
         let now = now_ms();
-        let mut index = 0usize;
-        while index < self.requests.len() {
-            if now > self.requests[index].expires {
+        let mut expired = Vec::new();
+        let mut pending = Vec::new();
+        for request in std::mem::take(&mut self.requests) {
+            if now > request.expires {
                 logger().debug(
                     &format!(
                         "Request Queue ({}/{}): discard after timeout. Size before: {}",
                         self.device_ieee_address,
                         self.endpoint_id,
-                        self.requests.len()
+                        pending.len() + expired.len() + 1
                     ),
                     NS,
                 );
-                let mut request = self.requests.remove(index);
-                request.reject(None);
+                expired.push(request);
             } else {
-                index += 1;
+                pending.push(request);
             }
         }
         self.sync_size();
@@ -266,47 +273,74 @@ impl<T: Clone + Send + 'static> RequestQueue<T> {
                 "Request Queue ({}/{}): send pending requests ({}, {})",
                 self.device_ieee_address,
                 self.endpoint_id,
-                self.requests.len(),
+                pending.len(),
                 fast_polling
             ),
             NS,
         );
 
-        let mut index = 0usize;
-        while index < self.requests.len() {
-            if fast_polling || self.requests[index].send_policy != Some(SendPolicy::Bulk) {
-                let mut request = self.requests.remove(index);
-                match request.send().await {
-                    Ok(result) => {
-                        logger().debug(
-                            &format!(
-                                "Request Queue ({}/{}): send success",
-                                self.device_ieee_address, self.endpoint_id
-                            ),
-                            NS,
-                        );
-                        request.resolve(result);
-                    }
-                    Err(error) => {
-                        logger().debug(
-                            &format!(
-                                "Request Queue ({}/{}): send failed, expires in {} seconds ({error})",
-                                self.device_ieee_address,
-                                self.endpoint_id,
-                                (request.expires.saturating_sub(now)) as f64 / 1000.0
-                            ),
-                            NS,
-                        );
-                        self.requests.insert(index, request);
-                        index += 1;
-                    }
-                }
+        let mut to_send = Vec::new();
+        let mut remaining = Vec::new();
+        for request in pending {
+            if fast_polling || request.send_policy != Some(SendPolicy::Bulk) {
+                to_send.push(request);
             } else {
-                index += 1;
+                remaining.push(request);
             }
         }
+        self.requests = remaining;
+        self.sync_size();
+        Some((to_send, expired))
+    }
+
+    /// Puts a request back after a failed send attempt.
+    pub fn requeue(&mut self, request: Request<T>) {
+        self.requests.push(request);
+        self.sync_size();
+    }
+
+    /// Clears the in-progress marker once a send round finished.
+    pub fn finish_send(&mut self) {
         self.send_in_progress = false;
         self.sync_size();
+    }
+
+    /// Upstream `send(fastPolling)` — requestQueue.ts:23.
+    pub async fn send(&mut self, fast_polling: bool) {
+        let Some((to_send, mut expired)) = self.take_for_send(fast_polling) else {
+            return;
+        };
+        for request in &mut expired {
+            request.reject(None);
+        }
+        let now = now_ms();
+        for mut request in to_send {
+            match request.send().await {
+                Ok(result) => {
+                    logger().debug(
+                        &format!(
+                            "Request Queue ({}/{}): send success",
+                            self.device_ieee_address, self.endpoint_id
+                        ),
+                        NS,
+                    );
+                    request.resolve(result);
+                }
+                Err(error) => {
+                    logger().debug(
+                        &format!(
+                            "Request Queue ({}/{}): send failed, expires in {} seconds ({error})",
+                            self.device_ieee_address,
+                            self.endpoint_id,
+                            (request.expires.saturating_sub(now)) as f64 / 1000.0
+                        ),
+                        NS,
+                    );
+                    self.requeue(request);
+                }
+            }
+        }
+        self.finish_send();
     }
 }
 #[cfg(test)]

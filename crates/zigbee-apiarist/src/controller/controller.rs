@@ -339,6 +339,29 @@ impl Controller {
         self: &Arc<Self>,
         adapter: Arc<dyn ControllerRuntimeAdapter>,
     ) -> Result<StartResult, String> {
+        self.start_with_abort(adapter, std::future::pending::<()>())
+            .await
+    }
+
+    /// Upstream `start(abortSignal?)` — aborts startup when the signal fires.
+    pub async fn start_with_abort<F>(
+        self: &Arc<Self>,
+        adapter: Arc<dyn ControllerRuntimeAdapter>,
+        abort: F,
+    ) -> Result<StartResult, String>
+    where
+        F: std::future::Future<Output = ()>,
+    {
+        tokio::select! {
+            result = self.start_inner(adapter) => result,
+            _ = abort => Err("aborted".to_string()),
+        }
+    }
+
+    async fn start_inner(
+        self: &Arc<Self>,
+        adapter: Arc<dyn ControllerRuntimeAdapter>,
+    ) -> Result<StartResult, String> {
         Utils::warm_cluster_catalog();
 
         // Database (create once and inject; a restart must reuse the same

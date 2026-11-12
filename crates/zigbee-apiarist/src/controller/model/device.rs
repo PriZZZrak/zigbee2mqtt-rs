@@ -304,6 +304,8 @@ impl Device {
 
     pub fn set_checkin_interval(&self, value: Option<u64>) {
         *self.checkin_interval.lock().unwrap() = value;
+        // Upstream's setter recomputes the pending request timeout.
+        self.reset_pending_request_timeout();
     }
 
     pub fn pending_request_timeout(&self) -> u64 {

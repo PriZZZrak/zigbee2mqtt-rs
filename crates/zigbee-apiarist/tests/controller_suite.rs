@@ -7618,3 +7618,802 @@ async fn device_network_address_changed_no_duplicate_ieee_request() {
         1
     );
 }
+
+fn occupancy_report_payload(
+    device: &zigbee_apiarist::controller::model::device::Device,
+) -> zigbee_apiarist::adapter::events::ZclPayload {
+    let buffer = vec![24, 169, 10, 0, 0, 24, 1];
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0406,
+        data: buffer,
+        header: Some(header),
+        address: json!(device.network_address()),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    }
+}
+
+fn count_command(adapter: &MockAdapter, name: &str) -> usize {
+    adapter
+        .sent_endpoint
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|frame| frame.command.name == name)
+        .count()
+}
+
+#[tokio::test]
+async fn write_with_pending_request_timeout_queues_and_flushes() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 174, "0x129");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.set_pending_request_timeout(10000);
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    fail_next(&adapter, "write");
+    let endpoint_for_task = endpoint.clone();
+    let write = tokio::spawn(async move {
+        endpoint_for_task
+            .write(
+                json!("genOnOff"),
+                json!({"onTime": 1}),
+                Some(zigbee_apiarist::controller::model::endpoint::Options {
+                    disable_response: Some(true),
+                    ..Default::default()
+                }),
+            )
+            .await
+    });
+    for _ in 0..100 {
+        if count_command(&adapter, "write") == 1 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    assert_eq!(count_command(&adapter, "write"), 1);
+    assert!(endpoint.has_pending_requests());
+
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), write)
+        .await
+        .expect("write resolves")
+        .expect("task");
+    result.expect("write");
+    assert_eq!(count_command(&adapter, "write"), 2);
+    assert!(!endpoint.has_pending_requests());
+
+    // A second check-in does not send the request again.
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    settle().await;
+    assert_eq!(count_command(&adapter, "write"), 2);
+}
+
+#[tokio::test]
+async fn write_with_pending_request_timeout_immediate_policy_errors() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 174, "0x129");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.set_pending_request_timeout(10000);
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    // Put one request in the queue.
+    fail_next(&adapter, "write");
+    let endpoint_for_task = endpoint.clone();
+    let queued = tokio::spawn(async move {
+        endpoint_for_task
+            .write(
+                json!("genOnOff"),
+                json!({"onTime": 0}),
+                Some(zigbee_apiarist::controller::model::endpoint::Options {
+                    disable_response: Some(true),
+                    ..Default::default()
+                }),
+            )
+            .await
+    });
+    for _ in 0..100 {
+        if endpoint.has_pending_requests() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    assert_eq!(endpoint.pending_request_count(), 1);
+
+    fail_next(&adapter, "write");
+    let error = endpoint
+        .write(
+            json!("genOnOff"),
+            json!({"onTime": 1}),
+            Some(zigbee_apiarist::controller::model::endpoint::Options {
+                disable_response: Some(true),
+                send_policy: Some(zigbee_apiarist::controller::tstype::SendPolicy::Immediate),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect_err("immediate send fails");
+    assert_eq!(
+        error,
+        r#"ZCL command 0x129/1 genOnOff.write({"onTime":1}, {"timeout":10000,"disableResponse":true,"disableRecovery":false,"disableDefaultResponse":true,"direction":0,"reservedBits":0,"writeUndiv":false,"sendPolicy":"immediate"}) failed (timeout occurred)"#
+    );
+    // The immediate request is not queued.
+    assert_eq!(endpoint.pending_request_count(), 1);
+
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), queued).await;
+}
+
+fn checkin_payload(
+    device: &zigbee_apiarist::controller::model::device::Device,
+) -> zigbee_apiarist::adapter::events::ZclPayload {
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        1,
+        1,
+        true,
+        Some(1),
+        1,
+        "checkin",
+        0x0020,
+        json!({}),
+        json!({}),
+        0,
+    );
+    zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0020,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(device.network_address()),
+        endpoint: 1,
+        linkquality: 52,
+        group_id: 0,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    }
+}
+
+#[tokio::test]
+async fn write_bulk_messages_sent_on_checkin() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 174, "0x174");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x174").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    let endpoint_for_task = endpoint.clone();
+    let write = tokio::spawn(async move {
+        endpoint_for_task
+            .write(
+                json!("genOnOff"),
+                json!({"onTime": 1}),
+                Some(zigbee_apiarist::controller::model::endpoint::Options {
+                    disable_response: Some(true),
+                    send_policy: Some(zigbee_apiarist::controller::tstype::SendPolicy::Bulk),
+                    ..Default::default()
+                }),
+            )
+            .await
+    });
+    for _ in 0..100 {
+        if endpoint.has_pending_requests() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    assert_eq!(count_command(&adapter, "write"), 0);
+
+    // Implicit check-in (fast polling = false) does not flush bulk messages.
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    settle().await;
+    assert_eq!(count_command(&adapter, "write"), 0);
+
+    // A real check-in flushes them.
+    adapter.emit_zcl(checkin_payload(&device));
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), write)
+        .await
+        .expect("write resolves")
+        .expect("task");
+    result.expect("write");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    let names = frames
+        .iter()
+        .map(|frame| frame.command.name.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(names, vec!["checkinRsp", "write", "fastPollStop"]);
+}
+
+#[tokio::test]
+async fn send_retries_on_timeout_error() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.set_checkin_interval(Some(3600));
+    assert_eq!(device.pending_request_timeout(), 3_600_000);
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    fail_next(&adapter, "add");
+    let endpoint_for_task = endpoint.clone();
+    let group_for_task = group.clone();
+    let add = tokio::spawn(async move { endpoint_for_task.add_to_group(&group_for_task).await });
+    for _ in 0..100 {
+        if endpoint.has_pending_requests() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    assert_eq!(count_command(&adapter, "add"), 1);
+
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), add)
+        .await
+        .expect("add resolves")
+        .expect("task");
+    result.expect("add");
+    assert_eq!(count_command(&adapter, "add"), 2);
+    assert!(group.has_member(&endpoint));
+}
+
+#[tokio::test]
+async fn send_fails_on_non_timeout_error() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.set_checkin_interval(Some(3600));
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    adapter.set_zcl(|_ieee, network_address, endpoint, frame| {
+        if frame.cluster.ID == 0x0004 && frame.command.name == "add" {
+            let response = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+                0,
+                1,
+                true,
+                None,
+                2,
+                "defaultRsp",
+                0x0004,
+                json!({"cmdId": 0, "statusCode": 0xc3}),
+                json!({}),
+                0,
+            );
+            return Ok(Some(zigbee_apiarist::adapter::events::ZclPayload {
+                cluster_id: 0x0004,
+                data: response.to_buffer(),
+                header: Some(response.header),
+                address: json!(network_address),
+                endpoint,
+                linkquality: 50,
+                group_id: 0,
+                was_broadcast: false,
+                destination_endpoint: 1,
+            }));
+        }
+        Ok(None)
+    });
+
+    let error = endpoint
+        .add_to_group(&group)
+        .await
+        .expect_err("non-timeout failure");
+    assert!(error.contains("UNSUPPORTED_CLUSTER"));
+    assert_eq!(count_command(&adapter, "add"), 1);
+    assert!(!endpoint.has_pending_requests());
+
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    settle().await;
+    assert_eq!(count_command(&adapter, "add"), 1);
+}
+
+async fn wait_until<F: Fn() -> bool>(condition: F) {
+    for _ in 0..400 {
+        if condition() {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    panic!("condition not met");
+}
+
+#[tokio::test]
+async fn queued_request_error_after_expiration() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 174, "0x174");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x174").unwrap();
+    device.set_pending_request_timeout(50);
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    fail_next(&adapter, "write");
+    let endpoint_for_task = endpoint.clone();
+    let write = tokio::spawn(async move {
+        endpoint_for_task
+            .write(
+                json!("genOnOff"),
+                json!({"onTime": 1}),
+                Some(zigbee_apiarist::controller::model::endpoint::Options {
+                    disable_response: Some(true),
+                    ..Default::default()
+                }),
+            )
+            .await
+    });
+    wait_until(|| endpoint.has_pending_requests()).await;
+    assert_eq!(count_command(&adapter, "write"), 1);
+
+    // The retry fails too, keeping the request queued.
+    fail_next(&adapter, "write");
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    wait_until(|| count_command(&adapter, "write") == 2).await;
+    assert!(endpoint.has_pending_requests());
+
+    // After the timeout the next check-in discards the request with its error.
+    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), write)
+        .await
+        .expect("write resolves")
+        .expect("task");
+    let error = result.expect_err("request rejected");
+    assert!(error.contains("failed (timeout occurred)"));
+    assert_eq!(count_command(&adapter, "write"), 2);
+    assert!(!endpoint.has_pending_requests());
+}
+
+#[tokio::test]
+async fn queued_request_discarded_after_expiration() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 174, "0x174");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x174").unwrap();
+    device.set_pending_request_timeout(50);
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    fail_next(&adapter, "write");
+    let endpoint_for_task = endpoint.clone();
+    let write = tokio::spawn(async move {
+        endpoint_for_task
+            .write(
+                json!("genOnOff"),
+                json!({"onTime": 10}),
+                Some(zigbee_apiarist::controller::model::endpoint::Options {
+                    disable_response: Some(true),
+                    ..Default::default()
+                }),
+            )
+            .await
+    });
+    wait_until(|| endpoint.has_pending_requests()).await;
+    assert_eq!(count_command(&adapter, "write"), 1);
+
+    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), write)
+        .await
+        .expect("write resolves")
+        .expect("task");
+    assert!(result.is_err());
+    assert_eq!(count_command(&adapter, "write"), 1);
+    assert_eq!(endpoint.pending_request_count(), 0);
+}
+
+#[tokio::test]
+async fn implicit_checkin_while_send_in_progress() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 174, "0x174");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x174").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    fail_next(&adapter, "write");
+    let endpoint_for_task = endpoint.clone();
+    let write = tokio::spawn(async move {
+        endpoint_for_task
+            .write(
+                json!("genOnOff"),
+                json!({"onTime": 10}),
+                Some(zigbee_apiarist::controller::model::endpoint::Options {
+                    disable_response: Some(true),
+                    ..Default::default()
+                }),
+            )
+            .await
+    });
+    wait_until(|| endpoint.has_pending_requests()).await;
+    assert_eq!(count_command(&adapter, "write"), 1);
+
+    // Make the retry slow so the second check-in arrives while it is in flight.
+    adapter
+        .zcl_delay_ms
+        .store(100, std::sync::atomic::Ordering::SeqCst);
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    adapter
+        .zcl_delay_ms
+        .store(0, std::sync::atomic::Ordering::SeqCst);
+
+    let result = tokio::time::timeout(std::time::Duration::from_secs(3), write)
+        .await
+        .expect("write resolves")
+        .expect("task");
+    result.expect("write");
+    assert_eq!(count_command(&adapter, "write"), 2);
+    assert_eq!(endpoint.pending_request_count(), 0);
+}
+
+#[tokio::test]
+async fn queued_messages_are_replaced_and_merged() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.set_pending_request_timeout(10000);
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    fail_next(&adapter, "write");
+    let first = {
+        let endpoint = endpoint.clone();
+        tokio::spawn(async move {
+            endpoint
+                .write(
+                    json!("genOnOff"),
+                    json!({"onTime": 0, "startUpOnOff": 0}),
+                    Some(zigbee_apiarist::controller::model::endpoint::Options {
+                        disable_response: Some(true),
+                        ..Default::default()
+                    }),
+                )
+                .await
+        })
+    };
+    wait_until(|| endpoint.has_pending_requests()).await;
+
+    fail_next(&adapter, "write");
+    let second = {
+        let endpoint = endpoint.clone();
+        tokio::spawn(async move {
+            endpoint
+                .write(
+                    json!("genOnOff"),
+                    json!({"onTime": 0}),
+                    Some(zigbee_apiarist::controller::model::endpoint::Options {
+                        disable_response: Some(true),
+                        ..Default::default()
+                    }),
+                )
+                .await
+        })
+    };
+    wait_until(|| endpoint.pending_request_count() == 2).await;
+
+    fail_next(&adapter, "write");
+    let third = {
+        let endpoint = endpoint.clone();
+        tokio::spawn(async move {
+            endpoint
+                .write(
+                    json!("genOnOff"),
+                    json!({"onTime": 1}),
+                    Some(zigbee_apiarist::controller::model::endpoint::Options {
+                        disable_response: Some(true),
+                        ..Default::default()
+                    }),
+                )
+                .await
+        })
+    };
+    let second_result = tokio::time::timeout(std::time::Duration::from_secs(2), second)
+        .await
+        .expect("second resolves")
+        .expect("task");
+    assert!(second_result
+        .expect_err("superseded")
+        .contains("Request superseded"));
+    assert_eq!(endpoint.pending_request_count(), 2);
+
+    adapter.emit_zcl(occupancy_report_payload(&device));
+    for task in [first, third] {
+        let result = tokio::time::timeout(std::time::Duration::from_secs(2), task)
+            .await
+            .expect("task resolves")
+            .expect("task");
+        result.expect("write");
+    }
+    assert_eq!(count_command(&adapter, "write"), 5);
+    assert_eq!(endpoint.pending_request_count(), 0);
+}
+
+#[tokio::test]
+async fn aborts_start_on_signal() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    adapter
+        .start_delay_ms
+        .store(500, std::sync::atomic::Ordering::SeqCst);
+    let harness = Harness::new(adapter.clone());
+    let controller = harness.controller.clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel::<()>();
+    let start = tokio::spawn(async move {
+        controller
+            .start_with_abort(adapter, async move {
+                let _ = receiver.await;
+            })
+            .await
+    });
+    wait_until(|| {
+        harness
+            .adapter
+            .started
+            .load(std::sync::atomic::Ordering::SeqCst)
+            == 1
+    })
+    .await;
+    let _ = sender.send(());
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), start)
+        .await
+        .expect("start resolves")
+        .expect("task");
+    assert_eq!(result.expect_err("aborted"), "aborted");
+    assert_eq!(
+        harness
+            .adapter
+            .started
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+}
+
+#[tokio::test]
+async fn try_to_get_deleted_device_from_endpoint() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    device.remove_from_network(false).await.expect("remove");
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::cache_len(),
+        1
+    );
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::deleted_cache_len(),
+        1
+    );
+    assert!(endpoint.try_get_device().is_none());
+    assert!(logs.has(
+        "error",
+        "Tried to get unknown/deleted device 0x129 from endpoint 1.",
+        "zh:controller:endpoint"
+    ));
+}
+
+#[tokio::test]
+async fn receive_zcldata_with_device_deleted_during_processing() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.remove_from_network(false).await.expect("remove");
+    harness.events.lock().unwrap().clear();
+    adapter.sent_endpoint.lock().unwrap().clear();
+
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        0,
+        0,
+        true,
+        None,
+        40,
+        "read",
+        "genTime",
+        json!([{"attrId": 0}]),
+        json!({}),
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+
+    assert!(!harness.take_events().iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::Message(_)
+    )));
+    assert!(adapter.sent_endpoint.lock().unwrap().is_empty());
+    assert!(harness
+        .controller
+        .get_device_by_ieee_addr("0x129")
+        .is_none());
+}
+
+#[tokio::test]
+async fn default_response_failure_does_not_trigger_route_discovery() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    adapter.zdo_calls.lock().unwrap().clear();
+
+    // The default response cannot be sent; the adapter has no route-discovery
+    // capability, so nothing else must be attempted.
+    fail_next(&adapter, "defaultRsp");
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        1,
+        1,
+        false,
+        Some(4476),
+        29,
+        1u8,
+        5,
+        json!({
+            "groupid": 1, "sceneid": 1, "status": 0, "transtime": 0,
+            "scenename": "", "extensionfieldsets": []
+        }),
+        json!({}),
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 5,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 19,
+        group_id: 10,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+
+    assert_eq!(count_command(&adapter, "defaultRsp"), 1);
+    assert!(adapter.zdo_calls.lock().unwrap().is_empty());
+    let events = messages(&harness);
+    assert_eq!(events.len(), 1);
+}
+
+#[tokio::test]
+async fn green_power_rx_on_cap_commissioning_reply() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let network_parameters = harness
+        .controller
+        .get_network_parameters()
+        .await
+        .expect("network");
+    logs.messages.lock().unwrap().clear();
+    adapter.sent_all.lock().unwrap().clear();
+
+    // Upstream constructs the commissioning frame object directly because the
+    // GPD 0xe0 writer is not implemented; the equivalent spec-valid bytes are
+    // assembled here instead.
+    let mut buffer = vec![0x11, 10, 0x04];
+    buffer.extend_from_slice(&0x0800u16.to_le_bytes()); // options: proxy info (app id 0 -> srcID)
+    buffer.extend_from_slice(&0x0046f4feu32.to_le_bytes()); // srcID
+    buffer.extend_from_slice(&228u32.to_le_bytes()); // frameCounter
+    buffer.push(0xe0); // commandID
+    buffer.push(27); // payloadSize
+    buffer.push(0x02); // deviceID
+    buffer.push(0x83); // gpd options
+    buffer.push(0xf2); // extended options
+    buffer.extend_from_slice(&[
+        0xf1, 0xec, 0x92, 0xab, 0xff, 0x8f, 0x13, 0x63, 0xe1, 0x46, 0xbe, 0xb5, 0x18, 0xc9, 0x0c,
+        0xab,
+    ]); // security key
+    buffer.extend_from_slice(&0xd5d446a4u32.to_le_bytes()); // key mic
+    buffer.extend_from_slice(&0x000004e4u32.to_le_bytes()); // outgoing counter
+    buffer.extend_from_slice(&0x1234u16.to_le_bytes()); // gpp nwk address
+    buffer.push(0xd8); // gpp gpd link
+
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 33,
+        data: buffer,
+        header: Some(header),
+        address: json!(0x46f4fe),
+        endpoint: 242,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: true,
+        destination_endpoint: 242,
+    });
+    settle().await;
+
+    assert!(logs.messages.lock().unwrap().iter().any(|entry| {
+        entry.0 == "debug"
+            && entry
+                .1
+                .starts_with("[COMMISSIONING] srcID=4650238 gpp=4660")
+            && entry
+                .1
+                .contains("GPD has receiving capabilities in operational mode (RxOnCapability)")
+            && entry.2 == "zh:controller:greenpower"
+    }));
+    let frames = adapter.sent_all.lock().unwrap();
+    assert_eq!(frames.len(), 2);
+    assert_eq!(frames[0].command.name, "response");
+    assert_eq!(frames[0].payload["gpdCmd"], 0xf0);
+    assert_eq!(frames[0].payload["tempMaster"], 0x1234);
+    assert_eq!(
+        frames[0].payload["tempMasterTx"],
+        network_parameters.channel - 11
+    );
+    assert_eq!(frames[1].command.name, "pairing");
+    assert_eq!(frames[1].payload["sinkGroupID"], 0x0b84);
+    drop(frames);
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x000000000046f4fe")
+        .expect("green power device");
+    assert_eq!(
+        device.r#type(),
+        zigbee_apiarist::controller::database::DeviceType::GreenPower
+    );
+}
