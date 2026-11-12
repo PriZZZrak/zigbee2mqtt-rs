@@ -117,8 +117,8 @@ are explicitly `PENDING`.
 | 108 | 3522 | Control4 device join (genBasic reads fail, interview completes via quirk) | `control4_device_join_completes_via_quirk` | PORTED |
 | 109 | 3537 | Xiaomi end device joins (node descriptor fails) | `xiaomi_end_device_joins_node_descriptor_fails` | PORTED |
 | 110 | 3598 | Xiaomi end device joins (node descriptor succeeds, but active endpoint response fails) | `xiaomi_end_device_joins_active_endpoints_fails` | PORTED |
-| 111 | 3659 | Should use cached node descriptor when device is re-interviewed, but retrieve it when ignoreCache=true | — | PENDING |
-| 112 | 3679 | Should remove disappeared endpoints on updateActiveEndpoints | — | PENDING |
+| 111 | 3659 | Should use cached node descriptor when device is re-interviewed, but retrieve it when ignoreCache=true | `should_use_cached_node_descriptor` | PORTED |
+| 112 | 3679 | Should remove disappeared endpoints on updateActiveEndpoints | `should_remove_disappeared_endpoints` | PORTED |
 | 113 | 3691 | Receive zclData report from unkown attribute | `receive_report_from_unknown_attribute` | PORTED |
 | 114 | 3748 | Should allow to specify custom attributes for existing cluster | `custom_attributes_for_existing_cluster` | PORTED |
 | 115 | 3786 | Should allow to specify custom cluster | `custom_cluster_and_override` | PORTED |
@@ -130,7 +130,7 @@ are explicitly `PENDING`.
 | 121 | 4148 | Throw error when creating endpoint which already exists | `throw_error_creating_duplicate_entities` | PORTED |
 | 122 | 4161 | Throw error when device with IEEE address already exists | `throw_error_when_device_with_ieee_address_already_exists` | PORTED |
 | 123 | 4173 | Should allow to set type | `should_allow_to_set_type` | PORTED |
-| 124 | 4180 | Return device from databse when not in lookup | — | PENDING |
+| 124 | 4180 | Return device from databse when not in lookup | `return_device_and_group_from_database` | PORTED |
 | 125 | 4187 | Throw error when interviewing and calling interview again | — | PENDING |
 | 126 | 4206 | Removes device from network and database but keep in cache | `remove_device_from_network_and_database_variants` | PORTED |
 | 127 | 4225 | Removes device from network and clears cache | `remove_device_clear_cache_variants` | PORTED |
@@ -177,7 +177,7 @@ are explicitly `PENDING`.
 | 168 | 5500 | Endpoint throws without response to read reporting config | `read_reporting_config_no_response_errors` | PORTED |
 | 169 | 5510 | Endpoint ignores unknown attributes for read reporting config | `read_reporting_config_ignores_unknown_attributes` | PORTED |
 | 170 | 5567 | Endpoint manuf-spec read reporting config | `read_reporting_config_manufacturer_specific` | PORTED |
-| 171 | 5710 | Return group from databse when not in lookup | — | PENDING |
+| 171 | 5710 | Return group from databse when not in lookup | `return_device_and_group_from_database` | PORTED |
 | 172 | 5717 | Throw error when creating group already exists | `throw_error_creating_duplicate_entities` | PORTED |
 | 173 | 5729 | Add endpoint to group | `endpoint_add_and_remove_from_group` | PORTED |
 | 174 | 5769 | Adds endpoint to group when Add Group response reports duplicate | `endpoint_add_to_group_when_response_reports_duplicate` | PORTED |
@@ -317,6 +317,6 @@ are explicitly `PENDING`.
 | 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
 | 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | `send_raw_uses_custom_cluster_definitions` | PORTED |
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
-| 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
+| 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **250 / 311**.
+Ported: **255 / 311**.

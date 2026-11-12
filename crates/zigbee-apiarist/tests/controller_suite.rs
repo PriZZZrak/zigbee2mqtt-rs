@@ -5610,3 +5610,195 @@ async fn updates_device_gen_basic_properties() {
         })
     );
 }
+
+#[tokio::test]
+async fn should_use_cached_node_descriptor() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+
+    let node_descriptor_requests = |adapter: &MockAdapter| {
+        adapter
+            .zdo_calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|call| {
+                call.2
+                    == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NODE_DESCRIPTOR_REQUEST
+            })
+            .count()
+    };
+    let before = node_descriptor_requests(&adapter);
+    device.interview(false).await.expect("interview cached");
+    assert_eq!(node_descriptor_requests(&adapter), before);
+    device
+        .interview(true)
+        .await
+        .expect("interview ignore cache");
+    assert_eq!(node_descriptor_requests(&adapter), before + 1);
+}
+
+#[tokio::test]
+async fn should_remove_disappeared_endpoints() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    assert!(device.get_endpoint(1).is_some());
+    adapter.set_zdo(|_ieee, _nwk, cluster_id, _payload, _disable| {
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::ACTIVE_ENDPOINTS_REQUEST
+        {
+            Ok(json!([0, {"nwkAddress": 129, "endpointList": [2]}]))
+        } else {
+            Ok(json!([0, Value::Null]))
+        }
+    });
+    device
+        .update_active_endpoints()
+        .await
+        .expect("active endpoints");
+    assert!(device.get_endpoint(1).is_none());
+    assert!(device.get_endpoint(2).is_some());
+}
+
+#[tokio::test]
+async fn return_device_and_group_from_database() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let device = zigbee_apiarist::controller::model::device::Device::create(
+        zigbee_apiarist::controller::database::DeviceType::Router,
+        "0x999",
+        999,
+        None,
+        Some("Test".to_string()),
+        None,
+        Some("TEST".to_string()),
+        zigbee_apiarist::controller::model::device::InterviewState::Successful,
+        None,
+    )
+    .expect("device");
+    device.save(true);
+    let group = zigbee_apiarist::controller::model::group::Group::create(77).expect("group");
+
+    zigbee_apiarist::controller::model::device::Device::reset_cache();
+    zigbee_apiarist::controller::model::group::Group::reset_cache();
+
+    let loaded = zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x999", false)
+        .expect("device from database");
+    assert_eq!(loaded.network_address(), 999);
+    let loaded_group = zigbee_apiarist::controller::model::group::Group::by_group_id(77)
+        .expect("group from database");
+    assert_eq!(loaded_group.group_id, 77);
+}
+
+#[tokio::test]
+async fn ensures_manufacturer_code_unique_in_single_call() {
+    use zigbee_apiarist::controller::model::endpoint::{
+        ConfigureReportingItem, ReadReportConfigItem,
+    };
+    use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
+    use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let mut cluster = Cluster::new("hvacThermostat", 0x0201);
+    let mut attribute = Attribute::new("viessmannWindowOpenInternal", 0x4000, DataType::ENUM8);
+    attribute.manufacturerCode = Some(0x1221);
+    attribute.write = true;
+    cluster
+        .attributes
+        .insert("viessmannWindowOpenInternal".to_string(), attribute);
+    device
+        .add_custom_cluster("hvacThermostat", cluster)
+        .expect("custom cluster");
+    let endpoint = device.get_endpoint(1).unwrap();
+
+    let error = endpoint
+        .write(
+            json!("hvacThermostat"),
+            json!({"occupiedHeatingSetpoint": 2000, "viessmannWindowOpenInternal": 1}),
+            None,
+        )
+        .await
+        .expect_err("write manufacturer codes");
+    assert_eq!(
+        error,
+        "Cannot have attributes with different manufacturerCode in single 'write' call"
+    );
+
+    let error = endpoint
+        .read(
+            json!("hvacThermostat"),
+            json!(["localTemp", "viessmannWindowOpenInternal"]),
+            None,
+        )
+        .await
+        .expect_err("read manufacturer codes");
+    assert_eq!(
+        error,
+        "Cannot have attributes with different manufacturerCode in single 'read' call"
+    );
+
+    let error = endpoint
+        .configure_reporting(
+            json!("hvacThermostat"),
+            vec![
+                ConfigureReportingItem {
+                    attribute: json!("localTemp"),
+                    minimum_report_interval: 1,
+                    maximum_report_interval: 10,
+                    reportable_change: Some(1.0),
+                },
+                ConfigureReportingItem {
+                    attribute: json!("viessmannWindowOpenInternal"),
+                    minimum_report_interval: 1,
+                    maximum_report_interval: 10,
+                    reportable_change: Some(1.0),
+                },
+            ],
+            None,
+        )
+        .await
+        .expect_err("configure reporting manufacturer codes");
+    assert_eq!(
+        error,
+        "Cannot have attributes with different manufacturerCode in single 'configureReporting' call"
+    );
+
+    let error = endpoint
+        .read_reporting_config(
+            json!("hvacThermostat"),
+            vec![
+                ReadReportConfigItem {
+                    direction: None,
+                    attribute: json!("localTemp"),
+                },
+                ReadReportConfigItem {
+                    direction: None,
+                    attribute: json!("viessmannWindowOpenInternal"),
+                },
+            ],
+            None,
+        )
+        .await
+        .expect_err("read reporting config manufacturer codes");
+    assert_eq!(
+        error,
+        "Cannot have attributes with different manufacturerCode in single 'readReportingConfig' call"
+    );
+}
