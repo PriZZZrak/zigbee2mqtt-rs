@@ -46,7 +46,8 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | MQTT bridge + `bridge/request/*` | `zigbee2mqtt/lib/mqtt.ts`, `extension/*` | BLOCKED | not ported |
 | Home Assistant discovery | `extension/homeassistant.ts` | BLOCKED | not ported |
 | Frontend / Windfront protocol | `extension/frontend.ts` | BLOCKED | not ported |
-| Storage (`database.db`, `state.json`, config) | `controller/database.ts`, `lib/state.ts`, `util/settings.ts` | PARTIAL | database + settings validated against router data; `settings.apply`/`reRead`/`write` and the Ajv schema subset (`settings_schema`, `requiresRestart`) are PORTED; `state.json`/bridge missing |
+| Storage (`database.db`, `state.json`, config) | `controller/database.ts`, `lib/state.ts`, `util/settings.ts` | PARTIAL | database + settings validated against router data; `settings.apply`/`reRead`/`write`, the Ajv schema subset and `state.ts` (`lib/state.rs` port with load/save/merge/filter) are PORTED; bridge missing |
+| z2m entity model (`Device`/`Group`, no converters) | `lib/model/device.ts`, `lib/model/group.ts` | PARTIAL | definition-independent surface ported (`ID`, `name`, `options`, `ensureInSettings`, endpoint lookup, group members); definition/exposes/converters are out of R1 |
 | Backup metadata (`toUnifiedBackup`/`fromUnifiedBackup`/`fromLegacyBackup`) | `utils/backup.ts` | PORTED | unified round-trip against the real router backup; legacy parser unit test |
 | HIL (coordinator in container) | — | PORTED | Dongle Plus `10c4:ea60`, SYS version + NV init, see `docs/hil/2026-11-09-dongle-plus.md` |
 | Upstream z2m oracle (container) | `zigbee2mqtt.14.3` | PORTED | resumed network, 3 devices, MQTT transcripts, see `docs/hil/2026-11-09-z2m-run.md` |

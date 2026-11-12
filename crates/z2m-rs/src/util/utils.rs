@@ -1,8 +1,12 @@
 // Original: .upstream/zigbee2mqtt/lib/util/utils.ts
 
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
+
+/// Upstream `DEFAULT_BIND_GROUP_ID` (`utils.ts:15`).
+pub const DEFAULT_BIND_GROUP_ID: u16 = 901;
 
 pub fn object_is_empty(value: &Value) -> bool {
     match value {
@@ -153,4 +157,34 @@ pub fn remove_null_properties_from_object(value: &mut Value, keep: &[&str]) {
     }
 
     visit(value, keep);
+}
+
+/// Upstream `filterProperties(filter, data)` (`utils.ts:318-326`).
+pub fn filter_properties(filter: Option<&[String]>, data: &mut Value) {
+    let Some(filter) = filter else {
+        return;
+    };
+    let Value::Object(map) = data else {
+        return;
+    };
+
+    map.retain(|key, _| !filter.iter().any(|pattern| matches_pattern(pattern, key)));
+}
+
+fn matches_pattern(pattern: &str, text: &str) -> bool {
+    fn compiled(pattern: &str) -> regex::Regex {
+        regex::Regex::new(&format!("^{pattern}$"))
+            .unwrap_or_else(|error| panic!("invalid filterProperties pattern '{pattern}': {error}"))
+    }
+
+    static CACHE: OnceLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
+        OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
+    let mut cache = cache
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    cache
+        .entry(pattern.to_string())
+        .or_insert_with(|| compiled(pattern))
+        .is_match(text)
 }

@@ -14,7 +14,7 @@ Last verified against crates.io: **2026-11-09**.
 | `serde_yaml_ng` | `0.10` | 0.10.0 | 0.10.0 | current; replaced deprecated `serde_yaml` |
 | `tokio` | `1` | 1.54.1 | 1.54.1 | current |
 | `rumqttc` | `0.25` | 0.25.1 | 0.25.1 | current |
-| `regex` | `1` | 1.13.1 | 1.13.1 | current; imported only by `z2m_rs::util::settings_schema` (Ajv wrapper) |
+| `regex` | `1` | 1.13.1 | 1.13.1 | current; imported only by `z2m_rs::util::settings_schema` (Ajv wrapper) and `z2m_rs::util::utils` (`filterProperties`) |
 | `socket2` | `0.6` | 0.6.5 | 0.6.5 | current |
 | `serial2-tokio` | `0.1` | 0.1.26 | 0.1.26 | current |
 
