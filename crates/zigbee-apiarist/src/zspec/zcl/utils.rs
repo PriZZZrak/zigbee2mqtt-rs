@@ -644,22 +644,33 @@ impl Utils {
         manufacturer_code: Option<u16>,
     ) -> Option<Attribute> {
         let key = key.into();
-        let attribute = match key {
-            AttributeKey::Id(id) => cluster
-                .attributes
-                .values()
-                .filter(|attr| attr.ID as u32 == id)
-                .min_by_key(|attr| attr.order),
-            AttributeKey::Name(name) => cluster.attributes.get(&name),
-        }?;
-
-        if let Some(attribute_code) = attribute.manufacturerCode {
-            if Some(attribute_code) != manufacturer_code {
-                return None;
+        match key {
+            AttributeKey::Id(id) => {
+                // Upstream: an exact manufacturer match returns immediately,
+                // otherwise the last non-manufacturer match wins (insertion
+                // order, i.e. definition order).
+                let mut ordered = cluster.attributes.values().collect::<Vec<_>>();
+                ordered.sort_by_key(|attribute| attribute.order);
+                let mut partial_match: Option<Attribute> = None;
+                for attribute in ordered {
+                    if attribute.ID as u32 == id {
+                        if let (Some(code), Some(attribute_code)) =
+                            (manufacturer_code, attribute.manufacturerCode)
+                        {
+                            if code == attribute_code {
+                                return Some(attribute.clone());
+                            }
+                        }
+                        if attribute.manufacturerCode.is_none() {
+                            partial_match = Some(attribute.clone());
+                        }
+                    }
+                }
+                partial_match
             }
+            // Upstream returns `attributes[key]` without manufacturer filtering.
+            AttributeKey::Name(name) => cluster.attributes.get(&name).cloned(),
         }
-
-        Some(attribute.clone())
     }
 
     /// Upstream `Utils.getClusterCommand(cluster, key)`.

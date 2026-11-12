@@ -2303,13 +2303,43 @@ impl Device {
             extended.name = cluster.name.clone();
             extended.ID = cluster.ID;
             extended.manufacturerCode = cluster.manufacturerCode;
-            for (key, value) in cluster.attributes.clone() {
+            // Custom definitions extend the catalog: give every merged member a
+            // higher definition order so "last inserted wins" lookups (upstream
+            // object overwrite semantics) stay deterministic.
+            let mut next_order = extended
+                .attributes
+                .values()
+                .map(|attribute| attribute.order)
+                .max()
+                .unwrap_or(0)
+                + 1;
+            for (key, mut value) in cluster.attributes.clone() {
+                value.order = next_order;
+                next_order += 1;
                 extended.attributes.insert(key, value);
             }
-            for (key, value) in cluster.commands.clone() {
+            let mut next_order = extended
+                .commands
+                .values()
+                .map(|command| command.order)
+                .max()
+                .unwrap_or(0)
+                + 1;
+            for (key, mut value) in cluster.commands.clone() {
+                value.order = next_order;
+                next_order += 1;
                 extended.commands.insert(key, value);
             }
-            for (key, value) in cluster.commandsResponse.clone() {
+            let mut next_order = extended
+                .commandsResponse
+                .values()
+                .map(|command| command.order)
+                .max()
+                .unwrap_or(0)
+                + 1;
+            for (key, mut value) in cluster.commandsResponse.clone() {
+                value.order = next_order;
+                next_order += 1;
                 extended.commandsResponse.insert(key, value);
             }
             custom_clusters.insert(extended);

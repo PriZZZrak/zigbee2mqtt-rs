@@ -101,7 +101,7 @@ are explicitly `PENDING`.
 | 92 | 2892 | Receive zclData with device deleted during processing (prevent race condition) | — | PENDING |
 | 93 | 2937 | Receive readResponse from unknown endpoint | `receive_read_response_from_unknown_endpoint` | PORTED |
 | 94 | 2981 | Receive cluster command | `receive_cluster_command` | PORTED |
-| 95 | 3035 | Receive cluster command from unknown cluster | — | PENDING |
+| 95 | 3035 | Receive cluster command from unknown cluster | `receive_cluster_command_from_unknown_cluster_emits_nothing` | PORTED |
 | 96 | 3070 | Receive zclData send default response | `send_default_response_when_requested` | PORTED |
 | 97 | 3118 | Receive zclData dont send default resopnse with skipDefaultResponse | `do_not_send_default_response_when_disabled_broadcast_or_skip` | PORTED |
 | 98 | 3158 | Receive zclData dont send default resopnse when broadcast | `do_not_send_default_response_when_disabled_broadcast_or_skip` | PORTED |
@@ -119,26 +119,26 @@ are explicitly `PENDING`.
 | 110 | 3598 | Xiaomi end device joins (node descriptor succeeds, but active endpoint response fails) | `xiaomi_end_device_joins_active_endpoints_fails` | PORTED |
 | 111 | 3659 | Should use cached node descriptor when device is re-interviewed, but retrieve it when ignoreCache=true | — | PENDING |
 | 112 | 3679 | Should remove disappeared endpoints on updateActiveEndpoints | — | PENDING |
-| 113 | 3691 | Receive zclData report from unkown attribute | — | PENDING |
-| 114 | 3748 | Should allow to specify custom attributes for existing cluster | — | PENDING |
-| 115 | 3786 | Should allow to specify custom cluster | — | PENDING |
-| 116 | 3814 | Should allow to specify custom cluster as override for Zcl cluster | — | PENDING |
+| 113 | 3691 | Receive zclData report from unkown attribute | `receive_report_from_unknown_attribute` | PORTED |
+| 114 | 3748 | Should allow to specify custom attributes for existing cluster | `custom_attributes_for_existing_cluster` | PORTED |
+| 115 | 3786 | Should allow to specify custom cluster | `custom_cluster_and_override` | PORTED |
+| 116 | 3814 | Should allow to specify custom cluster as override for Zcl cluster | `custom_cluster_and_override` | PORTED |
 | 117 | 3842 | merges added custom clusters definitions | — | PENDING |
 | 118 | 4068 | Send zcl command to all no options | `send_zcl_command_to_all_no_options_and_manufacturer` | PORTED |
 | 119 | 4091 | Send zcl command to all with manufacturer option | `send_zcl_command_to_all_no_options_and_manufacturer` | PORTED |
 | 120 | 4126 | Should roll-over transaction ID | `should_roll_over_transaction_id` | PORTED |
-| 121 | 4148 | Throw error when creating endpoint which already exists | — | PENDING |
+| 121 | 4148 | Throw error when creating endpoint which already exists | `throw_error_creating_duplicate_entities` | PORTED |
 | 122 | 4161 | Throw error when device with IEEE address already exists | — | PENDING |
 | 123 | 4173 | Should allow to set type | `should_allow_to_set_type` | PORTED |
 | 124 | 4180 | Return device from databse when not in lookup | — | PENDING |
 | 125 | 4187 | Throw error when interviewing and calling interview again | — | PENDING |
-| 126 | 4206 | Removes device from network and database but keep in cache | — | PENDING |
+| 126 | 4206 | Removes device from network and database but keep in cache | `remove_device_from_network_and_database_variants` | PORTED |
 | 127 | 4225 | Removes device from network and clears cache | — | PENDING |
-| 128 | 4286 | Removes device from database but keep in cache | — | PENDING |
+| 128 | 4286 | Removes device from database but keep in cache | `remove_device_from_network_and_database_variants` | PORTED |
 | 129 | 4302 | Removes device from database and clears cache | — | PENDING |
-| 130 | 4315 | Removes group from network and database | — | PENDING |
-| 131 | 4339 | Removes every member when removing a group from the network | — | PENDING |
-| 132 | 4363 | Removes group from database | — | PENDING |
+| 130 | 4315 | Removes group from network and database | `remove_group_from_network_and_database` | PORTED |
+| 131 | 4339 | Removes every member when removing a group from the network | `remove_group_from_network_and_database` | PORTED |
+| 132 | 4363 | Removes group from database | `remove_group_from_network_and_database` | PORTED |
 | 133 | 4376 | Device lqi | `device_lqi_routing_and_binding_table` | PORTED |
 | 134 | 4387 | Device routing table | `device_lqi_routing_and_binding_table` | PORTED |
 | 135 | 4398 | Device binding table | `device_lqi_routing_and_binding_table` | PORTED |
@@ -164,27 +164,27 @@ are explicitly `PENDING`.
 | 155 | 4923 | Group unbind by number | — | PENDING |
 | 156 | 4948 | Group unbind by number, non-existing group and non-existing bind with force=true | — | PENDING |
 | 157 | 4970 | Endpoint configure reporting | `endpoint_configure_reporting_and_read_config` | PORTED |
-| 158 | 5006 | handles configure reporting with non-Analog data type | — | PENDING |
+| 158 | 5006 | handles configure reporting with non-Analog data type | `configure_reporting_non_analog_and_disable_response` | PORTED |
 | 159 | 5041 | throws when trying to configure reporting on endpoint with bad attribute | `endpoint_configure_reporting_bad_attribute` | PORTED |
 | 160 | 5071 | Should replace legacy configured reportings without manufacturerCode | — | PENDING |
-| 161 | 5095 | Endpoint configure reporting for manufacturer specific attribute | — | PENDING |
+| 161 | 5095 | Endpoint configure reporting for manufacturer specific attribute | `configure_reporting_manufacturer_specific_attribute` | PORTED |
 | 162 | 5148 | Endpoint configure reporting for manufacturer specific attribute from definition | — | PENDING |
 | 163 | 5196 | Save endpoint configure reporting | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 164 | 5264 | Endpoint configure reporting fails when status code is not 0 | `endpoint_configure_reporting_fails_on_non_zero_status` | PORTED |
 | 165 | 5291 | Endpoint configure reporting fails when status code is not 0 default rsp | — | PENDING |
-| 166 | 5319 | Endpoint configure reporting with disable response | — | PENDING |
+| 166 | 5319 | Endpoint configure reporting with disable response | `configure_reporting_non_analog_and_disable_response` | PORTED |
 | 167 | 5341 | Endpoint read reporting config | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 168 | 5500 | Endpoint throws without response to read reporting config | — | PENDING |
 | 169 | 5510 | Endpoint ignores unknown attributes for read reporting config | — | PENDING |
 | 170 | 5567 | Endpoint manuf-spec read reporting config | — | PENDING |
 | 171 | 5710 | Return group from databse when not in lookup | — | PENDING |
-| 172 | 5717 | Throw error when creating group already exists | — | PENDING |
+| 172 | 5717 | Throw error when creating group already exists | `throw_error_creating_duplicate_entities` | PORTED |
 | 173 | 5729 | Add endpoint to group | `endpoint_add_and_remove_from_group` | PORTED |
 | 174 | 5769 | Adds endpoint to group when Add Group response reports duplicate | `endpoint_add_to_group_when_response_reports_duplicate` | PORTED |
 | 175 | 5796 | Does not add endpoint to group when Add Group response reports failure | `endpoint_add_to_group_failure_does_not_add` | PORTED |
 | 176 | 5821 | Remove endpoint from group | `endpoint_add_and_remove_from_group` | PORTED |
 | 177 | 5840 | Does not remove endpoint from group when Remove Group response reports failure | `endpoint_remove_from_group_failure_keeps_member` | PORTED |
-| 178 | 5866 | Removes endpoint from group database when Remove Group response reports NOT_FOUND | — | PENDING |
+| 178 | 5866 | Removes endpoint from group database when Remove Group response reports NOT_FOUND | `endpoint_remove_from_group_database_when_not_found` | PORTED |
 | 179 | 5893 | Remove endpoint from group by number | — | PENDING |
 | 180 | 5909 | Try to get deleted device from endpoint | — | PENDING |
 | 181 | 5925 | Command response | `command_response` | PORTED |
@@ -195,31 +195,31 @@ are explicitly `PENDING`.
 | 186 | 6019 | Endpoint commandResponse | `endpoint_command_response` | PORTED |
 | 187 | 6046 | Device without meta should set meta to {} | `device_without_meta_sets_empty` | PORTED |
 | 188 | 6125 | Read from group | `read_from_group_and_failure` | PORTED |
-| 189 | 6139 | Read from group ignores unknown attributes | — | PENDING |
-| 190 | 6154 | Read from group fails | — | PENDING |
+| 189 | 6139 | Read from group ignores unknown attributes | `read_from_group_and_failure` | PORTED |
+| 190 | 6154 | Read from group fails | `read_from_group_and_failure` | PORTED |
 | 191 | 6167 | Write to group | `write_to_group_and_failure` | PORTED |
-| 192 | 6194 | Write to group with unknown attribute should fail | — | PENDING |
-| 193 | 6206 | Write to group fails | — | PENDING |
-| 194 | 6219 | Write to endpoint custom attributes | — | PENDING |
-| 195 | 6250 | Write to endpoint custom attributes without specifying manufacturerCode | — | PENDING |
-| 196 | 6283 | WriteUndiv to endpoint custom attributes without response | — | PENDING |
-| 197 | 6321 | Write to endpoint with unknown string attribute | — | PENDING |
-| 198 | 6337 | Write response to endpoint with non ZCL attribute | — | PENDING |
-| 199 | 6367 | Write response to endpoint with unknown string attribute | — | PENDING |
-| 200 | 6383 | Write response to endpoint throw when transaction sequence number provided through options | — | PENDING |
-| 201 | 6399 | Write response to endpoint with no status attribute specified | — | PENDING |
-| 202 | 6415 | Write response to endpoint with ZCL attribute | — | PENDING |
+| 192 | 6194 | Write to group with unknown attribute should fail | `write_to_group_and_failure` | PORTED |
+| 193 | 6206 | Write to group fails | `write_to_group_and_failure` | PORTED |
+| 194 | 6219 | Write to endpoint custom attributes | `write_to_endpoint_custom_attributes` | PORTED |
+| 195 | 6250 | Write to endpoint custom attributes without specifying manufacturerCode | `write_to_endpoint_custom_attributes_variants` | PORTED |
+| 196 | 6283 | WriteUndiv to endpoint custom attributes without response | `write_to_endpoint_custom_attributes_variants` | PORTED |
+| 197 | 6321 | Write to endpoint with unknown string attribute | `write_to_endpoint_with_unknown_string_attribute_fails` | PORTED |
+| 198 | 6337 | Write response to endpoint with non ZCL attribute | `write_response_to_endpoint_variants` | PORTED |
+| 199 | 6367 | Write response to endpoint with unknown string attribute | `write_response_to_endpoint_variants` | PORTED |
+| 200 | 6383 | Write response to endpoint throw when transaction sequence number provided through options | `write_response_to_endpoint_variants` | PORTED |
+| 201 | 6399 | Write response to endpoint with no status attribute specified | `write_response_to_endpoint_variants` | PORTED |
+| 202 | 6415 | Write response to endpoint with ZCL attribute | `write_response_to_endpoint_variants` | PORTED |
 | 203 | 6445 | WriteResponse error | — | PENDING |
-| 204 | 6464 | Write response to endpoint with options | — | PENDING |
-| 205 | 6494 | Read from endpoint with string | — | PENDING |
-| 206 | 6512 | Read from endpoint with string ignores unknown | — | PENDING |
+| 204 | 6464 | Write response to endpoint with options | `write_response_to_endpoint_variants` | PORTED |
+| 205 | 6494 | Read from endpoint with string | `read_from_endpoint_variants` | PORTED |
+| 206 | 6512 | Read from endpoint with string ignores unknown | `read_from_endpoint_variants` | PORTED |
 | 207 | 6531 | Read from endpoint with custom attribute | — | PENDING |
-| 208 | 6563 | Read from endpoint unknown attribute with options | — | PENDING |
-| 209 | 6581 | Read response to endpoint with non ZCL attribute | — | PENDING |
-| 210 | 6611 | Read response to endpoint with unknown string attribute | — | PENDING |
-| 211 | 6627 | Read response to endpoint throw when transaction sequence number provided through options | — | PENDING |
-| 212 | 6643 | Configure reporting endpoint custom attributes | — | PENDING |
-| 213 | 6692 | Remove endpoint from all groups | — | PENDING |
+| 208 | 6563 | Read from endpoint unknown attribute with options | `read_from_endpoint_variants` | PORTED |
+| 209 | 6581 | Read response to endpoint with non ZCL attribute | `read_response_to_endpoint_variants` | PORTED |
+| 210 | 6611 | Read response to endpoint with unknown string attribute | `read_response_to_endpoint_variants` | PORTED |
+| 211 | 6627 | Read response to endpoint throw when transaction sequence number provided through options | `read_response_to_endpoint_variants` | PORTED |
+| 212 | 6643 | Configure reporting endpoint custom attributes | `configure_reporting_custom_attribute_by_id` | PORTED |
+| 213 | 6692 | Remove endpoint from all groups | `remove_endpoint_from_all_groups` | PORTED |
 | 214 | 6720 | Load database | — | PENDING |
 | 215 | 7060 | Load database: interviewState migration and reset IN_PROGRESS | — | PENDING |
 | 216 | 7087 | Shouldnt load device from group databaseentry | — | PENDING |
@@ -260,8 +260,8 @@ are explicitly `PENDING`.
 | 251 | 8199 | Green power rxOnCap | — | PENDING |
 | 252 | 8304 | Green power unicast | — | PENDING |
 | 253 | 8624 | Get input/ouptut clusters | — | PENDING |
-| 254 | 8642 | Report to endpoint custom attributes | — | PENDING |
-| 255 | 8673 | Report to endpoint with unknown string attribute | — | PENDING |
+| 254 | 8642 | Report to endpoint custom attributes | `write_to_endpoint_custom_attributes` | PORTED |
+| 255 | 8673 | Report to endpoint with unknown string attribute | `write_to_endpoint_with_unknown_string_attribute_fails` | PORTED |
 | 256 | 8689 | Report error | — | PENDING |
 | 257 | 8708 | Write to device with pendingRequestTimeout > 0 | — | PENDING |
 | 258 | 8754 | Write to device with pendingRequestTimeout > 0, override default sendPolicy | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **132 / 311**.
+Ported: **172 / 311**.

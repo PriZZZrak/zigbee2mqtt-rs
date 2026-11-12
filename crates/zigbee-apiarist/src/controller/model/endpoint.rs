@@ -1405,14 +1405,29 @@ impl Endpoint {
                 })?;
                 (attribute.r#type as u16, attribute.ID)
             };
-            payload.push(json!({
-                "direction": Direction::CLIENT_TO_SERVER as u8,
-                "attrId": attr_id,
-                "dataType": data_type,
-                "minRepIntval": item.minimum_report_interval,
-                "maxRepIntval": item.maximum_report_interval,
-                "repChange": item.reportable_change,
-            }));
+            let mut entry = serde_json::Map::new();
+            entry.insert(
+                "direction".to_string(),
+                json!(Direction::CLIENT_TO_SERVER as u8),
+            );
+            entry.insert("attrId".to_string(), json!(attr_id));
+            entry.insert("dataType".to_string(), json!(data_type));
+            entry.insert(
+                "minRepIntval".to_string(),
+                json!(item.minimum_report_interval),
+            );
+            entry.insert(
+                "maxRepIntval".to_string(),
+                json!(item.maximum_report_interval),
+            );
+            if let Some(change) = item.reportable_change {
+                // JavaScript has a single number type: 25.0 serializes as 25.
+                entry.insert(
+                    "repChange".to_string(),
+                    crate::zspec::zcl::utils::ZclValue::from_json(&json!(change)).to_json(),
+                );
+            }
+            payload.push(Value::Object(entry));
         }
         self.zcl_command(
             Value::from(cluster.name.clone()),
