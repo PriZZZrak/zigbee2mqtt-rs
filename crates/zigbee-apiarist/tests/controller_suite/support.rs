@@ -1340,6 +1340,32 @@ pub fn install_default_devices(adapter: &MockAdapter) {
         },
     );
     adapter.add_device(
+        53934,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(53934, 1, 1212)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 53934, "endpointList": [1]}])),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(53934, 1, 99, 5, vec![0, 1], vec![2]),
+            )]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([
+                    ("modelId".to_string(), json!("myModelID")),
+                    ("manufacturerName".to_string(), json!("KoenAndCo")),
+                    ("zclVersion".to_string(), json!(1)),
+                    ("appVersion".to_string(), json!(2)),
+                    ("hwVersion".to_string(), json!(3)),
+                    ("dateCode".to_string(), json!("201901")),
+                    ("swBuildId".to_string(), json!("1.01")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(101)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
         176,
         MockDevice {
             node_descriptor: Some(node_descriptor(176, 1, 1212)),

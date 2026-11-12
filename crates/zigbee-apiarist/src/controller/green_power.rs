@@ -669,7 +669,12 @@ impl GreenPower {
                         let status_code =
                             payload_u64(&pairing_rsp_frame.payload, "statusCode").unwrap_or(0);
                         if status_code != 0 {
-                            return Err(format!("ZCL status error '{status_code}'"));
+                            let name = crate::zspec::zcl::definition::status::Status::from_u8(
+                                status_code as u8,
+                            )
+                            .map(crate::zspec::zcl::definition::status::Status::name)
+                            .unwrap_or("UNKNOWN");
+                            return Err(format!("Status '{name}'"));
                         }
                     }
                 }

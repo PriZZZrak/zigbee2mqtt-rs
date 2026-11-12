@@ -64,7 +64,7 @@ are explicitly `PENDING`.
 | 55 | 1890 | Device leave event and remove from database | `device_leave_event_and_remove_from_database` | PORTED |
 | 56 | 1905 | Device leave event with only nwk addr and remove from database | `device_leave_event_with_only_network_address` | PORTED |
 | 57 | 1921 | Start with reset should clear database | `start_with_reset_should_clear_database` | PORTED |
-| 58 | 1947 | Existing database.tmp should not be overwritten | — | PENDING |
+| 58 | 1947 | Existing database.tmp should not be overwritten | `existing_database_tmp_is_preserved` | PORTED |
 | 59 | 1966 | Should create backup of databse before clearing when datbaseBackupPath is provided | `should_create_database_backup_before_clearing` | PORTED |
 | 60 | 1980 | Add install code 18 byte | `add_install_code_18_byte` | PORTED |
 | 61 | 1992 | Add install code 16 byte - missing CRC is appended | `add_install_code_16_byte_missing_crc_is_appended` | PORTED |
@@ -220,7 +220,7 @@ are explicitly `PENDING`.
 | 211 | 6627 | Read response to endpoint throw when transaction sequence number provided through options | `read_response_to_endpoint_variants` | PORTED |
 | 212 | 6643 | Configure reporting endpoint custom attributes | `configure_reporting_custom_attribute_by_id` | PORTED |
 | 213 | 6692 | Remove endpoint from all groups | `remove_endpoint_from_all_groups` | PORTED |
-| 214 | 6720 | Load database | — | PENDING |
+| 214 | 6720 | Load database | `load_database` | PORTED |
 | 215 | 7060 | Load database: interviewState migration and reset IN_PROGRESS | `load_database_interview_state_migration` | PORTED |
 | 216 | 7087 | Shouldnt load device from group databaseentry | `shouldnt_load_device_from_group_database_entry` | PORTED |
 | 217 | 7094 | Should throw datbase basic crud errors | `database_basic_crud_errors` | PORTED |
@@ -250,15 +250,15 @@ are explicitly `PENDING`.
 | 241 | 7577 | Write with custom payload | `write_structured_and_custom_payload` | PORTED |
 | 242 | 7631 | Green power | `green_power_commissioning_creates_device_and_emits_join` | PORTED |
 | 243 | 7875 | Should handle green power responses gracefully | `green_power_response_without_command_id_is_handled_gracefully` | PORTED |
-| 244 | 7916 | Should handle green power broadcast commissioning | — | PENDING |
-| 245 | 7954 | Should handle green power unicast commissioning success | — | PENDING |
-| 246 | 8010 | Should handle green power unicast commissioning failure | — | PENDING |
+| 244 | 7916 | Should handle green power broadcast commissioning | `green_power_broadcast_commissioning` | PORTED |
+| 245 | 7954 | Should handle green power unicast commissioning success | `green_power_unicast_commissioning_success` | PORTED |
+| 246 | 8010 | Should handle green power unicast commissioning failure | `green_power_unicast_commissioning_failure` | PORTED |
 | 247 | 8065 | Should handle green power commissioning frame with IEEE addressing gracefully | `green_power_ieee_addressing_is_skipped` | PORTED |
-| 248 | 8091 | Should handle green power commissioning frame with switch info | — | PENDING |
+| 248 | 8091 | Should handle green power commissioning frame with switch info | `green_power_commissioning_with_switch_info` | PORTED |
 | 249 | 8120 | Should ignore invalid green power frame | `invalid_green_power_frame_is_ignored` | PORTED |
 | 250 | 8146 | Green power channel request | `green_power_channel_request_sends_response` | PORTED |
 | 251 | 8199 | Green power rxOnCap | — | PENDING |
-| 252 | 8304 | Green power unicast | — | PENDING |
+| 252 | 8304 | Green power unicast | `green_power_unicast_commissioning_success` | PORTED |
 | 253 | 8624 | Get input/ouptut clusters | `get_input_and_output_clusters` | PORTED |
 | 254 | 8642 | Report to endpoint custom attributes | `write_to_endpoint_custom_attributes` | PORTED |
 | 255 | 8673 | Report to endpoint with unknown string attribute | `write_to_endpoint_with_unknown_string_attribute_fails` | PORTED |
@@ -301,7 +301,7 @@ are explicitly `PENDING`.
 | 292 | 10099 | Device network address changed while Z2M was offline, received no notification on start | `device_network_address_changed_offline` | PORTED |
 | 293 | 10149 | Device network address changed while Z2M was running, received no notification | `device_network_address_changed_while_running` | PORTED |
 | 294 | 10224 | Device network address changed while Z2M was offline - fails to retrieve new one | `device_network_address_changed_retrieval_fails` | PORTED |
-| 295 | 10268 | Device network address changed while Z2M was offline, no duplicate triggering of IEEE request | — | PENDING |
+| 295 | 10268 | Device network address changed while Z2M was offline, no duplicate triggering of IEEE request | `device_network_address_changed_no_duplicate_ieee_request` | PORTED |
 | 296 | 10326 | Device network address changed while Z2M was offline, no spamming of IEEE request when device doesnt respond | `device_network_address_changed_no_spam_when_unresponsive` | PORTED |
 | 297 | 10368 | does not try to identify unknown device when deleted | `does_not_identify_deleted_device` | PORTED |
 | 298 | 10414 | reads/writes to group with custom cluster when common to all members | `reads_writes_group_custom_cluster_common_to_all_members` | PORTED |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **289 / 311**.
+Ported: **297 / 311**.

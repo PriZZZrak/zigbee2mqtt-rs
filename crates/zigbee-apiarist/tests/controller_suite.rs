@@ -7209,3 +7209,412 @@ async fn device_network_address_changed_no_spam_when_unresponsive() {
             | zigbee_apiarist::controller::events::ControllerEvent::DeviceNetworkAddressChanged(_)
     )));
 }
+
+fn hex_bytes(hex: &str) -> Vec<u8> {
+    hex.as_bytes()
+        .chunks(2)
+        .map(|chunk| u8::from_str_radix(std::str::from_utf8(chunk).unwrap(), 16).unwrap())
+        .collect()
+}
+
+#[tokio::test]
+async fn green_power_broadcast_commissioning() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    logs.messages.lock().unwrap().clear();
+
+    let gpd_nwk_address = (22410362u32 & 0xffff) as u16;
+    let buffer = hex_bytes("11020400087af455012e000000e0330285f2c925821df46f458cf0e637aac3bab6aa45831a112e280000041610112223181914151213646562631e1f1c1d1a1b1617966fd7");
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0021,
+        data: buffer,
+        header: Some(header),
+        address: json!(gpd_nwk_address),
+        endpoint: 242,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: true,
+        destination_endpoint: 242,
+    });
+    settle().await;
+
+    assert!(logs.has(
+        "debug",
+        "[PAIRING] srcID=22410362 gpp=28566 options=58696 (addSink=true commMode=2)",
+        "zh:controller:greenpower"
+    ));
+    assert!(logs.has(
+        "info",
+        "[COMMISSIONING] srcID=22410362 gpp=28566 rssi=23 linkQuality=Excellent",
+        "zh:controller:greenpower"
+    ));
+    let device = harness
+        .controller
+        .get_device_by_network_address(gpd_nwk_address)
+        .expect("green power device");
+    assert_eq!(
+        device.r#type(),
+        zigbee_apiarist::controller::database::DeviceType::GreenPower
+    );
+    assert!(!logs
+        .messages
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|entry| entry.0 == "error"));
+}
+
+#[tokio::test]
+async fn green_power_commissioning_with_ieee_addressing() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    logs.messages.lock().unwrap().clear();
+
+    let buffer = hex_bytes("11020402087af4550100000000012e000000e0330285f2c925821df46f458cf0e637aac3bab6aa45831a112e280000041610112223181914151213646562631e1f1c1d1a1b1617966fd7");
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0021,
+        data: buffer,
+        header: Some(header),
+        address: json!(0xf4fe),
+        endpoint: 242,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: true,
+        destination_endpoint: 242,
+    });
+    settle().await;
+
+    assert!(!logs
+        .messages
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|entry| entry.0 == "error"));
+    assert!(harness.controller.get_devices().iter().all(|device| {
+        device.r#type() != zigbee_apiarist::controller::database::DeviceType::GreenPower
+    }));
+}
+
+#[tokio::test]
+async fn green_power_commissioning_with_switch_info() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    logs.messages.lock().unwrap().clear();
+
+    let buffer = hex_bytes("1102040008d755550114000000e01f0785f256b8e010b32e6921aca5d18ab7b7d44d0f063d4d140300001002050229dfe2");
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0021,
+        data: buffer,
+        header: Some(header),
+        address: json!(57129),
+        endpoint: 242,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: true,
+        destination_endpoint: 242,
+    });
+    settle().await;
+
+    assert!(logs.has(
+        "debug",
+        "[PAIRING] srcID=22369751 gpp=57129 options=58696 (addSink=true commMode=2)",
+        "zh:controller:greenpower"
+    ));
+    assert!(logs.has(
+        "info",
+        "[COMMISSIONING] srcID=22369751 gpp=57129 rssi=34 linkQuality=Excellent",
+        "zh:controller:greenpower"
+    ));
+    assert!(!logs
+        .messages
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|entry| entry.0 == "error"));
+}
+
+fn green_power_pairing_reply(status: u8) -> Value {
+    json!([0x00, 0x06, 0x0b, 0x01, status])
+}
+
+#[tokio::test]
+async fn green_power_unicast_commissioning_success() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 53934, "0x129");
+    settle().await;
+    logs.messages.lock().unwrap().clear();
+
+    adapter.set_zcl(|_ieee, network_address, _endpoint, frame| {
+        if frame.cluster.ID == 0x0021 {
+            let data = green_power_pairing_reply(0)
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_u64().unwrap() as u8)
+                .collect::<Vec<_>>();
+            let header = zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&data)
+                .expect("header");
+            return Ok(Some(zigbee_apiarist::adapter::events::ZclPayload {
+                cluster_id: 0x0021,
+                data,
+                header: Some(header),
+                address: json!(network_address),
+                endpoint: 242,
+                linkquality: 50,
+                group_id: 0,
+                was_broadcast: false,
+                destination_endpoint: 242,
+            }));
+        }
+        Ok(None)
+    });
+
+    let gpd_nwk_address = (22410362u32 & 0xffff) as u16;
+    let buffer = hex_bytes("11770400087af45501e2000000e01f0785f2c925821df46f458cf0e637aac3bab6aa45831a11e22c000010020508aed2dd");
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0021,
+        data: buffer,
+        header: Some(header),
+        address: json!(gpd_nwk_address),
+        endpoint: 242,
+        linkquality: 50,
+        group_id: 0,
+        was_broadcast: false,
+        destination_endpoint: 242,
+    });
+    settle().await;
+
+    assert!(logs.has(
+        "info",
+        "[COMMISSIONING] srcID=22410362 gpp=53934 rssi=29 linkQuality=Excellent",
+        "zh:controller:greenpower"
+    ));
+    assert!(logs.has(
+        "debug",
+        "[PAIRING] srcID=22410362 gpp=53934 options=58728 (addSink=true commMode=3)",
+        "zh:controller:greenpower"
+    ));
+    let device = harness
+        .controller
+        .get_device_by_network_address(gpd_nwk_address)
+        .expect("green power device");
+    assert_eq!(
+        device.r#type(),
+        zigbee_apiarist::controller::database::DeviceType::GreenPower
+    );
+    assert!(!logs
+        .messages
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|entry| entry.0 == "error"));
+}
+
+#[tokio::test]
+async fn green_power_unicast_commissioning_failure() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 53934, "0x129");
+    settle().await;
+    logs.messages.lock().unwrap().clear();
+
+    adapter.set_zcl(|_ieee, network_address, _endpoint, frame| {
+        if frame.cluster.ID == 0x0021 {
+            let data = green_power_pairing_reply(0x89)
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_u64().unwrap() as u8)
+                .collect::<Vec<_>>();
+            let header = zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&data)
+                .expect("header");
+            return Ok(Some(zigbee_apiarist::adapter::events::ZclPayload {
+                cluster_id: 0x0021,
+                data,
+                header: Some(header),
+                address: json!(network_address),
+                endpoint: 242,
+                linkquality: 50,
+                group_id: 0,
+                was_broadcast: false,
+                destination_endpoint: 242,
+            }));
+        }
+        Ok(None)
+    });
+
+    let gpd_nwk_address = (22410362u32 & 0xffff) as u16;
+    let buffer = hex_bytes("11770400087af45501e2000000e01f0785f2c925821df46f458cf0e637aac3bab6aa45831a11e22c000010020508aed2dd");
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0021,
+        data: buffer,
+        header: Some(header),
+        address: json!(gpd_nwk_address),
+        endpoint: 242,
+        linkquality: 50,
+        group_id: 0,
+        was_broadcast: false,
+        destination_endpoint: 242,
+    });
+    settle().await;
+
+    assert!(logs.has(
+        "info",
+        "[COMMISSIONING] srcID=22410362 gpp=53934 rssi=29 linkQuality=Excellent",
+        "zh:controller:greenpower"
+    ));
+    assert!(logs.has(
+        "debug",
+        "[PAIRING] srcID=22410362 gpp=53934 options=58728 (addSink=true commMode=3)",
+        "zh:controller:greenpower"
+    ));
+    assert!(harness
+        .controller
+        .get_device_by_network_address(gpd_nwk_address)
+        .is_none());
+    assert!(logs.messages.lock().unwrap().iter().any(|entry| {
+        entry.0 == "error"
+            && entry.1.contains("Status 'INSUFFICIENT_SPACE'")
+            && entry.2 == "zh:controller:greenpower"
+    }));
+}
+
+#[tokio::test]
+async fn existing_database_tmp_is_preserved() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    let tmp_path = format!("{}.tmp", harness.database_path);
+    std::fs::write(&tmp_path, "Hello, World!").expect("tmp");
+
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.controller.create_group(1).expect("group");
+
+    // The old database.tmp was renamed away, not overwritten.
+    assert!(!std::path::Path::new(&tmp_path).exists());
+    let directory = std::path::Path::new(&harness.database_path)
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let prefix = format!(
+        "{}.tmp.",
+        std::path::Path::new(&harness.database_path)
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+    );
+    let preserved = std::fs::read_dir(&directory)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with(&prefix))
+        .collect::<Vec<_>>();
+    assert_eq!(preserved.len(), 1);
+    let content = std::fs::read_to_string(preserved[0].path()).unwrap();
+    assert!(content.starts_with("Hello, World!"));
+    for entry in preserved {
+        let _ = std::fs::remove_file(entry.path());
+    }
+}
+
+#[tokio::test]
+async fn device_network_address_changed_no_duplicate_ieee_request() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    std::fs::write(&harness.database_path, router_database_line(40369)).expect("database");
+    harness.start().await.expect("start");
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x000b57fffec6a5b2")
+        .expect("device");
+    assert_eq!(device.network_address(), 40369);
+    harness.events.lock().unwrap().clear();
+    adapter.zdo_calls.lock().unwrap().clear();
+
+    let frame = read_rsp_new_model();
+    let payload = zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(12345),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    };
+    let nested = payload.clone();
+    let adapter_for_handler = adapter.clone();
+    adapter.set_zdo(move |_ieee, _nwk, cluster_id, _payload, _disable| {
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::IEEE_ADDRESS_REQUEST
+        {
+            // A second payload arrives while the IEEE request is in flight.
+            adapter_for_handler.emit_zcl(nested.clone());
+            return Ok(json!([0, {
+                "eui64": "0x000b57fffec6a5b2",
+                "nwkAddress": 12345,
+                "startIndex": 0,
+                "assocDevList": []
+            }]));
+        }
+        Ok(json!([0, Value::Null]))
+    });
+    adapter.emit_zcl(payload);
+    settle().await;
+
+    assert_eq!(device.network_address(), 12345);
+    assert_eq!(device.model_id().as_deref(), Some("new.model.id"));
+    assert_eq!(
+        adapter
+            .zdo_calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|call| call.2
+                == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::IEEE_ADDRESS_REQUEST)
+            .count(),
+        1
+    );
+    let events = harness.take_events();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(
+                event,
+                zigbee_apiarist::controller::events::ControllerEvent::DeviceNetworkAddressChanged(
+                    _
+                )
+            ))
+            .count(),
+        1
+    );
+}
