@@ -37,8 +37,8 @@ are explicitly `PENDING`.
 | 28 | 1348 | Iterates over groups with predicate | `iterates_over_all_groups_and_with_predicate` | PORTED |
 | 29 | 1364 | Join a device | `join_a_device` | PORTED |
 | 30 | 1448 | Join a device and explictly accept it | `join_a_device_and_explicitly_accept_it` | PORTED |
-| 31 | 1530 | Join a device and explictly refuses it | — | PENDING |
-| 32 | 1547 | Join a device and explictly refuses it but LEAVE request fails | — | PENDING |
+| 31 | 1530 | Join a device and explictly refuses it | `join_a_device_and_explicitly_refuses_it` | PORTED |
+| 32 | 1547 | Join a device and explictly refuses it but LEAVE request fails | `join_a_device_and_explicitly_refuses_it_but_leave_fails` | PORTED |
 | 33 | 1566 | Set device powersource by string | `set_device_power_source_by_string` | PORTED |
 | 34 | 1574 | Get device should return same instance | `get_device_should_return_same_instance` | PORTED |
 | 35 | 1580 | Device announce event | `device_announce_event` | PORTED |
@@ -47,7 +47,7 @@ are explicitly `PENDING`.
 | 38 | 1627 | Network address event should update network address when different | `network_address_event_should_update_network_address_when_different` | PORTED |
 | 39 | 1644 | Network address event shouldnt update network address when the same | `network_address_event_should_not_update_network_address_when_same` | PORTED |
 | 40 | 1658 | Network address event from unknown device | `zdo_network_address_response_from_unknown_device` | PORTED |
-| 41 | 1669 | Network address event should update the last seen value | — | PENDING |
+| 41 | 1669 | Network address event should update the last seen value | `network_address_event_should_update_last_seen` | PORTED |
 | 42 | 1684 | IEEE address event should update network address when different | `ieee_address_event_should_update_network_address_when_different` | PORTED |
 | 43 | 1701 | IEEE address event shouldnt update network address when the same | `ieee_address_event_should_not_update_network_address_when_same` | PORTED |
 | 44 | 1715 | IEEE address event from unknown device | `ieee_address_event_from_unknown_device` | PORTED |
@@ -123,19 +123,19 @@ are explicitly `PENDING`.
 | 114 | 3748 | Should allow to specify custom attributes for existing cluster | `custom_attributes_for_existing_cluster` | PORTED |
 | 115 | 3786 | Should allow to specify custom cluster | `custom_cluster_and_override` | PORTED |
 | 116 | 3814 | Should allow to specify custom cluster as override for Zcl cluster | `custom_cluster_and_override` | PORTED |
-| 117 | 3842 | merges added custom clusters definitions | — | PENDING |
+| 117 | 3842 | merges added custom clusters definitions | `merges_added_custom_clusters_definitions` | PORTED |
 | 118 | 4068 | Send zcl command to all no options | `send_zcl_command_to_all_no_options_and_manufacturer` | PORTED |
 | 119 | 4091 | Send zcl command to all with manufacturer option | `send_zcl_command_to_all_no_options_and_manufacturer` | PORTED |
 | 120 | 4126 | Should roll-over transaction ID | `should_roll_over_transaction_id` | PORTED |
 | 121 | 4148 | Throw error when creating endpoint which already exists | `throw_error_creating_duplicate_entities` | PORTED |
-| 122 | 4161 | Throw error when device with IEEE address already exists | — | PENDING |
+| 122 | 4161 | Throw error when device with IEEE address already exists | `throw_error_when_device_with_ieee_address_already_exists` | PORTED |
 | 123 | 4173 | Should allow to set type | `should_allow_to_set_type` | PORTED |
 | 124 | 4180 | Return device from databse when not in lookup | — | PENDING |
 | 125 | 4187 | Throw error when interviewing and calling interview again | — | PENDING |
 | 126 | 4206 | Removes device from network and database but keep in cache | `remove_device_from_network_and_database_variants` | PORTED |
-| 127 | 4225 | Removes device from network and clears cache | — | PENDING |
+| 127 | 4225 | Removes device from network and clears cache | `remove_device_clear_cache_variants` | PORTED |
 | 128 | 4286 | Removes device from database but keep in cache | `remove_device_from_network_and_database_variants` | PORTED |
-| 129 | 4302 | Removes device from database and clears cache | — | PENDING |
+| 129 | 4302 | Removes device from database and clears cache | `remove_device_clear_cache_variants` | PORTED |
 | 130 | 4315 | Removes group from network and database | `remove_group_from_network_and_database` | PORTED |
 | 131 | 4339 | Removes every member when removing a group from the network | `remove_group_from_network_and_database` | PORTED |
 | 132 | 4363 | Removes group from database | `remove_group_from_network_and_database` | PORTED |
@@ -213,7 +213,7 @@ are explicitly `PENDING`.
 | 204 | 6464 | Write response to endpoint with options | `write_response_to_endpoint_variants` | PORTED |
 | 205 | 6494 | Read from endpoint with string | `read_from_endpoint_variants` | PORTED |
 | 206 | 6512 | Read from endpoint with string ignores unknown | `read_from_endpoint_variants` | PORTED |
-| 207 | 6531 | Read from endpoint with custom attribute | — | PENDING |
+| 207 | 6531 | Read from endpoint with custom attribute | `read_from_endpoint_custom_attribute` | PORTED |
 | 208 | 6563 | Read from endpoint unknown attribute with options | `read_from_endpoint_variants` | PORTED |
 | 209 | 6581 | Read response to endpoint with non ZCL attribute | `read_response_to_endpoint_variants` | PORTED |
 | 210 | 6611 | Read response to endpoint with unknown string attribute | `read_response_to_endpoint_variants` | PORTED |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **188 / 311**.
+Ported: **196 / 311**.

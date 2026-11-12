@@ -4599,3 +4599,201 @@ async fn load_database_interview_state_migration() {
         zigbee_apiarist::controller::model::device::InterviewState::Successful
     );
 }
+
+#[tokio::test]
+async fn join_a_device_and_explicitly_refuses_it() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::with_options_network_and_accept(
+        adapter.clone(),
+        support::default_network_options(),
+        false,
+    );
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    adapter.zdo_calls.lock().unwrap().clear();
+    join(&adapter, 129, "0x129");
+    settle().await;
+    assert!(harness
+        .controller
+        .get_device_by_ieee_addr("0x129")
+        .is_none());
+    assert!(adapter.zdo_calls.lock().unwrap().iter().any(|call| call.2
+        == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::LEAVE_REQUEST));
+    assert!(!harness.take_events().iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::DeviceInterview(_)
+    )));
+}
+
+#[tokio::test]
+async fn join_a_device_and_explicitly_refuses_it_but_leave_fails() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::with_options_network_and_accept(
+        adapter.clone(),
+        support::default_network_options(),
+        false,
+    );
+    harness.start().await.expect("start");
+    adapter.set_zdo(|_ieee, _nwk, cluster_id, _payload, _disable| {
+        if cluster_id == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::LEAVE_REQUEST
+        {
+            Err("timeout".to_string())
+        } else {
+            Ok(json!([0, Value::Null]))
+        }
+    });
+    join(&adapter, 129, "0x129");
+    settle().await;
+    assert!(harness
+        .controller
+        .get_device_by_ieee_addr("0x129")
+        .is_none());
+}
+
+#[tokio::test]
+async fn network_address_event_should_update_last_seen() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let before = device.last_seen();
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    harness.events.lock().unwrap().clear();
+    zdo(
+        &adapter,
+        0x8000,
+        json!([0, {"nwkAddress": 129, "eui64": "0x129", "startIndex": 0, "assocDevList": []}]),
+    );
+    settle().await;
+    assert!(device.last_seen().is_some());
+    assert!(device.last_seen() >= before);
+    assert!(last_seen_events(&harness)
+        .iter()
+        .any(|event| event.device.ieee_addr() == "0x129"));
+}
+
+#[tokio::test]
+async fn merges_added_custom_clusters_definitions() {
+    use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
+    use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+
+    let mut first = Cluster::new("hvacThermostat", 0x0201);
+    first.attributes.insert(
+        "boschOperatingMode".to_string(),
+        Attribute::new("boschOperatingMode", 16391, DataType::ENUM8),
+    );
+    device
+        .add_custom_cluster("hvacThermostat", first)
+        .expect("first");
+    let mut second = Cluster::new("hvacThermostat", 0x0201);
+    second.attributes.insert(
+        "boschHeatingDemand".to_string(),
+        Attribute::new("boschHeatingDemand", 16416, DataType::ENUM8),
+    );
+    device
+        .add_custom_cluster("hvacThermostat", second)
+        .expect("second");
+
+    let clusters = device.custom_clusters();
+    let cluster =
+        zigbee_apiarist::zspec::zcl::utils::Utils::get_cluster("hvacThermostat", None, &clusters);
+    assert!(cluster.attributes.contains_key("boschOperatingMode"));
+    assert!(cluster.attributes.contains_key("boschHeatingDemand"));
+    // Built-in attributes are preserved.
+    assert!(cluster.attributes.contains_key("localTemp"));
+}
+
+#[tokio::test]
+async fn throw_error_when_device_with_ieee_address_already_exists() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let error = zigbee_apiarist::controller::model::device::Device::create(
+        zigbee_apiarist::controller::database::DeviceType::Router,
+        "0x129",
+        129,
+        None,
+        None,
+        None,
+        None,
+        zigbee_apiarist::controller::model::device::InterviewState::Pending,
+        None,
+    )
+    .err()
+    .expect("duplicate device");
+    assert_eq!(error, "Device with IEEE address '0x129' already exists");
+}
+
+#[tokio::test]
+async fn remove_device_clear_cache_variants() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    join(&adapter, 130, "0x130");
+    settle().await;
+    let first = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    first
+        .remove_from_network(true)
+        .await
+        .expect("remove network clear");
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x129", true).is_none()
+    );
+    let second = harness.controller.get_device_by_ieee_addr("0x130").unwrap();
+    second.remove_from_database(true);
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x130", true).is_none()
+    );
+}
+
+#[tokio::test]
+async fn read_from_endpoint_custom_attribute() {
+    use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
+    use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let mut cluster = Cluster::new("hvacThermostat", 0x0201);
+    let mut attribute = Attribute::new("viessmannWindowOpenInternal", 0x4000, DataType::ENUM8);
+    attribute.manufacturerCode = Some(0x1221);
+    cluster
+        .attributes
+        .insert("viessmannWindowOpenInternal".to_string(), attribute);
+    device
+        .add_custom_cluster("hvacThermostat", cluster)
+        .expect("custom cluster");
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .read(
+            json!("hvacThermostat"),
+            json!(["viessmannWindowOpenInternal"]),
+            None,
+        )
+        .await
+        .expect("read custom attribute");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    assert_eq!(frames[0].header.manufacturer_code, Some(0x1221));
+    assert_eq!(frames[0].payload, json!([{"attrId": 16384}]));
+}

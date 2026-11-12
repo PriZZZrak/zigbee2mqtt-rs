@@ -535,11 +535,19 @@ pub struct Harness {
 
 impl Harness {
     pub fn new(adapter: Arc<MockAdapter>) -> Self {
-        install_default_devices(&adapter);
         Self::with_options_and_network(adapter, default_network_options())
     }
 
     pub fn with_options_and_network(adapter: Arc<MockAdapter>, network: NetworkOptions) -> Self {
+        Self::with_options_network_and_accept(adapter, network, true)
+    }
+
+    pub fn with_options_network_and_accept(
+        adapter: Arc<MockAdapter>,
+        network: NetworkOptions,
+        accept: bool,
+    ) -> Self {
+        install_default_devices(&adapter);
         Device::reset_cache();
         Group::reset_cache();
         let database_path = temp_path("database");
@@ -551,7 +559,9 @@ impl Harness {
             database_backup_path: Some(format!("{database_path}.backup")),
             backup_path: Some(backup_path.clone()),
             adapter: json!({}),
-            accept_joining_device_handler: Some(Arc::new(|_| Box::pin(async { Ok(true) }))),
+            accept_joining_device_handler: Some(Arc::new(move |_| {
+                Box::pin(async move { Ok(accept) })
+            })),
         };
         let controller = Arc::new(Controller::new(options).expect("controller options"));
         let events = Arc::new(Mutex::new(Vec::new()));
