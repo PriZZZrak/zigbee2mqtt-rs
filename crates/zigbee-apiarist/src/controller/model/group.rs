@@ -97,6 +97,11 @@ impl Group {
     }
 
     /// Upstream `resetCache()`.
+    /// Test support: current runtime cache size (upstream `Group.groups.size`).
+    pub fn cache_len() -> usize {
+        groups_slot().read().unwrap().len()
+    }
+
     pub fn reset_cache() {
         groups_slot().write().unwrap().clear();
         LOADED.store(false, Ordering::SeqCst);

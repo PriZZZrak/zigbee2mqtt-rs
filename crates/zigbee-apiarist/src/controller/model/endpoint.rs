@@ -1942,11 +1942,25 @@ impl Endpoint {
 
     /// Upstream `removeFromGroup(group)`.
     pub async fn remove_from_group(&self, group: &Group) -> Result<(), String> {
+        self.remove_from_group_inner(group.group_id, Some(group))
+            .await
+    }
+
+    /// Upstream `removeFromGroup(group: number)`.
+    pub async fn remove_from_group_by_id(&self, group_id: u16) -> Result<(), String> {
+        self.remove_from_group_inner(group_id, None).await
+    }
+
+    async fn remove_from_group_inner(
+        &self,
+        group_id: u16,
+        group: Option<&Group>,
+    ) -> Result<(), String> {
         let response = self
             .zcl_command(
                 Value::from("genGroups"),
                 Value::from("remove"),
-                json!({"groupid": group.group_id}),
+                json!({"groupid": group_id}),
                 None,
                 None,
                 true,
@@ -1961,8 +1975,7 @@ impl Endpoint {
         if status == Some(Status::NOT_FOUND as u64) {
             logger().info(
                 &format!(
-                    "Group '{}' was not found on endpoint '{}/{}'",
-                    group.group_id,
+                    "Group '{group_id}' was not found on endpoint '{}/{}'",
                     self.device_ieee_address.lock().unwrap(),
                     self.ID
                 ),
@@ -1976,7 +1989,9 @@ impl Endpoint {
                 return Err(format!("Status '{name}'"));
             }
         }
-        group.remove_member(&self.arc_self());
+        if let Some(group) = group {
+            group.remove_member(&self.arc_self());
+        }
         Ok(())
     }
 
@@ -2011,7 +2026,7 @@ impl Endpoint {
 
     /// Upstream `zclCommand(...)`.
     #[allow(clippy::too_many_arguments)]
-    async fn zcl_command(
+    pub async fn zcl_command(
         &self,
         cluster_key: Value,
         command_key: Value,

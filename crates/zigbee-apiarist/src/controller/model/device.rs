@@ -983,6 +983,16 @@ impl Device {
     }
 
     /// Upstream `resetCache()`.
+    /// Test support: current runtime cache size (upstream `Device.devices.size`).
+    pub fn cache_len() -> usize {
+        devices_slot().read().unwrap().len()
+    }
+
+    /// Test support: deleted cache size (upstream `Device.deletedDevices.size`).
+    pub fn deleted_cache_len() -> usize {
+        deleted_slot().read().unwrap().len()
+    }
+
     pub fn reset_cache() {
         devices_slot().write().unwrap().clear();
         LOADED.store(false, Ordering::SeqCst);

@@ -6169,3 +6169,286 @@ async fn does_not_identify_deleted_device() {
         .get_device_by_ieee_addr("0x129")
         .is_none());
 }
+
+#[tokio::test]
+async fn syncs_runtime_lookups() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+
+    join(&adapter, 129, "0x129");
+    wait_interviews(&harness, 2).await;
+    // The coordinator is part of the runtime cache as well.
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::cache_len(),
+        2
+    );
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::deleted_cache_len(),
+        0
+    );
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x129", false).is_some()
+    );
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x128", false).is_none()
+    );
+
+    join(&adapter, 128, "0x128");
+    wait_interviews(&harness, 4).await;
+    adapter.emit(ControllerAdapterEvent::DeviceLeave(AdapterDeviceLeave {
+        network_address: Some(128),
+        ieee_addr: Some("0x128".to_string()),
+    }));
+    settle().await;
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::cache_len(),
+        2
+    );
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::deleted_cache_len(),
+        1
+    );
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x128", false).is_none()
+    );
+    assert!(
+        zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x128", true).is_some()
+    );
+
+    join(&adapter, 128, "0x128");
+    wait_interviews(&harness, 6).await;
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::cache_len(),
+        3
+    );
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::deleted_cache_len(),
+        0
+    );
+    let device = zigbee_apiarist::controller::model::device::Device::by_ieee_addr("0x128", false)
+        .expect("device");
+    assert_eq!(
+        device.undelete().expect_err("not deleted"),
+        "Device '0x128' is not deleted"
+    );
+
+    harness.controller.create_group(1).expect("group 1");
+    assert_eq!(
+        zigbee_apiarist::controller::model::group::Group::cache_len(),
+        1
+    );
+    assert!(zigbee_apiarist::controller::model::group::Group::by_group_id(1).is_some());
+    assert!(zigbee_apiarist::controller::model::group::Group::by_group_id(2).is_none());
+
+    let group2 = harness.controller.create_group(2).expect("group 2");
+    group2.remove_from_network().await.expect("remove group");
+    assert_eq!(
+        zigbee_apiarist::controller::model::group::Group::cache_len(),
+        1
+    );
+    assert!(zigbee_apiarist::controller::model::group::Group::by_group_id(2).is_none());
+
+    harness.controller.stop().await.expect("stop");
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::cache_len(),
+        0
+    );
+    assert_eq!(
+        zigbee_apiarist::controller::model::device::Device::deleted_cache_len(),
+        0
+    );
+    assert_eq!(
+        zigbee_apiarist::controller::model::group::Group::cache_len(),
+        0
+    );
+}
+
+#[tokio::test]
+async fn zcl_command_without_response() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    no_response_next(&adapter, "discover");
+    let result = endpoint
+        .zcl_command(
+            json!("genOnOff"),
+            json!("discover"),
+            json!({"startAttrId": 1, "maxAttrIds": 255}),
+            None,
+            None,
+            false,
+            0,
+            None,
+        )
+        .await
+        .expect("zcl command");
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn device_requests_network_address() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    assert_eq!(device.ieee_addr(), "0x129");
+
+    *adapter.network_address_response.lock().unwrap() = Some(129);
+    adapter.zdo_calls.lock().unwrap().clear();
+    device
+        .request_network_address()
+        .await
+        .expect("request unchanged");
+    let calls = adapter.zdo_calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(
+        calls[0].2,
+        zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NETWORK_ADDRESS_REQUEST
+    );
+    assert_eq!(
+        calls[0].1,
+        zigbee_apiarist::zspec::enums::BroadcastAddress::RX_ON_WHEN_IDLE as u16
+    );
+    assert!(calls[0].4);
+    drop(calls);
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x129")
+            .unwrap()
+            .network_address(),
+        129
+    );
+
+    *adapter.network_address_response.lock().unwrap() = Some(9999);
+    device
+        .request_network_address()
+        .await
+        .expect("request changed");
+    let updated = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    assert_eq!(updated.network_address(), 9999);
+    assert_eq!(
+        *updated
+            .get_endpoint(1)
+            .unwrap()
+            .device_network_address
+            .lock()
+            .unwrap(),
+        9999
+    );
+    assert!(harness
+        .controller
+        .get_device_by_network_address(129)
+        .is_none());
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_network_address(9999)
+            .unwrap()
+            .ieee_addr(),
+        "0x129"
+    );
+}
+
+#[tokio::test]
+async fn touchlink_stop_paths() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    {
+        let touchlink = harness.controller.touchlink();
+        let mut guard = touchlink.lock().await;
+        guard.as_mut().unwrap().lock(true).expect("lock");
+    }
+    harness.controller.stop().await.expect("stop");
+    assert_eq!(
+        adapter
+            .restore_calls
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+
+    // Failing touchlink stop is logged and does not fail the controller stop.
+    let adapter = MockAdapter::new();
+    adapter
+        .fail_restore
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    {
+        let touchlink = harness.controller.touchlink();
+        let mut guard = touchlink.lock().await;
+        guard.as_mut().unwrap().lock(true).expect("lock");
+    }
+    harness.controller.stop().await.expect("stop");
+    assert!(logs.has(
+        "error",
+        "Failed to stop Touchlink: Error: timeout",
+        "zh:controller"
+    ));
+}
+
+#[tokio::test]
+async fn adapter_failures_during_stop_and_disconnect() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    adapter
+        .fail_permit_join
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.controller.stop().await.expect("stop");
+    assert!(logs.has(
+        "error",
+        "Failed to disable join on stop: Error: timeout",
+        "zh:controller"
+    ));
+
+    let adapter = MockAdapter::new();
+    adapter
+        .fail_stop
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    adapter.emit(ControllerAdapterEvent::Disconnected);
+    settle().await;
+    assert!(logs.has(
+        "error",
+        "Failed to stop adapter on disconnect: Error: timeout",
+        "zh:controller"
+    ));
+}
+
+#[tokio::test]
+async fn remove_endpoint_from_group_by_number() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .remove_from_group_by_id(4)
+        .await
+        .expect("remove by number");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    assert_eq!(frames[0].payload, json!({"groupid": 4}));
+    assert_eq!(frames[0].command.name, "remove");
+    assert_eq!(frames[0].cluster.ID, 4);
+}

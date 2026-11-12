@@ -60,6 +60,11 @@ pub struct MockAdapter {
     pub read_report_config_payload: Mutex<Option<Value>>,
     /// Command name answered with no response (upstream mock returning undefined).
     pub no_response_command: Mutex<Option<String>>,
+    pub restore_calls: AtomicU64,
+    pub fail_restore: AtomicBool,
+    pub fail_permit_join: AtomicBool,
+    pub fail_stop: AtomicBool,
+    pub network_address_response: Mutex<Option<u16>>,
     pub zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
     pub sent_endpoint: Mutex<Vec<Frame>>,
     pub sent_group: Mutex<Vec<Frame>>,
@@ -101,6 +106,11 @@ impl MockAdapter {
             fail_group_send: AtomicBool::new(false),
             read_report_config_payload: Mutex::new(None),
             no_response_command: Mutex::new(None),
+            restore_calls: AtomicU64::new(0),
+            fail_restore: AtomicBool::new(false),
+            fail_permit_join: AtomicBool::new(false),
+            fail_stop: AtomicBool::new(false),
+            network_address_response: Mutex::new(None),
             zdo_calls: Mutex::new(Vec::new()),
             sent_endpoint: Mutex::new(Vec::new()),
             sent_group: Mutex::new(Vec::new()),
@@ -203,6 +213,20 @@ impl ControllerAdapter for MockAdapter {
                 device.set_manufacturer_name(Some("LUMI".to_string()));
             }
         }
+        let network_address_response = *self.network_address_response.lock().unwrap();
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NETWORK_ADDRESS_REQUEST
+        {
+            if let Some(new_address) = network_address_response {
+                // Upstream's mock emits the ZDO response synchronously; the
+                // controller applies it before the request resolves. The
+                // controller awaits the request inside its event loop, so the
+                // harness applies the same state directly here.
+                if let Some(device) = Device::by_ieee_addr(ieee_address, true) {
+                    device.set_network_address(new_address);
+                }
+            }
+        }
         let ieee = ieee_address.to_string();
         let payload = payload.to_vec();
         Box::pin(async move {
@@ -214,6 +238,18 @@ impl ControllerAdapter for MockAdapter {
                     &payload,
                     disable_response,
                 );
+            }
+            if cluster_id
+                == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NETWORK_ADDRESS_REQUEST
+            {
+                if let Some(new_address) = network_address_response {
+                    return Ok(json!([0, {
+                        "eui64": ieee,
+                        "nwkAddress": new_address,
+                        "startIndex": 0,
+                        "assocDevList": []
+                    }]));
+                }
             }
             default_zdo(&devices, network_address, cluster_id, &payload)
         })
@@ -368,7 +404,15 @@ impl TouchlinkAdapter for MockAdapter {
     }
 
     fn restore_channel_inter_pan(&self) -> ControllerFuture<'_, ()> {
-        Box::pin(async { Ok(()) })
+        self.restore_calls.fetch_add(1, Ordering::SeqCst);
+        let fail = self.fail_restore.load(Ordering::SeqCst);
+        Box::pin(async move {
+            if fail {
+                Err("timeout".to_string())
+            } else {
+                Ok(())
+            }
+        })
     }
 
     fn send_zcl_frame_inter_pan_broadcast(
@@ -409,7 +453,14 @@ impl ControllerRuntimeAdapter for MockAdapter {
 
     fn stop(&self) -> ControllerFuture<'_, ()> {
         self.stopped.store(true, Ordering::SeqCst);
-        Box::pin(async { Ok(()) })
+        let fail = self.fail_stop.load(Ordering::SeqCst);
+        Box::pin(async move {
+            if fail {
+                Err("timeout".to_string())
+            } else {
+                Ok(())
+            }
+        })
     }
 
     fn subscribe(&self) -> mpsc::UnboundedReceiver<ControllerAdapterEvent> {
@@ -423,7 +474,14 @@ impl ControllerRuntimeAdapter for MockAdapter {
             .lock()
             .unwrap()
             .push((time, network_address));
-        Box::pin(async { Ok(()) })
+        let fail = self.fail_permit_join.load(Ordering::SeqCst);
+        Box::pin(async move {
+            if fail {
+                Err("timeout".to_string())
+            } else {
+                Ok(())
+            }
+        })
     }
 
     fn get_network_parameters_full(&self) -> ControllerFuture<'_, ControllerNetworkParameters> {

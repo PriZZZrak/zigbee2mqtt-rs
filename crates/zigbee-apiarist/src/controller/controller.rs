@@ -929,12 +929,15 @@ impl Controller {
         } else {
             if let Some(mut touchlink) = self.touchlink.lock().await.take() {
                 if let Err(error) = touchlink.stop().await {
-                    logger().error(&format!("Failed to stop Touchlink: {error}"), NS);
+                    logger().error(&format!("Failed to stop Touchlink: Error: {error}"), NS);
                 }
             }
 
             if let Err(error) = self.permit_join(0, None).await {
-                logger().error(&format!("Failed to disable join on stop: {error}"), NS);
+                logger().error(
+                    &format!("Failed to disable join on stop: Error: {error}"),
+                    NS,
+                );
             }
 
             self.backup().await?;
@@ -1383,7 +1386,7 @@ impl Controller {
         if let Ok(adapter) = self.adapter() {
             if let Err(error) = adapter.stop().await {
                 logger().error(
-                    &format!("Failed to stop adapter on disconnect: {error}"),
+                    &format!("Failed to stop adapter on disconnect: Error: {error}"),
                     NS,
                 );
             }

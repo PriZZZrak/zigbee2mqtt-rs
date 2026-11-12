@@ -15,7 +15,7 @@ are explicitly `PENDING`.
 | 6 | 661 | Controller stop, should create backup | `controller_stop_should_create_backup` | PORTED |
 | 7 | 678 | controller should backup at defined interval | `controller_should_backup_at_defined_interval` | PORTED |
 | 8 | 687 | controller should not crash on failed interval backup | `controller_should_not_crash_on_failed_interval_backup` | PORTED |
-| 9 | 696 | Syncs runtime lookups | — | PENDING |
+| 9 | 696 | Syncs runtime lookups | `syncs_runtime_lookups` | PORTED |
 | 10 | 756 | Controller start | `controller_start` | PORTED |
 | 11 | 820 | aborts start on signal | — | PENDING |
 | 12 | 847 | Controller update ieeeAddr if changed | `controller_update_ieee_addr_if_changed` | PORTED |
@@ -185,7 +185,7 @@ are explicitly `PENDING`.
 | 176 | 5821 | Remove endpoint from group | `endpoint_add_and_remove_from_group` | PORTED |
 | 177 | 5840 | Does not remove endpoint from group when Remove Group response reports failure | `endpoint_remove_from_group_failure_keeps_member` | PORTED |
 | 178 | 5866 | Removes endpoint from group database when Remove Group response reports NOT_FOUND | `endpoint_remove_from_group_database_when_not_found` | PORTED |
-| 179 | 5893 | Remove endpoint from group by number | — | PENDING |
+| 179 | 5893 | Remove endpoint from group by number | `remove_endpoint_from_group_by_number` | PORTED |
 | 180 | 5909 | Try to get deleted device from endpoint | — | PENDING |
 | 181 | 5925 | Command response | `command_response` | PORTED |
 | 182 | 5934 | Group command | `group_command` | PORTED |
@@ -275,7 +275,7 @@ are explicitly `PENDING`.
 | 266 | 9342 | Handle retransmitted Xiaomi messages | `xiaomi_retransmit_resolves_target_device_from_group_id` | PORTED |
 | 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | `coordinator_check_with_supported_backup` | PORTED |
 | 268 | 9388 | Should do a coordinator check | `coordinator_check_with_supported_backup` | PORTED |
-| 269 | 9667 | zclCommand | — | PENDING |
+| 269 | 9667 | zclCommand | `zcl_command_without_response` | PORTED |
 | 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
 | 271 | 9689 | zclCommand with error | `group_command_error` | PORTED |
 | 272 | 9709 | Interview on coordinator | `interview_on_coordinator` | PORTED |
@@ -284,8 +284,8 @@ are explicitly `PENDING`.
 | 275 | 9741 | Endpoint simple descriptor fails | `interview_descriptor_requests_fail` | PORTED |
 | 276 | 9752 | Node Descriptor on R21 device | `node_descriptor_revision_logs` | PORTED |
 | 277 | 9762 | Node Descriptor on R pre-21 device | `node_descriptor_revision_logs` | PORTED |
-| 278 | 9772 | Device requests network address - unchanged | — | PENDING |
-| 279 | 9809 | Device requests network address - changed | — | PENDING |
+| 278 | 9772 | Device requests network address - unchanged | `device_requests_network_address` | PORTED |
+| 279 | 9809 | Device requests network address - changed | `device_requests_network_address` | PORTED |
 | 280 | 9849 | Device remove from network fails | `zdo_table_and_remove_errors` | PORTED |
 | 281 | 9862 | Device LQI table fails | `zdo_table_and_remove_errors` | PORTED |
 | 282 | 9875 | Device routing table fails | `zdo_table_and_remove_errors` | PORTED |
@@ -294,10 +294,10 @@ are explicitly `PENDING`.
 | 285 | 9914 | Device LQI table with more than 1 request | `tables_with_more_than_one_request` | PORTED |
 | 286 | 9951 | Device routing table with more than 1 request | `tables_with_more_than_one_request` | PORTED |
 | 287 | 9988 | Device binding table with more than 1 request | `tables_with_more_than_one_request` | PORTED |
-| 288 | 10067 | Touchlink stops during stop | — | PENDING |
-| 289 | 10075 | Touchlink fails to stop during stop | — | PENDING |
-| 290 | 10083 | Adapter permitJoin fails during stop | — | PENDING |
-| 291 | 10091 | Adapter stop fails after adapter disconnected | — | PENDING |
+| 288 | 10067 | Touchlink stops during stop | `touchlink_stop_paths` | PORTED |
+| 289 | 10075 | Touchlink fails to stop during stop | `touchlink_stop_paths` | PORTED |
+| 290 | 10083 | Adapter permitJoin fails during stop | `adapter_failures_during_stop_and_disconnect` | PORTED |
+| 291 | 10091 | Adapter stop fails after adapter disconnected | `adapter_failures_during_stop_and_disconnect` | PORTED |
 | 292 | 10099 | Device network address changed while Z2M was offline, received no notification on start | — | PENDING |
 | 293 | 10149 | Device network address changed while Z2M was running, received no notification | — | PENDING |
 | 294 | 10224 | Device network address changed while Z2M was offline - fails to retrieve new one | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **269 / 311**.
+Ported: **278 / 311**.
