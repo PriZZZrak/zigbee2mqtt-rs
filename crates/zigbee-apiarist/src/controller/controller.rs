@@ -1202,17 +1202,22 @@ impl Controller {
                     return Ok(device);
                 }
 
+                let code = response.get(0).and_then(Value::as_u64).unwrap_or(0) as u8;
+                let name = crate::zspec::zdo::definition::status::Status::from_u8(code)
+                    .map(crate::zspec::zdo::definition::status::Status::name)
+                    .unwrap_or("UNKNOWN");
                 logger().debug(
                     &format!(
-                        "Failed to retrieve IEEE address for device '{nwk_address}': status {}",
-                        response.get(0).and_then(Value::as_u64).unwrap_or(0)
+                        "Failed to retrieve IEEE address for device '{nwk_address}': Error: Status '{name}'"
                     ),
                     NS,
                 );
             }
             Err(error) => {
                 logger().debug(
-                    &format!("Failed to retrieve IEEE address for device '{nwk_address}': {error}"),
+                    &format!(
+                        "Failed to retrieve IEEE address for device '{nwk_address}': Error: {error}"
+                    ),
                     NS,
                 );
             }

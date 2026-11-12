@@ -4298,12 +4298,6 @@ async fn device_updates_endpoint_bindings_from_binding_table() {
     assert_eq!(table.len(), 2);
     let ep1 = device.get_endpoint(1).unwrap();
     let ep4 = device.get_endpoint(4).unwrap();
-    eprintln!(
-        "DBG table={table:?} endpoints={} ep1={} ep4={}",
-        device.endpoints().len(),
-        ep1.binds().len(),
-        ep4.binds().len()
-    );
     assert_eq!(ep1.binds().len(), 1);
     assert_eq!(ep1.binds()[0].cluster.ID, 0);
     assert_eq!(ep4.binds().len(), 1);
@@ -6983,4 +6977,235 @@ async fn sends_one_group_command_with_explicit_custom_cluster() {
         vec![0x1d, 0x2f, 0x12, 0x7b, 0x01, 0x0c]
     );
     assert!(adapter.sent_endpoint.lock().unwrap().is_empty());
+}
+
+fn read_rsp_new_model() -> zigbee_apiarist::zspec::zcl::zcl_frame::Frame {
+    zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        0,
+        1,
+        true,
+        None,
+        10,
+        "readRsp",
+        0,
+        json!([{"attrId": 5, "status": 0, "dataType": 66, "attrData": "new.model.id"}]),
+        json!({}),
+        0,
+    )
+}
+
+fn router_database_line(nwk_address: u16) -> String {
+    format!(
+        r#"{{"id":1,"type":"Coordinator","ieeeAddr":"0x0000012300000000","nwkAddr":0,"manufId":0,"epList":[1],"endpoints":{{"1":{{"profId":260,"epId":1,"devId":5,"inClusterList":[],"meta":{{}},"outClusterList":[],"clusters":{{}}}}}},"interviewCompleted":false,"meta":{{}},"_id":"coord"}}"#,
+    ) + "\n"
+        + &format!(
+            r#"{{"id":3,"type":"Router","ieeeAddr":"0x000b57fffec6a5b2","nwkAddr":{nwk_address},"manufId":4476,"manufName":"IKEA of Sweden","powerSource":"Mains (single phase)","modelId":"TRADFRI bulb E27 WS opal 980lm","epList":[1],"endpoints":{{"1":{{"profId":49246,"epId":1,"devId":544,"inClusterList":[0,3,4,5,6,8,768,2821,4096],"meta":{{}},"outClusterList":[5,25,32,4096],"clusters":{{}}}}}},"appVersion":17,"stackVersion":87,"hwVersion":1,"dateCode":"20170331","swBuildId":"1.2.217","zclVersion":1,"interviewState":"SUCCESSFUL","meta":{{"reporting":1}},"_id":"router"}}"#,
+        )
+        + "\n"
+}
+
+#[tokio::test]
+async fn device_network_address_changed_offline() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    std::fs::write(&harness.database_path, router_database_line(40369)).expect("database");
+    harness.start().await.expect("start");
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x000b57fffec6a5b2")
+        .expect("device");
+    assert_eq!(device.network_address(), 40369);
+    harness.events.lock().unwrap().clear();
+
+    *adapter.ieee_address_response.lock().unwrap() =
+        Some(("0x000b57fffec6a5b2".to_string(), 12345, 0));
+    let frame = read_rsp_new_model();
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(12345),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+
+    assert_eq!(device.network_address(), 12345);
+    assert_eq!(device.model_id().as_deref(), Some("new.model.id"));
+    let events = harness.take_events();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(
+                event,
+                zigbee_apiarist::controller::events::ControllerEvent::LastSeenChanged(_)
+            ))
+            .count(),
+        2
+    );
+    let changed = events
+        .iter()
+        .filter_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::DeviceNetworkAddressChanged(
+                payload,
+            ) => Some(payload.device.network_address()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(changed, vec![12345]);
+}
+
+#[tokio::test]
+async fn device_network_address_changed_while_running() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    harness.events.lock().unwrap().clear();
+
+    *adapter.ieee_address_response.lock().unwrap() = Some(("0x129".to_string(), 9999, 0));
+    let frame = read_rsp_new_model();
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(9999),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+
+    assert_eq!(device.network_address(), 9999);
+    assert_eq!(device.model_id().as_deref(), Some("new.model.id"));
+    let events = harness.take_events();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(
+                event,
+                zigbee_apiarist::controller::events::ControllerEvent::LastSeenChanged(_)
+            ))
+            .count(),
+        2
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(
+                event,
+                zigbee_apiarist::controller::events::ControllerEvent::DeviceNetworkAddressChanged(
+                    _
+                )
+            ))
+            .count(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn device_network_address_changed_retrieval_fails() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    std::fs::write(&harness.database_path, router_database_line(40369)).expect("database");
+    harness.start().await.expect("start");
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x000b57fffec6a5b2")
+        .expect("device");
+    assert_eq!(device.network_address(), 40369);
+    harness.events.lock().unwrap().clear();
+
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Ok(json!([0x80, Value::Null])));
+    let frame = read_rsp_new_model();
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(12345),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+
+    assert_eq!(device.network_address(), 40369);
+    assert_eq!(
+        device.model_id().as_deref(),
+        Some("TRADFRI bulb E27 WS opal 980lm")
+    );
+    assert!(logs.has(
+        "debug",
+        "Failed to retrieve IEEE address for device '12345': Error: Status 'INV_REQUESTTYPE'",
+        "zh:controller"
+    ));
+    let events = harness.take_events();
+    assert!(!events.iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::LastSeenChanged(_)
+            | zigbee_apiarist::controller::events::ControllerEvent::DeviceNetworkAddressChanged(_)
+    )));
+}
+
+#[tokio::test]
+async fn device_network_address_changed_no_spam_when_unresponsive() {
+    let _guard = support::test_lock().await;
+    let logs = support::capture_logs();
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Err("timeout".to_string()));
+    let frame = read_rsp_new_model();
+    for _ in 0..2 {
+        adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+            cluster_id: 0,
+            data: frame.to_buffer(),
+            header: Some(frame.header),
+            address: json!(40369),
+            endpoint: 1,
+            linkquality: 50,
+            group_id: 1,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        });
+        settle().await;
+    }
+    assert_eq!(
+        adapter
+            .zdo_calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|call| call.2
+                == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::IEEE_ADDRESS_REQUEST)
+            .count(),
+        1
+    );
+    assert!(logs.has(
+        "debug",
+        "Failed to retrieve IEEE address for device '40369': Error: timeout",
+        "zh:controller"
+    ));
+    let events = harness.take_events();
+    assert!(!events.iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::LastSeenChanged(_)
+            | zigbee_apiarist::controller::events::ControllerEvent::DeviceNetworkAddressChanged(_)
+    )));
 }

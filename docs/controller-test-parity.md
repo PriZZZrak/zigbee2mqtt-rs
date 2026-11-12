@@ -222,7 +222,7 @@ are explicitly `PENDING`.
 | 213 | 6692 | Remove endpoint from all groups | `remove_endpoint_from_all_groups` | PORTED |
 | 214 | 6720 | Load database | — | PENDING |
 | 215 | 7060 | Load database: interviewState migration and reset IN_PROGRESS | `load_database_interview_state_migration` | PORTED |
-| 216 | 7087 | Shouldnt load device from group databaseentry | — | PENDING |
+| 216 | 7087 | Shouldnt load device from group databaseentry | `shouldnt_load_device_from_group_database_entry` | PORTED |
 | 217 | 7094 | Should throw datbase basic crud errors | `database_basic_crud_errors` | PORTED |
 | 218 | 7113 | Should save received attributes | `should_save_received_attributes` | PORTED |
 | 219 | 7149 | Emit read from device | `emit_read_from_device` | PORTED |
@@ -298,11 +298,11 @@ are explicitly `PENDING`.
 | 289 | 10075 | Touchlink fails to stop during stop | `touchlink_stop_paths` | PORTED |
 | 290 | 10083 | Adapter permitJoin fails during stop | `adapter_failures_during_stop_and_disconnect` | PORTED |
 | 291 | 10091 | Adapter stop fails after adapter disconnected | `adapter_failures_during_stop_and_disconnect` | PORTED |
-| 292 | 10099 | Device network address changed while Z2M was offline, received no notification on start | — | PENDING |
-| 293 | 10149 | Device network address changed while Z2M was running, received no notification | — | PENDING |
-| 294 | 10224 | Device network address changed while Z2M was offline - fails to retrieve new one | — | PENDING |
+| 292 | 10099 | Device network address changed while Z2M was offline, received no notification on start | `device_network_address_changed_offline` | PORTED |
+| 293 | 10149 | Device network address changed while Z2M was running, received no notification | `device_network_address_changed_while_running` | PORTED |
+| 294 | 10224 | Device network address changed while Z2M was offline - fails to retrieve new one | `device_network_address_changed_retrieval_fails` | PORTED |
 | 295 | 10268 | Device network address changed while Z2M was offline, no duplicate triggering of IEEE request | — | PENDING |
-| 296 | 10326 | Device network address changed while Z2M was offline, no spamming of IEEE request when device doesnt respond | — | PENDING |
+| 296 | 10326 | Device network address changed while Z2M was offline, no spamming of IEEE request when device doesnt respond | `device_network_address_changed_no_spam_when_unresponsive` | PORTED |
 | 297 | 10368 | does not try to identify unknown device when deleted | `does_not_identify_deleted_device` | PORTED |
 | 298 | 10414 | reads/writes to group with custom cluster when common to all members | `reads_writes_group_custom_cluster_common_to_all_members` | PORTED |
 | 299 | 10540 | does not read/write to group with non-common custom clusters | `does_not_read_write_group_with_non_common_custom_clusters` | PORTED |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **284 / 311**.
+Ported: **289 / 311**.

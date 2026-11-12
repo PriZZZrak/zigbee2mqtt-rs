@@ -65,6 +65,8 @@ pub struct MockAdapter {
     pub fail_permit_join: AtomicBool,
     pub fail_stop: AtomicBool,
     pub network_address_response: Mutex<Option<u16>>,
+    /// `(eui64, nwkAddress, status)` answered and emitted for IEEE_ADDRESS_REQUEST.
+    pub ieee_address_response: Mutex<Option<(String, u16, u8)>>,
     pub zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
     pub sent_endpoint: Mutex<Vec<Frame>>,
     pub sent_group: Mutex<Vec<Frame>>,
@@ -111,6 +113,7 @@ impl MockAdapter {
             fail_permit_join: AtomicBool::new(false),
             fail_stop: AtomicBool::new(false),
             network_address_response: Mutex::new(None),
+            ieee_address_response: Mutex::new(None),
             zdo_calls: Mutex::new(Vec::new()),
             sent_endpoint: Mutex::new(Vec::new()),
             sent_group: Mutex::new(Vec::new()),
@@ -211,6 +214,31 @@ impl ControllerAdapter for MockAdapter {
             if let Some(device) = Device::by_network_address(network_address, true) {
                 device.set_model_id("lumi.occupancy".to_string());
                 device.set_manufacturer_name(Some("LUMI".to_string()));
+            }
+        }
+        let ieee_address_response = self.ieee_address_response.lock().unwrap().clone();
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::IEEE_ADDRESS_REQUEST
+        {
+            if let Some((eui64, nwk_address, status)) = ieee_address_response {
+                let response = if status == 0 {
+                    json!([0, {
+                        "eui64": eui64,
+                        "nwkAddress": nwk_address,
+                        "startIndex": 0,
+                        "assocDevList": []
+                    }])
+                } else {
+                    json!([status, Value::Null])
+                };
+                // Upstream's mock emits the ZDO response as well; the controller
+                // processes it after the awaited identify request.
+                self.emit(ControllerAdapterEvent::ZdoResponse {
+                    cluster_id:
+                        zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::IEEE_ADDRESS_RESPONSE,
+                    response: response.clone(),
+                });
+                return Box::pin(async move { Ok(response) });
             }
         }
         let network_address_response = *self.network_address_response.lock().unwrap();
