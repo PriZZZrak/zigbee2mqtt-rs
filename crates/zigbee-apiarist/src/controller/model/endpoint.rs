@@ -963,7 +963,25 @@ impl Endpoint {
             options.as_ref().and_then(|o| o.manufacturer_code),
         );
         let mut payload = Vec::new();
-        for (name_or_id, value) in attributes.as_object().cloned().unwrap_or_default() {
+        // JavaScript enumerates integer-like object keys first in ascending
+        // order, then the remaining string keys in insertion order. Mirror that
+        // so the readRsp entry order matches upstream.
+        let entries = attributes.as_object().cloned().unwrap_or_default();
+        let mut numeric = entries
+            .iter()
+            .filter_map(|(key, value)| key.parse::<u16>().ok().map(|id| (id, value.clone())))
+            .collect::<Vec<_>>();
+        numeric.sort_by_key(|(id, _)| *id);
+        let mut ordered = numeric
+            .into_iter()
+            .map(|(id, value)| (id.to_string(), value))
+            .collect::<Vec<_>>();
+        for (key, value) in &entries {
+            if key.parse::<u16>().is_err() {
+                ordered.push((key.clone(), value.clone()));
+            }
+        }
+        for (name_or_id, value) in ordered {
             if let Some(attribute) = Utils::get_cluster_attribute(
                 &cluster,
                 name_or_id.as_str(),

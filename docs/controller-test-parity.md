@@ -39,7 +39,7 @@ are explicitly `PENDING`.
 | 30 | 1448 | Join a device and explictly accept it | `join_a_device_and_explicitly_accept_it` | PORTED |
 | 31 | 1530 | Join a device and explictly refuses it | — | PENDING |
 | 32 | 1547 | Join a device and explictly refuses it but LEAVE request fails | — | PENDING |
-| 33 | 1566 | Set device powersource by string | — | PENDING |
+| 33 | 1566 | Set device powersource by string | `set_device_power_source_by_string` | PORTED |
 | 34 | 1574 | Get device should return same instance | `get_device_should_return_same_instance` | PORTED |
 | 35 | 1580 | Device announce event | `device_announce_event` | PORTED |
 | 36 | 1597 | Skip Device announce event from unknown device | `skip_device_announce_event_from_unknown_device` | PORTED |
@@ -56,13 +56,13 @@ are explicitly `PENDING`.
 | 47 | 1755 | ZDO response for NETWORK_ADDRESS_RESPONSE shouldnt update network address when the same | `zdo_network_address_response_should_not_update_when_same` | PORTED |
 | 48 | 1766 | ZDO response for NETWORK_ADDRESS_RESPONSE from unknown device | `zdo_network_address_response_from_unknown_device` | PORTED |
 | 49 | 1774 | ZDO response for NETWORK_ADDRESS_RESPONSE should update the last seen value | `zdo_network_address_response_updates_last_seen` | PORTED |
-| 50 | 1786 | ZDO response for END_DEVICE_ANNOUNCE should bubble up event | — | PENDING |
+| 50 | 1786 | ZDO response for END_DEVICE_ANNOUNCE should bubble up event | `zdo_end_device_announce_should_bubble_event` | PORTED |
 | 51 | 1813 | ZDO response for END_DEVICE_ANNOUNCE should update network address when different | `zdo_end_device_announce_updates_network_address_when_different` | PORTED |
 | 52 | 1840 | ZDO response for END_DEVICE_ANNOUNCE from unknown device | `zdo_end_device_announce_from_unknown_device` | PORTED |
 | 53 | 1862 | ZDO response for cluster ID with no extra processing | `zdo_cluster_with_no_extra_processing` | PORTED |
 | 54 | 1867 | Emit lastSeenChanged event even when no message is emitted from it | `emit_last_seen_changed_even_without_message` | PORTED |
 | 55 | 1890 | Device leave event and remove from database | `device_leave_event_and_remove_from_database` | PORTED |
-| 56 | 1905 | Device leave event with only nwk addr and remove from database | — | PENDING |
+| 56 | 1905 | Device leave event with only nwk addr and remove from database | `device_leave_event_with_only_network_address` | PORTED |
 | 57 | 1921 | Start with reset should clear database | `start_with_reset_should_clear_database` | PORTED |
 | 58 | 1947 | Existing database.tmp should not be overwritten | — | PENDING |
 | 59 | 1966 | Should create backup of databse before clearing when datbaseBackupPath is provided | `should_create_database_backup_before_clearing` | PORTED |
@@ -89,7 +89,7 @@ are explicitly `PENDING`.
 | 80 | 2391 | Device joins and interview succeeds | `device_joins_and_interview_succeeds` | PORTED |
 | 81 | 2403 | Device joins and interview fails | `device_joins_and_interview_fails` | PORTED |
 | 82 | 2416 | Device joins with endpoints [4,1], should read modelID from 1 | `device_joins_with_endpoints_4_and_1_reads_model_id_from_1` | PORTED |
-| 83 | 2429 | Device joins with endpoints [2,1], as 2 is the only endpoint supporting genBasic it should read modelID from that | — | PENDING |
+| 83 | 2429 | Device joins with endpoints [2,1], as 2 is the only endpoint supporting genBasic it should read modelID from that | `device_joins_with_endpoints_2_and_1_reads_model_id_from_2` | PORTED |
 | 84 | 2442 | Device joins and interview iAs enrollment succeeds | `device_joins_and_interview_ias_enrollment_succeeds` | PORTED |
 | 85 | 2499 | Device joins and interview iAs enrollment fails | `device_joins_and_interview_ias_enrollment_fails` | PORTED |
 | 86 | 2513 | Device joins and interview iAs enrollment throws | `device_joins_and_interview_ias_enrollment_throws` | PORTED |
@@ -99,24 +99,24 @@ are explicitly `PENDING`.
 | 90 | 2621 | Receive raw data from unknown cluster | `receive_raw_data_and_unknown_cluster` | PORTED |
 | 91 | 2873 | Receive zclData from unkonwn device shouldnt emit anything | `receive_zcldata_from_unknown_device_should_emit_nothing` | PORTED |
 | 92 | 2892 | Receive zclData with device deleted during processing (prevent race condition) | — | PENDING |
-| 93 | 2937 | Receive readResponse from unknown endpoint | — | PENDING |
-| 94 | 2981 | Receive cluster command | — | PENDING |
+| 93 | 2937 | Receive readResponse from unknown endpoint | `receive_read_response_from_unknown_endpoint` | PORTED |
+| 94 | 2981 | Receive cluster command | `receive_cluster_command` | PORTED |
 | 95 | 3035 | Receive cluster command from unknown cluster | — | PENDING |
-| 96 | 3070 | Receive zclData send default response | — | PENDING |
-| 97 | 3118 | Receive zclData dont send default resopnse with skipDefaultResponse | — | PENDING |
-| 98 | 3158 | Receive zclData dont send default resopnse when broadcast | — | PENDING |
+| 96 | 3070 | Receive zclData send default response | `send_default_response_when_requested` | PORTED |
+| 97 | 3118 | Receive zclData dont send default resopnse with skipDefaultResponse | `do_not_send_default_response_when_disabled_broadcast_or_skip` | PORTED |
+| 98 | 3158 | Receive zclData dont send default resopnse when broadcast | `do_not_send_default_response_when_disabled_broadcast_or_skip` | PORTED |
 | 99 | 3195 | Receive zclData send default response fails should NOT attempt route discover when adapter does not support it | — | PENDING |
-| 100 | 3235 | Respond to genTime read | — | PENDING |
-| 101 | 3340 | Allow to override read response through `device.customReadResponse | — | PENDING |
-| 102 | 3368 | Respond to read of attribute | — | PENDING |
-| 103 | 3404 | Sends read response for unsupported attribute | — | PENDING |
-| 104 | 3430 | Respond to genTime read fails | — | PENDING |
-| 105 | 3450 | Tuya end devices joins, stops responding after 1 requests, should read modelID and manufacturerName immediately on second pair | — | PENDING |
+| 100 | 3235 | Respond to genTime read | `respond_to_gen_time_read_and_failure` | PORTED |
+| 101 | 3340 | Allow to override read response through `device.customReadResponse | `allow_override_read_response` | PORTED |
+| 102 | 3368 | Respond to read of attribute | `respond_to_read_of_attribute` | PORTED |
+| 103 | 3404 | Sends read response for unsupported attribute | `sends_read_response_for_unsupported_attribute` | PORTED |
+| 104 | 3430 | Respond to genTime read fails | `respond_to_gen_time_read_and_failure` | PORTED |
+| 105 | 3450 | Tuya end devices joins, stops responding after 1 requests, should read modelID and manufacturerName immediately on second pair | `tuya_end_device_second_pair_reads_model_and_manufacturer` | PORTED |
 | 106 | 3494 | Xiaomi WXCJKG11LM join (get simple descriptor for endpoint 2 fails) | `xiaomi_wxcjkg11lm_join_simple_descriptor_for_endpoint_2_fails` | PORTED |
-| 107 | 3508 | Gledopto GL-C-007/GL-C-008 join (all endpoints support genBasic but only 12 responds) | — | PENDING |
-| 108 | 3522 | Control4 device join (genBasic reads fail, interview completes via quirk) | — | PENDING |
+| 107 | 3508 | Gledopto GL-C-007/GL-C-008 join (all endpoints support genBasic but only 12 responds) | `gledopto_join_only_endpoint_12_responds` | PORTED |
+| 108 | 3522 | Control4 device join (genBasic reads fail, interview completes via quirk) | `control4_device_join_completes_via_quirk` | PORTED |
 | 109 | 3537 | Xiaomi end device joins (node descriptor fails) | `xiaomi_end_device_joins_node_descriptor_fails` | PORTED |
-| 110 | 3598 | Xiaomi end device joins (node descriptor succeeds, but active endpoint response fails) | — | PENDING |
+| 110 | 3598 | Xiaomi end device joins (node descriptor succeeds, but active endpoint response fails) | `xiaomi_end_device_joins_active_endpoints_fails` | PORTED |
 | 111 | 3659 | Should use cached node descriptor when device is re-interviewed, but retrieve it when ignoreCache=true | — | PENDING |
 | 112 | 3679 | Should remove disappeared endpoints on updateActiveEndpoints | — | PENDING |
 | 113 | 3691 | Receive zclData report from unkown attribute | — | PENDING |
@@ -124,12 +124,12 @@ are explicitly `PENDING`.
 | 115 | 3786 | Should allow to specify custom cluster | — | PENDING |
 | 116 | 3814 | Should allow to specify custom cluster as override for Zcl cluster | — | PENDING |
 | 117 | 3842 | merges added custom clusters definitions | — | PENDING |
-| 118 | 4068 | Send zcl command to all no options | — | PENDING |
-| 119 | 4091 | Send zcl command to all with manufacturer option | — | PENDING |
-| 120 | 4126 | Should roll-over transaction ID | — | PENDING |
+| 118 | 4068 | Send zcl command to all no options | `send_zcl_command_to_all_no_options_and_manufacturer` | PORTED |
+| 119 | 4091 | Send zcl command to all with manufacturer option | `send_zcl_command_to_all_no_options_and_manufacturer` | PORTED |
+| 120 | 4126 | Should roll-over transaction ID | `should_roll_over_transaction_id` | PORTED |
 | 121 | 4148 | Throw error when creating endpoint which already exists | — | PENDING |
 | 122 | 4161 | Throw error when device with IEEE address already exists | — | PENDING |
-| 123 | 4173 | Should allow to set type | — | PENDING |
+| 123 | 4173 | Should allow to set type | `should_allow_to_set_type` | PORTED |
 | 124 | 4180 | Return device from databse when not in lookup | — | PENDING |
 | 125 | 4187 | Throw error when interviewing and calling interview again | — | PENDING |
 | 126 | 4206 | Removes device from network and database but keep in cache | — | PENDING |
@@ -150,8 +150,8 @@ are explicitly `PENDING`.
 | 141 | 4600 | Device ping | `device_ping` | PORTED |
 | 142 | 4620 | Poll control supported | — | PENDING |
 | 143 | 4739 | Poll control unsupported | — | PENDING |
-| 144 | 4748 | Endpoint get id | — | PENDING |
-| 145 | 4755 | Endpoint get id by endpoint device type | — | PENDING |
+| 144 | 4748 | Endpoint get id | `endpoint_get_id_and_device_type` | PORTED |
+| 145 | 4755 | Endpoint get id by endpoint device type | `endpoint_get_id_and_device_type` | PORTED |
 | 146 | 4763 | Endpoint bind | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 147 | 4783 | Endpoint addBinding | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 148 | 4798 | Endpoint get binds non-existing device | — | PENDING |
@@ -181,11 +181,11 @@ are explicitly `PENDING`.
 | 172 | 5717 | Throw error when creating group already exists | — | PENDING |
 | 173 | 5729 | Add endpoint to group | `endpoint_add_and_remove_from_group` | PORTED |
 | 174 | 5769 | Adds endpoint to group when Add Group response reports duplicate | `endpoint_add_to_group_when_response_reports_duplicate` | PORTED |
-| 175 | 5796 | Does not add endpoint to group when Add Group response reports failure | `endpoint_add_to_group_when_response_reports_duplicate` | PORTED |
+| 175 | 5796 | Does not add endpoint to group when Add Group response reports failure | `endpoint_add_to_group_failure_does_not_add` | PORTED |
 | 176 | 5821 | Remove endpoint from group | `endpoint_add_and_remove_from_group` | PORTED |
 | 177 | 5840 | Does not remove endpoint from group when Remove Group response reports failure | `endpoint_remove_from_group_failure_keeps_member` | PORTED |
 | 178 | 5866 | Removes endpoint from group database when Remove Group response reports NOT_FOUND | — | PENDING |
-| 179 | 5893 | Remove endpoint from group by number | `endpoint_add_and_remove_from_group` | PORTED |
+| 179 | 5893 | Remove endpoint from group by number | — | PENDING |
 | 180 | 5909 | Try to get deleted device from endpoint | — | PENDING |
 | 181 | 5925 | Command response | `command_response` | PORTED |
 | 182 | 5934 | Group command | `group_command` | PORTED |
@@ -228,7 +228,7 @@ are explicitly `PENDING`.
 | 219 | 7149 | Emit read from device | — | PENDING |
 | 220 | 7191 | Emit write from device | — | PENDING |
 | 221 | 7235 | Endpoint command error | — | PENDING |
-| 222 | 7254 | Endpoint commandResponse error | `endpoint_command_response` | PORTED |
+| 222 | 7254 | Endpoint commandResponse error | — | PENDING |
 | 223 | 7273 | Endpoint commandResponse error when transactionSequenceNumber provided through options | — | PENDING |
 | 224 | 7288 | ConfigureReporting error | — | PENDING |
 | 225 | 7309 | DefaultResponse error | — | PENDING |
@@ -275,8 +275,8 @@ are explicitly `PENDING`.
 | 266 | 9342 | Handle retransmitted Xiaomi messages | — | PENDING |
 | 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | — | PENDING |
 | 268 | 9388 | Should do a coordinator check | — | PENDING |
-| 269 | 9667 | zclCommand | `command_response` | PORTED |
-| 270 | 9677 | zclCommand with cluster/command objects | `endpoint_command_with_duplicate_cluster_id` | PORTED |
+| 269 | 9667 | zclCommand | — | PENDING |
+| 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
 | 271 | 9689 | zclCommand with error | — | PENDING |
 | 272 | 9709 | Interview on coordinator | — | PENDING |
 | 273 | 9721 | Device node descriptor fails | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **112 / 311**.
+Ported: **132 / 311**.

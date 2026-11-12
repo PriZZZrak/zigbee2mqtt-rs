@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 socket2 = "0.6"
 tokio = { version = "1", features = ["rt", "sync", "time", "io-util", "macros", "net"] }
 
