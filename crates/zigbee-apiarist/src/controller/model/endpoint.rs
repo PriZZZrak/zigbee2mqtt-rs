@@ -1534,9 +1534,13 @@ impl Endpoint {
             for entry in &payload {
                 let attr_id = entry.get("attrId").and_then(Value::as_u64).unwrap_or(0) as u16;
                 reportings.retain(|reporting| {
+                    // Upstream replaces legacy entries that have no
+                    // manufacturerCode when configuring a manufacturer-specific
+                    // attribute.
                     !(reporting.attr_id == attr_id
                         && reporting.cluster == cluster.ID as u16
-                        && reporting.manufacturer_code == options.manufacturer_code)
+                        && (reporting.manufacturer_code.is_none()
+                            || reporting.manufacturer_code == options.manufacturer_code))
                 });
             }
             for entry in &payload {

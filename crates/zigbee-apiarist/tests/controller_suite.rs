@@ -5955,3 +5955,217 @@ async fn endpoint_and_group_unbind_variants() {
         "Unbind 0x129/1 genOnOff invalid target '1' (no group with this ID exists)."
     );
 }
+
+#[tokio::test]
+async fn replace_legacy_configured_reportings() {
+    use zigbee_apiarist::controller::model::endpoint::ConfigureReportingItem;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    endpoint.save_cluster_attribute_report_config(
+        0xfc57,
+        None,
+        &[json!({
+            "status": 0,
+            "direction": 0,
+            "attrId": 0x0005,
+            "dataType": 66,
+            "minRepIntval": 60,
+            "maxRepIntval": 900,
+            "repChange": 1
+        })],
+    );
+    endpoint
+        .configure_reporting(
+            json!("manuSpecificAmazonWWAH"),
+            vec![ConfigureReportingItem {
+                attribute: json!("macRetryCount"),
+                minimum_report_interval: 1,
+                maximum_report_interval: 10,
+                reportable_change: Some(1.0),
+            }],
+            None,
+        )
+        .await
+        .expect("configure reporting");
+    let reportings = endpoint.configured_reportings();
+    assert_eq!(reportings.len(), 1);
+    assert_eq!(reportings[0].attribute["name"], "macRetryCount");
+    assert_eq!(reportings[0].cluster.name, "manuSpecificAmazonWWAH");
+}
+
+#[tokio::test]
+async fn configure_reporting_manufacturer_specific_from_definition() {
+    use zigbee_apiarist::controller::model::endpoint::ConfigureReportingItem;
+    use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
+    use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let mut cluster = Cluster::new("hvacThermostat", 0x0201);
+    let mut attribute = Attribute::new("viessmannWindowOpenInternal", 0x4000, DataType::ENUM8);
+    attribute.manufacturerCode = Some(0x1221);
+    attribute.write = true;
+    cluster
+        .attributes
+        .insert("viessmannWindowOpenInternal".to_string(), attribute);
+    device
+        .add_custom_cluster("hvacThermostat", cluster)
+        .expect("custom cluster");
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .configure_reporting(
+            json!("hvacThermostat"),
+            vec![ConfigureReportingItem {
+                attribute: json!("viessmannWindowOpenInternal"),
+                minimum_report_interval: 1,
+                maximum_report_interval: 10,
+                reportable_change: Some(1.0),
+            }],
+            None,
+        )
+        .await
+        .expect("configure reporting");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    assert_eq!(frames[0].header.manufacturer_code, Some(0x1221));
+    assert_eq!(frames[0].payload[0]["attrId"], 16384);
+    assert_eq!(frames[0].payload[0]["dataType"], 48);
+    assert_eq!(frames[0].payload[0]["minRepIntval"], 1);
+    assert_eq!(frames[0].payload[0]["maxRepIntval"], 10);
+    assert_eq!(frames[0].payload[0]["repChange"], 1);
+    drop(frames);
+    let reportings = endpoint.configured_reportings();
+    assert_eq!(reportings.len(), 1);
+    assert_eq!(reportings[0].attribute["ID"], 16384);
+    assert_eq!(reportings[0].attribute["manufacturerCode"], 0x1221);
+}
+
+#[tokio::test]
+async fn configure_reporting_fails_status_default_rsp() {
+    use zigbee_apiarist::controller::model::endpoint::ConfigureReportingItem;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    adapter
+        .configure_report_status
+        .store(1, std::sync::atomic::Ordering::SeqCst);
+    adapter
+        .configure_report_default_rsp
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let error = endpoint
+        .configure_reporting(
+            json!("genPowerCfg"),
+            vec![ConfigureReportingItem {
+                attribute: json!("mainsFrequency"),
+                minimum_report_interval: 1,
+                maximum_report_interval: 10,
+                reportable_change: Some(1.0),
+            }],
+            None,
+        )
+        .await
+        .expect_err("default response failure");
+    assert_eq!(
+        error,
+        r#"ZCL command 0x129/1 genPowerCfg.configReport([{"attribute":"mainsFrequency","minimumReportInterval":1,"maximumReportInterval":10,"reportableChange":1}], {"timeout":10000,"disableResponse":false,"disableRecovery":false,"disableDefaultResponse":true,"direction":0,"reservedBits":0,"writeUndiv":false}) failed (Status 'FAILURE')"#
+    );
+}
+
+#[tokio::test]
+async fn throw_error_when_interviewing_and_calling_interview_again() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let device = zigbee_apiarist::controller::model::device::Device::create(
+        zigbee_apiarist::controller::database::DeviceType::EndDevice,
+        "0x170",
+        170,
+        Some(4619),
+        None,
+        None,
+        None,
+        zigbee_apiarist::controller::model::device::InterviewState::Pending,
+        None,
+    )
+    .expect("device");
+    let first = {
+        let device = device.clone();
+        tokio::spawn(async move { device.interview(true).await })
+    };
+    for _ in 0..200 {
+        if device.interview_state()
+            == zigbee_apiarist::controller::model::device::InterviewState::InProgress
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        device.interview_state(),
+        zigbee_apiarist::controller::model::device::InterviewState::InProgress
+    );
+    let error = device
+        .interview(false)
+        .await
+        .expect_err("already in progress");
+    assert_eq!(
+        error,
+        "Interview - interview already in progress for '0x170'"
+    );
+    first.abort();
+    let _ = first.await;
+}
+
+#[tokio::test]
+async fn does_not_identify_deleted_device() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    device.remove_from_network(false).await.expect("remove");
+    assert!(zigbee_apiarist::controller::model::device::Device::is_deleted_by_network_address(129));
+
+    adapter.zdo_calls.lock().unwrap().clear();
+    harness.events.lock().unwrap().clear();
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0406,
+        data: vec![24, 169, 10, 0, 0, 24, 1],
+        header: None,
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    assert!(!harness.take_events().iter().any(|event| matches!(
+        event,
+        zigbee_apiarist::controller::events::ControllerEvent::Message(_)
+    )));
+    assert!(!adapter.zdo_calls.lock().unwrap().iter().any(|call| call.2
+        == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::IEEE_ADDRESS_REQUEST));
+    assert!(harness
+        .controller
+        .get_device_by_ieee_addr("0x129")
+        .is_none());
+}

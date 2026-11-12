@@ -131,7 +131,7 @@ are explicitly `PENDING`.
 | 122 | 4161 | Throw error when device with IEEE address already exists | `throw_error_when_device_with_ieee_address_already_exists` | PORTED |
 | 123 | 4173 | Should allow to set type | `should_allow_to_set_type` | PORTED |
 | 124 | 4180 | Return device from databse when not in lookup | `return_device_and_group_from_database` | PORTED |
-| 125 | 4187 | Throw error when interviewing and calling interview again | — | PENDING |
+| 125 | 4187 | Throw error when interviewing and calling interview again | `throw_error_when_interviewing_and_calling_interview_again` | PORTED |
 | 126 | 4206 | Removes device from network and database but keep in cache | `remove_device_from_network_and_database_variants` | PORTED |
 | 127 | 4225 | Removes device from network and clears cache | `remove_device_clear_cache_variants` | PORTED |
 | 128 | 4286 | Removes device from database but keep in cache | `remove_device_from_network_and_database_variants` | PORTED |
@@ -166,12 +166,12 @@ are explicitly `PENDING`.
 | 157 | 4970 | Endpoint configure reporting | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 158 | 5006 | handles configure reporting with non-Analog data type | `configure_reporting_non_analog_and_disable_response` | PORTED |
 | 159 | 5041 | throws when trying to configure reporting on endpoint with bad attribute | `endpoint_configure_reporting_bad_attribute` | PORTED |
-| 160 | 5071 | Should replace legacy configured reportings without manufacturerCode | — | PENDING |
+| 160 | 5071 | Should replace legacy configured reportings without manufacturerCode | `replace_legacy_configured_reportings` | PORTED |
 | 161 | 5095 | Endpoint configure reporting for manufacturer specific attribute | `configure_reporting_manufacturer_specific_attribute` | PORTED |
-| 162 | 5148 | Endpoint configure reporting for manufacturer specific attribute from definition | — | PENDING |
+| 162 | 5148 | Endpoint configure reporting for manufacturer specific attribute from definition | `configure_reporting_manufacturer_specific_from_definition` | PORTED |
 | 163 | 5196 | Save endpoint configure reporting | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 164 | 5264 | Endpoint configure reporting fails when status code is not 0 | `endpoint_configure_reporting_fails_on_non_zero_status` | PORTED |
-| 165 | 5291 | Endpoint configure reporting fails when status code is not 0 default rsp | — | PENDING |
+| 165 | 5291 | Endpoint configure reporting fails when status code is not 0 default rsp | `configure_reporting_fails_status_default_rsp` | PORTED |
 | 166 | 5319 | Endpoint configure reporting with disable response | `configure_reporting_non_analog_and_disable_response` | PORTED |
 | 167 | 5341 | Endpoint read reporting config | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 168 | 5500 | Endpoint throws without response to read reporting config | `read_reporting_config_no_response_errors` | PORTED |
@@ -272,7 +272,7 @@ are explicitly `PENDING`.
 | 263 | 9139 | Write to device with pendingRequestTimeout > 0, send bulk messages | — | PENDING |
 | 264 | 9220 | Send to device with pendingRequestTimeout > 0, retry on timeout error | — | PENDING |
 | 265 | 9269 | Send to device with pendingRequestTimeout > 0, fails on non-timeout error | — | PENDING |
-| 266 | 9342 | Handle retransmitted Xiaomi messages | — | PENDING |
+| 266 | 9342 | Handle retransmitted Xiaomi messages | `xiaomi_retransmit_resolves_target_device_from_group_id` | PORTED |
 | 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | `coordinator_check_with_supported_backup` | PORTED |
 | 268 | 9388 | Should do a coordinator check | `coordinator_check_with_supported_backup` | PORTED |
 | 269 | 9667 | zclCommand | — | PENDING |
@@ -303,7 +303,7 @@ are explicitly `PENDING`.
 | 294 | 10224 | Device network address changed while Z2M was offline - fails to retrieve new one | — | PENDING |
 | 295 | 10268 | Device network address changed while Z2M was offline, no duplicate triggering of IEEE request | — | PENDING |
 | 296 | 10326 | Device network address changed while Z2M was offline, no spamming of IEEE request when device doesnt respond | — | PENDING |
-| 297 | 10368 | does not try to identify unknown device when deleted | — | PENDING |
+| 297 | 10368 | does not try to identify unknown device when deleted | `does_not_identify_deleted_device` | PORTED |
 | 298 | 10414 | reads/writes to group with custom cluster when common to all members | — | PENDING |
 | 299 | 10540 | does not read/write to group with non-common custom clusters | — | PENDING |
 | 300 | 10572 | sends & receives command to group with custom cluster when common to all members | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **263 / 311**.
+Ported: **269 / 311**.
