@@ -43,7 +43,11 @@ pub struct MockAdapter {
     pub supports_backup: AtomicBool,
     pub zdo_handler: Mutex<Option<ZdoHandler>>,
     pub zcl_handler: Mutex<Option<ZclHandler>>,
-    pub devices: Mutex<HashMap<u16, MockDevice>>,
+    pub devices: Arc<Mutex<HashMap<u16, MockDevice>>>,
+    /// Upstream `enroll170`: whether the mock IAS device acknowledges enrollment.
+    pub ias_enroll: AtomicBool,
+    /// Command name whose endpoint send should fail (upstream `enrollRspThrow`).
+    pub fail_zcl_command: Mutex<Option<String>>,
     pub zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
     pub sent_endpoint: Mutex<Vec<Frame>>,
     pub sent_group: Mutex<Vec<Frame>>,
@@ -76,7 +80,9 @@ impl MockAdapter {
             supports_backup: AtomicBool::new(true),
             zdo_handler: Mutex::new(None),
             zcl_handler: Mutex::new(None),
-            devices: Mutex::new(HashMap::new()),
+            devices: Arc::new(Mutex::new(HashMap::new())),
+            ias_enroll: AtomicBool::new(true),
+            fail_zcl_command: Mutex::new(None),
             zdo_calls: Mutex::new(Vec::new()),
             sent_endpoint: Mutex::new(Vec::new()),
             sent_group: Mutex::new(Vec::new()),
@@ -95,6 +101,15 @@ impl MockAdapter {
 
     pub fn add_device(&self, network_address: u16, device: MockDevice) {
         self.devices.lock().unwrap().insert(network_address, device);
+    }
+
+    pub fn update_device<F>(&self, network_address: u16, update: F)
+    where
+        F: FnOnce(&mut MockDevice),
+    {
+        if let Some(device) = self.devices.lock().unwrap().get_mut(&network_address) {
+            update(device);
+        }
     }
 
     pub fn set_zdo<F>(&self, handler: F)
@@ -151,6 +166,25 @@ impl ControllerAdapter for MockAdapter {
         ));
         let handler = self.zdo_handler.lock().unwrap().clone();
         let devices = self.devices.lock().unwrap().clone();
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::NODE_DESCRIPTOR_REQUEST
+            && devices
+                .get(&network_address)
+                .and_then(|device| device.key.as_deref())
+                == Some("xiaomi")
+            && devices
+                .get(&network_address)
+                .is_some_and(|device| device.node_descriptor.is_none())
+        {
+            // Upstream mock: a Xiaomi device answers the node descriptor request
+            // with an unsolicited genBasic read response carrying its modelID.
+            // The controller awaits the interview inside its event loop, so the
+            // harness applies the same state directly instead of queueing it.
+            if let Some(device) = Device::by_network_address(network_address, true) {
+                device.set_model_id("lumi.occupancy".to_string());
+                device.set_manufacturer_name(Some("LUMI".to_string()));
+            }
+        }
         let ieee = ieee_address.to_string();
         let payload = payload.to_vec();
         Box::pin(async move {
@@ -181,14 +215,26 @@ impl ControllerAdapter for MockAdapter {
     ) -> ControllerFuture<'_, Option<ZclPayload>> {
         self.sent_endpoint.lock().unwrap().push(frame.clone());
         let handler = self.zcl_handler.lock().unwrap().clone();
-        let devices = self.devices.lock().unwrap().clone();
+        let devices = self.devices.clone();
+        let ias_enroll = self.ias_enroll.load(Ordering::SeqCst);
+        let fail_command = {
+            let mut slot = self.fail_zcl_command.lock().unwrap();
+            if slot.as_deref() == Some(frame.command.name.as_str()) {
+                slot.take()
+            } else {
+                None
+            }
+        };
         let ieee = ieee_address.to_string();
         let frame = frame.clone();
         Box::pin(async move {
             if let Some(handler) = handler {
                 return handler(&ieee, network_address, endpoint, &frame);
             }
-            default_zcl(&devices, network_address, endpoint, &frame)
+            if fail_command.as_deref() == Some(frame.command.name.as_str()) {
+                return Err("timeout".to_string());
+            }
+            default_zcl(&devices, ias_enroll, network_address, endpoint, &frame)
         })
     }
 
@@ -592,7 +638,8 @@ fn default_zdo(
 }
 
 fn default_zcl(
-    devices: &HashMap<u16, MockDevice>,
+    devices: &Arc<Mutex<HashMap<u16, MockDevice>>>,
+    ias_enroll: bool,
     network_address: u16,
     endpoint: u8,
     frame: &Frame,
@@ -600,14 +647,17 @@ fn default_zcl(
     let is_global = frame.header.frame_control.frame_type
         == zigbee_apiarist::zspec::zcl::zcl_header::FrameType::GLOBAL;
     if is_global && frame.command.name == "read" {
-        let Some(device) = devices.get(&network_address) else {
+        let Some(mut device) = devices.lock().unwrap().get(&network_address).cloned() else {
             return Err(format!("Mock device {network_address} not found"));
         };
-        let attributes = device
-            .attributes
-            .get(&endpoint)
-            .cloned()
-            .unwrap_or_default();
+        let attributes = match device.attributes.get(&endpoint).cloned() {
+            Some(attributes) => attributes,
+            None => {
+                // Upstream mock throws when the endpoint has no attribute map,
+                // which the adapter surfaces as a failed request.
+                return Err("timeout".to_string());
+            }
+        };
         let mut payload = Vec::new();
         for item in frame.payload.as_array().cloned().unwrap_or_default() {
             let attr_id = item["attrId"].as_u64().unwrap_or(0) as u16;
@@ -657,6 +707,41 @@ fn default_zcl(
             was_broadcast: false,
             destination_endpoint: 1,
         }));
+    }
+    if frame.cluster.ID == 0x0500 && is_global && frame.command.name == "write" {
+        if ias_enroll {
+            if let Some(device) = devices.lock().unwrap().get_mut(&network_address) {
+                device
+                    .attributes
+                    .entry(endpoint)
+                    .or_default()
+                    .insert("zoneState".to_string(), json!(1));
+            }
+            let enroll = Frame::create(
+                zigbee_apiarist::zspec::zcl::zcl_header::FrameType::SPECIFIC as u8,
+                zigbee_apiarist::zspec::zcl::zcl_header::Direction::SERVER_TO_CLIENT as u8,
+                false,
+                None,
+                1,
+                "enrollReq",
+                0x0500,
+                json!({"zonetype": 0, "manucode": 1}),
+                json!({}),
+                0,
+            );
+            return Ok(Some(ZclPayload {
+                cluster_id: 0x0500,
+                data: enroll.to_buffer(),
+                header: Some(enroll.header),
+                address: json!(network_address),
+                endpoint,
+                linkquality: 50,
+                group_id: 0,
+                was_broadcast: false,
+                destination_endpoint: 1,
+            }));
+        }
+        return Ok(None);
     }
     if is_global && frame.command.name == "write" {
         let payload = frame
@@ -768,6 +853,146 @@ pub fn install_default_devices(adapter: &MockAdapter) {
                 (1, simple_descriptor(0, 1, 2, 3, vec![10], vec![11])),
                 (2, simple_descriptor(0, 2, 3, 5, vec![1], vec![0])),
             ]),
+            ..MockDevice::default()
+        },
+    );
+
+    adapter.add_device(
+        150,
+        MockDevice {
+            node_descriptor: None,
+            key: Some("xiaomi".to_string()),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        151,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(151, 2, 1219)),
+            active_endpoints: None,
+            key: Some("xiaomi".to_string()),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        170,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(170, 2, 4619)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 170, "endpointList": [1]}])),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(170, 1, 99, 5, vec![0, 1280], vec![2]),
+            )]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([
+                    ("zoneState".to_string(), json!(0)),
+                    ("iasCieAddr".to_string(), json!("0x0000012300000000")),
+                    ("modelId".to_string(), json!("myIasDevice")),
+                    ("manufacturerName".to_string(), json!("KoenAndCoSecurity")),
+                    ("zclVersion".to_string(), json!(1)),
+                    ("appVersion".to_string(), json!(2)),
+                    ("hwVersion".to_string(), json!(3)),
+                    ("dateCode".to_string(), json!("201901")),
+                    ("swBuildId".to_string(), json!("1.01")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(101)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        171,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(171, 2, 1212)),
+            active_endpoints: Some(
+                json!([0, {"nwkAddress": 171, "endpointList": [1, 2, 3, 4, 5, 6]}]),
+            ),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(171, 1, 99, 5, vec![0, 1, 2], vec![2]),
+            )]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([
+                    ("modelId".to_string(), json!("lumi.remote.b286opcn01")),
+                    ("manufacturerName".to_string(), json!("Xioami")),
+                    ("zclVersion".to_string(), json!(1)),
+                    ("appVersion".to_string(), json!(2)),
+                    ("hwVersion".to_string(), json!(3)),
+                    ("dateCode".to_string(), json!("201901")),
+                    ("swBuildId".to_string(), json!("1.01")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(101)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        172,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(172, 1, 1212)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 172, "endpointList": [12, 11, 13]}])),
+            simple_descriptor: HashMap::from([
+                (
+                    11,
+                    simple_descriptor(
+                        172,
+                        11,
+                        99,
+                        0x0210,
+                        vec![0, 3, 4, 5, 6, 8, 768, 62301],
+                        vec![2],
+                    ),
+                ),
+                (
+                    12,
+                    simple_descriptor(172, 12, 99, 0xe15e, vec![0, 3, 4, 5, 6, 8, 768], vec![2]),
+                ),
+                (
+                    13,
+                    simple_descriptor(172, 13, 99, 0x0100, vec![0, 3, 4, 5, 6, 8, 768], vec![2]),
+                ),
+            ]),
+            attributes: HashMap::from([(
+                12,
+                HashMap::from([
+                    ("modelId".to_string(), json!("GL-C-008")),
+                    ("manufacturerName".to_string(), json!("Gledopto")),
+                    ("zclVersion".to_string(), json!(1)),
+                    ("appVersion".to_string(), json!(2)),
+                    ("hwVersion".to_string(), json!(3)),
+                    ("dateCode".to_string(), json!("201901")),
+                    ("swBuildId".to_string(), json!("1.01")),
+                    ("powerSource".to_string(), json!(1)),
+                    ("stackVersion".to_string(), json!(101)),
+                ]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        173,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(173, 2, 0)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 173, "endpointList": [1]}])),
+            simple_descriptor: HashMap::new(),
+            attributes: HashMap::new(),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
+        180,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(180, 1, 0xabcd)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 180, "endpointList": [1, 197]}])),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(180, 1, 260, 257, vec![0, 6, 8], vec![]),
+            )]),
+            attributes: HashMap::new(),
             ..MockDevice::default()
         },
     );

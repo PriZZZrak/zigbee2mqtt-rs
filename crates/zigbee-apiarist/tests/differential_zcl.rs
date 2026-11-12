@@ -308,7 +308,7 @@ fn zcl_catalog_covers_all_upstream_clusters() {
 }
 
 #[test]
-fn unknown_cluster_reports_unsupported_status() {
+fn unknown_cluster_specific_command_reports_unsup_command() {
     use zigbee_apiarist::zspec::zcl::zcl_frame::{try_from_buffer, FrameParseError};
     use zigbee_apiarist::zspec::zcl::zcl_header::{Direction, FrameControl, FrameType, Header};
 
@@ -330,6 +330,8 @@ fn unknown_cluster_reports_unsupported_status() {
         &[0x01, 1, 1],
         &CustomClusters::empty(),
     )
-    .expect_err("unknown cluster must fail");
-    assert_eq!(error, FrameParseError::Status(0xc3));
+    .expect_err("unknown cluster specific command must fail");
+    // Upstream: `Utils.getClusterCommand` throws UNSUP_COMMAND for a generated
+    // (unknown) cluster that has no command definitions.
+    assert_eq!(error, FrameParseError::Status(0x81));
 }

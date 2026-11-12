@@ -240,14 +240,10 @@ impl Frame {
             let frame_type = buffer[0] & 0x03;
             panic!("Unsupported frameType '{frame_type}'");
         };
+        // Unknown clusters are valid: global frames (e.g. raw attribute
+        // reports on vendor clusters) are parsed without a cluster definition,
+        // matching upstream.
         let cluster = Utils::get_cluster(cluster_id, None, custom_clusters);
-        if cluster.name == cluster_id.to_string()
-            && cluster.commands.is_empty()
-            && cluster.commandsResponse.is_empty()
-            && cluster.attributes.is_empty()
-        {
-            panic!("UNSUPPORTED_CLUSTER");
-        }
         let server_to_client = header.frame_control.direction == Direction::SERVER_TO_CLIENT;
         let (command, payload) = if header.frame_control.frame_type == FrameType::SPECIFIC {
             let command = resolve_command(

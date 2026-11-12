@@ -22,12 +22,12 @@ are explicitly `PENDING`.
 | 13 | 856 | Touchlink factory reset first | `touchlink_factory_reset_first` | PORTED |
 | 14 | 961 | Touchlink scan | `touchlink_scan` | PORTED |
 | 15 | 1029 | Touchlink lock | — | PENDING |
-| 16 | 1050 | Touchlink factory reset | `touchlink_factory_reset_first` | PORTED |
+| 16 | 1050 | Touchlink factory reset | `touchlink_factory_reset_and_identify` | PORTED |
 | 17 | 1123 | Touchlink identify | `touchlink_factory_reset_and_identify` | PORTED |
 | 18 | 1180 | Controller should ignore touchlink messages | `controller_should_ignore_touchlink_messages` | PORTED |
 | 19 | 1223 | Device should update properties when reported | `device_should_update_properties_when_reported` | PORTED |
-| 20 | 1242 | Change channel on start | `does_not_change_channel_on_start_if_not_changed` | PORTED |
-| 21 | 1263 | Change channel on start when nwkUpdateID is 0xff | — | PENDING |
+| 20 | 1242 | Change channel on start | `change_channel_on_start` | PORTED |
+| 21 | 1263 | Change channel on start when nwkUpdateID is 0xff | `change_channel_on_start` | PORTED |
 | 22 | 1282 | Does not change channel on start if not changed | `does_not_change_channel_on_start_if_not_changed` | PORTED |
 | 23 | 1291 | Get coordinator version | `get_coordinator_version_and_network_parameters` | PORTED |
 | 24 | 1296 | Get network parameters | `get_coordinator_version_and_network_parameters` | PORTED |
@@ -39,15 +39,15 @@ are explicitly `PENDING`.
 | 30 | 1448 | Join a device and explictly accept it | `join_a_device_and_explicitly_accept_it` | PORTED |
 | 31 | 1530 | Join a device and explictly refuses it | — | PENDING |
 | 32 | 1547 | Join a device and explictly refuses it but LEAVE request fails | — | PENDING |
-| 33 | 1566 | Set device powersource by string | `set_device_power_source_by_string` | PORTED |
+| 33 | 1566 | Set device powersource by string | — | PENDING |
 | 34 | 1574 | Get device should return same instance | `get_device_should_return_same_instance` | PORTED |
 | 35 | 1580 | Device announce event | `device_announce_event` | PORTED |
 | 36 | 1597 | Skip Device announce event from unknown device | `skip_device_announce_event_from_unknown_device` | PORTED |
 | 37 | 1609 | Device announce event should update network address when different | `device_announce_event_should_update_network_address_when_different` | PORTED |
-| 38 | 1627 | Network address event should update network address when different | `device_announce_event_should_update_network_address_when_different` | PORTED |
+| 38 | 1627 | Network address event should update network address when different | `network_address_event_should_update_network_address_when_different` | PORTED |
 | 39 | 1644 | Network address event shouldnt update network address when the same | `network_address_event_should_not_update_network_address_when_same` | PORTED |
 | 40 | 1658 | Network address event from unknown device | `zdo_network_address_response_from_unknown_device` | PORTED |
-| 41 | 1669 | Network address event should update the last seen value | `ieee_address_event_should_update_last_seen` | PORTED |
+| 41 | 1669 | Network address event should update the last seen value | — | PENDING |
 | 42 | 1684 | IEEE address event should update network address when different | `ieee_address_event_should_update_network_address_when_different` | PORTED |
 | 43 | 1701 | IEEE address event shouldnt update network address when the same | `ieee_address_event_should_not_update_network_address_when_same` | PORTED |
 | 44 | 1715 | IEEE address event from unknown device | `ieee_address_event_from_unknown_device` | PORTED |
@@ -56,7 +56,7 @@ are explicitly `PENDING`.
 | 47 | 1755 | ZDO response for NETWORK_ADDRESS_RESPONSE shouldnt update network address when the same | `zdo_network_address_response_should_not_update_when_same` | PORTED |
 | 48 | 1766 | ZDO response for NETWORK_ADDRESS_RESPONSE from unknown device | `zdo_network_address_response_from_unknown_device` | PORTED |
 | 49 | 1774 | ZDO response for NETWORK_ADDRESS_RESPONSE should update the last seen value | `zdo_network_address_response_updates_last_seen` | PORTED |
-| 50 | 1786 | ZDO response for END_DEVICE_ANNOUNCE should bubble up event | `zdo_end_device_announce_should_bubble_event` | PORTED |
+| 50 | 1786 | ZDO response for END_DEVICE_ANNOUNCE should bubble up event | — | PENDING |
 | 51 | 1813 | ZDO response for END_DEVICE_ANNOUNCE should update network address when different | `zdo_end_device_announce_updates_network_address_when_different` | PORTED |
 | 52 | 1840 | ZDO response for END_DEVICE_ANNOUNCE from unknown device | `zdo_end_device_announce_from_unknown_device` | PORTED |
 | 53 | 1862 | ZDO response for cluster ID with no extra processing | `zdo_cluster_with_no_extra_processing` | PORTED |
@@ -65,7 +65,7 @@ are explicitly `PENDING`.
 | 56 | 1905 | Device leave event with only nwk addr and remove from database | — | PENDING |
 | 57 | 1921 | Start with reset should clear database | `start_with_reset_should_clear_database` | PORTED |
 | 58 | 1947 | Existing database.tmp should not be overwritten | — | PENDING |
-| 59 | 1966 | Should create backup of databse before clearing when datbaseBackupPath is provided | — | PENDING |
+| 59 | 1966 | Should create backup of databse before clearing when datbaseBackupPath is provided | `should_create_database_backup_before_clearing` | PORTED |
 | 60 | 1980 | Add install code 18 byte | `add_install_code_18_byte` | PORTED |
 | 61 | 1992 | Add install code 16 byte - missing CRC is appended | `add_install_code_16_byte_missing_crc_is_appended` | PORTED |
 | 62 | 2010 | Add install code widely adopted format | `add_install_code_widely_adopted_format` | PORTED |
@@ -75,7 +75,7 @@ are explicitly `PENDING`.
 | 66 | 2099 | Add install code pipe-enclosed | `add_install_code_aqara_hue_and_pipe_formats` | PORTED |
 | 67 | 2111 | Add install code invalid | `add_install_code_invalid_and_unknown_format` | PORTED |
 | 68 | 2121 | Add install code unknown format | `add_install_code_invalid_and_unknown_format` | PORTED |
-| 69 | 2133 | Controller permit joining all, disabled automatically | `controller_permit_joining_all_disabled_manually` | PORTED |
+| 69 | 2133 | Controller permit joining all, disabled automatically | `controller_permit_joining_all_disabled_automatically` | PORTED |
 | 70 | 2183 | Controller permit joining all, disabled manually | `controller_permit_joining_all_disabled_manually` | PORTED |
 | 71 | 2244 | Controller permit joining through specific device | `controller_permit_joining_through_specific_device` | PORTED |
 | 72 | 2271 | Controller permit joining for specific time | `controller_permit_joining_for_specific_time` | PORTED |
@@ -84,24 +84,24 @@ are explicitly `PENDING`.
 | 75 | 2312 | Soft reset | `soft_and_hard_reset` | PORTED |
 | 76 | 2319 | Hard reset | `soft_and_hard_reset` | PORTED |
 | 77 | 2326 | Adapter disconnected event | `adapter_disconnected_event` | PORTED |
-| 78 | 2350 | handles disconnected event early after adapter.start | — | PENDING |
+| 78 | 2350 | handles disconnected event early after adapter.start | `adapter_disconnected_event` | PORTED |
 | 79 | 2375 | Device joins another time with different network address | `device_joins_another_time_with_different_network_address` | PORTED |
 | 80 | 2391 | Device joins and interview succeeds | `device_joins_and_interview_succeeds` | PORTED |
 | 81 | 2403 | Device joins and interview fails | `device_joins_and_interview_fails` | PORTED |
 | 82 | 2416 | Device joins with endpoints [4,1], should read modelID from 1 | `device_joins_with_endpoints_4_and_1_reads_model_id_from_1` | PORTED |
 | 83 | 2429 | Device joins with endpoints [2,1], as 2 is the only endpoint supporting genBasic it should read modelID from that | — | PENDING |
-| 84 | 2442 | Device joins and interview iAs enrollment succeeds | — | PENDING |
-| 85 | 2499 | Device joins and interview iAs enrollment fails | — | PENDING |
-| 86 | 2513 | Device joins and interview iAs enrollment throws | — | PENDING |
-| 87 | 2527 | Device joins, shouldnt enroll when already enrolled | — | PENDING |
+| 84 | 2442 | Device joins and interview iAs enrollment succeeds | `device_joins_and_interview_ias_enrollment_succeeds` | PORTED |
+| 85 | 2499 | Device joins and interview iAs enrollment fails | `device_joins_and_interview_ias_enrollment_fails` | PORTED |
+| 86 | 2513 | Device joins and interview iAs enrollment throws | `device_joins_and_interview_ias_enrollment_throws` | PORTED |
+| 87 | 2527 | Device joins, shouldnt enroll when already enrolled | `device_joins_shouldnt_enroll_when_already_enrolled` | PORTED |
 | 88 | 2541 | Receive zclData occupancy report | `receive_zcldata_occupancy_report` | PORTED |
 | 89 | 2585 | Receive raw data | `receive_raw_data_and_unknown_cluster` | PORTED |
 | 90 | 2621 | Receive raw data from unknown cluster | `receive_raw_data_and_unknown_cluster` | PORTED |
-| 91 | 2873 | Receive zclData from unkonwn device shouldnt emit anything | — | PENDING |
+| 91 | 2873 | Receive zclData from unkonwn device shouldnt emit anything | `receive_zcldata_from_unknown_device_should_emit_nothing` | PORTED |
 | 92 | 2892 | Receive zclData with device deleted during processing (prevent race condition) | — | PENDING |
 | 93 | 2937 | Receive readResponse from unknown endpoint | — | PENDING |
-| 94 | 2981 | Receive cluster command | `receive_raw_data_and_unknown_cluster` | PORTED |
-| 95 | 3035 | Receive cluster command from unknown cluster | `receive_raw_data_and_unknown_cluster` | PORTED |
+| 94 | 2981 | Receive cluster command | — | PENDING |
+| 95 | 3035 | Receive cluster command from unknown cluster | — | PENDING |
 | 96 | 3070 | Receive zclData send default response | — | PENDING |
 | 97 | 3118 | Receive zclData dont send default resopnse with skipDefaultResponse | — | PENDING |
 | 98 | 3158 | Receive zclData dont send default resopnse when broadcast | — | PENDING |
@@ -112,10 +112,10 @@ are explicitly `PENDING`.
 | 103 | 3404 | Sends read response for unsupported attribute | — | PENDING |
 | 104 | 3430 | Respond to genTime read fails | — | PENDING |
 | 105 | 3450 | Tuya end devices joins, stops responding after 1 requests, should read modelID and manufacturerName immediately on second pair | — | PENDING |
-| 106 | 3494 | Xiaomi WXCJKG11LM join (get simple descriptor for endpoint 2 fails) | — | PENDING |
+| 106 | 3494 | Xiaomi WXCJKG11LM join (get simple descriptor for endpoint 2 fails) | `xiaomi_wxcjkg11lm_join_simple_descriptor_for_endpoint_2_fails` | PORTED |
 | 107 | 3508 | Gledopto GL-C-007/GL-C-008 join (all endpoints support genBasic but only 12 responds) | — | PENDING |
 | 108 | 3522 | Control4 device join (genBasic reads fail, interview completes via quirk) | — | PENDING |
-| 109 | 3537 | Xiaomi end device joins (node descriptor fails) | — | PENDING |
+| 109 | 3537 | Xiaomi end device joins (node descriptor fails) | `xiaomi_end_device_joins_node_descriptor_fails` | PORTED |
 | 110 | 3598 | Xiaomi end device joins (node descriptor succeeds, but active endpoint response fails) | — | PENDING |
 | 111 | 3659 | Should use cached node descriptor when device is re-interviewed, but retrieve it when ignoreCache=true | — | PENDING |
 | 112 | 3679 | Should remove disappeared endpoints on updateActiveEndpoints | — | PENDING |
@@ -179,27 +179,27 @@ are explicitly `PENDING`.
 | 170 | 5567 | Endpoint manuf-spec read reporting config | — | PENDING |
 | 171 | 5710 | Return group from databse when not in lookup | — | PENDING |
 | 172 | 5717 | Throw error when creating group already exists | — | PENDING |
-| 173 | 5729 | Add endpoint to group | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 173 | 5729 | Add endpoint to group | — | PENDING |
 | 174 | 5769 | Adds endpoint to group when Add Group response reports duplicate | — | PENDING |
 | 175 | 5796 | Does not add endpoint to group when Add Group response reports failure | — | PENDING |
-| 176 | 5821 | Remove endpoint from group | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 176 | 5821 | Remove endpoint from group | — | PENDING |
 | 177 | 5840 | Does not remove endpoint from group when Remove Group response reports failure | — | PENDING |
 | 178 | 5866 | Removes endpoint from group database when Remove Group response reports NOT_FOUND | — | PENDING |
 | 179 | 5893 | Remove endpoint from group by number | — | PENDING |
 | 180 | 5909 | Try to get deleted device from endpoint | — | PENDING |
-| 181 | 5925 | Command response | `green_power_response_without_command_id_is_handled_gracefully` | PORTED |
+| 181 | 5925 | Command response | — | PENDING |
 | 182 | 5934 | Group command | — | PENDING |
-| 183 | 5956 | Endpoint command with options | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
+| 183 | 5956 | Endpoint command with options | — | PENDING |
 | 184 | 5983 | Endpoint command with duplicate cluster ID | — | PENDING |
 | 185 | 6005 | Endpoint command with duplicate identifier | — | PENDING |
-| 186 | 6019 | Endpoint commandResponse | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
+| 186 | 6019 | Endpoint commandResponse | — | PENDING |
 | 187 | 6046 | Device without meta should set meta to {} | — | PENDING |
 | 188 | 6125 | Read from group | — | PENDING |
 | 189 | 6139 | Read from group ignores unknown attributes | — | PENDING |
 | 190 | 6154 | Read from group fails | — | PENDING |
-| 191 | 6167 | Write to group | `device_endpoint_group_roundtrip_and_write_frame` | PORTED |
+| 191 | 6167 | Write to group | — | PENDING |
 | 192 | 6194 | Write to group with unknown attribute should fail | — | PENDING |
-| 193 | 6206 | Write to group fails | `device_endpoint_group_roundtrip_and_write_frame` | PORTED |
+| 193 | 6206 | Write to group fails | — | PENDING |
 | 194 | 6219 | Write to endpoint custom attributes | — | PENDING |
 | 195 | 6250 | Write to endpoint custom attributes without specifying manufacturerCode | — | PENDING |
 | 196 | 6283 | WriteUndiv to endpoint custom attributes without response | — | PENDING |
@@ -209,7 +209,7 @@ are explicitly `PENDING`.
 | 200 | 6383 | Write response to endpoint throw when transaction sequence number provided through options | — | PENDING |
 | 201 | 6399 | Write response to endpoint with no status attribute specified | — | PENDING |
 | 202 | 6415 | Write response to endpoint with ZCL attribute | — | PENDING |
-| 203 | 6445 | WriteResponse error | `parse_error_sends_default_response_with_status` | PORTED |
+| 203 | 6445 | WriteResponse error | — | PENDING |
 | 204 | 6464 | Write response to endpoint with options | — | PENDING |
 | 205 | 6494 | Read from endpoint with string | — | PENDING |
 | 206 | 6512 | Read from endpoint with string ignores unknown | — | PENDING |
@@ -227,20 +227,20 @@ are explicitly `PENDING`.
 | 218 | 7113 | Should save received attributes | — | PENDING |
 | 219 | 7149 | Emit read from device | — | PENDING |
 | 220 | 7191 | Emit write from device | — | PENDING |
-| 221 | 7235 | Endpoint command error | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
-| 222 | 7254 | Endpoint commandResponse error | `green_power_endpoint_242_broadcasts_command_response` | PORTED |
+| 221 | 7235 | Endpoint command error | — | PENDING |
+| 222 | 7254 | Endpoint commandResponse error | — | PENDING |
 | 223 | 7273 | Endpoint commandResponse error when transactionSequenceNumber provided through options | — | PENDING |
 | 224 | 7288 | ConfigureReporting error | — | PENDING |
-| 225 | 7309 | DefaultResponse error | `parse_error_sends_default_response_with_status` | PORTED |
+| 225 | 7309 | DefaultResponse error | — | PENDING |
 | 226 | 7328 | DefaultResponse error when transactionSequenceNumber provided through options | — | PENDING |
 | 227 | 7343 | Skip unbind if not bound | — | PENDING |
 | 228 | 7354 | Handle unbind with number not matching any group | — | PENDING |
 | 229 | 7367 | Unbind against unbound cluster | — | PENDING |
 | 230 | 7395 | Unbind error | — | PENDING |
 | 231 | 7422 | Bind error | — | PENDING |
-| 232 | 7448 | ReadResponse error | `parse_error_sends_default_response_with_status` | PORTED |
+| 232 | 7448 | ReadResponse error | — | PENDING |
 | 233 | 7467 | Read error | — | PENDING |
-| 234 | 7486 | Read with disable response | `skips_non_success_read_response_records` | PORTED |
+| 234 | 7486 | Read with disable response | — | PENDING |
 | 235 | 7496 | Write error | — | PENDING |
 | 236 | 7515 | Write with disable response | — | PENDING |
 | 237 | 7525 | Group command error | — | PENDING |
@@ -248,17 +248,17 @@ are explicitly `PENDING`.
 | 239 | 7548 | Write structured with disable response | — | PENDING |
 | 240 | 7558 | Write structured error | — | PENDING |
 | 241 | 7577 | Write with custom payload | — | PENDING |
-| 242 | 7631 | Green power | `green_power_commissioning_creates_device_and_emits_join` | PORTED |
+| 242 | 7631 | Green power | — | PENDING |
 | 243 | 7875 | Should handle green power responses gracefully | — | PENDING |
 | 244 | 7916 | Should handle green power broadcast commissioning | — | PENDING |
 | 245 | 7954 | Should handle green power unicast commissioning success | — | PENDING |
 | 246 | 8010 | Should handle green power unicast commissioning failure | — | PENDING |
 | 247 | 8065 | Should handle green power commissioning frame with IEEE addressing gracefully | — | PENDING |
 | 248 | 8091 | Should handle green power commissioning frame with switch info | — | PENDING |
-| 249 | 8120 | Should ignore invalid green power frame | `invalid_green_power_frame_is_ignored` | PORTED |
-| 250 | 8146 | Green power channel request | `green_power_channel_request_sends_response` | PORTED |
+| 249 | 8120 | Should ignore invalid green power frame | — | PENDING |
+| 250 | 8146 | Green power channel request | — | PENDING |
 | 251 | 8199 | Green power rxOnCap | — | PENDING |
-| 252 | 8304 | Green power unicast | `green_power_commissioning_creates_device_and_emits_join` | PORTED |
+| 252 | 8304 | Green power unicast | — | PENDING |
 | 253 | 8624 | Get input/ouptut clusters | — | PENDING |
 | 254 | 8642 | Report to endpoint custom attributes | — | PENDING |
 | 255 | 8673 | Report to endpoint with unknown string attribute | — | PENDING |
@@ -275,7 +275,7 @@ are explicitly `PENDING`.
 | 266 | 9342 | Handle retransmitted Xiaomi messages | — | PENDING |
 | 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | — | PENDING |
 | 268 | 9388 | Should do a coordinator check | — | PENDING |
-| 269 | 9667 | zclCommand | `green_power_response_without_command_id_is_handled_gracefully` | PORTED |
+| 269 | 9667 | zclCommand | — | PENDING |
 | 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
 | 271 | 9689 | zclCommand with error | — | PENDING |
 | 272 | 9709 | Interview on coordinator | — | PENDING |
@@ -309,14 +309,14 @@ are explicitly `PENDING`.
 | 300 | 10572 | sends & receives command to group with custom cluster when common to all members | — | PENDING |
 | 301 | 10704 | sends one group command with an explicit custom cluster supported by one member | — | PENDING |
 | 302 | 10760 | Updates a device genBasic properties | — | PENDING |
-| 303 | 10808 | triggers sendZdo on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 303 | 10808 | triggers sendZdo on sendRaw | — | PENDING |
 | 304 | 10825 | triggers sendZclFrameInterPANToIeeeAddr on sendRaw | — | PENDING |
-| 305 | 10857 | triggers sendZclFrameInterPANBroadcast on sendRaw | `send_raw_inter_pan_dispatches_to_touchlink` | PORTED |
-| 306 | 10886 | triggers sendZclFrameToGroup on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 305 | 10857 | triggers sendZclFrameInterPANBroadcast on sendRaw | — | PENDING |
+| 306 | 10886 | triggers sendZclFrameToGroup on sendRaw | — | PENDING |
 | 307 | 10920 | triggers sendZclFrameToAll on sendRaw | — | PENDING |
-| 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
-| 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | `send_raw_uses_custom_cluster_definitions` | PORTED |
+| 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | — | PENDING |
+| 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | — | PENDING |
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **100 / 311**.
+Ported: **82 / 311**.

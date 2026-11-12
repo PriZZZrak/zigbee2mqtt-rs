@@ -154,10 +154,14 @@ impl Device {
         if let Some(value) = manufacturer_name {
             gen_basic.insert("manufacturerName".to_string(), json!(value));
         }
-        gen_basic.insert(
-            "powerSource".to_string(),
-            json!(power_source.unwrap_or_else(|| "Unknown".to_string())),
-        );
+        let power_source_name = power_source.unwrap_or_else(|| "Unknown".to_string());
+        // Upstream `this.powerSource = powerSource ?? Zcl.PowerSource.Unknown`
+        // stores the numeric enum value in `genBasic.powerSource`.
+        let power_source_code = crate::zspec::zcl::definition::consts::power_sources()
+            .into_iter()
+            .find_map(|(code, name)| (name == power_source_name).then_some(code))
+            .unwrap_or(0);
+        gen_basic.insert("powerSource".to_string(), json!(power_source_code));
         if let Some(value) = model_id {
             gen_basic.insert("modelId".to_string(), json!(value));
         }
@@ -1368,7 +1372,15 @@ impl Device {
                 && (matches_tz_name(&manufacturer_name)
                     || manufacturer_name.starts_with("_TYZB01_")))
         {
-            if self.gen_basic.lock().unwrap().get("powerSource").is_none() {
+            // Upstream: `this.#genBasic.powerSource = this.#genBasic.powerSource || Zcl.PowerSource.Battery;`
+            // so the default Unknown (0) also counts as unset.
+            if self
+                .gen_basic
+                .lock()
+                .unwrap()
+                .get("powerSource")
+                .is_none_or(|value| value.as_u64() == Some(0))
+            {
                 self.set_power_source(json!("Battery"));
             }
             logger().debug("Interview - quirks matched for Tuya end device", NS);

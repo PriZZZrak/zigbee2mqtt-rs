@@ -222,6 +222,29 @@ async fn settle() {
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 }
 
+/// Waits until at least `count` interview events were emitted (interviews may
+/// include bounded retries/timeouts).
+async fn wait_interviews(harness: &Harness, count: usize) {
+    for _ in 0..2400 {
+        let seen = harness
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    zigbee_apiarist::controller::events::ControllerEvent::DeviceInterview(_)
+                )
+            })
+            .count();
+        if seen >= count {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+}
+
 fn join(adapter: &MockAdapter, network_address: u16, ieee: &str) {
     adapter.emit(ControllerAdapterEvent::DeviceJoined(AdapterDeviceJoined {
         network_address,
@@ -1806,4 +1829,410 @@ fn report_header(
 
 fn ts011f_payload() -> Vec<u8> {
     vec![0x02, 0xd0, 0x48, 0x02, 0x00, 0x0a]
+}
+
+#[tokio::test]
+async fn send_default_response_when_requested() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    adapter.sent_endpoint.lock().unwrap().clear();
+    let header = report_header(false);
+    let mut data = header.to_buffer();
+    data.extend_from_slice(&ts011f_payload());
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0xe000,
+        data,
+        header: Some(header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 0,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    let response = frames
+        .iter()
+        .find(|frame| frame.command.name == "defaultRsp")
+        .expect("default response");
+    assert_eq!(response.payload["cmdId"], 10);
+    assert_eq!(response.payload["statusCode"], 0);
+}
+
+#[tokio::test]
+async fn send_default_response_with_parsing_error_status_when_requested() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    adapter.sent_endpoint.lock().unwrap().clear();
+    let header = zigbee_apiarist::zspec::zcl::zcl_header::Header::new(
+        zigbee_apiarist::zspec::zcl::zcl_header::FrameControl {
+            reserved_bits: 0,
+            frame_type: zigbee_apiarist::zspec::zcl::zcl_header::FrameType::SPECIFIC,
+            direction: zigbee_apiarist::zspec::zcl::zcl_header::Direction::CLIENT_TO_SERVER,
+            disable_default_response: false,
+            manufacturer_specific: false,
+        },
+        None,
+        5,
+        0xfe,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 6,
+        data: header.to_buffer(),
+        header: Some(header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 0,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    let response = frames
+        .iter()
+        .find(|frame| frame.command.name == "defaultRsp")
+        .expect("default response");
+    assert_eq!(response.payload["cmdId"], 0xfe);
+    assert_eq!(response.payload["statusCode"], 0x81);
+}
+
+#[tokio::test]
+async fn do_not_send_default_response_when_disabled_broadcast_or_skip() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    for (disabled, broadcast, skip) in [
+        (true, false, false),
+        (false, true, false),
+        (false, false, true),
+    ] {
+        adapter.sent_endpoint.lock().unwrap().clear();
+        let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+        device.set_skip_default_response(skip);
+        let header = report_header(disabled);
+        let mut data = header.to_buffer();
+        data.extend_from_slice(&ts011f_payload());
+        adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+            cluster_id: 0xe000,
+            data,
+            header: Some(header),
+            address: json!(129),
+            endpoint: 1,
+            linkquality: 50,
+            group_id: 0,
+            was_broadcast: broadcast,
+            destination_endpoint: 1,
+        });
+        settle().await;
+        assert!(!adapter
+            .sent_endpoint
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|frame| frame.command.name == "defaultRsp"));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Interview quirks (IAS enrollment, Tuya, Xiaomi, Gledopto, Control4)
+// ---------------------------------------------------------------------------
+
+fn interview_statuses(harness: &Harness) -> Vec<String> {
+    harness
+        .take_events()
+        .iter()
+        .filter_map(|event| match event {
+            zigbee_apiarist::controller::events::ControllerEvent::DeviceInterview(payload) => {
+                Some(payload.status.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn device_joins_and_interview_ias_enrollment_succeeds() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 170, "0x170");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    let device = harness.controller.get_device_by_ieee_addr("0x170").unwrap();
+    assert_eq!(device.model_id().as_deref(), Some("myIasDevice"));
+}
+
+#[tokio::test]
+async fn device_joins_and_interview_ias_enrollment_fails() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    adapter
+        .ias_enroll
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    adapter.update_device(170, |device| {
+        if let Some(attributes) = device.attributes.get_mut(&1) {
+            attributes.insert("zoneState".to_string(), json!(0));
+        }
+    });
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 170, "0x170");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "failed".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn device_joins_and_interview_ias_enrollment_throws() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    *adapter.fail_zcl_command.lock().unwrap() = Some("enrollRsp".to_string());
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 170, "0x170");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "failed".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn device_joins_shouldnt_enroll_when_already_enrolled() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    adapter.update_device(170, |device| {
+        if let Some(attributes) = device.attributes.get_mut(&1) {
+            attributes.insert("zoneState".to_string(), json!(1));
+        }
+    });
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    join(&adapter, 170, "0x170");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    assert!(!adapter
+        .sent_endpoint
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|frame| frame.cluster.ID == 0x0500 && frame.command.name == "write"));
+}
+
+#[tokio::test]
+async fn tuya_end_device_second_pair_reads_model_and_manufacturer() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 173, "0x173");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "failed".to_string()]
+    );
+    let device = harness.controller.get_device_by_ieee_addr("0x173").unwrap();
+    assert_eq!(device.model_id(), None);
+    assert_eq!(device.manufacturer_name(), None);
+
+    adapter.emit(ControllerAdapterEvent::DeviceLeave(AdapterDeviceLeave {
+        network_address: Some(173),
+        ieee_addr: Some("0x173".to_string()),
+    }));
+    settle().await;
+    adapter.update_device(173, |device| {
+        device.node_descriptor = None;
+        device.attributes.insert(
+            1,
+            std::collections::HashMap::from([
+                ("modelId".to_string(), json!("TS0203")),
+                ("manufacturerName".to_string(), json!("_TYZB01_xph99wvr")),
+            ]),
+        );
+    });
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 173, "0x173");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    let device = harness.controller.get_device_by_ieee_addr("0x173").unwrap();
+    assert_eq!(device.model_id().as_deref(), Some("TS0203"));
+    assert_eq!(
+        device.manufacturer_name().as_deref(),
+        Some("_TYZB01_xph99wvr")
+    );
+    assert_eq!(device.power_source().as_deref(), Some("Battery"));
+}
+
+#[tokio::test]
+async fn xiaomi_wxcjkg11lm_join_simple_descriptor_for_endpoint_2_fails() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 171, "0x171");
+    settle().await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x171")
+            .unwrap()
+            .model_id()
+            .as_deref(),
+        Some("lumi.remote.b286opcn01")
+    );
+}
+
+#[tokio::test]
+async fn gledopto_join_only_endpoint_12_responds() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 172, "0x172");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    assert_eq!(
+        harness
+            .controller
+            .get_device_by_ieee_addr("0x172")
+            .unwrap()
+            .model_id()
+            .as_deref(),
+        Some("GL-C-008")
+    );
+}
+
+#[tokio::test]
+async fn control4_device_join_completes_via_quirk() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 180, "0x180");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    let device = harness.controller.get_device_by_ieee_addr("0x180").unwrap();
+    assert_eq!(
+        device.interview_state(),
+        zigbee_apiarist::controller::model::device::InterviewState::Successful
+    );
+    assert_eq!(device.model_id().as_deref(), Some("C4-Zigbee"));
+    assert_eq!(device.manufacturer_name().as_deref(), Some("Control4"));
+    assert_eq!(
+        device.power_source().as_deref(),
+        Some("Mains (single phase)")
+    );
+}
+
+#[tokio::test]
+async fn xiaomi_end_device_joins_node_descriptor_fails() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 150, "0x150");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "successful".to_string()]
+    );
+    let device = harness.controller.get_device_by_ieee_addr("0x150").unwrap();
+    assert_eq!(
+        device.r#type(),
+        zigbee_apiarist::controller::database::DeviceType::EndDevice
+    );
+    assert_eq!(device.model_id().as_deref(), Some("lumi.occupancy"));
+    assert_eq!(device.manufacturer_name().as_deref(), Some("LUMI"));
+}
+
+#[tokio::test]
+async fn xiaomi_end_device_joins_active_endpoints_fails() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 151, "0x151");
+    wait_interviews(&harness, 2).await;
+    assert_eq!(
+        interview_statuses(&harness),
+        vec!["started".to_string(), "failed".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn controller_permit_joining_all_disabled_automatically() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    assert!(!harness.controller.get_permit_join());
+    assert!(harness.controller.get_permit_join_end().is_none());
+    harness
+        .controller
+        .permit_join(1, None)
+        .await
+        .expect("permit");
+    assert!(harness.controller.get_permit_join());
+    let end = harness.controller.get_permit_join_end().expect("end");
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    assert!(end >= now && end <= now + 2000);
+    assert!(permit_join_events(&harness)
+        .iter()
+        .any(|event| event.permitted));
+    tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+    settle().await;
+    assert!(!harness.controller.get_permit_join());
+    assert!(harness.controller.get_permit_join_end().is_none());
+    assert!(permit_join_events(&harness)
+        .iter()
+        .any(|event| !event.permitted));
 }
