@@ -6503,3 +6503,107 @@ async fn touchlink_lock_guard() {
     touchlink.lock(false).expect("unlock");
     assert!(!touchlink.is_locked());
 }
+
+#[tokio::test]
+async fn load_database() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    let lines = [
+        r#"{"id":1,"type":"Coordinator","ieeeAddr":"0x0000012300000000","nwkAddr":0,"manufId":0,"epList":[11,6,5,4,3,2,1],"endpoints":{"1":{"profId":260,"epId":1,"devId":5,"inClusterList":[],"meta":{},"outClusterList":[],"clusters":{}},"2":{"profId":257,"epId":2,"devId":5,"inClusterList":[],"meta":{},"outClusterList":[],"clusters":{}},"3":{"profId":261,"epId":3,"devId":5,"inClusterList":[],"meta":{},"outClusterList":[],"clusters":{}},"4":{"profId":263,"epId":4,"devId":5,"inClusterList":[],"meta":{},"outClusterList":[],"clusters":{}},"5":{"profId":264,"epId":5,"devId":5,"inClusterList":[],"meta":{},"outClusterList":[],"clusters":{}},"6":{"profId":265,"epId":6,"devId":5,"inClusterList":[],"meta":{},"outClusterList":[],"clusters":{}},"11":{"profId":260,"epId":11,"devId":1024,"inClusterList":[],"meta":{},"outClusterList":[1280],"clusters":{}}},"interviewCompleted":false,"meta":{},"_id":"aM341ldunExFmJ3u"}"#,
+        r#"{"id":2,"type":"Group","groupID":1,"members":[],"meta":{},"_id":"kiiAEst4irEEqG8T"}"#,
+        r#"{"id":3,"type":"Router","ieeeAddr":"0x000b57fffec6a5b2","nwkAddr":40369,"manufId":4476,"manufName":"IKEA of Sweden","powerSource":"Mains (single phase)","modelId":"TRADFRI bulb E27 WS opal 980lm","epList":[1],"endpoints":{"1":{"profId":49246,"epId":1,"devId":544,"inClusterList":[0,3,4,5,6,8,768,2821,4096],"meta":{},"outClusterList":[5,25,32,4096],"clusters":{}}},"appVersion":17,"stackVersion":87,"hwVersion":1,"dateCode":"20170331","swBuildId":"1.2.217","zclVersion":1,"interviewState":"SUCCESSFUL","meta":{"reporting":1},"_id":"pagvP2f9Bbj3o9TM"}"#,
+        r#"{"id":4,"type":"EndDevice","ieeeAddr":"0x0017880104e45517","nwkAddr":6535,"manufId":4107,"manufName":"Philips","powerSource":"Battery","modelId":"RWL021","epList":[1,2],"endpoints":{"1":{"profId":49246,"epId":1,"devId":2096,"inClusterList":[0],"meta":{},"outClusterList":[0,3,4,6,8,5],"clusters":{}},"2":{"profId":260,"epId":2,"devId":12,"inClusterList":[0,1,3,15,64512],"meta":{},"outClusterList":[25],"clusters":{}}},"appVersion":2,"stackVersion":1,"hwVersion":1,"dateCode":"20160302","swBuildId":"5.45.1.17846","zclVersion":1,"interviewState":"SUCCESSFUL","meta":{"configured":1},"_id":"qxhymbX6H2GXDw8Z"}"#,
+        r#"{"$$indexCreated":{"fieldName":"id","unique":true,"sparse":false}}"#,
+        r#"{"id":4,"type":"EndDevice","ieeeAddr":"0x0017880104e45517","lastSeen":123,"nwkAddr":6538,"manufId":4107,"manufName":"Philips","powerSource":"Battery","modelId":"RWL021","epList":[1,2],"endpoints":{"1":{"profId":49246,"epId":1,"devId":2096,"inClusterList":[0],"meta":{},"outClusterList":[0,3,4,6,8,5],"binds":[{"type":"endpoint","endpointID":1,"deviceIeeeAddr":"0x000b57fffec6a5b2"}],"configuredReportings":[{"cluster":1,"attrId":0,"minRepIntval":1,"maxRepIntval":20,"repChange":2}],"clusters":{"genBasic":{"dir":{"value":3},"attrs":{"modelId":"RWL021"}}}},"2":{"profId":260,"epId":2,"devId":12,"inClusterList":[0,1,3,15,64512],"meta":{},"outClusterList":[25],"clusters":{}}},"appVersion":2,"stackVersion":1,"hwVersion":1,"dateCode":"20160302","swBuildId":"5.45.1.17846","zclVersion":1,"interviewState":"SUCCESSFUL","meta":{"configured":1},"_id":"qxhymbX6H2GXDw8Z"}"#,
+        r#"{"id":5,"type":"Group","groupID":2,"members":[{"deviceIeeeAddr":"0x000b57fffec6a5b2","endpointID":1},{"deviceIeeeAddr":"notExisting","endpointID":1}],"meta":{},"_id":"kiiAEst4irEEqG8K"}"#,
+        r#"{"id":6,"type":"EndDevice","ieeeAddr":"0x0017880104e45518","nwkAddr":6536,"manufId":4107,"manufName":"Philips","powerSource":"Battery","modelId":"RWL021","epList":[1,2],"endpoints":{"1":{"profId":49246,"epId":1,"devId":2096,"inClusterList":[0],"meta":{},"outClusterList":[0,3,4,6,8,5],"clusters":{}},"2":{"profId":260,"epId":2,"devId":12,"inClusterList":[0,1,3,15,32,64512],"meta":{},"outClusterList":[25],"clusters":{}}},"appVersion":2,"stackVersion":1,"hwVersion":1,"dateCode":"20160302","swBuildId":"5.45.1.17846","zclVersion":1,"interviewState":"SUCCESSFUL","meta":{"configured":1},"checkinInterval":123456,"_id":"qxhymbX6H2GXDw8Z2"}"#,
+    ];
+    std::fs::write(&harness.database_path, format!("{}\n", lines.join("\n"))).expect("database");
+    harness.start().await.expect("start");
+    assert_eq!(harness.controller.get_devices().len(), 4);
+
+    let coordinator = harness
+        .controller
+        .get_device_by_ieee_addr("0x0000012300000000")
+        .expect("coordinator");
+    let mut endpoints = coordinator
+        .endpoints()
+        .iter()
+        .map(|endpoint| (endpoint.ID, *endpoint.profile_id.lock().unwrap()))
+        .collect::<Vec<_>>();
+    endpoints.sort();
+    assert_eq!(
+        endpoints,
+        vec![
+            (1, Some(260)),
+            (2, Some(257)),
+            (3, Some(261)),
+            (4, Some(263)),
+            (5, Some(264)),
+            (6, Some(265)),
+            (11, Some(260)),
+        ]
+    );
+
+    let router = harness
+        .controller
+        .get_device_by_ieee_addr("0x000b57fffec6a5b2")
+        .expect("router");
+    assert_eq!(
+        router.model_id().as_deref(),
+        Some("TRADFRI bulb E27 WS opal 980lm")
+    );
+    assert_eq!(router.meta.lock().unwrap()["reporting"], 1);
+    let router_endpoint = router.get_endpoint(1).expect("endpoint");
+    assert_eq!(router_endpoint.get_input_clusters().len(), 9);
+    assert_eq!(router_endpoint.get_output_clusters().len(), 4);
+
+    let end_device = harness
+        .controller
+        .get_device_by_ieee_addr("0x0017880104e45517")
+        .expect("end device");
+    // The last database entry for ID 4 wins.
+    assert_eq!(end_device.network_address(), 6538);
+    assert_eq!(end_device.last_seen(), Some(123));
+    assert_eq!(end_device.endpoints().len(), 2);
+    let ep1 = end_device.get_endpoint(1).expect("ep1");
+    assert_eq!(ep1.binds().len(), 1);
+    assert_eq!(ep1.configured_reportings().len(), 1);
+    assert_eq!(
+        ep1.get_cluster_attribute_value(json!("genBasic"), json!("modelId")),
+        Some(json!("RWL021"))
+    );
+
+    let group = harness.controller.get_group_by_id(2).expect("group");
+    // The non-existing member is skipped.
+    assert_eq!(group.members().len(), 1);
+
+    let checkin_device = harness
+        .controller
+        .get_device_by_ieee_addr("0x0017880104e45518")
+        .expect("checkin device");
+    assert_eq!(checkin_device.checkin_interval(), Some(123456));
+    assert_eq!(checkin_device.pending_request_timeout(), 123456000);
+}
+
+#[tokio::test]
+async fn shouldnt_load_device_from_group_database_entry() {
+    let _guard = support::test_lock().await;
+    let result = std::panic::catch_unwind(|| {
+        zigbee_apiarist::controller::model::device::Device::from_database_entry(
+            &json!({"type": "Group", "endpoints": []}),
+        );
+    });
+    let payload = result.expect_err("must panic");
+    let message = payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| {
+            payload
+                .downcast_ref::<&str>()
+                .map(|value| value.to_string())
+        })
+        .unwrap_or_default();
+    assert_eq!(message, "Cannot load device from group");
+}

@@ -126,11 +126,12 @@ async fn nv_memory_roundtrip_over_unpi() {
         let mut buffer = [0u8; 256];
         let mut pending = Vec::new();
         loop {
-            let read = match peer.read(&mut buffer).await {
-                Ok(0) => return,
-                Ok(read) => read,
-                Err(_) => return,
+            let Ok(read) = peer.read(&mut buffer).await else {
+                return;
             };
+            if read == 0 {
+                return;
+            }
             pending.extend_from_slice(&buffer[..read]);
             loop {
                 if pending.len() < 5 {

@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
 use crate::event_bus::EventBus;
+use zigbee_apiarist::utils::logger::logger;
 
 /// Upstream `MqttPublishOptions`.
 #[derive(Debug, Clone, Default)]
@@ -108,10 +109,9 @@ impl Mqtt {
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Packet::Publish(publish))) => {
-                        let payload = match std::str::from_utf8(&publish.payload) {
-                            Ok(payload) => payload.to_string(),
-                            Err(_) => continue,
-                        };
+                        // Upstream uses `payload.toString()`; lossy UTF-8 keeps
+                        // the same contract instead of dropping the message.
+                        let payload = String::from_utf8_lossy(&publish.payload).to_string();
                         event_bus.lock().await.emit_mqtt_message(json!({
                             "topic": publish.topic,
                             "message": payload,
@@ -119,7 +119,8 @@ impl Mqtt {
                     }
                     Ok(Event::Incoming(Packet::ConnAck(_))) => {}
                     Ok(_) => {}
-                    Err(_) => {
+                    Err(error) => {
+                        logger().error(&format!("MQTT error: {error}"), "z2m:mqtt");
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     }
                 }

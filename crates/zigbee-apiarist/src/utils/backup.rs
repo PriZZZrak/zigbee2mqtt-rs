@@ -204,14 +204,9 @@ pub fn from_legacy_backup(backup: &Value) -> Result<Backup, String> {
     let preconfigured = nv("ZCD_NV_PRECFGKEY_ENABLE").map_err(|_| {
         "Backup corrupted - missing pre-configured key enable attribute".to_string()
     })?;
-    let material = match nv("ZCD_NV_EX_NWK_SEC_MATERIAL_TABLE")
+    let material = nv("ZCD_NV_EX_NWK_SEC_MATERIAL_TABLE")
         .or_else(|_| nv("ZCD_NV_LEGACY_NWK_SEC_MATERIAL_TABLE_START"))
-    {
-        Ok(value) => value,
-        Err(_) => {
-            return Err("Backup corrupted - missing network security material table".to_string())
-        }
-    };
+        .map_err(|_| "Backup corrupted - missing network security material table".to_string())?;
     let extaddr = nv("ZCD_NV_EXTADDR")
         .map_err(|_| "Backup corrupted - missing adapter IEEE address NV entry".to_string())?;
 

@@ -2255,10 +2255,13 @@ fn key_from_command(value: &Value) -> crate::zspec::zcl::utils::CommandKey {
 
 fn bind_from_value(value: &Value) -> Option<BindInternal> {
     Some(BindInternal {
-        cluster: value.get("cluster").and_then(Value::as_u64)? as u16,
+        // The database bind record has no cluster (upstream stores the raw
+        // {type, endpointID, deviceIeeeAddr} / {type, groupID} shape).
+        cluster: value.get("cluster").and_then(Value::as_u64).unwrap_or(0) as u16,
         r#type: value.get("type").and_then(Value::as_str)?.to_string(),
         device_ieee_address: value
-            .get("deviceIeeeAddress")
+            .get("deviceIeeeAddr")
+            .or_else(|| value.get("deviceIeeeAddress"))
             .and_then(Value::as_str)
             .map(str::to_string),
         endpoint_id: value
@@ -2273,11 +2276,18 @@ fn bind_from_value(value: &Value) -> Option<BindInternal> {
 }
 
 fn bind_to_value(bind: &BindInternal) -> Value {
-    json!({
-        "cluster": bind.cluster,
-        "type": bind.r#type,
-        "deviceIeeeAddress": bind.device_ieee_address,
-        "endpointID": bind.endpoint_id,
-        "groupID": bind.group_id,
-    })
+    // Upstream database shape: endpoint binds keep type/endpointID/deviceIeeeAddr,
+    // group binds keep type/groupID. The cluster is not persisted.
+    if bind.r#type == "endpoint" {
+        json!({
+            "type": "endpoint",
+            "endpointID": bind.endpoint_id,
+            "deviceIeeeAddr": bind.device_ieee_address,
+        })
+    } else {
+        json!({
+            "type": "group",
+            "groupID": bind.group_id,
+        })
+    }
 }

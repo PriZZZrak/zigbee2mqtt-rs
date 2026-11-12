@@ -24,11 +24,12 @@ fn spawn_fake_coordinator() -> (AdapterTransport, tokio::task::JoinHandle<()>) {
         let mut buffer = [0u8; 512];
         let mut pending = Vec::new();
         loop {
-            let read = match peer.read(&mut buffer).await {
-                Ok(0) => return,
-                Ok(read) => read,
-                Err(_) => return,
+            let Ok(read) = peer.read(&mut buffer).await else {
+                return;
             };
+            if read == 0 {
+                return;
+            }
             pending.extend_from_slice(&buffer[..read]);
             loop {
                 if pending.len() < 5 {
@@ -235,11 +236,12 @@ async fn skips_cc2530_bootloader_with_magic_byte() {
         let mut pending = Vec::new();
         let mut first_ping = true;
         loop {
-            let read = match peer.read(&mut buffer).await {
-                Ok(0) => return,
-                Ok(read) => read,
-                Err(_) => return,
+            let Ok(read) = peer.read(&mut buffer).await else {
+                return;
             };
+            if read == 0 {
+                return;
+            }
             pending.extend_from_slice(&buffer[..read]);
             // The magic byte is sent raw, outside of UNPI framing.
             while let Some(position) = pending.iter().position(|byte| *byte == 0xef) {

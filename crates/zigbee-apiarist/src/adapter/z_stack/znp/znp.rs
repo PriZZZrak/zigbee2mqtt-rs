@@ -162,7 +162,14 @@ impl Znp {
                 let _ = event_tx.send(object.clone());
                 received.lock().await.push(object);
             }
-            Err(_) => logger().error("Error while parsing to ZpiObject", NS),
+            Err(payload) => {
+                let message = payload
+                    .downcast_ref::<&str>()
+                    .map(|value| value.to_string())
+                    .or_else(|| payload.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "unknown panic".to_string());
+                logger().error(&format!("Error while parsing to ZpiObject: {message}"), NS);
+            }
         }
     }
 

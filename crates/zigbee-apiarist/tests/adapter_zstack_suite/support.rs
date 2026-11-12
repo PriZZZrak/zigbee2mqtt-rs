@@ -282,10 +282,11 @@ impl MockCoordinator {
             loop {
                 tokio::select! {
                     read = reader.read(&mut buffer) => {
-                        match read {
-                            Ok(0) | Err(_) => return,
-                            Ok(read) => pending.extend_from_slice(&buffer[..read]),
+                        let Ok(read) = read else { return };
+                        if read == 0 {
+                            return;
                         }
+                        pending.extend_from_slice(&buffer[..read]);
                     }
                     command = command_rx.recv() => {
                         let Some(bytes) = command else { return };

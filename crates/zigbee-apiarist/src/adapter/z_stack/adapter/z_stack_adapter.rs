@@ -1282,11 +1282,12 @@ mod tests {
             let mut buffer = [0u8; 256];
             let mut pending = Vec::new();
             loop {
-                let read = match peer.read(&mut buffer).await {
-                    Ok(0) => return,
-                    Ok(read) => read,
-                    Err(_) => return,
+                let Ok(read) = peer.read(&mut buffer).await else {
+                    return;
                 };
+                if read == 0 {
+                    return;
+                }
                 pending.extend_from_slice(&buffer[..read]);
                 loop {
                     if pending.len() < 5 {
@@ -1993,9 +1994,12 @@ impl ZStackAdapter {
         }
 
         if let Some((_, receiver)) = response {
-            match receiver.await {
-                Ok(Ok(payload)) => return Ok(Some(payload)),
-                Ok(Err(error)) => {
+            let Ok(response) = receiver.await else {
+                return Err("Waiter dropped".to_string());
+            };
+            match response {
+                Ok(payload) => return Ok(Some(payload)),
+                Err(error) => {
                     logger().debug(
                         &format!(
                             "Response timeout ({ieee_address}:{network_address},{response_attempt}): {error}"
@@ -2084,7 +2088,6 @@ impl ZStackAdapter {
                     }
                     return Err(error);
                 }
-                Err(_) => return Err("Waiter dropped".to_string()),
             }
         }
         Ok(None)

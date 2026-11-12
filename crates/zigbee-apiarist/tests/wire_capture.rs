@@ -56,11 +56,12 @@ async fn run_coordinator(
     let mut pending = Vec::new();
 
     loop {
-        let read = match socket.read(&mut buffer).await {
-            Ok(0) => return,
-            Ok(read) => read,
-            Err(_) => return,
+        let Ok(read) = socket.read(&mut buffer).await else {
+            return;
         };
+        if read == 0 {
+            return;
+        }
         pending.extend_from_slice(&buffer[..read]);
 
         if !pending.is_empty() && pending[0] != 0xfe {

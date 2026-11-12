@@ -1249,9 +1249,10 @@ fn gpd_attribute_name(
 }
 
 fn attribute_value_from_name(name: &str, attribute_id: u16) -> Value {
-    match name.parse::<u64>() {
-        Ok(_) => json!(attribute_id),
-        Err(_) => json!(name),
+    if name.parse::<u64>().is_ok() {
+        json!(attribute_id)
+    } else {
+        json!(name)
     }
 }
 

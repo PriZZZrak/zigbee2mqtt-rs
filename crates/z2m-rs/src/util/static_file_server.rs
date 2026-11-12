@@ -55,9 +55,8 @@ impl StaticFileServer {
             self.dir.join(&relative)
         };
 
-        let resolved = match requested.canonicalize() {
-            Ok(path) => path,
-            Err(_) => return send_not_found(request),
+        let Ok(resolved) = requested.canonicalize() else {
+            return send_not_found(request);
         };
         if !resolved.starts_with(self.dir.canonicalize().unwrap_or_else(|_| self.dir.clone())) {
             return send_not_found(request);
@@ -66,9 +65,8 @@ impl StaticFileServer {
         let is_root = request.target == "/" || request.target.is_empty();
         let plain_content_type = content_type(&resolved).to_string();
         let (path, encoding) = choose_encoding(&resolved, request);
-        let body = match std::fs::read(&path) {
-            Ok(body) => body,
-            Err(_) => return send_not_found(request),
+        let Ok(body) = std::fs::read(&path) else {
+            return send_not_found(request);
         };
 
         let metadata = std::fs::metadata(&path).ok();

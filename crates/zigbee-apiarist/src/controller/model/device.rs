@@ -1000,7 +1000,12 @@ impl Device {
         nwk_slot().write().unwrap().clear();
     }
 
-    fn from_database_entry(entry: &Value) -> Arc<Device> {
+    /// Upstream `fromDatabaseEntry(entry)`. Exposed for tests, which call it
+    /// directly with an invalid (group) entry like upstream does.
+    pub fn from_database_entry(entry: &Value) -> Arc<Device> {
+        if entry.get("type").and_then(Value::as_str) == Some("Group") {
+            panic!("Cannot load device from group");
+        }
         let network_address = entry.get("nwkAddr").and_then(Value::as_u64).unwrap_or(0) as u16;
         let ieee_addr = entry
             .get("ieeeAddr")

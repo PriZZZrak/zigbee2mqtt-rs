@@ -1983,9 +1983,9 @@ impl Controller {
                 device.manufacturer_id(),
                 &device.custom_clusters(),
             );
-            cluster_name = match cluster.name.parse::<u64>() {
-                Ok(number) => json!(number),
-                Err(_) => json!(cluster.name),
+            cluster_name = match cluster.name.parse::<u64>().ok() {
+                Some(number) => json!(number),
+                None => json!(cluster.name),
             };
         }
 
