@@ -2236,3 +2236,694 @@ async fn controller_permit_joining_all_disabled_automatically() {
         .iter()
         .any(|event| !event.permitted));
 }
+
+#[tokio::test]
+async fn command_response() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let response = endpoint
+        .command(
+            json!("genGroups"),
+            json!("add"),
+            json!({"groupid": 1, "groupname": ""}),
+            None,
+        )
+        .await
+        .expect("command");
+    assert_eq!(response, Some(json!({"groupid": 1, "status": 0})));
+}
+
+#[tokio::test]
+async fn group_command() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let group = harness.controller.create_group(2).expect("group");
+    adapter.sent_group.lock().unwrap().clear();
+    group
+        .command(
+            json!("genOnOff"),
+            json!("offWithEffect"),
+            json!({"effectid": 9, "effectvariant": 10}),
+            None,
+        )
+        .await
+        .expect("group command");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames.len(), 1);
+    let frame = &frames[0];
+    assert_eq!(frame.header.command_identifier, 64);
+    assert_eq!(frame.payload, json!({"effectid": 9, "effectvariant": 10}));
+    assert_eq!(frame.command.name, "offWithEffect");
+}
+
+#[tokio::test]
+async fn endpoint_command_with_options() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .command(
+            json!("genOnOff"),
+            json!("off"),
+            json!({}),
+            Some(zigbee_apiarist::controller::model::endpoint::Options {
+                manufacturer_code: Some(100),
+                disable_default_response: Some(true),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("command");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    let frame = &frames[0];
+    assert_eq!(frame.header.manufacturer_code, Some(100));
+    assert!(frame.header.frame_control.disable_default_response);
+    assert!(frame.header.frame_control.manufacturer_specific);
+    assert_eq!(frame.header.command_identifier, 0);
+    assert_eq!(frame.command.name, "off");
+}
+
+#[tokio::test]
+async fn endpoint_command_with_duplicate_cluster_id() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let mut cluster =
+        zigbee_apiarist::zspec::zcl::utils::Cluster::new("manuSpecificAssaDoorLock", 0xfc00);
+    let mut command = zigbee_apiarist::zspec::zcl::utils::Command::new("getBatteryLevel", 0x12);
+    command.order = 0;
+    cluster
+        .commands
+        .insert("getBatteryLevel".to_string(), command);
+    device
+        .add_custom_cluster("manuSpecificAssaDoorLock", cluster)
+        .expect("custom cluster");
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .command(
+            json!("manuSpecificAssaDoorLock"),
+            json!("getBatteryLevel"),
+            json!({}),
+            None,
+        )
+        .await
+        .expect("command");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    let buffer = frames[0].to_buffer();
+    // Transaction sequence number is a global counter; upstream resets it in
+    // the test setup, so only the frame type/command are asserted here.
+    assert_eq!(buffer[0], 1);
+    assert_eq!(buffer[2], 18);
+    assert_eq!(buffer.len(), 3);
+}
+
+#[tokio::test]
+async fn endpoint_command_with_duplicate_identifier() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let mut cluster = zigbee_apiarist::zspec::zcl::utils::Cluster::new("lightingColorCtrl", 0x0300);
+    let mut command = zigbee_apiarist::zspec::zcl::utils::Command::new(
+        "tuyaMoveToHueAndSaturationBrightness",
+        0x06,
+    );
+    command.parameters = vec![
+        zigbee_apiarist::zspec::zcl::utils::Parameter::new(
+            "hue",
+            zigbee_apiarist::zspec::zcl::definition::enums::DataType::UINT8,
+        ),
+        zigbee_apiarist::zspec::zcl::utils::Parameter::new(
+            "saturation",
+            zigbee_apiarist::zspec::zcl::definition::enums::DataType::UINT8,
+        ),
+        zigbee_apiarist::zspec::zcl::utils::Parameter::new(
+            "transtime",
+            zigbee_apiarist::zspec::zcl::definition::enums::DataType::UINT16,
+        ),
+        zigbee_apiarist::zspec::zcl::utils::Parameter::new(
+            "brightness",
+            zigbee_apiarist::zspec::zcl::definition::enums::DataType::UINT8,
+        ),
+    ];
+    command.order = 0;
+    cluster
+        .commands
+        .insert("tuyaMoveToHueAndSaturationBrightness".to_string(), command);
+    device
+        .add_custom_cluster("lightingColorCtrl", cluster)
+        .expect("custom cluster");
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .command(
+            json!("lightingColorCtrl"),
+            json!("tuyaMoveToHueAndSaturationBrightness"),
+            json!({"hue": 1, "saturation": 1, "transtime": 0, "brightness": 22}),
+            None,
+        )
+        .await
+        .expect("command");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    let buffer = frames[0].to_buffer();
+    assert_eq!(buffer[0], 1);
+    assert_eq!(buffer[2], 6);
+    assert_eq!(&buffer[3..], &[1, 1, 0, 0, 22]);
+}
+
+#[tokio::test]
+async fn endpoint_command_response() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .command_response(
+            json!("genOta"),
+            json!("imageNotify"),
+            json!({"payloadType": 0, "queryJitter": 1}),
+            None,
+            None,
+        )
+        .await
+        .expect("command response");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    let frame = &frames[0];
+    assert_eq!(frame.header.command_identifier, 0);
+    assert_eq!(frame.command.name, "imageNotify");
+    assert_eq!(frame.payload, json!({"payloadType": 0, "queryJitter": 1}));
+    assert_eq!(
+        frame.header.frame_control.direction,
+        zigbee_apiarist::zspec::zcl::zcl_header::Direction::SERVER_TO_CLIENT
+    );
+}
+
+#[tokio::test]
+async fn device_without_meta_sets_empty() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    let line = json!({
+        "id": 3,
+        "type": "EndDevice",
+        "ieeeAddr": "0x90fd9ffffe4b64ae",
+        "nwkAddr": 19468,
+        "manufId": 4476,
+        "manufName": "IKEA of Sweden",
+        "powerSource": "Battery",
+        "modelId": "TRADFRI remote control",
+        "epList": [1],
+        "endpoints": {
+            "1": {
+                "profId": 49246,
+                "epId": 1,
+                "devId": 2096,
+                "inClusterList": [0, 1, 3, 9, 2821, 4096],
+                "outClusterList": [3, 4, 5, 6, 8, 25, 4096],
+                "clusters": {}
+            }
+        },
+        "appVersion": 17,
+        "stackVersion": 87,
+        "hwVersion": 1,
+        "dateCode": "20170302",
+        "swBuildId": "1.2.214",
+        "zclVersion": 1,
+        "interviewState": "successful",
+        "_id": "fJ5pmjqKRYbNvslK"
+    });
+    std::fs::write(&harness.database_path, format!("{line}\n")).expect("database");
+    harness.start().await.expect("start");
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x90fd9ffffe4b64ae")
+        .expect("device");
+    assert_eq!(*device.meta.lock().unwrap(), json!({}));
+    assert_eq!(
+        device.gen_basic(),
+        json!({
+            "manufacturerName": "IKEA of Sweden",
+            "modelId": "TRADFRI remote control",
+            "powerSource": 3,
+            "swBuildId": "1.2.214",
+            "stackVersion": 87,
+            "zclVersion": 1,
+            "appVersion": 17,
+            "dateCode": "20170302",
+            "hwVersion": 1
+        })
+    );
+    assert_eq!(device.endpoints().len(), 1);
+    assert_eq!(
+        device.r#type(),
+        zigbee_apiarist::controller::database::DeviceType::EndDevice
+    );
+}
+
+#[tokio::test]
+async fn device_lqi_routing_and_binding_table() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 140, "0x140");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x140").unwrap();
+    let lqi = device.lqi().await.expect("lqi");
+    assert_eq!(lqi.len(), 2);
+    assert_eq!(lqi[0]["eui64"], "0x160");
+    assert_eq!(lqi[0]["nwkAddress"], 160);
+    assert_eq!(lqi[0]["lqi"], 20);
+    assert_eq!(lqi[0]["relationship"], 2);
+    assert_eq!(lqi[0]["depth"], 5);
+    assert_eq!(lqi[1]["eui64"], "0x170");
+    assert_eq!(lqi[1]["lqi"], 21);
+
+    let routing = device.routing_table().await.expect("routing");
+    assert_eq!(routing.len(), 2);
+    assert_eq!(routing[0]["destinationAddress"], 120);
+    assert_eq!(routing[0]["status"], "ACTIVE");
+    assert_eq!(routing[0]["nextHopAddress"], 1);
+    assert_eq!(routing[1]["status"], "DISCOVERY_FAILED");
+
+    let binding = device.binding_table().await.expect("binding");
+    assert_eq!(binding.len(), 2);
+    assert_eq!(binding[0]["sourceEui64"], "0xf1f2f3f5f6f7f8");
+    assert_eq!(binding[0]["clusterId"], 0);
+    assert_eq!(binding[0]["destAddrMode"], 3);
+    assert_eq!(binding[0]["dest"], "0xa1a2a3a4a5a6a7a8");
+    assert_eq!(binding[1]["destAddrMode"], 1);
+    assert_eq!(binding[1]["dest"], 4660);
+}
+
+#[tokio::test]
+async fn device_ping() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    device.ping(false).await.expect("ping");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].command.name, "read");
+    assert_eq!(frames[0].payload, json!([{"attrId": 0}]));
+}
+
+#[tokio::test]
+async fn coordinator_check_with_supported_backup() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let missing = harness.controller.coordinator_check().await.expect("check");
+    // The backup fixture has no devices, so every known device is reported missing.
+    assert!(missing.iter().any(|device| device.ieee_addr() == "0x129"));
+
+    adapter
+        .supports_backup
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    let error = match harness.controller.coordinator_check().await {
+        Ok(_) => panic!("expected error"),
+        Err(error) => error,
+    };
+    assert_eq!(
+        error,
+        "Coordinator does not coordinator check because it doesn't support backups"
+    );
+}
+
+#[tokio::test]
+async fn endpoint_bind_add_binding_and_unbind() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+
+    adapter.zdo_calls.lock().unwrap().clear();
+    endpoint
+        .bind(
+            json!("genBasic"),
+            zigbee_apiarist::controller::model::endpoint::BindTarget::Group(group.clone()),
+        )
+        .await
+        .expect("bind");
+    assert!(adapter
+        .zdo_calls
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|call| call.2
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::BIND_REQUEST));
+    assert_eq!(endpoint.binds().len(), 1);
+
+    endpoint
+        .unbind(
+            json!("genBasic"),
+            zigbee_apiarist::controller::model::endpoint::BindTarget::Group(group.clone()),
+            false,
+        )
+        .await
+        .expect("unbind");
+    assert!(endpoint.binds().is_empty());
+
+    endpoint
+        .add_binding(
+            json!("genBasic"),
+            zigbee_apiarist::controller::model::endpoint::BindTarget::Group(group.clone()),
+        )
+        .expect("add binding");
+    assert_eq!(endpoint.binds().len(), 1);
+    assert!(endpoint.has_bind(
+        0,
+        &zigbee_apiarist::controller::model::endpoint::BindTarget::Group(group)
+    ));
+}
+
+#[tokio::test]
+async fn endpoint_add_and_remove_from_group() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+
+    endpoint.add_to_group(&group).await.expect("add to group");
+    assert!(group.has_member(&endpoint));
+    endpoint
+        .remove_from_group(&group)
+        .await
+        .expect("remove from group");
+    assert!(!group.has_member(&endpoint));
+}
+
+#[tokio::test]
+async fn endpoint_add_to_group_when_response_reports_duplicate() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+    adapter
+        .group_status
+        .store(0x8a, std::sync::atomic::Ordering::SeqCst);
+    endpoint.add_to_group(&group).await.expect("duplicate");
+    assert!(group.has_member(&endpoint));
+}
+
+#[tokio::test]
+async fn endpoint_add_to_group_failure_does_not_add() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+    adapter
+        .group_status
+        .store(0x8b, std::sync::atomic::Ordering::SeqCst);
+    assert!(endpoint.add_to_group(&group).await.is_err());
+    assert!(!group.has_member(&endpoint));
+}
+
+#[tokio::test]
+async fn endpoint_remove_from_group_failure_keeps_member() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+    endpoint.add_to_group(&group).await.expect("add");
+    adapter
+        .group_status
+        .store(0x01, std::sync::atomic::Ordering::SeqCst);
+    assert!(endpoint.remove_from_group(&group).await.is_err());
+    assert!(group.has_member(&endpoint));
+}
+
+#[tokio::test]
+async fn endpoint_remove_from_group_database_when_not_found() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+    endpoint.add_to_group(&group).await.expect("add");
+    adapter
+        .group_status
+        .store(0x8b, std::sync::atomic::Ordering::SeqCst);
+    endpoint
+        .remove_from_group(&group)
+        .await
+        .expect("not found is ignored");
+    assert!(!group.has_member(&endpoint));
+    adapter
+        .group_status
+        .store(0x00, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[tokio::test]
+async fn endpoint_configure_reporting_and_read_config() {
+    use zigbee_apiarist::controller::model::endpoint::{
+        ConfigureReportingItem, ReadReportConfigItem,
+    };
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter.sent_endpoint.lock().unwrap().clear();
+    endpoint
+        .configure_reporting(
+            json!("genPowerCfg"),
+            vec![ConfigureReportingItem {
+                attribute: json!("batteryPercentageRemaining"),
+                minimum_report_interval: 60,
+                maximum_report_interval: 3600,
+                reportable_change: Some(10.0),
+            }],
+            None,
+        )
+        .await
+        .expect("configure reporting");
+    let frames = adapter.sent_endpoint.lock().unwrap();
+    assert_eq!(frames[0].command.name, "configReport");
+    assert_eq!(frames[0].payload[0]["attrId"], 0x0021);
+    assert_eq!(frames[0].payload[0]["minRepIntval"], 60);
+    assert_eq!(frames[0].payload[0]["maxRepIntval"], 3600);
+    assert_eq!(endpoint.configured_reportings().len(), 1);
+    drop(frames);
+
+    let response = endpoint
+        .read_reporting_config(
+            json!("genPowerCfg"),
+            vec![ReadReportConfigItem {
+                direction: None,
+                attribute: json!("batteryPercentageRemaining"),
+            }],
+            None,
+        )
+        .await
+        .expect("read reporting config");
+    assert_eq!(response[0]["attrId"], 0x0021);
+    assert_eq!(response[0]["status"], 0);
+}
+
+#[tokio::test]
+async fn endpoint_configure_reporting_fails_on_non_zero_status() {
+    use zigbee_apiarist::controller::model::endpoint::ConfigureReportingItem;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    adapter
+        .configure_report_status
+        .store(0x8b, std::sync::atomic::Ordering::SeqCst);
+    let error = endpoint
+        .configure_reporting(
+            json!("genPowerCfg"),
+            vec![ConfigureReportingItem {
+                attribute: json!("batteryPercentageRemaining"),
+                minimum_report_interval: 60,
+                maximum_report_interval: 3600,
+                reportable_change: Some(10.0),
+            }],
+            None,
+        )
+        .await
+        .expect_err("status");
+    assert!(error.contains("Status"));
+}
+
+#[tokio::test]
+async fn endpoint_configure_reporting_bad_attribute() {
+    use zigbee_apiarist::controller::model::endpoint::ConfigureReportingItem;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let error = endpoint
+        .configure_reporting(
+            json!("genPowerCfg"),
+            vec![ConfigureReportingItem {
+                attribute: json!("notAnAttribute"),
+                minimum_report_interval: 60,
+                maximum_report_interval: 3600,
+                reportable_change: None,
+            }],
+            None,
+        )
+        .await
+        .expect_err("bad attribute");
+    assert_eq!(
+        error,
+        "Invalid attribute 'notAnAttribute' for cluster 'genPowerCfg'"
+    );
+}
+
+#[tokio::test]
+async fn read_from_group_and_failure() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let group = harness.controller.create_group(2).expect("group");
+    adapter.sent_group.lock().unwrap().clear();
+    group
+        .read(json!("genBasic"), json!(["modelId", 1, "notanattr"]), None)
+        .await
+        .expect("read");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].command.name, "read");
+    assert_eq!(frames[0].payload, json!([{"attrId": 5}, {"attrId": 1}]));
+    drop(frames);
+
+    adapter
+        .fail_group_send
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    assert!(group
+        .read(json!("genBasic"), json!(["modelId", 1]), None)
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn write_to_group_and_failure() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let group = harness.controller.create_group(2).expect("group");
+    adapter.sent_group.lock().unwrap().clear();
+    group
+        .write(
+            json!("genBasic"),
+            json!({"49": {"value": 0x000b, "type": 0x19}, "deviceEnabled": 1}),
+            None,
+        )
+        .await
+        .expect("write");
+    let frames = adapter.sent_group.lock().unwrap();
+    assert_eq!(frames[0].command.name, "write");
+    assert_eq!(
+        frames[0].payload,
+        json!([
+            {"attrData": 11, "attrId": 49, "dataType": 25},
+            {"attrData": 1, "attrId": 18, "dataType": 16}
+        ])
+    );
+    drop(frames);
+
+    let error = group
+        .write(
+            json!("genBasic"),
+            json!({"UNKNOWN": {"value": 11, "type": 25}}),
+            None,
+        )
+        .await
+        .expect_err("unknown");
+    assert_eq!(
+        error,
+        "Unknown attribute 'UNKNOWN', specify either an existing attribute or a number"
+    );
+
+    adapter
+        .fail_group_send
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    assert!(group
+        .write(
+            json!("genBasic"),
+            json!({"49": {"value": 11, "type": 25}}),
+            None
+        )
+        .await
+        .is_err());
+}

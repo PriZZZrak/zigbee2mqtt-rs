@@ -48,6 +48,16 @@ pub struct MockAdapter {
     pub ias_enroll: AtomicBool,
     /// Command name whose endpoint send should fail (upstream `enrollRspThrow`).
     pub fail_zcl_command: Mutex<Option<String>>,
+    /// Upstream `configureReportStatus` (status returned by configReport).
+    pub configure_report_status: AtomicU64,
+    /// Upstream `configureReportDefaultRsp` (configReport answered by defaultRsp).
+    pub configure_report_default_rsp: AtomicBool,
+    /// Status returned by genGroups add/remove responses.
+    pub group_status: AtomicU64,
+    /// Makes `sendZclFrameToGroup` fail (upstream mock rejection).
+    pub fail_group_send: AtomicBool,
+    /// Payload returned for `readReportConfig`.
+    pub read_report_config_payload: Mutex<Option<Value>>,
     pub zdo_calls: Mutex<Vec<(String, u16, u16, Vec<u8>, bool)>>,
     pub sent_endpoint: Mutex<Vec<Frame>>,
     pub sent_group: Mutex<Vec<Frame>>,
@@ -83,6 +93,11 @@ impl MockAdapter {
             devices: Arc::new(Mutex::new(HashMap::new())),
             ias_enroll: AtomicBool::new(true),
             fail_zcl_command: Mutex::new(None),
+            configure_report_status: AtomicU64::new(0),
+            configure_report_default_rsp: AtomicBool::new(false),
+            group_status: AtomicU64::new(0),
+            fail_group_send: AtomicBool::new(false),
+            read_report_config_payload: Mutex::new(None),
             zdo_calls: Mutex::new(Vec::new()),
             sent_endpoint: Mutex::new(Vec::new()),
             sent_group: Mutex::new(Vec::new()),
@@ -216,7 +231,14 @@ impl ControllerAdapter for MockAdapter {
         self.sent_endpoint.lock().unwrap().push(frame.clone());
         let handler = self.zcl_handler.lock().unwrap().clone();
         let devices = self.devices.clone();
-        let ias_enroll = self.ias_enroll.load(Ordering::SeqCst);
+        let state = MockZclState {
+            devices: self.devices.clone(),
+            ias_enroll: self.ias_enroll.load(Ordering::SeqCst),
+            configure_report_status: self.configure_report_status.load(Ordering::SeqCst) as u8,
+            configure_report_default_rsp: self.configure_report_default_rsp.load(Ordering::SeqCst),
+            group_status: self.group_status.load(Ordering::SeqCst) as u8,
+            read_report_config_payload: self.read_report_config_payload.lock().unwrap().clone(),
+        };
         let fail_command = {
             let mut slot = self.fail_zcl_command.lock().unwrap();
             if slot.as_deref() == Some(frame.command.name.as_str()) {
@@ -234,7 +256,7 @@ impl ControllerAdapter for MockAdapter {
             if fail_command.as_deref() == Some(frame.command.name.as_str()) {
                 return Err("timeout".to_string());
             }
-            default_zcl(&devices, ias_enroll, network_address, endpoint, &frame)
+            default_zcl(&state, network_address, endpoint, &frame)
         })
     }
 
@@ -246,7 +268,14 @@ impl ControllerAdapter for MockAdapter {
         _profile_id: Option<u16>,
     ) -> ControllerFuture<'_, ()> {
         self.sent_group.lock().unwrap().push(frame.clone());
-        Box::pin(async { Ok(()) })
+        let fail = self.fail_group_send.load(Ordering::SeqCst);
+        Box::pin(async move {
+            if fail {
+                Err("timeout".to_string())
+            } else {
+                Ok(())
+            }
+        })
     }
 
     fn send_zcl_frame_to_all(
@@ -637,13 +666,28 @@ fn default_zdo(
     }
 }
 
+#[derive(Clone)]
+pub struct MockZclState {
+    pub devices: Arc<Mutex<HashMap<u16, MockDevice>>>,
+    pub ias_enroll: bool,
+    pub configure_report_status: u8,
+    pub configure_report_default_rsp: bool,
+    pub group_status: u8,
+    pub read_report_config_payload: Option<Value>,
+}
+
 fn default_zcl(
-    devices: &Arc<Mutex<HashMap<u16, MockDevice>>>,
-    ias_enroll: bool,
+    state: &MockZclState,
     network_address: u16,
     endpoint: u8,
     frame: &Frame,
 ) -> Result<Option<ZclPayload>, String> {
+    eprintln!(
+        "MOCK default_zcl cmd={} cluster={}",
+        frame.command.name, frame.cluster.ID
+    );
+    let devices = &state.devices;
+    let ias_enroll = state.ias_enroll;
     let is_global = frame.header.frame_control.frame_type
         == zigbee_apiarist::zspec::zcl::zcl_header::FrameType::GLOBAL;
     if is_global && frame.command.name == "read" {
@@ -742,6 +786,152 @@ fn default_zcl(
             }));
         }
         return Ok(None);
+    }
+    if !is_global
+        && (frame.command.name == "add" || frame.command.name == "remove")
+        && frame.cluster.ID == 0x0004
+    {
+        let response_name = if frame.command.name == "add" {
+            "addRsp"
+        } else {
+            "removeRsp"
+        };
+        let response = Frame::create(
+            zigbee_apiarist::zspec::zcl::zcl_header::FrameType::SPECIFIC as u8,
+            zigbee_apiarist::zspec::zcl::zcl_header::Direction::SERVER_TO_CLIENT as u8,
+            true,
+            None,
+            10,
+            response_name,
+            0x0004,
+            json!({"status": state.group_status, "groupid": 1}),
+            json!({}),
+            0,
+        );
+        return Ok(Some(ZclPayload {
+            cluster_id: 0x0004,
+            data: response.to_buffer(),
+            header: Some(response.header),
+            address: json!(network_address),
+            endpoint,
+            linkquality: 50,
+            group_id: 0,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        }));
+    }
+    if is_global && frame.command.name == "configReport" {
+        if state.configure_report_default_rsp {
+            let response = Frame::create(
+                0,
+                1,
+                true,
+                None,
+                10,
+                "defaultRsp",
+                0,
+                json!({"cmdId": 6, "statusCode": state.configure_report_status}),
+                json!({}),
+                0,
+            );
+            return Ok(Some(ZclPayload {
+                cluster_id: 0,
+                data: response.to_buffer(),
+                header: Some(response.header),
+                address: json!(network_address),
+                endpoint,
+                linkquality: 50,
+                group_id: 0,
+                was_broadcast: false,
+                destination_endpoint: 1,
+            }));
+        }
+        let items = frame
+            .payload
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| {
+                json!({
+                    "status": state.configure_report_status,
+                    "direction": item["direction"],
+                    "attrId": item["attrId"],
+                    "dataType": item["dataType"],
+                })
+            })
+            .collect::<Vec<_>>();
+        let response = Frame::create(
+            0,
+            1,
+            true,
+            None,
+            10,
+            "configReportRsp",
+            frame.cluster.ID as u16,
+            Value::Array(items),
+            json!({}),
+            0,
+        );
+        return Ok(Some(ZclPayload {
+            cluster_id: frame.cluster.ID as u16,
+            data: response.to_buffer(),
+            header: Some(response.header),
+            address: json!(network_address),
+            endpoint,
+            linkquality: 50,
+            group_id: 0,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        }));
+    }
+    if is_global && frame.command.name == "readReportConfig" {
+        let items = match &state.read_report_config_payload {
+            Some(payload) => payload.clone(),
+            None => Value::Array(
+                frame
+                    .payload
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|item| {
+                        json!({
+                            "status": 0,
+                            "direction": item["direction"],
+                            "attrId": item["attrId"],
+                            "dataType": 32,
+                            "minRepIntval": 60,
+                            "maxRepIntval": 3600,
+                            "repChange": 10,
+                        })
+                    })
+                    .collect(),
+            ),
+        };
+        let response = Frame::create(
+            0,
+            1,
+            true,
+            None,
+            10,
+            "readReportConfigRsp",
+            frame.cluster.ID as u16,
+            items,
+            json!({}),
+            0,
+        );
+        return Ok(Some(ZclPayload {
+            cluster_id: frame.cluster.ID as u16,
+            data: response.to_buffer(),
+            header: Some(response.header),
+            address: json!(network_address),
+            endpoint,
+            linkquality: 50,
+            group_id: 0,
+            was_broadcast: false,
+            destination_endpoint: 1,
+        }));
     }
     if is_global && frame.command.name == "write" {
         let payload = frame
@@ -857,6 +1047,37 @@ pub fn install_default_devices(adapter: &MockAdapter) {
         },
     );
 
+    adapter.add_device(
+        140,
+        MockDevice {
+            node_descriptor: None,
+            lqi_table: Some(json!([0, {
+                "neighborTableEntries": 2,
+                "startIndex": 0,
+                "entryList": [
+                    {"extendedPanId": [1,2,3,4,5,6,7,8], "eui64": "0x160", "nwkAddress": 160, "deviceType": 1, "rxOnWhenIdle": 0, "relationship": 2, "reserved1": 0, "permitJoining": 0, "reserved2": 0, "depth": 5, "lqi": 20},
+                    {"extendedPanId": [1,2,3,4,5,6,7,8], "eui64": "0x170", "nwkAddress": 170, "deviceType": 1, "rxOnWhenIdle": 0, "relationship": 4, "reserved1": 0, "permitJoining": 0, "reserved2": 0, "depth": 8, "lqi": 21}
+                ]
+            }])),
+            routing_table: Some(json!([0, {
+                "routingTableEntries": 2,
+                "startIndex": 0,
+                "entryList": [
+                    {"destinationAddress": 120, "status": "ACTIVE", "memoryConstrained": 0, "manyToOne": 0, "routeRecordRequired": 0, "reserved1": 0, "nextHopAddress": 1},
+                    {"destinationAddress": 130, "status": "DISCOVERY_FAILED", "memoryConstrained": 0, "manyToOne": 0, "routeRecordRequired": 0, "reserved1": 0, "nextHopAddress": 2}
+                ]
+            }])),
+            binding_table: Some(json!([0, {
+                "bindingTableEntries": 2,
+                "startIndex": 0,
+                "entryList": [
+                    {"sourceEui64": "0xf1f2f3f5f6f7f8", "sourceEndpoint": 1, "clusterId": 0, "destAddrMode": 3, "dest": "0xa1a2a3a4a5a6a7a8", "destEndpoint": 2},
+                    {"sourceEui64": "0xe1e2e3e5e6e7e8", "sourceEndpoint": 3, "clusterId": 9, "destAddrMode": 1, "dest": 4660}
+                ]
+            }])),
+            ..MockDevice::default()
+        },
+    );
     adapter.add_device(
         150,
         MockDevice {
@@ -996,14 +1217,6 @@ pub fn install_default_devices(adapter: &MockAdapter) {
             ..MockDevice::default()
         },
     );
-    adapter.add_device(
-        140,
-        MockDevice {
-            node_descriptor: None,
-            ..MockDevice::default()
-        },
-    );
-
     adapter.add_device(
         161,
         MockDevice {

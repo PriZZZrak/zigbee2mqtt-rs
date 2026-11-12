@@ -139,65 +139,65 @@ are explicitly `PENDING`.
 | 130 | 4315 | Removes group from network and database | — | PENDING |
 | 131 | 4339 | Removes every member when removing a group from the network | — | PENDING |
 | 132 | 4363 | Removes group from database | — | PENDING |
-| 133 | 4376 | Device lqi | — | PENDING |
-| 134 | 4387 | Device routing table | — | PENDING |
-| 135 | 4398 | Device binding table | — | PENDING |
+| 133 | 4376 | Device lqi | `device_lqi_routing_and_binding_table` | PORTED |
+| 134 | 4387 | Device routing table | `device_lqi_routing_and_binding_table` | PORTED |
+| 135 | 4398 | Device binding table | `device_lqi_routing_and_binding_table` | PORTED |
 | 136 | 4422 | Device updates endpoint bindings from binding table | — | PENDING |
 | 137 | 4485 | Device updates existing endpoint bindings from binding table | — | PENDING |
 | 138 | 4552 | Device clears all bindings | — | PENDING |
 | 139 | 4568 | Device selectively clears target bindings | — | PENDING |
 | 140 | 4584 | Device selectively clears multi-target bindings | — | PENDING |
-| 141 | 4600 | Device ping | — | PENDING |
+| 141 | 4600 | Device ping | `device_ping` | PORTED |
 | 142 | 4620 | Poll control supported | — | PENDING |
 | 143 | 4739 | Poll control unsupported | — | PENDING |
 | 144 | 4748 | Endpoint get id | — | PENDING |
 | 145 | 4755 | Endpoint get id by endpoint device type | — | PENDING |
-| 146 | 4763 | Endpoint bind | — | PENDING |
-| 147 | 4783 | Endpoint addBinding | — | PENDING |
+| 146 | 4763 | Endpoint bind | `endpoint_bind_add_binding_and_unbind` | PORTED |
+| 147 | 4783 | Endpoint addBinding | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 148 | 4798 | Endpoint get binds non-existing device | — | PENDING |
 | 149 | 4813 | Group bind | — | PENDING |
 | 150 | 4835 | Group addBinding | — | PENDING |
 | 151 | 4845 | Group bind by number (should create group) | — | PENDING |
 | 152 | 4868 | Group addBinding by number (should create group) | — | PENDING |
-| 153 | 4879 | Endpoint unbind | — | PENDING |
+| 153 | 4879 | Endpoint unbind | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 154 | 4898 | Group unbind | — | PENDING |
 | 155 | 4923 | Group unbind by number | — | PENDING |
 | 156 | 4948 | Group unbind by number, non-existing group and non-existing bind with force=true | — | PENDING |
-| 157 | 4970 | Endpoint configure reporting | — | PENDING |
+| 157 | 4970 | Endpoint configure reporting | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 158 | 5006 | handles configure reporting with non-Analog data type | — | PENDING |
-| 159 | 5041 | throws when trying to configure reporting on endpoint with bad attribute | — | PENDING |
+| 159 | 5041 | throws when trying to configure reporting on endpoint with bad attribute | `endpoint_configure_reporting_bad_attribute` | PORTED |
 | 160 | 5071 | Should replace legacy configured reportings without manufacturerCode | — | PENDING |
 | 161 | 5095 | Endpoint configure reporting for manufacturer specific attribute | — | PENDING |
 | 162 | 5148 | Endpoint configure reporting for manufacturer specific attribute from definition | — | PENDING |
-| 163 | 5196 | Save endpoint configure reporting | — | PENDING |
-| 164 | 5264 | Endpoint configure reporting fails when status code is not 0 | — | PENDING |
+| 163 | 5196 | Save endpoint configure reporting | `endpoint_configure_reporting_and_read_config` | PORTED |
+| 164 | 5264 | Endpoint configure reporting fails when status code is not 0 | `endpoint_configure_reporting_fails_on_non_zero_status` | PORTED |
 | 165 | 5291 | Endpoint configure reporting fails when status code is not 0 default rsp | — | PENDING |
 | 166 | 5319 | Endpoint configure reporting with disable response | — | PENDING |
-| 167 | 5341 | Endpoint read reporting config | — | PENDING |
+| 167 | 5341 | Endpoint read reporting config | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 168 | 5500 | Endpoint throws without response to read reporting config | — | PENDING |
 | 169 | 5510 | Endpoint ignores unknown attributes for read reporting config | — | PENDING |
 | 170 | 5567 | Endpoint manuf-spec read reporting config | — | PENDING |
 | 171 | 5710 | Return group from databse when not in lookup | — | PENDING |
 | 172 | 5717 | Throw error when creating group already exists | — | PENDING |
-| 173 | 5729 | Add endpoint to group | — | PENDING |
-| 174 | 5769 | Adds endpoint to group when Add Group response reports duplicate | — | PENDING |
-| 175 | 5796 | Does not add endpoint to group when Add Group response reports failure | — | PENDING |
-| 176 | 5821 | Remove endpoint from group | — | PENDING |
-| 177 | 5840 | Does not remove endpoint from group when Remove Group response reports failure | — | PENDING |
+| 173 | 5729 | Add endpoint to group | `endpoint_add_and_remove_from_group` | PORTED |
+| 174 | 5769 | Adds endpoint to group when Add Group response reports duplicate | `endpoint_add_to_group_when_response_reports_duplicate` | PORTED |
+| 175 | 5796 | Does not add endpoint to group when Add Group response reports failure | `endpoint_add_to_group_when_response_reports_duplicate` | PORTED |
+| 176 | 5821 | Remove endpoint from group | `endpoint_add_and_remove_from_group` | PORTED |
+| 177 | 5840 | Does not remove endpoint from group when Remove Group response reports failure | `endpoint_remove_from_group_failure_keeps_member` | PORTED |
 | 178 | 5866 | Removes endpoint from group database when Remove Group response reports NOT_FOUND | — | PENDING |
-| 179 | 5893 | Remove endpoint from group by number | — | PENDING |
+| 179 | 5893 | Remove endpoint from group by number | `endpoint_add_and_remove_from_group` | PORTED |
 | 180 | 5909 | Try to get deleted device from endpoint | — | PENDING |
-| 181 | 5925 | Command response | — | PENDING |
-| 182 | 5934 | Group command | — | PENDING |
-| 183 | 5956 | Endpoint command with options | — | PENDING |
-| 184 | 5983 | Endpoint command with duplicate cluster ID | — | PENDING |
-| 185 | 6005 | Endpoint command with duplicate identifier | — | PENDING |
-| 186 | 6019 | Endpoint commandResponse | — | PENDING |
-| 187 | 6046 | Device without meta should set meta to {} | — | PENDING |
-| 188 | 6125 | Read from group | — | PENDING |
+| 181 | 5925 | Command response | `command_response` | PORTED |
+| 182 | 5934 | Group command | `group_command` | PORTED |
+| 183 | 5956 | Endpoint command with options | `endpoint_command_with_options` | PORTED |
+| 184 | 5983 | Endpoint command with duplicate cluster ID | `endpoint_command_with_duplicate_cluster_id` | PORTED |
+| 185 | 6005 | Endpoint command with duplicate identifier | `endpoint_command_with_duplicate_identifier` | PORTED |
+| 186 | 6019 | Endpoint commandResponse | `endpoint_command_response` | PORTED |
+| 187 | 6046 | Device without meta should set meta to {} | `device_without_meta_sets_empty` | PORTED |
+| 188 | 6125 | Read from group | `read_from_group_and_failure` | PORTED |
 | 189 | 6139 | Read from group ignores unknown attributes | — | PENDING |
 | 190 | 6154 | Read from group fails | — | PENDING |
-| 191 | 6167 | Write to group | — | PENDING |
+| 191 | 6167 | Write to group | `write_to_group_and_failure` | PORTED |
 | 192 | 6194 | Write to group with unknown attribute should fail | — | PENDING |
 | 193 | 6206 | Write to group fails | — | PENDING |
 | 194 | 6219 | Write to endpoint custom attributes | — | PENDING |
@@ -228,7 +228,7 @@ are explicitly `PENDING`.
 | 219 | 7149 | Emit read from device | — | PENDING |
 | 220 | 7191 | Emit write from device | — | PENDING |
 | 221 | 7235 | Endpoint command error | — | PENDING |
-| 222 | 7254 | Endpoint commandResponse error | — | PENDING |
+| 222 | 7254 | Endpoint commandResponse error | `endpoint_command_response` | PORTED |
 | 223 | 7273 | Endpoint commandResponse error when transactionSequenceNumber provided through options | — | PENDING |
 | 224 | 7288 | ConfigureReporting error | — | PENDING |
 | 225 | 7309 | DefaultResponse error | — | PENDING |
@@ -275,8 +275,8 @@ are explicitly `PENDING`.
 | 266 | 9342 | Handle retransmitted Xiaomi messages | — | PENDING |
 | 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | — | PENDING |
 | 268 | 9388 | Should do a coordinator check | — | PENDING |
-| 269 | 9667 | zclCommand | — | PENDING |
-| 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
+| 269 | 9667 | zclCommand | `command_response` | PORTED |
+| 270 | 9677 | zclCommand with cluster/command objects | `endpoint_command_with_duplicate_cluster_id` | PORTED |
 | 271 | 9689 | zclCommand with error | — | PENDING |
 | 272 | 9709 | Interview on coordinator | — | PENDING |
 | 273 | 9721 | Device node descriptor fails | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **82 / 311**.
+Ported: **112 / 311**.
