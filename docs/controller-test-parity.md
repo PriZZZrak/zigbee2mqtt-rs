@@ -155,14 +155,14 @@ are explicitly `PENDING`.
 | 146 | 4763 | Endpoint bind | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 147 | 4783 | Endpoint addBinding | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 148 | 4798 | Endpoint get binds non-existing device | `endpoint_get_binds_non_existing_device` | PORTED |
-| 149 | 4813 | Group bind | — | PENDING |
-| 150 | 4835 | Group addBinding | — | PENDING |
-| 151 | 4845 | Group bind by number (should create group) | — | PENDING |
-| 152 | 4868 | Group addBinding by number (should create group) | — | PENDING |
+| 149 | 4813 | Group bind | `group_bind_and_add_binding` | PORTED |
+| 150 | 4835 | Group addBinding | `group_bind_and_add_binding` | PORTED |
+| 151 | 4845 | Group bind by number (should create group) | `group_bind_and_add_binding_by_number_creates_group` | PORTED |
+| 152 | 4868 | Group addBinding by number (should create group) | `group_bind_and_add_binding_by_number_creates_group` | PORTED |
 | 153 | 4879 | Endpoint unbind | `endpoint_bind_add_binding_and_unbind` | PORTED |
-| 154 | 4898 | Group unbind | — | PENDING |
-| 155 | 4923 | Group unbind by number | — | PENDING |
-| 156 | 4948 | Group unbind by number, non-existing group and non-existing bind with force=true | — | PENDING |
+| 154 | 4898 | Group unbind | `endpoint_and_group_unbind_variants` | PORTED |
+| 155 | 4923 | Group unbind by number | `endpoint_and_group_unbind_variants` | PORTED |
+| 156 | 4948 | Group unbind by number, non-existing group and non-existing bind with force=true | `endpoint_and_group_unbind_variants` | PORTED |
 | 157 | 4970 | Endpoint configure reporting | `endpoint_configure_reporting_and_read_config` | PORTED |
 | 158 | 5006 | handles configure reporting with non-Analog data type | `configure_reporting_non_analog_and_disable_response` | PORTED |
 | 159 | 5041 | throws when trying to configure reporting on endpoint with bad attribute | `endpoint_configure_reporting_bad_attribute` | PORTED |
@@ -234,7 +234,7 @@ are explicitly `PENDING`.
 | 225 | 7309 | DefaultResponse error | `configure_reporting_and_default_response_errors` | PORTED |
 | 226 | 7328 | DefaultResponse error when transactionSequenceNumber provided through options | `configure_reporting_and_default_response_errors` | PORTED |
 | 227 | 7343 | Skip unbind if not bound | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
-| 228 | 7354 | Handle unbind with number not matching any group | — | PENDING |
+| 228 | 7354 | Handle unbind with number not matching any group | `endpoint_and_group_unbind_variants` | PORTED |
 | 229 | 7367 | Unbind against unbound cluster | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
 | 230 | 7395 | Unbind error | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
 | 231 | 7422 | Bind error | `skip_unbind_if_not_bound_and_bind_unbind_errors` | PORTED |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **255 / 311**.
+Ported: **263 / 311**.

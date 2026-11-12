@@ -109,13 +109,19 @@ pub struct OptionsWithDefaults {
 pub enum BindTarget {
     Endpoint(Arc<Endpoint>),
     Group(Arc<Group>),
+    /// Upstream allows passing a group ID; the group is created on bind.
+    GroupId(u16),
 }
 
 impl PartialEq for BindTarget {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Endpoint(a), Self::Endpoint(b)) => Arc::ptr_eq(a, b),
+            (Self::GroupId(a), Self::GroupId(b)) => a == b,
             (Self::Group(a), Self::Group(b)) => Arc::ptr_eq(a, b),
+            (Self::Group(a), Self::GroupId(b)) | (Self::GroupId(b), Self::Group(a)) => {
+                a.group_id == *b
+            }
             _ => false,
         }
     }
@@ -1161,6 +1167,12 @@ impl Endpoint {
     /// Upstream `addBinding(clusterKey, target)`.
     pub fn add_binding(&self, cluster_key: Value, target: BindTarget) -> Result<(), String> {
         let cluster = self.get_cluster(cluster_key, None, None);
+        let target = match target {
+            BindTarget::GroupId(group_id) => {
+                BindTarget::Group(Group::by_group_id(group_id).unwrap_or(Group::create(group_id)?))
+            }
+            other => other,
+        };
         self.add_binding_internal(&cluster, &target)
     }
 
@@ -1182,6 +1194,13 @@ impl Endpoint {
                     endpoint_id: Some(endpoint.ID),
                     group_id: None,
                 }),
+                BindTarget::GroupId(group_id) => binds.push(BindInternal {
+                    cluster: cluster.ID as u16,
+                    r#type: "group".to_string(),
+                    device_ieee_address: None,
+                    endpoint_id: None,
+                    group_id: Some(*group_id),
+                }),
             }
             drop(binds);
             self.save();
@@ -1192,11 +1211,18 @@ impl Endpoint {
     /// Upstream `bind(clusterKey, target)`.
     pub async fn bind(&self, cluster_key: Value, target: BindTarget) -> Result<(), String> {
         let cluster = self.get_cluster(cluster_key, None, None);
+        let target = match target {
+            BindTarget::GroupId(group_id) => {
+                BindTarget::Group(Group::by_group_id(group_id).unwrap_or(Group::create(group_id)?))
+            }
+            other => other,
+        };
         let ieee = self.device_ieee_address.lock().unwrap().clone();
         let nwk = *self.device_network_address.lock().unwrap();
         let destination_address = match &target {
             BindTarget::Endpoint(endpoint) => endpoint.device_ieee_address.lock().unwrap().clone(),
             BindTarget::Group(group) => group.group_id.to_string(),
+            BindTarget::GroupId(group_id) => group_id.to_string(),
         };
         let log = format!(
             "Bind {ieee}/{} {} from '{}'",
@@ -1205,6 +1231,7 @@ impl Endpoint {
             match &target {
                 BindTarget::Endpoint(endpoint) => format!("{destination_address}/{}", endpoint.ID),
                 BindTarget::Group(group) => group.group_id.to_string(),
+                BindTarget::GroupId(group_id) => group_id.to_string(),
             }
         );
         logger().debug(&log, NS);
@@ -1220,6 +1247,12 @@ impl Endpoint {
                 MULTICAST_BINDING,
                 "0x0000000000000000".to_string(),
                 group.group_id,
+                0xff,
+            ),
+            BindTarget::GroupId(group_id) => (
+                MULTICAST_BINDING,
+                "0x0000000000000000".to_string(),
+                *group_id,
                 0xff,
             ),
         };
@@ -1265,6 +1298,18 @@ impl Endpoint {
         let ieee = self.device_ieee_address.lock().unwrap().clone();
         let nwk = *self.device_network_address.lock().unwrap();
         let action = format!("Unbind {ieee}/{} {}", self.ID, cluster.name);
+        let target = match target {
+            BindTarget::GroupId(group_id) => match Group::by_group_id(group_id) {
+                Some(group) => BindTarget::Group(group),
+                None if !force => {
+                    return Err(format!(
+                        "{action} invalid target '{group_id}' (no group with this ID exists)."
+                    ));
+                }
+                None => BindTarget::GroupId(group_id),
+            },
+            other => other,
+        };
         let index = self.get_bind_index(cluster.ID as u16, &target);
         if index == -1 && !force {
             logger().debug(&format!("{action} no bind present, skipping."), NS);
@@ -1283,6 +1328,12 @@ impl Endpoint {
                 group.group_id,
                 0xff,
             ),
+            BindTarget::GroupId(group_id) => (
+                MULTICAST_BINDING,
+                "0x0000000000000000".to_string(),
+                *group_id,
+                0xff,
+            ),
         };
         let log = format!(
             "{action} from '{}'",
@@ -1295,6 +1346,7 @@ impl Endpoint {
                     )
                 }
                 BindTarget::Group(group) => group.group_id.to_string(),
+                BindTarget::GroupId(group_id) => group_id.to_string(),
             }
         );
         logger().debug(&log, NS);

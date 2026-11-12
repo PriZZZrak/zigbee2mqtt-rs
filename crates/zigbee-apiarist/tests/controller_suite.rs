@@ -5802,3 +5802,156 @@ async fn ensures_manufacturer_code_unique_in_single_call() {
         "Cannot have attributes with different manufacturerCode in single 'readReportingConfig' call"
     );
 }
+
+#[tokio::test]
+async fn group_bind_and_add_binding() {
+    use zigbee_apiarist::controller::model::endpoint::BindTarget;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+
+    let group = harness.controller.create_group(4).expect("group");
+    adapter.zdo_calls.lock().unwrap().clear();
+    endpoint
+        .bind(json!("genPowerCfg"), BindTarget::Group(group.clone()))
+        .await
+        .expect("group bind");
+    let binds = endpoint.binds();
+    assert_eq!(binds.len(), 1);
+    assert_eq!(binds[0].cluster.ID, 1);
+    assert!(matches!(binds[0].target, BindTarget::Group(_)));
+    assert!(adapter
+        .zdo_calls
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|call| call.2
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::BIND_REQUEST));
+
+    let second = harness.controller.create_group(5).expect("group 5");
+    endpoint
+        .add_binding(json!("genBasic"), BindTarget::Group(second.clone()))
+        .expect("group add binding");
+    let binds = endpoint.binds();
+    assert_eq!(binds.len(), 2);
+    assert!(binds
+        .iter()
+        .any(|bind| bind.cluster.ID == 0 && matches!(bind.target, BindTarget::Group(_))));
+}
+
+#[tokio::test]
+async fn group_bind_and_add_binding_by_number_creates_group() {
+    use zigbee_apiarist::controller::model::endpoint::BindTarget;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    assert!(harness.controller.get_group_by_id(11).is_none());
+
+    endpoint
+        .bind(json!("genPowerCfg"), BindTarget::GroupId(11))
+        .await
+        .expect("bind by number");
+    assert!(harness.controller.get_group_by_id(11).is_some());
+    assert_eq!(endpoint.binds().len(), 1);
+
+    endpoint
+        .add_binding(json!("genBasic"), BindTarget::GroupId(12))
+        .expect("add binding by number");
+    assert!(harness.controller.get_group_by_id(12).is_some());
+    assert_eq!(endpoint.binds().len(), 2);
+}
+
+#[tokio::test]
+async fn endpoint_and_group_unbind_variants() {
+    use zigbee_apiarist::controller::model::endpoint::BindTarget;
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    join(&adapter, 170, "0x170");
+    wait_interviews(&harness, 4).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let target = harness
+        .controller
+        .get_device_by_ieee_addr("0x170")
+        .unwrap()
+        .get_endpoint(1)
+        .unwrap();
+
+    // Endpoint unbind, and unbinding again when not in binds.
+    adapter.set_zdo(|_ieee, _nwk, _cluster, _payload, _disable| Ok(json!([0, Value::Null])));
+    endpoint
+        .bind(json!("genBasic"), BindTarget::Endpoint(target.clone()))
+        .await
+        .expect("bind");
+    endpoint
+        .unbind(
+            json!("genBasic"),
+            BindTarget::Endpoint(target.clone()),
+            false,
+        )
+        .await
+        .expect("unbind");
+    assert!(endpoint.binds().is_empty());
+    endpoint
+        .unbind(json!("genBasic"), BindTarget::Endpoint(target), false)
+        .await
+        .expect("unbind again");
+    assert!(endpoint.binds().is_empty());
+
+    // Group unbind.
+    let group = harness.controller.create_group(5).expect("group");
+    endpoint
+        .bind(json!("genPowerCfg"), BindTarget::Group(group.clone()))
+        .await
+        .expect("group bind");
+    assert_eq!(endpoint.binds().len(), 1);
+    endpoint
+        .unbind(json!("genPowerCfg"), BindTarget::Group(group), false)
+        .await
+        .expect("group unbind");
+    assert!(endpoint.binds().is_empty());
+
+    // Group unbind by number.
+    let group = harness.controller.create_group(6).expect("group");
+    endpoint
+        .bind(json!("genPowerCfg"), BindTarget::Group(group))
+        .await
+        .expect("group bind");
+    endpoint
+        .unbind(json!("genPowerCfg"), BindTarget::GroupId(6), false)
+        .await
+        .expect("group unbind by number");
+    assert!(endpoint.binds().is_empty());
+
+    // Force unbind for a non-existing group.
+    adapter.zdo_calls.lock().unwrap().clear();
+    endpoint
+        .unbind(json!("genPowerCfg"), BindTarget::GroupId(7), true)
+        .await
+        .expect("force unbind");
+    assert!(adapter.zdo_calls.lock().unwrap().iter().any(|call| call.2
+        == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::UNBIND_REQUEST));
+
+    // Unbind with a number that does not match any group fails.
+    let error = endpoint
+        .unbind(json!("genOnOff"), BindTarget::GroupId(1), false)
+        .await
+        .expect_err("no group");
+    assert_eq!(
+        error,
+        "Unbind 0x129/1 genOnOff invalid target '1' (no group with this ID exists)."
+    );
+}
