@@ -248,15 +248,15 @@ are explicitly `PENDING`.
 | 239 | 7548 | Write structured with disable response | — | PENDING |
 | 240 | 7558 | Write structured error | — | PENDING |
 | 241 | 7577 | Write with custom payload | — | PENDING |
-| 242 | 7631 | Green power | — | PENDING |
-| 243 | 7875 | Should handle green power responses gracefully | — | PENDING |
+| 242 | 7631 | Green power | `green_power_commissioning_creates_device_and_emits_join` | PORTED |
+| 243 | 7875 | Should handle green power responses gracefully | `green_power_response_without_command_id_is_handled_gracefully` | PORTED |
 | 244 | 7916 | Should handle green power broadcast commissioning | — | PENDING |
 | 245 | 7954 | Should handle green power unicast commissioning success | — | PENDING |
 | 246 | 8010 | Should handle green power unicast commissioning failure | — | PENDING |
-| 247 | 8065 | Should handle green power commissioning frame with IEEE addressing gracefully | — | PENDING |
+| 247 | 8065 | Should handle green power commissioning frame with IEEE addressing gracefully | `green_power_ieee_addressing_is_skipped` | PORTED |
 | 248 | 8091 | Should handle green power commissioning frame with switch info | — | PENDING |
-| 249 | 8120 | Should ignore invalid green power frame | — | PENDING |
-| 250 | 8146 | Green power channel request | — | PENDING |
+| 249 | 8120 | Should ignore invalid green power frame | `invalid_green_power_frame_is_ignored` | PORTED |
+| 250 | 8146 | Green power channel request | `green_power_channel_request_sends_response` | PORTED |
 | 251 | 8199 | Green power rxOnCap | — | PENDING |
 | 252 | 8304 | Green power unicast | — | PENDING |
 | 253 | 8624 | Get input/ouptut clusters | — | PENDING |
@@ -273,8 +273,8 @@ are explicitly `PENDING`.
 | 264 | 9220 | Send to device with pendingRequestTimeout > 0, retry on timeout error | — | PENDING |
 | 265 | 9269 | Send to device with pendingRequestTimeout > 0, fails on non-timeout error | — | PENDING |
 | 266 | 9342 | Handle retransmitted Xiaomi messages | — | PENDING |
-| 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | — | PENDING |
-| 268 | 9388 | Should do a coordinator check | — | PENDING |
+| 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | `coordinator_check_with_supported_backup` | PORTED |
+| 268 | 9388 | Should do a coordinator check | `coordinator_check_with_supported_backup` | PORTED |
 | 269 | 9667 | zclCommand | — | PENDING |
 | 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
 | 271 | 9689 | zclCommand with error | — | PENDING |
@@ -309,14 +309,14 @@ are explicitly `PENDING`.
 | 300 | 10572 | sends & receives command to group with custom cluster when common to all members | — | PENDING |
 | 301 | 10704 | sends one group command with an explicit custom cluster supported by one member | — | PENDING |
 | 302 | 10760 | Updates a device genBasic properties | — | PENDING |
-| 303 | 10808 | triggers sendZdo on sendRaw | — | PENDING |
-| 304 | 10825 | triggers sendZclFrameInterPANToIeeeAddr on sendRaw | — | PENDING |
-| 305 | 10857 | triggers sendZclFrameInterPANBroadcast on sendRaw | — | PENDING |
-| 306 | 10886 | triggers sendZclFrameToGroup on sendRaw | — | PENDING |
-| 307 | 10920 | triggers sendZclFrameToAll on sendRaw | — | PENDING |
-| 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | — | PENDING |
-| 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | — | PENDING |
+| 303 | 10808 | triggers sendZdo on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 304 | 10825 | triggers sendZclFrameInterPANToIeeeAddr on sendRaw | `send_raw_inter_pan_dispatches_to_touchlink` | PORTED |
+| 305 | 10857 | triggers sendZclFrameInterPANBroadcast on sendRaw | `send_raw_inter_pan_dispatches_to_touchlink` | PORTED |
+| 306 | 10886 | triggers sendZclFrameToGroup on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 307 | 10920 | triggers sendZclFrameToAll on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 308 | 10953 | triggers sendZclFrameToEndpoint on sendRaw | `send_raw_dispatches_zdo_group_broadcast_and_endpoint` | PORTED |
+| 309 | 10997 | triggers sendZclFrameToEndpoint with custom cluster on sendRaw | `send_raw_uses_custom_cluster_definitions` | PORTED |
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **196 / 311**.
+Ported: **210 / 311**.
