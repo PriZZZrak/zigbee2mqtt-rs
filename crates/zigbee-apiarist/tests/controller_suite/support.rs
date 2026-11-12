@@ -1205,6 +1205,22 @@ pub fn install_default_devices(adapter: &MockAdapter) {
         },
     );
     adapter.add_device(
+        174,
+        MockDevice {
+            node_descriptor: Some(node_descriptor(174, 2, 1213)),
+            active_endpoints: Some(json!([0, {"nwkAddress": 174, "endpointList": [1]}])),
+            simple_descriptor: HashMap::from([(
+                1,
+                simple_descriptor(174, 1, 99, 5, vec![0, 32], vec![2]),
+            )]),
+            attributes: HashMap::from([(
+                1,
+                HashMap::from([("checkinInterval".to_string(), json!(50))]),
+            )]),
+            ..MockDevice::default()
+        },
+    );
+    adapter.add_device(
         180,
         MockDevice {
             node_descriptor: Some(node_descriptor(180, 1, 0xabcd)),

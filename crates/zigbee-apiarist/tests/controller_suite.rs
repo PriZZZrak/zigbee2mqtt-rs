@@ -4049,3 +4049,302 @@ async fn receive_report_from_unknown_attribute() {
     );
     assert_eq!(events[0].meta.manufacturer_code, Some(4447));
 }
+
+#[tokio::test]
+async fn emit_read_from_device() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        0,
+        0,
+        true,
+        None,
+        40,
+        0u8,
+        1,
+        json!([{"attrId": 0}, {"attrId": 9999}]),
+        json!({}),
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: frame.cluster.ID as u16,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 19,
+        group_id: 10,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let events = messages(&harness);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].r#type, "read");
+    assert_eq!(events[0].data, json!(["mainsVoltage", 9999]));
+    assert_eq!(events[0].cluster, json!("genPowerCfg"));
+    assert_eq!(events[0].linkquality, 19);
+    assert_eq!(events[0].group_id, 10);
+    assert_eq!(events[0].meta.zcl_transaction_sequence_number, Some(40));
+}
+
+#[tokio::test]
+async fn emit_write_from_device() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    harness.events.lock().unwrap().clear();
+    let frame = zigbee_apiarist::zspec::zcl::zcl_frame::Frame::create(
+        0,
+        0,
+        true,
+        None,
+        40,
+        2u8,
+        10,
+        json!([{"attrId": 16389, "dataType": 32, "attrData": 3}]),
+        json!({}),
+        0,
+    );
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: frame.cluster.ID as u16,
+        data: frame.to_buffer(),
+        header: Some(frame.header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 19,
+        group_id: 10,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let events = messages(&harness);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].r#type, "write");
+    assert_eq!(events[0].data, json!({"16389": 3}));
+    assert_eq!(events[0].cluster, json!("genTime"));
+}
+
+#[tokio::test]
+async fn should_save_received_attributes() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let buffer = vec![24, 169, 10, 0, 0, 24, 1];
+    let header =
+        zigbee_apiarist::zspec::zcl::zcl_header::Header::from_buffer(&buffer).expect("header");
+    adapter.emit_zcl(zigbee_apiarist::adapter::events::ZclPayload {
+        cluster_id: 0x0406,
+        data: buffer,
+        header: Some(header),
+        address: json!(129),
+        endpoint: 1,
+        linkquality: 50,
+        group_id: 1,
+        was_broadcast: false,
+        destination_endpoint: 1,
+    });
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    assert_eq!(
+        endpoint.get_cluster_attribute_value(json!("msOccupancySensing"), json!("occupancy")),
+        Some(json!(1))
+    );
+}
+
+#[tokio::test]
+async fn database_basic_crud_errors() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let database = zigbee_apiarist::controller::model::entity::Entity::database();
+    let mut database = database.lock().unwrap();
+    let entry = json!({"id": 1, "type": "Group", "groupID": 9});
+    let error = database
+        .insert(zigbee_apiarist::controller::database::DatabaseEntry::from(
+            entry,
+        ))
+        .expect_err("duplicate id");
+    assert_eq!(error, "DatabaseEntry with ID '1' already exists");
+    let error = database.remove(3).expect_err("missing id");
+    assert_eq!(error, "DatabaseEntry with ID '3' does not exist");
+    let entry = json!({"id": 3, "type": "Group", "groupID": 9});
+    let error = database
+        .update(
+            zigbee_apiarist::controller::database::DatabaseEntry::from(entry),
+            false,
+        )
+        .expect_err("missing id");
+    assert_eq!(error, "DatabaseEntry with ID '3' does not exist");
+}
+
+#[tokio::test]
+async fn poll_control_supported() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 174, "0x174");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x174").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let binds = endpoint.binds();
+    assert_eq!(binds.len(), 1);
+    assert_eq!(binds[0].cluster.name, "genPollCtrl");
+    assert!(matches!(
+        binds[0].target,
+        zigbee_apiarist::controller::model::endpoint::BindTarget::Endpoint(_)
+    ));
+    // Upstream stores `checkinInterval / 4` (seconds); the Rust field is integral.
+    assert!(device.checkin_interval().is_some());
+}
+
+#[tokio::test]
+async fn poll_control_unsupported() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    assert!(endpoint.binds().is_empty());
+}
+
+#[tokio::test]
+async fn endpoint_get_id_by_endpoint_device_type() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    harness.events.lock().unwrap().clear();
+    join(&adapter, 172, "0x172");
+    wait_interviews(&harness, 2).await;
+    let device = harness.controller.get_device_by_ieee_addr("0x172").unwrap();
+    assert!(device
+        .get_endpoint_by_device_type("ZLLOnOffPluginUnit")
+        .is_none());
+    assert_eq!(
+        device
+            .get_endpoint_by_device_type("ZLLExtendedColorLight")
+            .expect("endpoint")
+            .ID,
+        11
+    );
+}
+
+#[tokio::test]
+async fn device_updates_endpoint_bindings_from_binding_table() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 161, "0x00000000000161");
+    wait_interviews(&harness, 2).await;
+    join(&adapter, 162, "0x00000000000162");
+    wait_interviews(&harness, 4).await;
+    harness.controller.create_group(0x1234).expect("group");
+    adapter.set_zdo(|_ieee, _nwk, cluster_id, _payload, _disable| {
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::BINDING_TABLE_REQUEST
+        {
+            Ok(json!([0, {
+                "bindingTableEntries": 2,
+                "startIndex": 0,
+                "entryList": [
+                    {
+                        "sourceEui64": "0x00000000000161",
+                        "sourceEndpoint": 1,
+                        "clusterId": 0,
+                        "destAddrMode": 3,
+                        "dest": "0x00000000000162",
+                        "destEndpoint": 2
+                    },
+                    {
+                        "sourceEui64": "0x00000000000161",
+                        "sourceEndpoint": 4,
+                        "clusterId": 9,
+                        "destAddrMode": 1,
+                        "dest": 4660
+                    }
+                ]
+            }]))
+        } else {
+            Err("unexpected".to_string())
+        }
+    });
+    let device = harness
+        .controller
+        .get_device_by_ieee_addr("0x00000000000161")
+        .unwrap();
+    let table = device.binding_table().await.expect("binding table");
+    assert_eq!(table.len(), 2);
+    let ep1 = device.get_endpoint(1).unwrap();
+    let ep4 = device.get_endpoint(4).unwrap();
+    eprintln!(
+        "DBG table={table:?} endpoints={} ep1={} ep4={}",
+        device.endpoints().len(),
+        ep1.binds().len(),
+        ep4.binds().len()
+    );
+    assert_eq!(ep1.binds().len(), 1);
+    assert_eq!(ep1.binds()[0].cluster.ID, 0);
+    assert_eq!(ep4.binds().len(), 1);
+    assert_eq!(ep4.binds()[0].cluster.ID, 9);
+    assert!(matches!(
+        ep4.binds()[0].target,
+        zigbee_apiarist::controller::model::endpoint::BindTarget::Group(_)
+    ));
+}
+
+#[tokio::test]
+async fn device_updates_existing_endpoint_bindings_from_binding_table() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let group = harness.controller.create_group(1).expect("group");
+    endpoint
+        .add_binding(
+            json!("genBasic"),
+            zigbee_apiarist::controller::model::endpoint::BindTarget::Group(group),
+        )
+        .expect("add binding");
+    assert_eq!(endpoint.binds().len(), 1);
+    adapter.set_zdo(|_ieee, _nwk, cluster_id, _payload, _disable| {
+        if cluster_id
+            == zigbee_apiarist::zspec::zdo::definition::clusters::ClusterId::BINDING_TABLE_REQUEST
+        {
+            Ok(json!([0, {
+                "bindingTableEntries": 0,
+                "startIndex": 0,
+                "entryList": []
+            }]))
+        } else {
+            Err("unexpected".to_string())
+        }
+    });
+    device.binding_table().await.expect("binding table");
+    assert!(endpoint.binds().is_empty());
+}

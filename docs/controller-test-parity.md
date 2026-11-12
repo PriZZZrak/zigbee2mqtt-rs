@@ -142,16 +142,16 @@ are explicitly `PENDING`.
 | 133 | 4376 | Device lqi | `device_lqi_routing_and_binding_table` | PORTED |
 | 134 | 4387 | Device routing table | `device_lqi_routing_and_binding_table` | PORTED |
 | 135 | 4398 | Device binding table | `device_lqi_routing_and_binding_table` | PORTED |
-| 136 | 4422 | Device updates endpoint bindings from binding table | — | PENDING |
-| 137 | 4485 | Device updates existing endpoint bindings from binding table | — | PENDING |
+| 136 | 4422 | Device updates endpoint bindings from binding table | `device_updates_endpoint_bindings_from_binding_table` | PORTED |
+| 137 | 4485 | Device updates existing endpoint bindings from binding table | `device_updates_existing_endpoint_bindings_from_binding_table` | PORTED |
 | 138 | 4552 | Device clears all bindings | — | PENDING |
 | 139 | 4568 | Device selectively clears target bindings | — | PENDING |
 | 140 | 4584 | Device selectively clears multi-target bindings | — | PENDING |
 | 141 | 4600 | Device ping | `device_ping` | PORTED |
-| 142 | 4620 | Poll control supported | — | PENDING |
-| 143 | 4739 | Poll control unsupported | — | PENDING |
+| 142 | 4620 | Poll control supported | `poll_control_supported` | PORTED |
+| 143 | 4739 | Poll control unsupported | `poll_control_unsupported` | PORTED |
 | 144 | 4748 | Endpoint get id | `endpoint_get_id_and_device_type` | PORTED |
-| 145 | 4755 | Endpoint get id by endpoint device type | `endpoint_get_id_and_device_type` | PORTED |
+| 145 | 4755 | Endpoint get id by endpoint device type | `endpoint_get_id_by_endpoint_device_type` | PORTED |
 | 146 | 4763 | Endpoint bind | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 147 | 4783 | Endpoint addBinding | `endpoint_bind_add_binding_and_unbind` | PORTED |
 | 148 | 4798 | Endpoint get binds non-existing device | — | PENDING |
@@ -223,10 +223,10 @@ are explicitly `PENDING`.
 | 214 | 6720 | Load database | — | PENDING |
 | 215 | 7060 | Load database: interviewState migration and reset IN_PROGRESS | — | PENDING |
 | 216 | 7087 | Shouldnt load device from group databaseentry | — | PENDING |
-| 217 | 7094 | Should throw datbase basic crud errors | — | PENDING |
-| 218 | 7113 | Should save received attributes | — | PENDING |
-| 219 | 7149 | Emit read from device | — | PENDING |
-| 220 | 7191 | Emit write from device | — | PENDING |
+| 217 | 7094 | Should throw datbase basic crud errors | `database_basic_crud_errors` | PORTED |
+| 218 | 7113 | Should save received attributes | `should_save_received_attributes` | PORTED |
+| 219 | 7149 | Emit read from device | `emit_read_from_device` | PORTED |
+| 220 | 7191 | Emit write from device | `emit_write_from_device` | PORTED |
 | 221 | 7235 | Endpoint command error | — | PENDING |
 | 222 | 7254 | Endpoint commandResponse error | — | PENDING |
 | 223 | 7273 | Endpoint commandResponse error when transactionSequenceNumber provided through options | — | PENDING |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | — | PENDING |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | — | PENDING |
 
-Ported: **172 / 311**.
+Ported: **180 / 311**.
