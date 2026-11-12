@@ -21,7 +21,7 @@ are explicitly `PENDING`.
 | 12 | 847 | Controller update ieeeAddr if changed | `controller_update_ieee_addr_if_changed` | PORTED |
 | 13 | 856 | Touchlink factory reset first | `touchlink_factory_reset_first` | PORTED |
 | 14 | 961 | Touchlink scan | `touchlink_scan` | PORTED |
-| 15 | 1029 | Touchlink lock | — | PENDING |
+| 15 | 1029 | Touchlink lock | `touchlink_lock_guard` | PORTED |
 | 16 | 1050 | Touchlink factory reset | `touchlink_factory_reset_and_identify` | PORTED |
 | 17 | 1123 | Touchlink identify | `touchlink_factory_reset_and_identify` | PORTED |
 | 18 | 1180 | Controller should ignore touchlink messages | `controller_should_ignore_touchlink_messages` | PORTED |
@@ -276,7 +276,7 @@ are explicitly `PENDING`.
 | 267 | 9379 | Shouldnt throw error on coordinatorCheck when adapter doesnt support backups | `coordinator_check_with_supported_backup` | PORTED |
 | 268 | 9388 | Should do a coordinator check | `coordinator_check_with_supported_backup` | PORTED |
 | 269 | 9667 | zclCommand | `zcl_command_without_response` | PORTED |
-| 270 | 9677 | zclCommand with cluster/command objects | — | PENDING |
+| 270 | 9677 | zclCommand with cluster/command objects | `zcl_command_with_cluster_and_command_objects` | PORTED |
 | 271 | 9689 | zclCommand with error | `group_command_error` | PORTED |
 | 272 | 9709 | Interview on coordinator | `interview_on_coordinator` | PORTED |
 | 273 | 9721 | Device node descriptor fails | `interview_descriptor_requests_fail` | PORTED |
@@ -319,4 +319,4 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **278 / 311**.
+Ported: **280 / 311**.

@@ -2038,6 +2038,14 @@ impl Endpoint {
         cluster_override: Option<Cluster>,
     ) -> Result<Option<Frame>, String> {
         let device = self.get_device();
+        let cluster_key = match &cluster_key {
+            // Upstream also accepts a cluster definition object.
+            Value::Object(object) => match object.get("name").and_then(Value::as_str) {
+                Some(name) => Value::String(name.to_string()),
+                None => Value::from(object.get("ID").and_then(Value::as_u64).unwrap_or(0)),
+            },
+            other => other.clone(),
+        };
         let cluster = cluster_override.unwrap_or_else(|| {
             self.get_cluster(
                 cluster_key,
@@ -2045,10 +2053,18 @@ impl Endpoint {
                 options.as_ref().and_then(|o| o.manufacturer_code),
             )
         });
+        let command_key = match &command_key {
+            // Upstream also accepts a command definition object.
+            Value::Object(object) => match object.get("name").and_then(Value::as_str) {
+                Some(name) => Value::String(name.to_string()),
+                None => Value::from(object.get("ID").and_then(Value::as_u64).unwrap_or(0)),
+            },
+            other => other.clone(),
+        };
         let command = if frame_type == FrameType::GLOBAL as u8 {
             Utils::get_global_command(key_from_command(&command_key))
         } else {
-            Utils::get_cluster_command(&cluster, command_key.as_str().unwrap_or_default())
+            Utils::get_cluster_command(&cluster, key_from_command(&command_key))
         };
         let has_response = if frame_type == FrameType::GLOBAL as u8 {
             true

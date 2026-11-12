@@ -6452,3 +6452,54 @@ async fn remove_endpoint_from_group_by_number() {
     assert_eq!(frames[0].command.name, "remove");
     assert_eq!(frames[0].cluster.ID, 4);
 }
+
+#[tokio::test]
+async fn zcl_command_with_cluster_and_command_objects() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    join(&adapter, 129, "0x129");
+    settle().await;
+    let device = harness.controller.get_device_by_ieee_addr("0x129").unwrap();
+    let endpoint = device.get_endpoint(1).unwrap();
+    let cluster = zigbee_apiarist::zspec::zcl::utils::Utils::get_cluster(
+        "genOnOff",
+        None,
+        &zigbee_apiarist::zspec::zcl::utils::CustomClusters::empty(),
+    );
+    let command = zigbee_apiarist::zspec::zcl::utils::Utils::get_global_command("discover");
+    no_response_next(&adapter, "discover");
+    let result = endpoint
+        .zcl_command(
+            json!({"name": cluster.name, "ID": cluster.ID}),
+            json!({"name": command.name, "ID": command.ID}),
+            json!({"startAttrId": 1, "maxAttrIds": 255}),
+            None,
+            None,
+            false,
+            0,
+            None,
+        )
+        .await
+        .expect("zcl command with objects");
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn touchlink_lock_guard() {
+    let _guard = support::test_lock().await;
+    let adapter = MockAdapter::new();
+    let harness = Harness::new(adapter.clone());
+    harness.start().await.expect("start");
+    let touchlink = harness.controller.touchlink();
+    let mut guard = touchlink.lock().await;
+    let touchlink = guard.as_mut().unwrap();
+    touchlink.lock(true).expect("first lock");
+    assert_eq!(
+        touchlink.lock(true).expect_err("already in progress"),
+        "Touchlink operation already in progress"
+    );
+    touchlink.lock(false).expect("unlock");
+    assert!(!touchlink.is_locked());
+}
