@@ -15,6 +15,8 @@ Last verified against crates.io: **2026-11-09**.
 | `tokio` | `1` | 1.54.1 | 1.54.1 | current |
 | `rumqttc` | `0.25` | 0.25.1 | 0.25.1 | current |
 | `regex` | `1` | 1.13.1 | 1.13.1 | current; imported only by `z2m_rs::util::settings_schema` (Ajv wrapper) and `z2m_rs::util::utils` (`filterProperties`) |
+| `tokio-tungstenite` | `0.30` | 0.30.0 | 0.30.0 | handshake only; `z2m_rs::extension::frontend` |
+| `futures-util` | `0.3` | 0.3.x | current | sink/stream helpers in `frontend` |
 | `socket2` | `0.6` | 0.6.5 | 0.6.5 | current |
 | `serial2-tokio` | `0.1` | 0.1.26 | 0.1.26 | current |
 

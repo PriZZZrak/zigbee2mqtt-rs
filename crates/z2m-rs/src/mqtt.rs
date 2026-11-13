@@ -210,7 +210,11 @@ impl Mqtt {
         self.event_bus
             .lock()
             .unwrap()
-            .emit_mqtt_message_published(json!({"topic": topic}));
+            .emit_mqtt_message_published(json!({
+                "topic": topic,
+                "payload": String::from_utf8_lossy(&payload).to_string(),
+                "options": {"meta": {"isEntityState": options.is_entity_state}},
+            }));
         true
     }
 
