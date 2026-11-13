@@ -205,20 +205,382 @@ impl HomeAssistant {
                         payload,
                     });
                 }
+                "climate" => {
+                    let find = |name: &str| {
+                        expose
+                            .features
+                            .iter()
+                            .find(|feature| feature.name.as_deref() == Some(name))
+                    };
+                    let heating = find("occupied_heating_setpoint")
+                        .or_else(|| find("current_heating_setpoint"));
+                    let cooling = find("occupied_cooling_setpoint");
+                    let Some(primary) = heating.or(cooling) else {
+                        continue;
+                    };
+                    let (Some(min), Some(max)) = (primary.value_min, primary.value_max) else {
+                        continue;
+                    };
+                    let Some(temperature) = find("local_temperature") else {
+                        continue;
+                    };
+
+                    let mut payload = Map::new();
+                    payload.insert("name".into(), Value::Null);
+                    payload.insert("state_topic".into(), Value::Bool(false));
+                    payload.insert("temperature_unit".into(), json!("C"));
+                    if let Some(step) = primary.value_step {
+                        payload.insert("temp_step".into(), Value::from(step));
+                    }
+                    payload.insert("min_temp".into(), Value::String(min.to_string()));
+                    payload.insert("max_temp".into(), Value::String(max.to_string()));
+                    payload.insert("current_temperature_topic".into(), Value::Bool(true));
+                    payload.insert(
+                        "current_temperature_template".into(),
+                        Value::String(state_value_template(
+                            temperature
+                                .property
+                                .as_deref()
+                                .unwrap_or("local_temperature"),
+                        )),
+                    );
+
+                    if let Some(mode) = find("system_mode") {
+                        let mut values: Vec<String> = mode
+                            .values
+                            .iter()
+                            .filter(|value| value.as_str() != "sleep")
+                            .cloned()
+                            .collect();
+                        payload.insert("mode_state_topic".into(), Value::Bool(true));
+                        payload.insert(
+                            "modes".into(),
+                            Value::Array(values.iter().cloned().map(Value::String).collect()),
+                        );
+                        if values.iter().any(|value| value == "emergency_heating") {
+                            let property = mode.property.as_deref().unwrap_or("system_mode");
+                            payload.insert(
+                                "mode_state_template".into(),
+                                Value::String(state_value_template_body(
+                                    property,
+                                    &format!("{{% set mode = value_json[\"{property}\"] %}}{{{{ heat if mode == emergency_heating else mode }}}}"),
+                                )),
+                            );
+                            values.retain(|value| value != "emergency_heating");
+                            payload.insert(
+                                "modes".into(),
+                                Value::Array(values.into_iter().map(Value::String).collect()),
+                            );
+                        } else {
+                            payload.insert(
+                                "mode_state_template".into(),
+                                Value::String(state_value_template(
+                                    mode.property.as_deref().unwrap_or("system_mode"),
+                                )),
+                            );
+                        }
+                        payload.insert("mode_command_topic".into(), Value::Bool(true));
+                    }
+
+                    if let Some(state) = find("running_state") {
+                        let property = state.property.as_deref().unwrap_or("running_state");
+                        payload.insert("action_topic".into(), Value::Bool(true));
+                        payload.insert(
+                            "action_template".into(),
+                            Value::String(state_value_template_body(
+                                property,
+                                &format!("{{% set values = {{None:None,idle:idle,heat:heating,cool:cooling,fan_only:fan}} %}}{{{{ values[value_json[\"{property}\"]] }}}}"),
+                            )),
+                        );
+                        let _ = state;
+                    }
+
+                    if let Some(cooling) = cooling.filter(|_| heating.is_some()) {
+                        let heating = heating.unwrap();
+                        payload.insert("temperature_low_command_topic".into(), json!(heating.name));
+                        payload.insert(
+                            "temperature_low_state_template".into(),
+                            Value::String(state_value_template(
+                                heating.property.as_deref().unwrap_or(""),
+                            )),
+                        );
+                        payload.insert("temperature_low_state_topic".into(), Value::Bool(true));
+                        payload
+                            .insert("temperature_high_command_topic".into(), json!(cooling.name));
+                        payload.insert(
+                            "temperature_high_state_template".into(),
+                            Value::String(state_value_template(
+                                cooling.property.as_deref().unwrap_or(""),
+                            )),
+                        );
+                        payload.insert("temperature_high_state_topic".into(), Value::Bool(true));
+                    } else {
+                        payload.insert("temperature_command_topic".into(), json!(primary.name));
+                        payload.insert(
+                            "temperature_state_template".into(),
+                            Value::String(state_value_template(
+                                primary.property.as_deref().unwrap_or(""),
+                            )),
+                        );
+                        payload.insert("temperature_state_topic".into(), Value::Bool(true));
+                    }
+
+                    if let Some(fan_mode) = find("fan_mode") {
+                        payload.insert(
+                            "fan_modes".into(),
+                            Value::Array(
+                                fan_mode.values.iter().cloned().map(Value::String).collect(),
+                            ),
+                        );
+                        payload.insert("fan_mode_command_topic".into(), Value::Bool(true));
+                        payload.insert(
+                            "fan_mode_state_template".into(),
+                            Value::String(state_value_template(
+                                fan_mode.property.as_deref().unwrap_or("fan_mode"),
+                            )),
+                        );
+                        payload.insert("fan_mode_state_topic".into(), Value::Bool(true));
+                    }
+                    if let Some(swing_mode) = find("swing_mode") {
+                        payload.insert(
+                            "swing_modes".into(),
+                            Value::Array(
+                                swing_mode
+                                    .values
+                                    .iter()
+                                    .cloned()
+                                    .map(Value::String)
+                                    .collect(),
+                            ),
+                        );
+                        payload.insert("swing_mode_command_topic".into(), Value::Bool(true));
+                        payload.insert(
+                            "swing_mode_state_template".into(),
+                            Value::String(state_value_template(
+                                swing_mode.property.as_deref().unwrap_or("swing_mode"),
+                            )),
+                        );
+                        payload.insert("swing_mode_state_topic".into(), Value::Bool(true));
+                    }
+                    if let Some(preset) = find("preset") {
+                        payload.insert(
+                            "preset_modes".into(),
+                            Value::Array(
+                                preset.values.iter().cloned().map(Value::String).collect(),
+                            ),
+                        );
+                        payload.insert("preset_mode_command_topic".into(), json!("preset"));
+                        payload.insert(
+                            "preset_mode_value_template".into(),
+                            Value::String(state_value_template(
+                                preset.property.as_deref().unwrap_or("preset"),
+                            )),
+                        );
+                        payload.insert("preset_mode_state_topic".into(), Value::Bool(true));
+                    }
+
+                    if let Some(calibration) = find("local_temperature_calibration") {
+                        let mut number = Map::new();
+                        number.insert("name".into(), json!(calibration.label));
+                        number.insert(
+                            "value_template".into(),
+                            Value::String(state_value_template(
+                                calibration.property.as_deref().unwrap_or(""),
+                            )),
+                        );
+                        number.insert("command_topic".into(), Value::Bool(true));
+                        number.insert("command_topic_postfix".into(), json!(calibration.property));
+                        number.insert("device_class".into(), json!("temperature_delta"));
+                        number.insert("entity_category".into(), json!("config"));
+                        if let Some(unit) = &calibration.unit {
+                            number.insert("unit_of_measurement".into(), json!(unit));
+                        }
+                        if let Some(v) = calibration.value_min {
+                            number.insert("min".into(), Value::from(v));
+                        }
+                        if let Some(v) = calibration.value_max {
+                            number.insert("max".into(), Value::from(v));
+                        }
+                        if let Some(v) = calibration.value_step {
+                            number.insert("step".into(), Value::from(v));
+                        }
+                        entries.push(Entry {
+                            r#type: "number".into(),
+                            object_id: calibration
+                                .name
+                                .clone()
+                                .unwrap_or_else(|| "local_temperature_calibration".to_string()),
+                            payload: number,
+                        });
+                    }
+
+                    if let Some(demand) = find("pi_heating_demand") {
+                        let mut entry = Map::new();
+                        entry.insert("name".into(), json!(demand.label));
+                        entry.insert(
+                            "value_template".into(),
+                            Value::String(state_value_template(
+                                demand.property.as_deref().unwrap_or(""),
+                            )),
+                        );
+                        if let Some(unit) = &demand.unit {
+                            entry.insert("unit_of_measurement".into(), json!(unit));
+                        }
+                        entry.insert("icon".into(), json!("mdi:radiator"));
+                        if demand.access & access::SET != 0 {
+                            entry.insert("command_topic".into(), Value::Bool(true));
+                            entry.insert("command_topic_postfix".into(), json!(demand.property));
+                            if let Some(v) = demand.value_min {
+                                entry.insert("min".into(), Value::from(v));
+                            }
+                            if let Some(v) = demand.value_max {
+                                entry.insert("max".into(), Value::from(v));
+                            }
+                            entries.push(Entry {
+                                r#type: "number".into(),
+                                object_id: demand
+                                    .name
+                                    .clone()
+                                    .unwrap_or_else(|| "pi_heating_demand".to_string()),
+                                payload: entry,
+                            });
+                        } else {
+                            entry.insert("entity_category".into(), json!("diagnostic"));
+                            entries.push(Entry {
+                                r#type: "sensor".into(),
+                                object_id: demand
+                                    .name
+                                    .clone()
+                                    .unwrap_or_else(|| "pi_heating_demand".to_string()),
+                                payload: entry,
+                            });
+                        }
+                    }
+                    if let Some(demand) = find("pi_cooling_demand") {
+                        let mut entry = Map::new();
+                        entry.insert("name".into(), json!(demand.label));
+                        entry.insert(
+                            "value_template".into(),
+                            Value::String(state_value_template(
+                                demand.property.as_deref().unwrap_or(""),
+                            )),
+                        );
+                        if let Some(unit) = &demand.unit {
+                            entry.insert("unit_of_measurement".into(), json!(unit));
+                        }
+                        entry.insert("entity_category".into(), json!("diagnostic"));
+                        entry.insert("icon".into(), json!("mdi:air-conditioner"));
+                        entries.push(Entry {
+                            r#type: "sensor".into(),
+                            object_id: demand
+                                .name
+                                .clone()
+                                .unwrap_or_else(|| "pi_cooling_demand".to_string()),
+                            payload: entry,
+                        });
+                    }
+
+                    let has_temperature_sensor = all_exposes.iter().any(|e| {
+                        e.r#type == "numeric"
+                            && e.name
+                                .as_deref()
+                                .is_some_and(|n| n == "temperature" || n == "local_temperature")
+                            && e.access & access::STATE != 0
+                    });
+                    if !has_temperature_sensor {
+                        if let Some(local) = find("local_temperature") {
+                            let mut entry = Map::new();
+                            entry.insert("name".into(), json!(local.label));
+                            entry.insert(
+                                "value_template".into(),
+                                Value::String(state_value_template(
+                                    local.property.as_deref().unwrap_or(""),
+                                )),
+                            );
+                            if let Some(unit) = &local.unit {
+                                entry.insert("unit_of_measurement".into(), json!(unit));
+                            }
+                            entry.insert("device_class".into(), json!("temperature"));
+                            entry.insert("state_class".into(), json!("measurement"));
+                            entries.push(Entry {
+                                r#type: "sensor".into(),
+                                object_id: local
+                                    .name
+                                    .clone()
+                                    .unwrap_or_else(|| "local_temperature".to_string()),
+                                payload: entry,
+                            });
+                        }
+                    }
+                    if let Some(humidity) = all_exposes
+                        .iter()
+                        .filter(|e| {
+                            e.r#type == "numeric"
+                                && e.name.as_deref() == Some("humidity")
+                                && e.access & access::STATE != 0
+                        })
+                        .find(|e| e.endpoint.is_none())
+                    {
+                        payload.insert(
+                            "current_humidity_template".into(),
+                            Value::String(state_value_template(
+                                humidity.property.as_deref().unwrap_or(""),
+                            )),
+                        );
+                        payload.insert("current_humidity_topic".into(), Value::Bool(true));
+                    }
+
+                    entries.push(Entry {
+                        r#type: "climate".into(),
+                        object_id: "climate".into(),
+                        payload,
+                    });
+                }
                 "light" => {
                     let feature = |name: &str| {
-                        all_exposes
-                            .iter()
-                            .find_map(|expose| expose.features.iter().find(|feature| feature.name.as_deref() == Some(name)))
+                        all_exposes.iter().find_map(|expose| {
+                            expose
+                                .features
+                                .iter()
+                                .find(|feature| feature.name.as_deref() == Some(name))
+                        })
                     };
-                    let has_color_xy = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("color_xy")));
-                    let has_color_hs = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("color_hs")));
-                    let has_brightness = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("brightness")));
-                    let has_color_temp = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("color_temp")));
-                    let Some(_state) = feature("state") else { continue };
+                    let has_color_xy = all_exposes.iter().any(|expose| {
+                        expose
+                            .features
+                            .iter()
+                            .any(|f| f.name.as_deref() == Some("color_xy"))
+                    });
+                    let has_color_hs = all_exposes.iter().any(|expose| {
+                        expose
+                            .features
+                            .iter()
+                            .any(|f| f.name.as_deref() == Some("color_hs"))
+                    });
+                    let has_brightness = all_exposes.iter().any(|expose| {
+                        expose
+                            .features
+                            .iter()
+                            .any(|f| f.name.as_deref() == Some("brightness"))
+                    });
+                    let has_color_temp = all_exposes.iter().any(|expose| {
+                        expose
+                            .features
+                            .iter()
+                            .any(|f| f.name.as_deref() == Some("color_temp"))
+                    });
+                    let Some(_state) = feature("state") else {
+                        continue;
+                    };
                     let prefer_hs = all_exposes.iter().any(|expose| {
-                        let xy = expose.features.iter().position(|f| f.name.as_deref() == Some("color_xy"));
-                        let hs = expose.features.iter().position(|f| f.name.as_deref() == Some("color_hs"));
+                        let xy = expose
+                            .features
+                            .iter()
+                            .position(|f| f.name.as_deref() == Some("color_xy"));
+                        let hs = expose
+                            .features
+                            .iter()
+                            .position(|f| f.name.as_deref() == Some("color_hs"));
                         xy.is_some() && hs.is_some() && hs < xy
                     });
 
@@ -229,51 +591,116 @@ impl HomeAssistant {
                     payload.insert("command_topic".into(), Value::Bool(true));
                     payload.insert("brightness_scale".into(), json!(254));
                     let mut modes: Vec<Value> = Vec::new();
-                    if has_color_xy && !prefer_hs { modes.push(json!("xy")); }
-                    if has_color_hs && (!has_color_xy || prefer_hs) { modes.push(json!("hs")); }
-                    if has_color_temp { modes.push(json!("color_temp")); }
-                    if modes.is_empty() { modes.push(json!("brightness")); }
+                    if has_color_xy && !prefer_hs {
+                        modes.push(json!("xy"));
+                    }
+                    if has_color_hs && (!has_color_xy || prefer_hs) {
+                        modes.push(json!("hs"));
+                    }
+                    if has_color_temp {
+                        modes.push(json!("color_temp"));
+                    }
+                    if modes.is_empty() {
+                        modes.push(json!("brightness"));
+                    }
                     payload.insert("supported_color_modes".into(), Value::Array(modes));
 
                     if has_color_temp {
-                        let color_temps: Vec<&Expose> = all_exposes.iter().filter_map(|expose| expose.features.iter().find(|f| f.name.as_deref() == Some("color_temp"))).collect();
-                        let max = color_temps.iter().filter_map(|e| e.value_max).reduce(f64::min);
-                        let min = color_temps.iter().filter_map(|e| e.value_min).reduce(f64::max);
-                        if let Some(max) = max { payload.insert("max_mireds".into(), Value::from(max)); }
-                        if let Some(min) = min { payload.insert("min_mireds".into(), Value::from(min)); }
+                        let color_temps: Vec<&Expose> = all_exposes
+                            .iter()
+                            .filter_map(|expose| {
+                                expose
+                                    .features
+                                    .iter()
+                                    .find(|f| f.name.as_deref() == Some("color_temp"))
+                            })
+                            .collect();
+                        let max = color_temps
+                            .iter()
+                            .filter_map(|e| e.value_max)
+                            .reduce(f64::min);
+                        let min = color_temps
+                            .iter()
+                            .filter_map(|e| e.value_min)
+                            .reduce(f64::max);
+                        if let Some(max) = max {
+                            payload.insert("max_mireds".into(), Value::from(max));
+                        }
+                        if let Some(min) = min {
+                            payload.insert("min_mireds".into(), Value::from(min));
+                        }
                     }
 
                     let mut effects: Vec<Value> = Vec::new();
                     for expose in &all_exposes {
                         if expose.r#type == "enum" && expose.name.as_deref() == Some("effect") {
-                            for value in &expose.values { if !effects.contains(&json!(value)) { effects.push(json!(value)); } }
+                            for value in &expose.values {
+                                if !effects.contains(&json!(value)) {
+                                    effects.push(json!(value));
+                                }
+                            }
                         }
                     }
                     if !effects.is_empty() {
                         payload.insert("effect".into(), Value::Bool(true));
                         payload.insert("effect_list".into(), Value::Array(effects));
                     }
-                    entries.push(Entry { r#type: "light".into(), object_id: "light".into(), payload });
+                    entries.push(Entry {
+                        r#type: "light".into(),
+                        object_id: "light".into(),
+                        payload,
+                    });
                 }
                 "lock" => {
-                    let Some(state) = expose.features.iter().find(|f| f.r#type == "binary" && f.name.as_deref() == Some("state")) else { continue };
+                    let Some(state) = expose
+                        .features
+                        .iter()
+                        .find(|f| f.r#type == "binary" && f.name.as_deref() == Some("state"))
+                    else {
+                        continue;
+                    };
                     let mut payload = Map::new();
                     payload.insert("name".into(), Value::Null);
                     payload.insert("command_topic".into(), Value::Bool(true));
-                    payload.insert("value_template".into(), Value::String(state_value_template(state.property.as_deref().unwrap_or("state"))));
+                    payload.insert(
+                        "value_template".into(),
+                        Value::String(state_value_template(
+                            state.property.as_deref().unwrap_or("state"),
+                        )),
+                    );
                     payload.insert("state_locked".into(), state.value_on.clone());
                     payload.insert("state_unlocked".into(), state.value_off.clone());
-                    entries.push(Entry { r#type: "lock".into(), object_id: "lock".into(), payload });
+                    entries.push(Entry {
+                        r#type: "lock".into(),
+                        object_id: "lock".into(),
+                        payload,
+                    });
                 }
                 "cover" => {
                     let feature = |name: &str| {
-                        all_exposes.iter().find_map(|expose| expose.features.iter().find(|feature| feature.name.as_deref() == Some(name)))
+                        all_exposes.iter().find_map(|expose| {
+                            expose
+                                .features
+                                .iter()
+                                .find(|feature| feature.name.as_deref() == Some(name))
+                        })
                     };
-                    let Some(state) = feature("state") else { continue };
+                    let Some(state) = feature("state") else {
+                        continue;
+                    };
                     let position = feature("position");
                     let tilt = feature("tilt");
-                    let motor_state = all_exposes.iter().find(|expose| expose.r#type == "enum" && expose.name.as_deref().is_some_and(|n| n == "motor_state" || n == "moving") && expose.access & access::STATE != 0);
-                    let running = all_exposes.iter().find(|expose| expose.r#type == "binary" && expose.name.as_deref() == Some("running"));
+                    let motor_state = all_exposes.iter().find(|expose| {
+                        expose.r#type == "enum"
+                            && expose
+                                .name
+                                .as_deref()
+                                .is_some_and(|n| n == "motor_state" || n == "moving")
+                            && expose.access & access::STATE != 0
+                    });
+                    let running = all_exposes.iter().find(|expose| {
+                        expose.r#type == "binary" && expose.name.as_deref() == Some("running")
+                    });
 
                     let mut payload = Map::new();
                     payload.insert("name".into(), Value::Null);
@@ -283,30 +710,70 @@ impl HomeAssistant {
                     if let Some(running) = running {
                         if let Some(position) = position {
                             let running_property = running.property.as_deref().unwrap_or("running");
-                            let position_property = position.property.as_deref().unwrap_or("position");
+                            let position_property =
+                                position.property.as_deref().unwrap_or("position");
                             payload.insert("value_template".into(), Value::String(format!("{{% if \"{running_property}\" in value_json and value_json[\"{running_property}\"] and \"{position_property}\" in value_json %}} {{% if value_json[\"{position_property}\"] > 0 %}} closing {{% else %}} opening {{% endif %}} {{% else %}} stopped {{% endif %}}")));
                         }
                     }
                     if let Some(motor_state) = motor_state {
-                        let motor_property = motor_state.property.as_deref().unwrap_or("motor_state");
+                        let motor_property =
+                            motor_state.property.as_deref().unwrap_or("motor_state");
                         let state_property = state.property.as_deref().unwrap_or("state");
                         let position_property = position.and_then(|p| p.property.as_deref());
-                        let opening = motor_state.values.iter().find(|v| ["opening","open","forward","up","rising"].contains(&v.to_lowercase().as_str())).cloned();
-                        let closing = motor_state.values.iter().find(|v| ["closing","close","backward","back","reverse","down","declining"].contains(&v.to_lowercase().as_str())).cloned();
-                        let stopped = motor_state.values.iter().find(|v| ["stopped","stop","pause","paused"].contains(&v.to_lowercase().as_str())).cloned();
-                        if let (Some(opening), Some(closing), Some(stopped)) = (opening, closing, stopped) {
+                        let opening = motor_state
+                            .values
+                            .iter()
+                            .find(|v| {
+                                ["opening", "open", "forward", "up", "rising"]
+                                    .contains(&v.to_lowercase().as_str())
+                            })
+                            .cloned();
+                        let closing = motor_state
+                            .values
+                            .iter()
+                            .find(|v| {
+                                [
+                                    "closing",
+                                    "close",
+                                    "backward",
+                                    "back",
+                                    "reverse",
+                                    "down",
+                                    "declining",
+                                ]
+                                .contains(&v.to_lowercase().as_str())
+                            })
+                            .cloned();
+                        let stopped = motor_state
+                            .values
+                            .iter()
+                            .find(|v| {
+                                ["stopped", "stop", "pause", "paused"]
+                                    .contains(&v.to_lowercase().as_str())
+                            })
+                            .cloned();
+                        if let (Some(opening), Some(closing), Some(stopped)) =
+                            (opening, closing, stopped)
+                        {
                             payload.insert("state_opening".into(), json!(opening));
                             payload.insert("state_closing".into(), json!(closing));
                             payload.insert("state_open".into(), json!("OPEN"));
                             payload.insert("state_closed".into(), json!("CLOSE"));
                             payload.insert("state_stopped".into(), json!(stopped));
-                            let position_value = position_property.map(|p| format!("value_json[\"{p}\"] | default(none)")).unwrap_or_else(|| "none".to_string());
+                            let position_value = position_property
+                                .map(|p| format!("value_json[\"{p}\"] | default(none)"))
+                                .unwrap_or_else(|| "none".to_string());
                             let template = format!("{{% set motor = value_json[\"{motor_property}\"] | default(none) %}}{{% set position = {position_value} %}}{{% set state = value_json[\"{state_property}\"] | default(none) %}}{{% if (motor == \"{opening}\" and position != 100) or (motor == \"{closing}\" and position != 0) %}}{{{{ motor }}}}{{% elif position == 0 %}}CLOSE{{% elif position == 100 %}}OPEN{{% elif motor == \"{stopped}\" and position is not none %}}OPEN{{% elif state in [\"OPEN\", \"CLOSE\"] %}}{{{{ state }}}}{{% else %}}{stopped}{{% endif %}}");
                             payload.insert("value_template".into(), Value::String(template));
                         }
                     }
                     if !payload.contains_key("value_template") {
-                        payload.insert("value_template".into(), Value::String(state_value_template(state.property.as_deref().unwrap_or("state"))));
+                        payload.insert(
+                            "value_template".into(),
+                            Value::String(state_value_template(
+                                state.property.as_deref().unwrap_or("state"),
+                            )),
+                        );
                         payload.insert("state_open".into(), json!("OPEN"));
                         payload.insert("state_closed".into(), json!("CLOSE"));
                         payload.insert("state_stopped".into(), json!("STOP"));
@@ -316,31 +783,72 @@ impl HomeAssistant {
                     }
                     if let Some(position) = position {
                         let property = position.property.as_deref().unwrap_or("position");
-                        payload.insert("position_template".into(), Value::String(state_value_template(property)));
-                        payload.insert("set_position_template".into(), Value::String(format!("{{ \"{property}\": {{{{ position }}}} }}")));
+                        payload.insert(
+                            "position_template".into(),
+                            Value::String(state_value_template(property)),
+                        );
+                        payload.insert(
+                            "set_position_template".into(),
+                            Value::String(format!("{{ \"{property}\": {{{{ position }}}} }}")),
+                        );
                         payload.insert("set_position_topic".into(), Value::Bool(true));
                         payload.insert("position_topic".into(), Value::Bool(true));
                     }
                     if let Some(tilt) = tilt {
                         payload.insert("tilt_command_topic".into(), Value::Bool(true));
                         payload.insert("tilt_status_topic".into(), Value::Bool(true));
-                        payload.insert("tilt_status_template".into(), Value::String(state_value_template(tilt.property.as_deref().unwrap_or("tilt"))));
+                        payload.insert(
+                            "tilt_status_template".into(),
+                            Value::String(state_value_template(
+                                tilt.property.as_deref().unwrap_or("tilt"),
+                            )),
+                        );
                     }
-                    entries.push(Entry { r#type: "cover".into(), object_id: "cover".into(), payload });
+                    entries.push(Entry {
+                        r#type: "cover".into(),
+                        object_id: "cover".into(),
+                        payload,
+                    });
                 }
                 "fan" => {
-                    let state = expose.features.iter().find(|f| f.r#type == "binary" && f.name.as_deref() == Some("state"));
-                    let state_property = state.and_then(|s| s.property.clone()).unwrap_or_else(|| "state".to_string());
-                    let mode = expose.features.iter().find(|f| f.r#type == "enum" && f.name.as_deref() == Some("mode"));
-                    let speed = expose.features.iter().find(|f| f.r#type == "numeric" && f.name.as_deref() == Some("speed"));
+                    let state = expose
+                        .features
+                        .iter()
+                        .find(|f| f.r#type == "binary" && f.name.as_deref() == Some("state"));
+                    let state_property = state
+                        .and_then(|s| s.property.clone())
+                        .unwrap_or_else(|| "state".to_string());
+                    let mode = expose
+                        .features
+                        .iter()
+                        .find(|f| f.r#type == "enum" && f.name.as_deref() == Some("mode"));
+                    let speed = expose
+                        .features
+                        .iter()
+                        .find(|f| f.r#type == "numeric" && f.name.as_deref() == Some("speed"));
                     let mut payload = Map::new();
                     payload.insert("name".into(), Value::Null);
                     payload.insert("command_topic".into(), Value::Bool(true));
                     payload.insert("state_topic".into(), Value::Bool(true));
                     if let Some(mode) = mode {
                         let property = mode.property.as_deref().unwrap_or("fan_mode");
-                        let speeds: Vec<Value> = std::iter::once("off".to_string()).chain(["low","medium","high","1","2","3","4","5","6","7","8","9"].iter().filter(|s| mode.values.iter().any(|v| v == *s)).map(|s| s.to_string())).map(Value::String).collect();
-                        let presets: Vec<Value> = ["on","auto","smart"].iter().filter(|s| mode.values.iter().any(|v| v == *s)).map(|s| json!(s)).collect();
+                        let speeds: Vec<Value> = std::iter::once("off".to_string())
+                            .chain(
+                                [
+                                    "low", "medium", "high", "1", "2", "3", "4", "5", "6", "7",
+                                    "8", "9",
+                                ]
+                                .iter()
+                                .filter(|s| mode.values.iter().any(|v| v == *s))
+                                .map(|s| s.to_string()),
+                            )
+                            .map(Value::String)
+                            .collect();
+                        let presets: Vec<Value> = ["on", "auto", "smart"]
+                            .iter()
+                            .filter(|s| mode.values.iter().any(|v| v == *s))
+                            .map(|s| json!(s))
+                            .collect();
                         payload.insert("percentage_state_topic".into(), Value::Bool(true));
                         payload.insert("percentage_command_topic".into(), json!(property));
                         let percent_values = speeds
@@ -398,16 +906,33 @@ impl HomeAssistant {
                         let property = speed.property.as_deref().unwrap_or("speed");
                         payload.insert("percentage_state_topic".into(), Value::Bool(true));
                         payload.insert("percentage_command_topic".into(), json!(property));
-                        payload.insert("percentage_value_template".into(), Value::String(state_value_template(property)));
-                        payload.insert("percentage_command_template".into(), Value::String("{{ value | default() }}".to_string()));
-                        if let Some(min) = speed.value_min { payload.insert("speed_range_min".into(), Value::from(min)); }
-                        if let Some(max) = speed.value_max { payload.insert("speed_range_max".into(), Value::from(max)); }
-                        payload.insert("state_value_template".into(), Value::String(state_value_template(&state_property)));
+                        payload.insert(
+                            "percentage_value_template".into(),
+                            Value::String(state_value_template(property)),
+                        );
+                        payload.insert(
+                            "percentage_command_template".into(),
+                            Value::String("{{ value | default() }}".to_string()),
+                        );
+                        if let Some(min) = speed.value_min {
+                            payload.insert("speed_range_min".into(), Value::from(min));
+                        }
+                        if let Some(max) = speed.value_max {
+                            payload.insert("speed_range_max".into(), Value::from(max));
+                        }
+                        payload.insert(
+                            "state_value_template".into(),
+                            Value::String(state_value_template(&state_property)),
+                        );
                         payload.insert("command_topic_postfix".into(), json!(state_property));
                     } else {
                         continue;
                     }
-                    entries.push(Entry { r#type: "fan".into(), object_id: "fan".into(), payload });
+                    entries.push(Entry {
+                        r#type: "fan".into(),
+                        object_id: "fan".into(),
+                        payload,
+                    });
                 }
                 "binary" => {
                     let property = expose.property.clone().unwrap_or_default();
@@ -436,10 +961,11 @@ impl HomeAssistant {
                             "command_topic_postfix".into(),
                             Value::String(property.clone()),
                         );
-                        merge_lookup(&mut payload, 
-                                "BINARY_DISCOVERY_LOOKUP",
-                                expose.name.as_deref().unwrap_or(""),
-                            );
+                        merge_lookup(
+                            &mut payload,
+                            "BINARY_DISCOVERY_LOOKUP",
+                            expose.name.as_deref().unwrap_or(""),
+                        );
                         entries.push(Entry {
                             r#type: "switch".into(),
                             object_id: format!("switch_{property}"),
@@ -454,10 +980,11 @@ impl HomeAssistant {
                         );
                         payload.insert("payload_on".into(), expose.value_on.clone());
                         payload.insert("payload_off".into(), expose.value_off.clone());
-                        merge_lookup(&mut payload, 
-                                "BINARY_DISCOVERY_LOOKUP",
-                                expose.name.as_deref().unwrap_or(""),
-                            );
+                        merge_lookup(
+                            &mut payload,
+                            "BINARY_DISCOVERY_LOOKUP",
+                            expose.name.as_deref().unwrap_or(""),
+                        );
                         entries.push(Entry {
                             r#type: "binary_sensor".into(),
                             object_id: expose.name.clone().unwrap_or(property),
@@ -577,10 +1104,11 @@ impl HomeAssistant {
                                     expose.values.iter().cloned().map(Value::String).collect(),
                                 ),
                             );
-                            merge_lookup(&mut payload, 
-                                    "ENUM_DISCOVERY_LOOKUP",
-                                    expose.name.as_deref().unwrap_or(""),
-                                );
+                            merge_lookup(
+                                &mut payload,
+                                "ENUM_DISCOVERY_LOOKUP",
+                                expose.name.as_deref().unwrap_or(""),
+                            );
                             entries.push(Entry {
                                 r#type: "event".into(),
                                 object_id: property.clone(),
@@ -604,10 +1132,11 @@ impl HomeAssistant {
                             Value::String(state_value_template(&property)),
                         );
                     }
-                    merge_lookup(&mut payload, 
-                            "ENUM_DISCOVERY_LOOKUP",
-                            expose.name.as_deref().unwrap_or(""),
-                        );
+                    merge_lookup(
+                        &mut payload,
+                        "ENUM_DISCOVERY_LOOKUP",
+                        expose.name.as_deref().unwrap_or(""),
+                    );
                     if expose.access & access::SET != 0 && expose.values.len() == 1 {
                         payload.insert("state_topic".into(), Value::Bool(false));
                         payload.insert("command_topic".into(), Value::Bool(true));
@@ -839,7 +1368,10 @@ impl HomeAssistant {
                 payload.insert("position_topic".into(), Value::String(state_topic.clone()));
             }
             if payload.get("tilt_status_topic").is_some() {
-                payload.insert("tilt_status_topic".into(), Value::String(state_topic.clone()));
+                payload.insert(
+                    "tilt_status_topic".into(),
+                    Value::String(state_topic.clone()),
+                );
             }
             if payload.get("command_topic").and_then(Value::as_bool) == Some(true) {
                 payload.insert(
@@ -849,13 +1381,60 @@ impl HomeAssistant {
             }
             let command_topic = format!("{base_topic}/{command_prefix}set{command_postfix}");
             if payload.get("set_position_topic").is_some() {
-                payload.insert("set_position_topic".into(), Value::String(command_topic.clone()));
+                payload.insert(
+                    "set_position_topic".into(),
+                    Value::String(command_topic.clone()),
+                );
+            }
+            for key in [
+                "mode_state_topic",
+                "current_temperature_topic",
+                "temperature_state_topic",
+                "temperature_low_state_topic",
+                "temperature_high_state_topic",
+                "fan_mode_state_topic",
+                "swing_mode_state_topic",
+                "preset_mode_state_topic",
+                "action_topic",
+                "current_humidity_topic",
+                "percentage_state_topic",
+            ] {
+                if payload.get(key).is_some() {
+                    payload.insert(key.to_string(), Value::String(state_topic.clone()));
+                }
             }
             if payload.get("tilt_command_topic").is_some() {
                 payload.insert(
                     "tilt_command_topic".into(),
                     Value::String(format!("{base_topic}/{command_prefix}set/tilt")),
                 );
+            }
+            for (key, postfix) in [
+                ("mode_command_topic", "system_mode".to_string()),
+                ("fan_mode_command_topic", "fan_mode".to_string()),
+                ("swing_mode_command_topic", "swing_mode".to_string()),
+            ] {
+                if payload.get(key).is_some() {
+                    payload.insert(
+                        key.to_string(),
+                        Value::String(format!("{base_topic}/{command_prefix}set/{postfix}")),
+                    );
+                }
+            }
+            for key in [
+                "temperature_command_topic",
+                "temperature_low_command_topic",
+                "temperature_high_command_topic",
+                "percentage_command_topic",
+                "preset_mode_command_topic",
+            ] {
+                if let Some(value) = payload.get(key).and_then(Value::as_str) {
+                    let value = value.to_string();
+                    payload.insert(
+                        key.to_string(),
+                        Value::String(format!("{base_topic}/{command_prefix}set/{value}")),
+                    );
+                }
             }
 
             let topic = self.discovery_topic_for(&config, &entity);
@@ -1193,8 +1772,13 @@ impl Extension for HomeAssistant {
     fn adjust_message_before_publish(&self, entity: &dyn Entity, message: &mut Value) {
         self.adjust_color(message);
         if entity.is_device()
-            && entity.definition().is_some_and(|definition| definition.ota.is_some())
-            && message.get("update").and_then(|update| update.get("latest_version")).is_none()
+            && entity
+                .definition()
+                .is_some_and(|definition| definition.ota.is_some())
+            && message
+                .get("update")
+                .and_then(|update| update.get("latest_version"))
+                .is_none()
         {
             message["update"] = json!({"installed_version": -1, "latest_version": -1});
         }

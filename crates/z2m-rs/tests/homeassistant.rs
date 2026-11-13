@@ -122,6 +122,33 @@ fn harness() -> Harness {
         Expose::binary("contact", access::STATE),
         Expose::binary("power", access::SET | access::STATE),
         Expose {
+            r#type: "climate".to_string(),
+            name: Some("climate".to_string()),
+            access: access::ALL,
+            features: vec![
+                Expose::numeric("local_temperature", access::STATE),
+                Expose {
+                    value_min: Some(5.0),
+                    value_max: Some(30.0),
+                    value_step: Some(0.5),
+                    ..Expose::numeric("occupied_heating_setpoint", access::SET | access::STATE)
+                },
+                Expose::enumeration(
+                    "system_mode",
+                    access::SET | access::STATE,
+                    &["off", "heat", "sleep"],
+                ),
+                Expose::enumeration("running_state", access::STATE, &["idle", "heat"]),
+                Expose::enumeration("fan_mode", access::SET | access::STATE, &["low", "auto"]),
+                Expose {
+                    value_min: Some(-5.0),
+                    value_max: Some(5.0),
+                    ..Expose::numeric("local_temperature_calibration", access::ALL)
+                },
+            ],
+            ..Default::default()
+        },
+        Expose {
             r#type: "light".to_string(),
             name: Some("light".to_string()),
             access: access::ALL,
@@ -222,7 +249,17 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
     )
     .await;
     if numeric.is_none() {
-        panic!("topics: {:?}", harness.mqtt.lock().await.attempted.iter().map(|(t,_,_)| t.clone()).collect::<Vec<_>>());
+        panic!(
+            "topics: {:?}",
+            harness
+                .mqtt
+                .lock()
+                .await
+                .attempted
+                .iter()
+                .map(|(t, _, _)| t.clone())
+                .collect::<Vec<_>>()
+        );
     }
     let numeric = numeric.unwrap();
     assert_eq!(
@@ -269,6 +306,31 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
     .expect("binary switch");
     assert_eq!(switch["command_topic"], "zigbee2mqtt/lamp/set/power");
 
+    let climate = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate/config"),
+    )
+    .await
+    .expect("climate");
+    assert_eq!(climate["min_temp"], "5");
+    assert_eq!(climate["max_temp"], "30");
+    assert_eq!(climate["modes"], json!(["off", "heat"]));
+    assert_eq!(
+        climate["temperature_command_topic"],
+        "zigbee2mqtt/lamp/set/occupied_heating_setpoint"
+    );
+    assert_eq!(climate["fan_modes"], json!(["low", "auto"]));
+    assert_eq!(climate["current_temperature_topic"], "zigbee2mqtt/lamp");
+    assert_eq!(
+        config(
+            &harness,
+            &format!("homeassistant/number/{IEEE}/local_temperature_calibration/config")
+        )
+        .await
+        .expect("calibration")["device_class"],
+        "temperature_delta"
+    );
+
     let light = config(
         &harness,
         &format!("homeassistant/light/{IEEE}/light/config"),
@@ -289,20 +351,14 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
     assert_eq!(cover["position_topic"], "zigbee2mqtt/lamp");
     assert_eq!(cover["set_position_topic"], format!("zigbee2mqtt/lamp/set"));
 
-    let lock = config(
-        &harness,
-        &format!("homeassistant/lock/{IEEE}/lock/config"),
-    )
-    .await
-    .expect("lock");
+    let lock = config(&harness, &format!("homeassistant/lock/{IEEE}/lock/config"))
+        .await
+        .expect("lock");
     assert_eq!(lock["state_locked"], true);
 
-    let fan = config(
-        &harness,
-        &format!("homeassistant/fan/{IEEE}/fan/config"),
-    )
-    .await
-    .expect("fan");
+    let fan = config(&harness, &format!("homeassistant/fan/{IEEE}/fan/config"))
+        .await
+        .expect("fan");
     assert_eq!(fan["preset_modes"], json!(["auto"]));
     assert_eq!(fan["speed_range_max"], 2);
 
