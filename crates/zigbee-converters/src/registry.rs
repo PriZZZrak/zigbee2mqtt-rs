@@ -179,6 +179,7 @@ impl DefinitionRegistry {
                 replaced.ota = definition.ota.clone();
                 replaced.from_zigbee = definition.from_zigbee.clone();
                 replaced.to_zigbee = definition.to_zigbee.clone();
+                replaced.on_event = definition.on_event.clone();
                 replaced.generated = definition.generated;
                 replaced.white_label = definition.white_label.clone();
                 replaced.fingerprint = definition.fingerprint.clone();

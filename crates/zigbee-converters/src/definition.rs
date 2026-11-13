@@ -31,6 +31,45 @@ pub struct ConvertData {
 /// Upstream `publish` callback passed to `fromZigbee` converters.
 pub type PublishCallback = Arc<dyn Fn(Value) -> ConverterFuture<()> + Send + Sync>;
 
+/// Upstream `OnEvent.BaseData`.
+#[derive(Clone)]
+pub struct OnEventBaseData {
+    pub device: Arc<zigbee_apiarist::controller::model::device::Device>,
+    pub state: Value,
+    pub options: Value,
+    pub device_exposes_changed: Arc<dyn Fn() + Send + Sync>,
+}
+
+/// Upstream `OnEvent.Event` union.
+#[derive(Clone)]
+pub enum OnEventEvent {
+    Start(OnEventBaseData),
+    DeviceJoined(OnEventBaseData),
+    DeviceInterview { data: OnEventBaseData, status: String },
+    DeviceAnnounce(OnEventBaseData),
+    DeviceNetworkAddressChanged(OnEventBaseData),
+    DeviceOptionsChanged { data: OnEventBaseData, from: Value, to: Value },
+    Stop { ieee_addr: String },
+}
+
+impl OnEventEvent {
+    pub fn event_type(&self) -> &str {
+        match self {
+            Self::Start(_) => "start",
+            Self::DeviceJoined(_) => "deviceJoined",
+            Self::DeviceInterview { .. } => "deviceInterview",
+            Self::DeviceAnnounce(_) => "deviceAnnounce",
+            Self::DeviceNetworkAddressChanged(_) => "deviceNetworkAddressChanged",
+            Self::DeviceOptionsChanged { .. } => "deviceOptionsChanged",
+            Self::Stop { .. } => "stop",
+        }
+    }
+}
+
+/// Upstream per-definition `onEvent` handler.
+pub type OnEventFn =
+    Arc<dyn Fn(OnEventEvent) -> ConverterFuture<Result<(), String>> + Send + Sync>;
+
 /// Upstream converter `meta` argument.
 #[derive(Clone)]
 pub struct ConvertMeta {
@@ -123,6 +162,7 @@ pub struct Definition {
     pub ota: Option<Value>,
     pub from_zigbee: Vec<FromZigbeeConverter>,
     pub to_zigbee: Vec<ToZigbeeConverter>,
+    pub on_event: Vec<OnEventFn>,
     pub generated: bool,
     pub white_label: Vec<WhiteLabel>,
     pub fingerprint: Vec<Fingerprint>,
@@ -156,6 +196,7 @@ impl Definition {
             ota: None,
             from_zigbee: Vec::new(),
             to_zigbee: Vec::new(),
+            on_event: Vec::new(),
             generated: false,
             white_label: Vec::new(),
             fingerprint: Vec::new(),

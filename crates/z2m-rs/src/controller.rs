@@ -26,7 +26,7 @@ pub struct Controller {
     pub mqtt: Arc<tokio::sync::Mutex<Mqtt>>,
     pub settings: Arc<Mutex<Settings>>,
     pub logger: Arc<Mutex<Logger>>,
-    extensions: Mutex<Vec<Arc<Mutex<dyn Extension>>>>,
+    extensions: Mutex<Vec<Arc<dyn Extension>>>,
 }
 
 impl Controller {
@@ -49,7 +49,7 @@ impl Controller {
         }
     }
 
-    pub fn add_extension(&self, extension: Arc<Mutex<dyn Extension>>) {
+    pub fn add_extension(&self, extension: Arc<dyn Extension>) {
         self.extensions.lock().unwrap().push(extension);
     }
 
@@ -116,10 +116,7 @@ impl Controller {
         }
 
         for extension in self.extensions.lock().unwrap().iter() {
-            extension
-                .lock()
-                .unwrap()
-                .adjust_message_before_publish(entity.as_ref(), &mut message);
+            extension.adjust_message_before_publish(entity.as_ref(), &mut message);
         }
 
         utils::filter_properties(
