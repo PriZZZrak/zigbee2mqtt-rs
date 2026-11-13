@@ -62,33 +62,47 @@ pub struct FromZigbeeConverter {
 #[derive(Clone)]
 pub struct ToZigbeeConverter {
     pub key: Vec<String>,
-    #[allow(clippy::type_complexity)]
-    pub convert: Arc<
-        dyn Fn(
-                to_zigbee::ToConvertData,
-                PublishCallback,
-                Value,
-                ConvertMeta,
-            ) -> ConverterFuture<Result<Option<Value>, String>>
-            + Send
-            + Sync,
-    >,
+    pub endpoints: Option<Vec<String>>,
+    pub convert_set: Option<ToZigbeeFn>,
+    pub convert_get: Option<ToZigbeeFn>,
+}
+
+pub type ToZigbeeFn = Arc<
+    dyn Fn(ToTarget, String, Value, ToMeta) -> ConverterFuture<Result<ToZigbeeResult, String>>
+        + Send
+        + Sync,
+>;
+
+/// Upstream `Tz.Meta`.
+#[derive(Clone)]
+pub struct ToMeta {
+    pub endpoint_name: Option<String>,
+    pub options: Value,
+    pub message: Value,
+    pub device: Option<Arc<zigbee_apiarist::controller::model::device::Device>>,
+    pub state: Value,
+    pub mapped: DefinitionRef,
+    pub publish: Option<PublishCallback>,
+    pub device_exposes_changed: Option<Arc<dyn Fn() + Send + Sync>>,
+}
+
+/// Upstream `Tz.ConvertResult`.
+#[derive(Clone, Default)]
+pub struct ToZigbeeResult {
+    pub state: Option<Value>,
+    pub members_state: Option<Value>,
+}
+
+/// Upstream converter target: endpoint for devices, group for groups.
+#[derive(Clone)]
+pub enum ToTarget {
+    Endpoint(Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>),
+    Group(Arc<zigbee_apiarist::controller::model::group::Group>),
 }
 
 /// Upstream `toZigbee` converter payload.
 pub mod to_zigbee {
-    use std::sync::Arc;
-
-    use serde_json::Value;
-
-    #[derive(Clone)]
-    pub struct ToConvertData {
-        pub device: Arc<zigbee_apiarist::controller::model::device::Device>,
-        pub endpoint: Option<Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>>,
-        pub key: Vec<String>,
-        pub value: Value,
-        pub meta: Value,
-    }
+    pub use super::{ToMeta, ToTarget, ToZigbeeResult};
 }
 
 /// Upstream `Definition` (`lib/exposes.js`).

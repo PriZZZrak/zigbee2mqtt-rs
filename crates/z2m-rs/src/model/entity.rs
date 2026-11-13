@@ -93,6 +93,37 @@ pub trait Entity: Send + Sync {
         None
     }
 
+    /// Upstream `device.endpoint(key)`.
+    fn endpoint(
+        &self,
+        _key: Option<&str>,
+    ) -> Option<Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>> {
+        None
+    }
+
+    /// Upstream `device.getEndpointNames()`.
+    fn endpoint_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Upstream `device.endpointName(endpoint)`.
+    fn endpoint_name(
+        &self,
+        _endpoint: &zigbee_apiarist::controller::model::endpoint::Endpoint,
+    ) -> Option<String> {
+        None
+    }
+
+    /// Upstream `group.membersDefinitions()`.
+    fn members_definitions(&self) -> Vec<zigbee_converters::DefinitionRef> {
+        Vec::new()
+    }
+
+    /// Upstream `group.zh`.
+    fn zh_group(&self) -> Option<Arc<zigbee_apiarist::controller::model::group::Group>> {
+        None
+    }
+
     fn is_group(&self) -> bool {
         !self.is_device()
     }

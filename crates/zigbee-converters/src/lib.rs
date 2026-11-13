@@ -15,7 +15,8 @@ mod registry;
 
 pub use definition::{
     to_zigbee, ConvertData, ConvertMeta, ConverterFuture, Definition, DefinitionRef,
-    FromZigbeeConverter, PublishCallback, ToZigbeeConverter,
+    FromZigbeeConverter, PublishCallback, ToMeta, ToTarget, ToZigbeeConverter, ToZigbeeFn,
+    ToZigbeeResult,
 };
 pub use exposes::{access, Expose, Exposes, Fingerprint, WhiteLabel};
 pub use registry::{normalize_model_id, DefinitionRegistry};

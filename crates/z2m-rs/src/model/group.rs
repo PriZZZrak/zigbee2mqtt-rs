@@ -112,6 +112,17 @@ impl Entity for Group {
         false
     }
 
+    fn members_definitions(&self) -> Vec<zigbee_converters::DefinitionRef> {
+        self.members_devices()
+            .into_iter()
+            .filter_map(|device| device.definition())
+            .collect()
+    }
+
+    fn zh_group(&self) -> Option<Arc<ZhGroup>> {
+        Some(self.zh.clone())
+    }
+
     fn event_value(&self) -> Value {
         json!({
             "ID": self.id(),

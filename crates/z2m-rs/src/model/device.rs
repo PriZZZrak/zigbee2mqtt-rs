@@ -252,6 +252,18 @@ impl Entity for Device {
         self.zh.linkquality()
     }
 
+    fn endpoint(&self, key: Option<&str>) -> Option<Arc<Endpoint>> {
+        Device::endpoint(self, key)
+    }
+
+    fn endpoint_names(&self) -> Vec<String> {
+        Device::get_endpoint_names(self)
+    }
+
+    fn endpoint_name(&self, endpoint: &Endpoint) -> Option<String> {
+        Device::endpoint_name(self, endpoint)
+    }
+
     fn entity_id(&self) -> EntityId {
         EntityId::Ieee(self.ieee_addr())
     }
