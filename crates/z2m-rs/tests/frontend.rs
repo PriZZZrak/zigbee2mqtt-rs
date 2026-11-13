@@ -104,20 +104,15 @@ async fn auth_token_is_enforced() {
     let addr = frontend.bound_addr().unwrap();
 
     let stream = TcpStream::connect(addr).await.unwrap();
-    let result = tokio_tungstenite::client_async(
-        format!("ws://{addr}/api?token=wrong"),
-        stream,
-    )
-    .await;
+    let result =
+        tokio_tungstenite::client_async(format!("ws://{addr}/api?token=wrong"), stream).await;
     assert!(result.is_err());
 
     let stream = TcpStream::connect(addr).await.unwrap();
-    let (socket, _) = tokio_tungstenite::client_async(
-        format!("ws://{addr}/api?token=secret"),
-        stream,
-    )
-    .await
-    .unwrap();
+    let (socket, _) =
+        tokio_tungstenite::client_async(format!("ws://{addr}/api?token=secret"), stream)
+            .await
+            .unwrap();
     drop(socket);
 }
 
@@ -144,10 +139,9 @@ async fn replay_retained_and_receive_messages() {
     frontend.clone().start().await.unwrap();
     let addr = frontend.bound_addr().unwrap();
     let stream = TcpStream::connect(addr).await.unwrap();
-    let (mut socket, _) =
-        tokio_tungstenite::client_async(format!("ws://{addr}/api"), stream)
-            .await
-            .unwrap();
+    let (mut socket, _) = tokio_tungstenite::client_async(format!("ws://{addr}/api"), stream)
+        .await
+        .unwrap();
 
     let replay = next_json(&mut socket).await;
     assert_eq!(replay["topic"], "bridge/info");
@@ -180,10 +174,9 @@ async fn broadcasts_published_messages_and_skips_entity_states() {
     frontend.clone().start().await.unwrap();
     let addr = frontend.bound_addr().unwrap();
     let stream = TcpStream::connect(addr).await.unwrap();
-    let (mut socket, _) =
-        tokio_tungstenite::client_async(format!("ws://{addr}/api"), stream)
-            .await
-            .unwrap();
+    let (mut socket, _) = tokio_tungstenite::client_async(format!("ws://{addr}/api"), stream)
+        .await
+        .unwrap();
 
     harness
         .event_bus
@@ -227,10 +220,9 @@ async fn stop_sends_offline_state() {
     frontend.clone().start().await.unwrap();
     let addr = frontend.bound_addr().unwrap();
     let stream = TcpStream::connect(addr).await.unwrap();
-    let (mut socket, _) =
-        tokio_tungstenite::client_async(format!("ws://{addr}/api"), stream)
-            .await
-            .unwrap();
+    let (mut socket, _) = tokio_tungstenite::client_async(format!("ws://{addr}/api"), stream)
+        .await
+        .unwrap();
 
     frontend.clone().stop().await.unwrap();
     let frame = next_json(&mut socket).await;

@@ -24,6 +24,8 @@ pub struct MqttPublishOptions {
     /// is built without MQTT v5 in this workspace, so it is tracked but not
     /// sent on the wire yet.
     pub message_expiry_interval: Option<u32>,
+    /// Upstream `baseTopic` override (HA discovery uses its own topic root).
+    pub base_topic: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -180,7 +182,11 @@ impl Mqtt {
             );
             return false;
         }
-        let topic = format!("{}/{}", self.base_topic, topic);
+        let base_topic = options
+            .base_topic
+            .clone()
+            .unwrap_or_else(|| self.base_topic.clone());
+        let topic = format!("{}/{}", base_topic, topic);
         self.attempted.push((
             topic.clone(),
             String::from_utf8_lossy(&payload).to_string(),

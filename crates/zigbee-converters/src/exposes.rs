@@ -36,6 +36,11 @@ pub struct Expose {
     /// Upstream `exposes`/`features` for composite/light/switch/cover/list.
     pub features: Vec<Expose>,
     pub endpoint: Option<String>,
+    /// Upstream `label` (HA-facing friendly feature name).
+    pub label: Option<String>,
+    /// Upstream `value_on` / `value_off` for binary/switch exposes.
+    pub value_on: Value,
+    pub value_off: Value,
     /// Raw upstream fields not modelled yet (e.g. `presets`, `color`).
     pub extra: Value,
 }
@@ -48,6 +53,7 @@ impl Expose {
             name: Some(name.to_string()),
             property: Some(name.to_string()),
             access,
+            label: Some(name.to_string()),
             ..Default::default()
         }
     }
@@ -58,6 +64,9 @@ impl Expose {
             name: Some(name.to_string()),
             property: Some(name.to_string()),
             access,
+            label: Some(name.to_string()),
+            value_on: Value::Bool(true),
+            value_off: Value::Bool(false),
             ..Default::default()
         }
     }
@@ -68,6 +77,7 @@ impl Expose {
             name: Some(name.to_string()),
             property: Some(name.to_string()),
             access,
+            label: Some(name.to_string()),
             values: values.iter().map(|value| (*value).to_string()).collect(),
             ..Default::default()
         }
@@ -79,6 +89,7 @@ impl Expose {
             name: Some(name.to_string()),
             property: Some(name.to_string()),
             access,
+            label: Some(name.to_string()),
             ..Default::default()
         }
     }
@@ -203,5 +214,17 @@ impl Expose {
             }
         }
         Value::Object(map)
+    }
+}
+
+impl Expose {
+    /// Upstream `stateOn/stateOff` for switch-like exposes.
+    pub fn with_value_on(mut self, value: Value) -> Self {
+        self.value_on = value;
+        self
+    }
+    pub fn with_value_off(mut self, value: Value) -> Self {
+        self.value_off = value;
+        self
     }
 }
