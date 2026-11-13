@@ -62,7 +62,7 @@ Notes:
 | `unix-dgram` | syslog socket | `std::os::unix::net::UnixDatagram` | `util::logger` syslog transport | BLOCKED |
 | `bind-decorator` | `this` binding | language feature | — | omitted |
 | `zigbee-herdsman` | Zigbee stack | `zigbee-apiarist` | workspace crate | PARTIAL |
-| `zigbee-herdsman-converters` | device converters | `crates/zigbee-converters` (separate crate) | `zigbee_converters::{Definition, DefinitionRegistry, Expose, ...}` | PORTED shared host; converter database excluded in R1 (AGENTS §5 Q4) |
+| `zigbee-herdsman-converters` | device converters | `crates/zigbee-converters` (separate crate) | `zigbee_converters::{Definition, DefinitionRegistry, Expose, ...}` | PORTED minimal surface required by the bridge; converter database and authoring tooling excluded (AGENTS §5 Q4) |
 | `zigbee2mqtt-frontend`, `zigbee2mqtt-windfront` | static frontend | served assets | `util::static_file_server` | assets only |
 
 ### Development tooling

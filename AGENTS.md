@@ -170,11 +170,13 @@ Resolved on 2026-11-06:
   discovery remains outside the initial R1 surface.
 - **Q4 — converter boundary (2026-11-13):** the R1 exclusion is the converter
   *database* (`definitions/`, `devices/`, `converters/`, vendor quirks), not the
-  shared converter host. Common files and loading/lookup mechanisms may and
-  should be ported: `access`, `exposes`, `utils`, `modernExtend` pieces as
-  needed, `findByDevice`/`findDefinition`/fingerprint matching, external
-  definition registration, `prepareDefinition`, and the `fromZigbee`/
-  `toZigbee` converter interfaces. With no database registered the lookup
+  shared converter host. From that package only the shared surface **required for zigbee2mqtt to
+  work** is ported, not the whole package: `access`, the exposes subset used by
+  the bridge, `Definition`, `findByDevice`/`findDefinition`/fingerprint
+  matching, external definition registration, and the `fromZigbee`/
+  `toZigbee` converter interfaces. `modernExtend`, vendor helper modules and
+  other converter-authoring tooling are added only if the bridge actually
+  needs them. With no database registered the lookup
   falls back to “not found”: unsupported devices stay definition-less and
   publish/receive follow their upstream fallback branches (e.g.
   `receive.ts:130-134`). `generateDefinition` (the “unknown device” synthesizer)

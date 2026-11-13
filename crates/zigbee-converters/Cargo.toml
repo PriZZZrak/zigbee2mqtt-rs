@@ -3,7 +3,7 @@ name = "zigbee-converters"
 version = "0.1.0"
 edition = "2021"
 
-# Rust replacement for `zigbee-herdsman-converters` (shared host only).
+# Rust replacement for the zigbee2mqtt-required surface of `zigbee-herdsman-converters`.
 # The converter database and vendor quirks are out of R1 (AGENTS §5 Q4).
 
 [dependencies]
