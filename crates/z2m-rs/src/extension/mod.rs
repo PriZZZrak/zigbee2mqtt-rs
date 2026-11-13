@@ -6,6 +6,7 @@ pub mod bridge;
 pub mod configure;
 pub mod groups;
 pub mod health;
+pub mod network_map;
 pub mod on_event;
 pub mod publish;
 pub mod receive;

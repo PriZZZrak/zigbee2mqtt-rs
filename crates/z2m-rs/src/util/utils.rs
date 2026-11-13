@@ -124,6 +124,7 @@ pub fn format_date(time: i64, kind: &str) -> String {
         "ISO_8601" => iso_utc(time),
         "ISO_8601_local" => to_local_iso_string(time),
         "epoch" => time.to_string(),
+        "relative" => relative_time(time),
         _ => format!("{time} ago"),
     }
 }
@@ -458,4 +459,47 @@ pub fn save_base64_device_icon(extension: &str, data: &str) -> Result<String, St
         .map_err(|error| error.to_string())?;
     std::fs::write(path, bytes).map_err(|error| error.to_string())?;
     Ok(file_settings)
+}
+
+/// Upstream `toNetworkAddressHex(value)` (`utils.ts:178-181`).
+pub fn to_network_address_hex(value: u64) -> String {
+    format!("0x{:04x}", value)
+}
+
+/// Upstream `formatDate(..., "relative")` (`utils.ts:68-85`).
+pub fn relative_time(time_ms: i64) -> String {
+    let now = zigbee_apiarist::utils::datetime::now_ms() as i64;
+    let diff = (now - time_ms).max(0);
+    let units: [(i64, &str); 6] = [
+        (365 * 24 * 3600 * 1000, "year"),
+        (30 * 24 * 3600 * 1000, "month"),
+        (7 * 24 * 3600 * 1000, "week"),
+        (24 * 3600 * 1000, "day"),
+        (3600 * 1000, "hour"),
+        (60 * 1000, "minute"),
+    ];
+    let mut remaining = diff;
+    let mut parts = Vec::new();
+    for (size, name) in units {
+        if remaining >= size && parts.len() < 2 {
+            let count = remaining / size;
+            remaining %= size;
+            parts.push(format!(
+                "{count} {name}{}",
+                if count == 1 { "" } else { "s" }
+            ));
+        }
+    }
+    if parts.is_empty() {
+        let seconds = diff / 1000;
+        parts.push(format!(
+            "{seconds} second{}",
+            if seconds == 1 { "" } else { "s" }
+        ));
+    }
+    format!("{} ago", parts.join(", "))
+}
+
+pub fn format_date_relative(time: i64) -> String {
+    format_date(time, "relative")
 }

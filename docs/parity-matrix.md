@@ -61,7 +61,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Groups | `lib/extension/groups.ts` | PORTED | state-change optimistic fan-out (device↔group, dedupe, off_state/all-members checks, endpoint suffixes), MQTT group/members add/remove/remove_all with validation, endpoint operations, responses, GroupMembersChanged payloads |
 | Health | `lib/extension/health.ts` | PORTED | interval timer, `bridge/health` payload (OS load/memory, process uptime/rss, mqtt stats, per-device messages/mps/leave/nwk changes), `reset_on_check`, retain+qos1 |
 | Home Assistant | `lib/extension/homeassistant.ts` | TODO | full port incl. bridge entities/discovery; per-device discovery works when definitions are registered |
-| Network map | `lib/extension/networkMap.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Network map | `lib/extension/networkMap.ts` | PORTED | networkmap request, raw/graphviz/plantuml renderers (colors, escaping, relative last-seen, routes), LQI+routing-table scan with retry and 1s spacing, node/link topology incl. disabled/GreenPower filtering and Xiaomi 0-EUI64 fallback |
 | OnEvent | `lib/extension/onEvent.ts` | PORTED | start/stop, deviceJoined/leave/announce/interview/networkAddressChanged/optionsChanged events, `startCalled` gating, disabled devices skipped; global vendor Legrand hook out of the minimal converter surface |
 | External JS/converters/extensions | `lib/extension/external*.ts` | OMITTED | user JS evaluation forbidden (AGENTS §5 Q5) |
 | OTA update | `lib/extension/otaUpdate.ts` | OMITTED | OTA out of R1 (AGENTS §4/§5) |
