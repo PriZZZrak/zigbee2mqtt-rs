@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde_json::{json, Value};
 use zigbee_apiarist::utils::datetime::{now_file_timestamp, now_iso8601};
@@ -17,7 +18,7 @@ pub struct Transport {
     pub maxsize: Option<u64>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Logger {
     pub level: String,
     pub namespaced_levels: BTreeMap<String, String>,
@@ -35,6 +36,8 @@ pub struct Logger {
     /// Test hook mirroring `vi.spyOn(fs, "rmSync").mockImplementationOnce(throw)`.
     pub remove_error: Option<String>,
     pub log_console_json: bool,
+    /// Upstream winston transport hook (`bridge.ts` EventTransport).
+    pub log_listener: Option<Arc<dyn Fn(&str, &str, &str) + Send + Sync>>,
 }
 
 impl Logger {
@@ -250,6 +253,14 @@ impl Logger {
         })
     }
 
+    pub fn set_log_listener(&mut self, listener: Arc<dyn Fn(&str, &str, &str) + Send + Sync>) {
+        self.log_listener = Some(listener);
+    }
+
+    pub fn clear_log_listener(&mut self) {
+        self.log_listener = None;
+    }
+
     pub fn add_transport(&mut self, transport: Transport) {
         self.transports.push(transport);
     }
@@ -327,6 +338,10 @@ impl Logger {
 
         if !accepted {
             return;
+        }
+
+        if let Some(listener) = &self.log_listener {
+            listener(level, message, namespace);
         }
 
         let message = format!("{namespace}: {message}");

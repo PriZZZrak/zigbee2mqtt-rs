@@ -20,3 +20,6 @@ pub use definition::{
 };
 pub use exposes::{access, Expose, Exposes, Fingerprint, WhiteLabel};
 pub use registry::{normalize_model_id, DefinitionRegistry};
+
+/// Crate version (Rust replacement for the upstream package version).
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

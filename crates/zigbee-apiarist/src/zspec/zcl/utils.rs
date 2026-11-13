@@ -1337,3 +1337,10 @@ fn parse_condition(value: &serde_json::Value) -> Option<ParameterCondition> {
         _ => return None,
     })
 }
+
+/// Upstream `Zcl.Clusters` for `bridge/definitions` (`clusters.json` is the
+/// pinned generated catalog).
+pub fn clusters_json() -> serde_json::Value {
+    serde_json::from_str(include_str!("definition/clusters.json"))
+        .expect("generated ZCL cluster catalog must be valid JSON")
+}

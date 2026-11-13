@@ -308,3 +308,36 @@ impl Entity for Device {
         })
     }
 }
+
+impl Device {
+    /// Upstream `reInterview(eventBus)` (`model/device.ts:74-91`).
+    pub async fn re_interview(
+        self: &Arc<Self>,
+        event_bus: Arc<Mutex<crate::event_bus::EventBus>>,
+    ) -> Result<(), String> {
+        let name = self.name();
+        event_bus
+            .lock()
+            .unwrap()
+            .emit_device_interview(json!({"status": "started", "device": self.event_value()}));
+
+        match self.zh.interview(true).await {
+            Ok(()) => {
+                self.resolve_definition(true);
+                event_bus.lock().unwrap().emit_device_interview(
+                    json!({"status": "successful", "device": self.event_value()}),
+                );
+                Ok(())
+            }
+            Err(error) => {
+                event_bus.lock().unwrap().emit_device_interview(
+                    json!({"status": "failed", "device": self.event_value()}),
+                );
+                Err(format!(
+                    "Interview of '{name}' ({}) failed: {error}",
+                    self.ieee_addr()
+                ))
+            }
+        }
+    }
+}

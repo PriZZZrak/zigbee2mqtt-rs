@@ -58,3 +58,40 @@ pub fn process_rss_kb() -> f64 {
         .unwrap_or(0.0);
     pages * 4096.0 / 1024.0
 }
+
+/// `os.version() - os.release() - os.arch()` for `bridge/info.os.version`.
+pub fn os_version() -> String {
+    let version = std::fs::read_to_string("/proc/version")
+        .ok()
+        .and_then(|content| content.split_whitespace().nth(2).map(str::to_string))
+        .unwrap_or_default();
+    let release = std::fs::read_to_string("/proc/sys/kernel/osrelease")
+        .map(|content| content.trim().to_string())
+        .unwrap_or_default();
+    format!("{version} - {release} - {}", std::env::consts::ARCH)
+}
+
+/// Unique CPU models and count (`os.cpus()` summary).
+pub fn cpu_summary() -> (String, usize) {
+    let content = std::fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
+    let mut models: Vec<String> = Vec::new();
+    let mut count = 0usize;
+    for line in content.lines() {
+        if let Some((key, value)) = line.split_once(':') {
+            let key = key.trim();
+            let value = value.trim();
+            if key == "processor" {
+                count += 1;
+            } else if key == "model name" && !models.iter().any(|model| model == value) {
+                models.push(value.to_string());
+            }
+        }
+    }
+    let count = if count == 0 { 1 } else { count };
+    (models.join(" | "), count)
+}
+
+/// `Math.round(os.totalmem() / 1024 / 1024)`.
+pub fn total_memory_mb() -> u64 {
+    (memory_kb().0 / 1024.0).round() as u64
+}

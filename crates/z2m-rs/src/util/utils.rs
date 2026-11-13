@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
+use base64::Engine as _;
 use serde_json::Value;
 
 /// Upstream `DEFAULT_BIND_GROUP_ID` (`utils.ts:15`).
@@ -334,4 +335,127 @@ pub fn random_f64() -> f64 {
         .map(|duration| duration.subsec_nanos())
         .unwrap_or(0);
     (nanos % 1_000_000) as f64 / 1_000_000.0
+}
+
+/// Upstream `capitalize(s)` (`utils.ts:33`).
+pub fn capitalize(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
+}
+
+/// Upstream `getScenes(endpoint|group)` (`utils.ts:362-379`).
+fn scenes_from_endpoints(
+    endpoints: &[std::sync::Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>],
+    group_id: u64,
+) -> Vec<Value> {
+    let mut scenes: std::collections::BTreeMap<u64, Value> = std::collections::BTreeMap::new();
+    for endpoint in endpoints {
+        let meta = endpoint.meta.lock().unwrap();
+        let Some(Value::Object(table)) = meta.get("scenes") else {
+            continue;
+        };
+        for (key, data) in table {
+            let mut parts = key.split('_');
+            let scene_id = parts
+                .next()
+                .and_then(|part| part.parse::<u64>().ok())
+                .unwrap_or(0);
+            let scene_group = parts
+                .next()
+                .and_then(|part| part.parse::<u64>().ok())
+                .unwrap_or(0);
+            if scene_group != group_id {
+                continue;
+            }
+            let name = data
+                .get("name")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("Scene {scene_id}"));
+            scenes.insert(scene_id, serde_json::json!({"id": scene_id, "name": name}));
+        }
+    }
+    scenes.into_values().collect()
+}
+
+pub fn get_scenes_endpoint(
+    endpoint: &std::sync::Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>,
+) -> Vec<Value> {
+    scenes_from_endpoints(std::slice::from_ref(endpoint), 0)
+}
+
+pub fn get_scenes_group(
+    group: &std::sync::Arc<zigbee_apiarist::controller::model::group::Group>,
+) -> Vec<Value> {
+    scenes_from_endpoints(&group.members(), group.group_id as u64)
+}
+
+/// Upstream `getAllFiles(path)` (`utils.ts:203-218`).
+pub fn get_all_files(path: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut result = Vec::new();
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return result;
+    };
+    for entry in entries.flatten() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() {
+            continue;
+        }
+        let file_path = entry.path();
+        if file_type.is_file() {
+            result.push(file_path);
+        } else {
+            result.extend(get_all_files(&file_path));
+        }
+    }
+    result
+}
+
+/// Upstream `sanitizeImageParameter` (`utils.ts`).
+pub fn sanitize_image_parameter(parameter: &str) -> String {
+    parameter
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric()
+                || matches!(character, '-' | '_' | ' ' | '.' | '/' | ':')
+            {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect()
+}
+
+/// Upstream `matchBase64File(value)` (`utils.ts:385-393`).
+pub fn match_base64_file(value: &str) -> Option<(String, String)> {
+    let rest = value.strip_prefix("data:image/")?;
+    let (extension, data) = rest.split_once(";base64,")?;
+    if extension.is_empty() || data.is_empty() {
+        return None;
+    }
+    Some((extension.to_string(), data.to_string()))
+}
+
+/// Upstream `saveBase64DeviceIcon(match)` (`utils.ts:396-403`).
+pub fn save_base64_device_icon(extension: &str, data: &str) -> Result<String, String> {
+    use md5::{Digest, Md5};
+
+    let digest = Md5::digest(data.as_bytes());
+    let hash: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    let file_settings = format!("device_icons/{hash}.{extension}");
+    let path = crate::util::data::join_path(&file_settings);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(|error| error.to_string())?;
+    std::fs::write(path, bytes).map_err(|error| error.to_string())?;
+    Ok(file_settings)
 }

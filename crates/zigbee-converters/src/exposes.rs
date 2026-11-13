@@ -149,3 +149,59 @@ impl Expose {
             .collect()
     }
 }
+
+impl Expose {
+    /// Upstream expose JSON (`bridge/devices[].definition.exposes`).
+    pub fn to_json(&self) -> Value {
+        let mut map = serde_json::Map::new();
+        map.insert("type".to_string(), Value::String(self.r#type.clone()));
+        if let Some(name) = &self.name {
+            map.insert("name".to_string(), Value::String(name.clone()));
+        }
+        if let Some(property) = &self.property {
+            map.insert("property".to_string(), Value::String(property.clone()));
+        }
+        if self.access != 0 {
+            map.insert("access".to_string(), Value::from(self.access));
+        }
+        if let Some(description) = &self.description {
+            map.insert("description".to_string(), Value::String(description.clone()));
+        }
+        if let Some(category) = &self.category {
+            map.insert("category".to_string(), Value::String(category.clone()));
+        }
+        if let Some(unit) = &self.unit {
+            map.insert("unit".to_string(), Value::String(unit.clone()));
+        }
+        if !self.values.is_empty() {
+            map.insert(
+                "values".to_string(),
+                Value::Array(self.values.iter().cloned().map(Value::String).collect()),
+            );
+        }
+        if let Some(minimum) = self.value_min {
+            map.insert("value_min".to_string(), Value::from(minimum));
+        }
+        if let Some(maximum) = self.value_max {
+            map.insert("value_max".to_string(), Value::from(maximum));
+        }
+        if let Some(step) = self.value_step {
+            map.insert("value_step".to_string(), Value::from(step));
+        }
+        if !self.features.is_empty() {
+            map.insert(
+                "features".to_string(),
+                Value::Array(self.features.iter().map(Expose::to_json).collect()),
+            );
+        }
+        if let Some(endpoint) = &self.endpoint {
+            map.insert("endpoint".to_string(), Value::String(endpoint.clone()));
+        }
+        if let Value::Object(extra) = &self.extra {
+            for (key, value) in extra {
+                map.insert(key.clone(), value.clone());
+            }
+        }
+        Value::Object(map)
+    }
+}

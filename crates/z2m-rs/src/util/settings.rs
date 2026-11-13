@@ -397,6 +397,18 @@ impl Settings {
         Ok(())
     }
 
+    /// Upstream `changeEntityOptions` restart detection (`bridge.ts:494`).
+    pub fn change_entity_options_with_restart(
+        &mut self,
+        entity_type: &str,
+        id: &str,
+        options: Value,
+    ) -> Result<bool, String> {
+        let restart = settings_schema::definition_restart_required(entity_type, &options);
+        self.change_entity_options(id, options)?;
+        Ok(restart)
+    }
+
     pub fn change_entity_options(&mut self, id: &str, options: Value) -> Result<(), String> {
         let Some((entity_type, key)) = self.find_entity(id) else {
             return Err(format!("Device or group '{id}' does not exist"));

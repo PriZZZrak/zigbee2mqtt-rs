@@ -471,3 +471,31 @@ fn matches_pattern(pattern: &str, text: &str) -> bool {
         .or_insert_with(|| compiled(pattern))
         .is_match(text.as_bytes())
 }
+
+/// Upstream `settings.schema.json.definitions.<kind>.properties` keys.
+pub fn definition_property_names(kind: &str) -> Vec<String> {
+    let root = schema();
+    let Some(definition) = resolve_pointer(root, &format!("#/definitions/{kind}")) else {
+        return Vec::new();
+    };
+    definition
+        .get("properties")
+        .and_then(Value::as_object)
+        .map(|properties| properties.keys().cloned().collect())
+        .unwrap_or_default()
+}
+
+/// Upstream device/group option validators that only mark `requiresRestart`.
+pub fn definition_restart_required(kind: &str, options: &Value) -> bool {
+    let root = schema();
+    let Some(definition) = resolve_pointer(root, &format!("#/definitions/{kind}")) else {
+        return false;
+    };
+    let Some(properties) = definition.get("properties").and_then(Value::as_object) else {
+        return false;
+    };
+    properties.iter().any(|(name, subschema)| {
+        subschema.get("requiresRestart").and_then(Value::as_bool) == Some(true)
+            && options.get(name).is_some()
+    })
+}

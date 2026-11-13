@@ -2,6 +2,7 @@ pub mod extension;
 
 pub mod availability;
 pub mod bind;
+pub mod bridge;
 pub mod configure;
 pub mod groups;
 pub mod health;
