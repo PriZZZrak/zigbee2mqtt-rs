@@ -121,6 +121,44 @@ fn harness() -> Harness {
         Expose::enumeration("mode", access::SET | access::STATE, &["auto", "manual"]),
         Expose::binary("contact", access::STATE),
         Expose::binary("power", access::SET | access::STATE),
+        Expose {
+            r#type: "light".to_string(),
+            name: Some("light".to_string()),
+            access: access::ALL,
+            features: vec![
+                Expose::binary("state", access::ALL),
+                Expose::numeric("brightness", access::ALL),
+                Expose::numeric("color_temp", access::ALL),
+            ],
+            ..Default::default()
+        },
+        Expose {
+            r#type: "cover".to_string(),
+            name: Some("cover".to_string()),
+            access: access::ALL,
+            features: vec![
+                Expose::binary("state", access::ALL),
+                Expose::numeric("position", access::ALL),
+            ],
+            ..Default::default()
+        },
+        Expose {
+            r#type: "lock".to_string(),
+            name: Some("lock".to_string()),
+            access: access::ALL,
+            features: vec![Expose::binary("state", access::ALL)],
+            ..Default::default()
+        },
+        Expose {
+            r#type: "fan".to_string(),
+            name: Some("fan".to_string()),
+            access: access::ALL,
+            features: vec![
+                Expose::binary("state", access::ALL),
+                Expose::enumeration("mode", access::ALL, &["off", "low", "high", "auto"]),
+            ],
+            ..Default::default()
+        },
     ]);
     zigbee.converters().lock().unwrap().register(definition);
     device.resolve_definition(false);
@@ -230,6 +268,43 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
     .await
     .expect("binary switch");
     assert_eq!(switch["command_topic"], "zigbee2mqtt/lamp/set/power");
+
+    let light = config(
+        &harness,
+        &format!("homeassistant/light/{IEEE}/light/config"),
+    )
+    .await
+    .expect("light");
+    assert_eq!(light["schema"], "json");
+    assert_eq!(light["brightness"], true);
+    assert_eq!(light["supported_color_modes"], json!(["color_temp"]));
+
+    let cover = config(
+        &harness,
+        &format!("homeassistant/cover/{IEEE}/cover/config"),
+    )
+    .await
+    .expect("cover");
+    assert_eq!(cover["state_closed"], "CLOSE");
+    assert_eq!(cover["position_topic"], "zigbee2mqtt/lamp");
+    assert_eq!(cover["set_position_topic"], format!("zigbee2mqtt/lamp/set"));
+
+    let lock = config(
+        &harness,
+        &format!("homeassistant/lock/{IEEE}/lock/config"),
+    )
+    .await
+    .expect("lock");
+    assert_eq!(lock["state_locked"], true);
+
+    let fan = config(
+        &harness,
+        &format!("homeassistant/fan/{IEEE}/fan/config"),
+    )
+    .await
+    .expect("fan");
+    assert_eq!(fan["preset_modes"], json!(["auto"]));
+    assert_eq!(fan["speed_range_max"], 2);
 
     let mqtt = harness.mqtt.lock().await;
     let entry = mqtt

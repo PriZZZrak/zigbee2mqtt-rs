@@ -79,9 +79,11 @@ fn clean_name(name: &str) -> String {
 }
 
 fn state_value_template(property: &str) -> String {
-    format!(
-        "{{% if \"{property}\" in value_json %}}{{{{ value_json[\"{property}\"] }}}}{{% endif %}}"
-    )
+    state_value_template_body(property, &format!("{{{{ value_json[\"{property}\"] }}}}"))
+}
+
+fn state_value_template_body(property: &str, body: &str) -> String {
+    format!("{{% if \"{property}\" in value_json %}}{body}{{% endif %}}")
 }
 
 fn capitalize(value: &str) -> String {
@@ -150,7 +152,8 @@ impl HomeAssistant {
         };
 
         let mut entries = Vec::new();
-        for expose in exposes {
+        let all_exposes = exposes.clone();
+        for expose in &exposes {
             match expose.r#type.as_str() {
                 "switch" => {
                     let Some(state) = expose.features.iter().find(|feature| {
@@ -201,6 +204,210 @@ impl HomeAssistant {
                         object_id: "switch".into(),
                         payload,
                     });
+                }
+                "light" => {
+                    let feature = |name: &str| {
+                        all_exposes
+                            .iter()
+                            .find_map(|expose| expose.features.iter().find(|feature| feature.name.as_deref() == Some(name)))
+                    };
+                    let has_color_xy = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("color_xy")));
+                    let has_color_hs = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("color_hs")));
+                    let has_brightness = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("brightness")));
+                    let has_color_temp = all_exposes.iter().any(|expose| expose.features.iter().any(|f| f.name.as_deref() == Some("color_temp")));
+                    let Some(_state) = feature("state") else { continue };
+                    let prefer_hs = all_exposes.iter().any(|expose| {
+                        let xy = expose.features.iter().position(|f| f.name.as_deref() == Some("color_xy"));
+                        let hs = expose.features.iter().position(|f| f.name.as_deref() == Some("color_hs"));
+                        xy.is_some() && hs.is_some() && hs < xy
+                    });
+
+                    let mut payload = Map::new();
+                    payload.insert("name".into(), Value::Null);
+                    payload.insert("brightness".into(), Value::Bool(has_brightness));
+                    payload.insert("schema".into(), json!("json"));
+                    payload.insert("command_topic".into(), Value::Bool(true));
+                    payload.insert("brightness_scale".into(), json!(254));
+                    let mut modes: Vec<Value> = Vec::new();
+                    if has_color_xy && !prefer_hs { modes.push(json!("xy")); }
+                    if has_color_hs && (!has_color_xy || prefer_hs) { modes.push(json!("hs")); }
+                    if has_color_temp { modes.push(json!("color_temp")); }
+                    if modes.is_empty() { modes.push(json!("brightness")); }
+                    payload.insert("supported_color_modes".into(), Value::Array(modes));
+
+                    if has_color_temp {
+                        let color_temps: Vec<&Expose> = all_exposes.iter().filter_map(|expose| expose.features.iter().find(|f| f.name.as_deref() == Some("color_temp"))).collect();
+                        let max = color_temps.iter().filter_map(|e| e.value_max).reduce(f64::min);
+                        let min = color_temps.iter().filter_map(|e| e.value_min).reduce(f64::max);
+                        if let Some(max) = max { payload.insert("max_mireds".into(), Value::from(max)); }
+                        if let Some(min) = min { payload.insert("min_mireds".into(), Value::from(min)); }
+                    }
+
+                    let mut effects: Vec<Value> = Vec::new();
+                    for expose in &all_exposes {
+                        if expose.r#type == "enum" && expose.name.as_deref() == Some("effect") {
+                            for value in &expose.values { if !effects.contains(&json!(value)) { effects.push(json!(value)); } }
+                        }
+                    }
+                    if !effects.is_empty() {
+                        payload.insert("effect".into(), Value::Bool(true));
+                        payload.insert("effect_list".into(), Value::Array(effects));
+                    }
+                    entries.push(Entry { r#type: "light".into(), object_id: "light".into(), payload });
+                }
+                "lock" => {
+                    let Some(state) = expose.features.iter().find(|f| f.r#type == "binary" && f.name.as_deref() == Some("state")) else { continue };
+                    let mut payload = Map::new();
+                    payload.insert("name".into(), Value::Null);
+                    payload.insert("command_topic".into(), Value::Bool(true));
+                    payload.insert("value_template".into(), Value::String(state_value_template(state.property.as_deref().unwrap_or("state"))));
+                    payload.insert("state_locked".into(), state.value_on.clone());
+                    payload.insert("state_unlocked".into(), state.value_off.clone());
+                    entries.push(Entry { r#type: "lock".into(), object_id: "lock".into(), payload });
+                }
+                "cover" => {
+                    let feature = |name: &str| {
+                        all_exposes.iter().find_map(|expose| expose.features.iter().find(|feature| feature.name.as_deref() == Some(name)))
+                    };
+                    let Some(state) = feature("state") else { continue };
+                    let position = feature("position");
+                    let tilt = feature("tilt");
+                    let motor_state = all_exposes.iter().find(|expose| expose.r#type == "enum" && expose.name.as_deref().is_some_and(|n| n == "motor_state" || n == "moving") && expose.access & access::STATE != 0);
+                    let running = all_exposes.iter().find(|expose| expose.r#type == "binary" && expose.name.as_deref() == Some("running"));
+
+                    let mut payload = Map::new();
+                    payload.insert("name".into(), Value::Null);
+                    payload.insert("command_topic".into(), Value::Bool(true));
+                    payload.insert("state_topic".into(), Value::Bool(true));
+
+                    if let Some(running) = running {
+                        if let Some(position) = position {
+                            let running_property = running.property.as_deref().unwrap_or("running");
+                            let position_property = position.property.as_deref().unwrap_or("position");
+                            payload.insert("value_template".into(), Value::String(format!("{{% if \"{running_property}\" in value_json and value_json[\"{running_property}\"] and \"{position_property}\" in value_json %}} {{% if value_json[\"{position_property}\"] > 0 %}} closing {{% else %}} opening {{% endif %}} {{% else %}} stopped {{% endif %}}")));
+                        }
+                    }
+                    if let Some(motor_state) = motor_state {
+                        let motor_property = motor_state.property.as_deref().unwrap_or("motor_state");
+                        let state_property = state.property.as_deref().unwrap_or("state");
+                        let position_property = position.and_then(|p| p.property.as_deref());
+                        let opening = motor_state.values.iter().find(|v| ["opening","open","forward","up","rising"].contains(&v.to_lowercase().as_str())).cloned();
+                        let closing = motor_state.values.iter().find(|v| ["closing","close","backward","back","reverse","down","declining"].contains(&v.to_lowercase().as_str())).cloned();
+                        let stopped = motor_state.values.iter().find(|v| ["stopped","stop","pause","paused"].contains(&v.to_lowercase().as_str())).cloned();
+                        if let (Some(opening), Some(closing), Some(stopped)) = (opening, closing, stopped) {
+                            payload.insert("state_opening".into(), json!(opening));
+                            payload.insert("state_closing".into(), json!(closing));
+                            payload.insert("state_open".into(), json!("OPEN"));
+                            payload.insert("state_closed".into(), json!("CLOSE"));
+                            payload.insert("state_stopped".into(), json!(stopped));
+                            let position_value = position_property.map(|p| format!("value_json[\"{p}\"] | default(none)")).unwrap_or_else(|| "none".to_string());
+                            let template = format!("{{% set motor = value_json[\"{motor_property}\"] | default(none) %}}{{% set position = {position_value} %}}{{% set state = value_json[\"{state_property}\"] | default(none) %}}{{% if (motor == \"{opening}\" and position != 100) or (motor == \"{closing}\" and position != 0) %}}{{{{ motor }}}}{{% elif position == 0 %}}CLOSE{{% elif position == 100 %}}OPEN{{% elif motor == \"{stopped}\" and position is not none %}}OPEN{{% elif state in [\"OPEN\", \"CLOSE\"] %}}{{{{ state }}}}{{% else %}}{stopped}{{% endif %}}");
+                            payload.insert("value_template".into(), Value::String(template));
+                        }
+                    }
+                    if !payload.contains_key("value_template") {
+                        payload.insert("value_template".into(), Value::String(state_value_template(state.property.as_deref().unwrap_or("state"))));
+                        payload.insert("state_open".into(), json!("OPEN"));
+                        payload.insert("state_closed".into(), json!("CLOSE"));
+                        payload.insert("state_stopped".into(), json!("STOP"));
+                    }
+                    if position.is_none() && tilt.is_none() {
+                        payload.insert("optimistic".into(), Value::Bool(true));
+                    }
+                    if let Some(position) = position {
+                        let property = position.property.as_deref().unwrap_or("position");
+                        payload.insert("position_template".into(), Value::String(state_value_template(property)));
+                        payload.insert("set_position_template".into(), Value::String(format!("{{ \"{property}\": {{{{ position }}}} }}")));
+                        payload.insert("set_position_topic".into(), Value::Bool(true));
+                        payload.insert("position_topic".into(), Value::Bool(true));
+                    }
+                    if let Some(tilt) = tilt {
+                        payload.insert("tilt_command_topic".into(), Value::Bool(true));
+                        payload.insert("tilt_status_topic".into(), Value::Bool(true));
+                        payload.insert("tilt_status_template".into(), Value::String(state_value_template(tilt.property.as_deref().unwrap_or("tilt"))));
+                    }
+                    entries.push(Entry { r#type: "cover".into(), object_id: "cover".into(), payload });
+                }
+                "fan" => {
+                    let state = expose.features.iter().find(|f| f.r#type == "binary" && f.name.as_deref() == Some("state"));
+                    let state_property = state.and_then(|s| s.property.clone()).unwrap_or_else(|| "state".to_string());
+                    let mode = expose.features.iter().find(|f| f.r#type == "enum" && f.name.as_deref() == Some("mode"));
+                    let speed = expose.features.iter().find(|f| f.r#type == "numeric" && f.name.as_deref() == Some("speed"));
+                    let mut payload = Map::new();
+                    payload.insert("name".into(), Value::Null);
+                    payload.insert("command_topic".into(), Value::Bool(true));
+                    payload.insert("state_topic".into(), Value::Bool(true));
+                    if let Some(mode) = mode {
+                        let property = mode.property.as_deref().unwrap_or("fan_mode");
+                        let speeds: Vec<Value> = std::iter::once("off".to_string()).chain(["low","medium","high","1","2","3","4","5","6","7","8","9"].iter().filter(|s| mode.values.iter().any(|v| v == *s)).map(|s| s.to_string())).map(Value::String).collect();
+                        let presets: Vec<Value> = ["on","auto","smart"].iter().filter(|s| mode.values.iter().any(|v| v == *s)).map(|s| json!(s)).collect();
+                        payload.insert("percentage_state_topic".into(), Value::Bool(true));
+                        payload.insert("percentage_command_topic".into(), json!(property));
+                        let percent_values = speeds
+                            .iter()
+                            .enumerate()
+                            .map(|(i, s)| format!("'{}':{i}", s.as_str().unwrap_or_default()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let percent_commands = speeds
+                            .iter()
+                            .enumerate()
+                            .map(|(i, s)| format!("{i}:'{}'", s.as_str().unwrap_or_default()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        payload.insert(
+                            "percentage_value_template".into(),
+                            Value::String(state_value_template_body(
+                                property,
+                                &format!(
+                                    "{{{{ {{{percent_values}}}[value_json[\"{property}\"]] | default('None') }}}}"
+                                ),
+                            )),
+                        );
+                        payload.insert(
+                            "percentage_command_template".into(),
+                            Value::String(format!(
+                                "{{{{ {{{percent_commands}}}[value] | default('') }}}}"
+                            )),
+                        );
+                        payload.insert("speed_range_min".into(), json!(1));
+                        payload.insert("speed_range_max".into(), json!(speeds.len() as u64 - 1));
+                        payload.insert("preset_mode_state_topic".into(), Value::Bool(true));
+                        payload.insert("preset_mode_command_topic".into(), json!(property));
+                        let preset_list = presets
+                            .iter()
+                            .map(|s| format!("'{}'", s.as_str().unwrap_or_default()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        payload.insert(
+                            "preset_mode_value_template".into(),
+                            Value::String(state_value_template_body(
+                                property,
+                                &format!(
+                                    "{{{{ value_json[\"{property}\"] if value_json[\"{property}\"] in [{preset_list}] else 'None' }}}}"
+                                ),
+                            )),
+                        );
+                        payload.insert("preset_modes".into(), Value::Array(presets));
+                        payload.insert(
+                            "state_value_template".into(),
+                            Value::String(state_value_template(&state_property)),
+                        );
+                        payload.insert("command_topic_postfix".into(), json!(state_property));
+                    } else if let Some(speed) = speed {
+                        let property = speed.property.as_deref().unwrap_or("speed");
+                        payload.insert("percentage_state_topic".into(), Value::Bool(true));
+                        payload.insert("percentage_command_topic".into(), json!(property));
+                        payload.insert("percentage_value_template".into(), Value::String(state_value_template(property)));
+                        payload.insert("percentage_command_template".into(), Value::String("{{ value | default() }}".to_string()));
+                        if let Some(min) = speed.value_min { payload.insert("speed_range_min".into(), Value::from(min)); }
+                        if let Some(max) = speed.value_max { payload.insert("speed_range_max".into(), Value::from(max)); }
+                        payload.insert("state_value_template".into(), Value::String(state_value_template(&state_property)));
+                        payload.insert("command_topic_postfix".into(), json!(state_property));
+                    } else {
+                        continue;
+                    }
+                    entries.push(Entry { r#type: "fan".into(), object_id: "fan".into(), payload });
                 }
                 "binary" => {
                     let property = expose.property.clone().unwrap_or_default();
@@ -628,10 +835,26 @@ impl HomeAssistant {
                 .remove("command_topic_postfix")
                 .and_then(|value| value.as_str().map(|value| format!("/{value}")))
                 .unwrap_or_default();
+            if payload.get("position_topic").is_some() {
+                payload.insert("position_topic".into(), Value::String(state_topic.clone()));
+            }
+            if payload.get("tilt_status_topic").is_some() {
+                payload.insert("tilt_status_topic".into(), Value::String(state_topic.clone()));
+            }
             if payload.get("command_topic").and_then(Value::as_bool) == Some(true) {
                 payload.insert(
                     "command_topic".into(),
                     json!(format!("{base_topic}/{command_prefix}set{command_postfix}")),
+                );
+            }
+            let command_topic = format!("{base_topic}/{command_prefix}set{command_postfix}");
+            if payload.get("set_position_topic").is_some() {
+                payload.insert("set_position_topic".into(), Value::String(command_topic.clone()));
+            }
+            if payload.get("tilt_command_topic").is_some() {
+                payload.insert(
+                    "tilt_command_topic".into(),
+                    Value::String(format!("{base_topic}/{command_prefix}set/tilt")),
                 );
             }
 
