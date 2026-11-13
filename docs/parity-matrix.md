@@ -52,6 +52,19 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Bridge Zigbee layer | `lib/zigbee.ts` | PARTIAL | start/stop, Z-Stack adapter wiring, permits, pass/block lists, device/group lookups, entity resolution, controller-event forwarding (message/join/interview/leave/last-seen/announce), `resolveDefinition` via the converter host; touchlink is out of R1 |
 | Receive extension | `lib/extension/receive.ts` | PARTIAL | definition-less fallback (`Skipping message, still interviewing` + `publishLastSeen`), matching `fromZigbee` converters, `genOta`/`genTime`/`genBasic`/`genPollCtrl` ignore list, per-device debounce (flush on conflict) and throttle, elapsed, state-cache updates; `postProcessConvertedFromZigbeeMessage` calibration pending |
 | Publish extension | `lib/extension/publish.ts` | PARTIAL | get/set topic parsing, JSON/state payloads, HA duplicate-state suppression, converter matching (key/endpoints), optimistic state + `filtered_optimistic`, set/get dispatch, scene-change event, `Cannot publish to unsupported device`; group `membersState` meta pending |
+| Extension base | `lib/extension/extension.ts` | PARTIAL | current trait carries name/start/stop/adjustMessage; full constructor context (zigbee/mqtt/state/publishEntityState/eventBus/enableDisable/restart/addExtension) lands with the extension port |
+| Availability | `lib/extension/availability.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Bind | `lib/extension/bind.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Bridge | `lib/extension/bridge.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Configure | `lib/extension/configure.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Frontend (protocol/API) | `lib/extension/frontend.ts` | TODO | WS protocol + HTTP API; static assets deferred to OpenWrt packaging |
+| Groups | `lib/extension/groups.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Health | `lib/extension/health.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Home Assistant | `lib/extension/homeassistant.ts` | TODO | full port incl. bridge entities/discovery; per-device discovery works when definitions are registered |
+| Network map | `lib/extension/networkMap.ts` | TODO | port scheduled (goal 2026-11-13) |
+| OnEvent | `lib/extension/onEvent.ts` | TODO | port scheduled (goal 2026-11-13) |
+| External JS/converters/extensions | `lib/extension/external*.ts` | OMITTED | user JS evaluation forbidden (AGENTS §5 Q5) |
+| OTA update | `lib/extension/otaUpdate.ts` | OMITTED | OTA out of R1 (AGENTS §4/§5) |
 | Controller publish pipeline | `lib/controller.ts` | PARTIAL | `publishEntityState` (cache_state, retain/qos/retention tracking, include_device_information, last_seen, linkquality, filtered_attributes, json/attribute outputs, PublishEntityState event) and `iteratePayloadAttributeOutput`; lifecycle/extensions wiring pending; MQTT v5 message-expiry is tracked but not sent (rumqttc built without v5) |
 | Backup metadata (`toUnifiedBackup`/`fromUnifiedBackup`/`fromLegacyBackup`) | `utils/backup.ts` | PORTED | unified round-trip against the real router backup; legacy parser unit test |
 | HIL (coordinator in container) | — | PORTED | Dongle Plus `10c4:ea60`, SYS version + NV init, see `docs/hil/2026-11-09-dongle-plus.md` |

@@ -147,7 +147,13 @@ bridge entities, Windfront and storage are in R1.
 
 ### Out of R1
 
-- `zigbee-herdsman-converters`, Boa/JS, vendor-specific exposes and quirks.
+- `zigbee-herdsman-converters` converter database, Boa/JS, vendor-specific
+exposes and quirks (shared converter host is in scope, AGENTS §5 Q4).
+- `lib/extension/externalJS.ts`, `externalConverters.ts`, `externalExtensions.ts`
+  (user JavaScript evaluation; AGENTS §5 Q5).
+- `lib/extension/otaUpdate.ts` (OTA flashing; AGENTS §5 Q5).
+- Frontend static assets (protocol/API only; assets decided at OpenWrt
+  packaging time; AGENTS §5 Q5).
 - Full device catalog and per-model configuration.
 - Adapters other than Z-Stack (ember, deconz, zigate, zboss, zoh, ezsp).
 - CC2531 hardware acceptance (R1 uses Dongle-P; CC2531 remains required for
@@ -182,6 +188,14 @@ Resolved on 2026-11-06:
   (e.g. `receive.ts:130-134`). `generateDefinition` (the “unknown device”
   synthesizer) is ported only if R1 needs generated definitions; until then the
   fallback is an explicit not-found, never a stub.
+
+- **Q5 — extension directory boundary (2026-11-13):** all files under
+  `lib/extension/` are ported except: `externalJS.ts`, `externalConverters.ts`,
+  `externalExtensions.ts` (they execute user JavaScript, which R1 forbids;
+  documented `OMITTED`, no JS runtime) and `otaUpdate.ts` (OTA stays out of
+  R1 per §4; documented `OMITTED`). `frontend.ts` is ported for the WebSocket
+  protocol and HTTP API only; Windfront static assets are deferred to OpenWrt
+  packaging. `publish.ts` and `receive.ts` are completed as part of this goal.
 
 ## 6. Technical constraints
 
