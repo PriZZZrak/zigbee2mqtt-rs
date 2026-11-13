@@ -450,6 +450,36 @@ async fn clears_discovery_on_entity_removed() {
     assert!(cleared.contains(&format!("homeassistant/sensor/{IEEE}/temperature/config")));
 }
 
+#[tokio::test]
+async fn action_publishes_device_trigger_and_republication() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
+        "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+        "message": {"action": "single"},
+    }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    let trigger = mqtt
+        .attempted
+        .iter()
+        .find(|(topic, _, _)| topic == &format!("homeassistant/device_automation/{IEEE}/action_single/config"))
+        .expect("trigger discovery");
+    let payload: Value = serde_json::from_str(&trigger.1).unwrap();
+    assert_eq!(payload["automation_type"], "trigger");
+    assert_eq!(payload["subtype"], "single");
+    assert_eq!(payload["topic"], "zigbee2mqtt/lamp/action");
+    assert!(mqtt
+        .attempted
+        .iter()
+        .any(|(topic, payload, _)| topic == "zigbee2mqtt/lamp/action" && payload == "single"));
+}
+
 #[test]
 fn adjust_message_copies_hue_and_saturation() {
     let _guard = serial();

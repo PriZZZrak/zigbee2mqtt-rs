@@ -40,6 +40,8 @@ pub struct HomeAssistant {
     legacy_action_sensor: bool,
     experimental_event_entities: bool,
     discovered: Mutex<HashMap<String, Arc<Mutex<Discovered>>>>,
+    group_member_lookup: Mutex<HashMap<String, String>>,
+    action_value_template: String,
     bridge_identifier: Mutex<String>,
     origin: Mutex<Value>,
     version: Mutex<String>,
@@ -111,6 +113,8 @@ impl HomeAssistant {
                 .as_bool()
                 .unwrap_or(false),
             discovered: Mutex::new(HashMap::new()),
+            group_member_lookup: Mutex::new(HashMap::new()),
+            action_value_template: action_value_template(),
             bridge_identifier: Mutex::new(String::new()),
             origin: Mutex::new(Value::Null),
             version: Mutex::new("unknown".to_string()),
@@ -1145,8 +1149,15 @@ impl HomeAssistant {
                             payload.insert(
                                 "event_types".into(),
                                 Value::Array(
-                                    expose.values.iter().cloned().map(Value::String).collect(),
+                                    prepare_action_event_types(&expose.values)
+                                        .into_iter()
+                                        .map(Value::String)
+                                        .collect(),
                                 ),
+                            );
+                            payload.insert(
+                                "value_template".into(),
+                                Value::String(self.action_value_template.clone()),
                             );
                             merge_lookup(
                                 &mut payload,
@@ -1292,6 +1303,80 @@ impl HomeAssistant {
             }
         }
 
+        if entity.is_device() {
+            let continuous = self.context.settings_value()["advanced"]["last_seen"]
+                .as_str()
+                .unwrap_or("disable")
+                .to_string();
+            if continuous != "disable" {
+                let mut payload = Map::new();
+                payload.insert("name".into(), json!("Last seen"));
+                payload.insert("value_template".into(), Value::String(state_value_template("last_seen")));
+                payload.insert("icon".into(), json!("mdi:clock"));
+                payload.insert("enabled_by_default".into(), Value::Bool(false));
+                payload.insert("entity_category".into(), json!("diagnostic"));
+                if continuous.starts_with("ISO_8601") {
+                    payload.insert("device_class".into(), json!("timestamp"));
+                }
+                entries.push(Entry { r#type: "sensor".into(), object_id: "last_seen".into(), payload });
+            }
+            if entity.definition().is_some_and(|definition| definition.ota.is_some()) {
+                let base = self.context.settings_value()["mqtt"]["base_topic"].as_str().unwrap_or("zigbee2mqtt").to_string();
+                let mut payload = Map::new();
+                payload.insert("name".into(), Value::Null);
+                payload.insert("entity_picture".into(), json!("https://github.com/Koenkk/zigbee2mqtt/raw/master/images/logo.png"));
+                payload.insert("state_topic".into(), Value::Bool(true));
+                payload.insert("device_class".into(), json!("firmware"));
+                payload.insert("entity_category".into(), json!("config"));
+                payload.insert("command_topic".into(), json!(format!("{base}/bridge/request/device/ota_update/update")));
+                payload.insert(
+                    "payload_install".into(),
+                    json!(format!(r#"{{"id": "{}"}}"#, entity.entity_id().key())),
+                );
+                payload.insert(
+                    "value_template".into(),
+                    Value::String(state_value_template_body(
+                        "update",
+                        r#"{"latest_version":"{{ value_json['update']['latest_version'] }}","installed_version":"{{ value_json['update']['installed_version'] }}","update_percentage":{{ value_json['update'].get('progress', 'null') }},"in_progress":{{ (value_json['update'].get('state') == 'updating')|lower }}}"#,
+                    )),
+                );
+                entries.push(Entry { r#type: "update".into(), object_id: "update".into(), payload });
+            }
+        }
+        let scene_endpoints: Vec<Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>> = if entity.is_device() {
+            entity.zh_device().map(|zh| zh.endpoints()).unwrap_or_default()
+        } else {
+            entity.zh_group().map(|group| group.members()).unwrap_or_default()
+        };
+        for endpoint in scene_endpoints {
+            let group_id = if entity.is_device() { 0 } else { entity.entity_id().key().parse::<u64>().unwrap_or(0) };
+            let scenes = if entity.is_device() {
+                utils::get_scenes_endpoint(&endpoint)
+            } else {
+                entity.zh_group().map(|group| utils::get_scenes_group(&group)).unwrap_or_default()
+            };
+            for scene in scenes {
+                let scene_id = scene.get("id").and_then(Value::as_u64).unwrap_or(0);
+                let scene_name = scene.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
+                let mut payload = Map::new();
+                payload.insert("name".into(), json!(scene_name));
+                payload.insert("state_topic".into(), Value::Bool(false));
+                payload.insert("command_topic".into(), Value::Bool(true));
+                payload.insert(
+                    "payload_on".into(),
+                    json!(format!(r#"{{ "scene_recall": {scene_id} }}"#)),
+                );
+                payload.insert(
+                    "object_id_postfix".into(),
+                    json!(format!(
+                        "_{}",
+                        scene_name.replace(' ', "_").to_lowercase()
+                    )),
+                );
+                entries.push(Entry { r#type: "scene".into(), object_id: format!("scene_{scene_id}"), payload });
+            }
+        }
+
         entries
     }
 
@@ -1417,6 +1502,23 @@ impl HomeAssistant {
             }
 
             payload.insert("device".into(), device_payload.clone());
+            if entity.is_device() {
+                if let Some(endpoint) = entity.endpoint(None) {
+                    let member_key = format!("{}_{}_{}", entity.entity_id().key(), endpoint.ID, config.r#type);
+                    self.group_member_lookup.lock().unwrap().insert(member_key, payload["unique_id"].as_str().unwrap_or_default().to_string());
+                }
+            } else if entity.is_group() {
+                let mut member_ids = Vec::new();
+                for member in entity.zh_group().map(|group| group.members()).unwrap_or_default() {
+                    let key = format!("{}_{}_{}", member.device_ieee_address.lock().unwrap(), member.ID, config.r#type);
+                    if let Some(unique) = self.group_member_lookup.lock().unwrap().get(&key) {
+                        member_ids.push(Value::String(unique.clone()));
+                    }
+                }
+                if !member_ids.is_empty() {
+                    payload.insert("group".into(), Value::Array(member_ids));
+                }
+            }
             payload.insert("origin".into(), self.origin.lock().unwrap().clone());
 
             let mut object_id = device_payload["name"]
@@ -1617,6 +1719,127 @@ impl HomeAssistant {
         }
     }
 
+    /// Upstream discovery-topic cleanup (`homeassistant.ts:2078-2144`).
+    async fn on_discovery_message(self: &Arc<Self>, data: &Value) {
+        let topic = data.get("topic").and_then(Value::as_str).unwrap_or("");
+        let Some(regex) = self.discovery_regex() else {
+            return;
+        };
+        let Some(captures) = regex.captures(topic) else {
+            return;
+        };
+        let component = captures.get(1).map(|value| value.as_str()).unwrap_or("");
+        let id_part = captures.get(2).map(|value| value.as_str()).unwrap_or("");
+        let object_id = captures.get(3).map(|value| value.as_str()).unwrap_or("");
+        let is_device_automation = component == "device_automation";
+        let text = data.get("message").and_then(Value::as_str).unwrap_or("");
+        let Ok(message) = serde_json::from_str::<Value>(text) else {
+            return;
+        };
+        let base = format!(
+            "{}/",
+            self.context.settings_value()["mqtt"]["base_topic"]
+                .as_str()
+                .unwrap_or("zigbee2mqtt")
+        );
+        let valid_base = if is_device_automation {
+            message
+                .get("topic")
+                .and_then(Value::as_str)
+                .is_some_and(|topic| topic.starts_with(&base))
+        } else {
+            message
+                .get("availability")
+                .and_then(|availability| availability.get(0))
+                .and_then(|entry| entry.get("topic"))
+                .and_then(Value::as_str)
+                .is_some_and(|topic| topic.starts_with(&base))
+        };
+        if !valid_base {
+            return;
+        }
+
+        let id = id_part
+            .strip_prefix("group_")
+            .unwrap_or(id_part)
+            .to_string();
+        let bridge_id = self.bridge_identifier.lock().unwrap().clone();
+        let entity = if id == self.context.zigbee.coordinator_ieee_addr().unwrap_or_default()
+            || bridge_id.ends_with(&id)
+        {
+            None
+        } else {
+            self.context.zigbee.resolve_entity(&id)
+        };
+        let mut clear = entity
+            .as_ref()
+            .map(|entity| entity.is_device() && entity.definition().is_none())
+            .unwrap_or(true);
+
+        if let Some(entity) = &entity {
+            let key = object_id.split('_').next().unwrap_or("");
+            let trigger_topic = format!("{base}/{}/{key}", entity.name());
+            if is_device_automation
+                && message.get("topic").and_then(Value::as_str) == Some(trigger_topic.as_str())
+            {
+                self.get_discovered(&entity.entity_id().key())
+                    .lock()
+                    .unwrap()
+                    .triggers
+                    .insert(object_id.to_string());
+            }
+        }
+        let discovery_topic = topic
+            .strip_prefix(&format!("{}/", self.discovery_topic))
+            .unwrap_or(topic)
+            .to_string();
+        if !clear && !is_device_automation {
+            if let Some(entity) = &entity {
+                clear = !self
+                    .get_discovered(&entity.entity_id().key())
+                    .lock()
+                    .unwrap()
+                    .messages
+                    .contains_key(&discovery_topic);
+            }
+        }
+        clear = clear
+            || entity.as_ref().is_some_and(|entity| {
+                entity
+                    .options()
+                    .get("homeassistant")
+                    .is_some_and(|value| value.as_bool() == Some(false))
+            });
+
+        if clear {
+            self.context.logger.lock().unwrap().debug(
+                &format!("Clearing outdated Home Assistant config '{topic}'"),
+                "z2m",
+            );
+            self.context
+                .mqtt
+                .lock()
+                .await
+                .publish(
+                    &discovery_topic,
+                    "",
+                    MqttPublishOptions {
+                        retain: true,
+                        qos: 1,
+                        base_topic: Some(self.discovery_topic.clone()),
+                        ..Default::default()
+                    },
+                )
+                .await;
+        } else if let Some(entity) = entity {
+            self.get_discovered(&entity.entity_id().key())
+                .lock()
+                .unwrap()
+                .messages
+                .insert(discovery_topic, (stringify(&message), true));
+        }
+    }
+
     /// Upstream `getBridgeEntity` (`homeassistant.ts:2304-2420`).
     async fn publish_bridge(self: &Arc<Self>) {
         let settings = self.context.settings_value();
@@ -1740,6 +1963,156 @@ impl HomeAssistant {
                     },
                 )
                 .await;
+        }
+    }
+
+    async fn publish_device_trigger_discover(
+        self: &Arc<Self>,
+        device: &Arc<dyn Entity>,
+        key: &str,
+        value: &str,
+        force: bool,
+    ) {
+        if matches!(device.options().get("homeassistant"), Some(Value::Bool(false)) | Some(Value::Null)) {
+            return;
+        }
+        let discovered = self.get_discovered(&device.entity_id().key());
+        let discovered_key = format!("{key}_{value}");
+        {
+            let state = discovered.lock().unwrap();
+            if state.triggers.contains(&discovered_key) && !force {
+                return;
+            }
+        }
+        let base = self.context.settings_value()["mqtt"]["base_topic"]
+            .as_str()
+            .unwrap_or("zigbee2mqtt")
+            .to_string();
+        let topic = format!(
+            "device_automation/{}/{key}_{value}/config",
+            device.entity_id().key()
+        );
+        let payload = json!({
+            "automation_type": "trigger",
+            "type": key,
+            "subtype": value,
+            "payload": value,
+            "topic": format!("{base}/{}/{key}", device.name()),
+            "device": self.device_payload(device),
+            "origin": self.origin.lock().unwrap().clone(),
+        });
+        self.context
+            .mqtt
+            .lock()
+            .await
+            .publish(
+                &topic,
+                stringify(&payload),
+                MqttPublishOptions {
+                    retain: true,
+                    qos: 1,
+                    base_topic: Some(self.discovery_topic.clone()),
+                    ..Default::default()
+                },
+            )
+            .await;
+        discovered
+            .lock()
+            .unwrap()
+            .triggers
+            .insert(discovered_key);
+    }
+
+    /// Upstream `onPublishEntityState` (`homeassistant.ts:1520-1620`).
+    async fn on_publish_entity_state(self: &Arc<Self>, data: Value) {
+        let name = data
+            .get("entity")
+            .and_then(|entity| entity.get("name"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let Some(entity) = self.context.zigbee.resolve_entity(&name) else {
+            return;
+        };
+        let message = data.get("message").cloned().unwrap_or(Value::Null);
+
+        if entity.is_device() {
+            let discovered = self.get_discovered(&entity.entity_id().key());
+            let topics: Vec<String> = discovered
+                .lock()
+                .unwrap()
+                .messages
+                .keys()
+                .cloned()
+                .collect();
+            for topic in topics {
+                let Some((component, rest)) = topic.split_once('/') else {
+                    continue;
+                };
+                if component != "light" && component != "cover" {
+                    continue;
+                }
+                let object_id = rest.split('/').next().unwrap_or("");
+                let endpoint = object_id
+                    .rsplit_once('_')
+                    .map(|(_, endpoint)| endpoint)
+                    .unwrap_or("");
+                if endpoint.is_empty() {
+                    continue;
+                }
+                let suffix = format!("_{endpoint}");
+                let mut payload = Map::new();
+                for (key, value) in message.as_object().cloned().unwrap_or_default() {
+                    if let Some(stripped) = key.strip_suffix(&suffix) {
+                        payload.insert(stripped.to_string(), value);
+                    }
+                }
+                if !payload.is_empty() {
+                    self.context
+                        .mqtt
+                        .lock()
+                        .await
+                        .publish(
+                            &format!("{name}/{endpoint}"),
+                            stringify(&Value::Object(payload)),
+                            Default::default(),
+                        )
+                        .await;
+                }
+            }
+        }
+
+        if self.legacy_action_sensor
+            && message
+                .get("action")
+                .and_then(Value::as_str)
+                .is_some_and(|action| !action.is_empty())
+        {
+            (self.context.publish_entity_state)(
+                entity.clone(),
+                json!({"action": ""}),
+                None,
+            )
+            .await;
+        }
+
+        if entity.is_device() && entity.definition().is_some() {
+            if let Some(action) = message.get("action").and_then(Value::as_str) {
+                if !action.is_empty() {
+                    self.publish_device_trigger_discover(&entity, "action", action, false)
+                        .await;
+                    if self.context.settings_value()["advanced"]["output"].as_str()
+                        == Some("json")
+                    {
+                        self.context
+                            .mqtt
+                            .lock()
+                            .await
+                            .publish(&format!("{name}/action"), action, Default::default())
+                            .await;
+                    }
+                }
+            }
         }
     }
 
@@ -1870,7 +2243,23 @@ impl Extension for HomeAssistant {
                             if let Some(device) = this.context.zigbee.resolve_device(ieee) {
                                 let device = device as Arc<dyn Entity>;
                                 this.clear_entity(&device).await;
-                                this.discover(device, true).await;
+                                this.discover(device.clone(), true).await;
+                                let triggers: Vec<String> = this
+                                    .get_discovered(&device.entity_id().key())
+                                    .lock()
+                                    .unwrap()
+                                    .triggers
+                                    .iter()
+                                    .cloned()
+                                    .collect();
+                                for trigger in triggers {
+                                    if let Some((key, value)) = trigger.split_once('_') {
+                                        this.publish_device_trigger_discover(
+                                            &device, key, value, true,
+                                        )
+                                        .await;
+                                    }
+                                }
                             }
                         }
                     });
@@ -1934,6 +2323,7 @@ impl Extension for HomeAssistant {
                 Arc::new(move |data| {
                     let this = this.clone();
                     tokio::spawn(async move {
+                        this.on_discovery_message(&data).await;
                         if data.get("topic").and_then(Value::as_str)
                             == Some(this.status_topic.as_str())
                             && data
@@ -1971,6 +2361,136 @@ impl Extension for HomeAssistant {
                                     .await;
                                 }
                             }
+                        }
+                    });
+                }),
+            );
+
+            let bus = self.context.event_bus.clone();
+            let this = self.clone();
+            bus.lock().unwrap().on_publish_entity_state(
+                self.context.key,
+                Arc::new(move |data| {
+                    let this = this.clone();
+                    tokio::spawn(async move { this.on_publish_entity_state(data).await });
+                }),
+            );
+
+            let bus = self.context.event_bus.clone();
+            let this = self.clone();
+            bus.lock().unwrap().on_group_members_changed(
+                self.context.key,
+                Arc::new(move |data| {
+                    let id = data
+                        .get("group")
+                        .and_then(|group| group.get("ID"))
+                        .map(|id| id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string()));
+                    let this = this.clone();
+                    tokio::spawn(async move {
+                        if let Some(group) = id
+                            .and_then(|id| this.context.zigbee.group_by_id(id.parse().unwrap_or(0)))
+                        {
+                            this.discover(group as Arc<dyn Entity>, true).await;
+                        }
+                    });
+                }),
+            );
+
+            let bus = self.context.event_bus.clone();
+            let this = self.clone();
+            bus.lock().unwrap().on_scenes_changed(
+                self.context.key,
+                Arc::new(move |data| {
+                    let name = data
+                        .get("entity")
+                        .and_then(|entity| entity.get("name"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    let this = this.clone();
+                    tokio::spawn(async move {
+                        let Some(entity) = name
+                            .and_then(|name| this.context.zigbee.resolve_entity(&name))
+                        else {
+                            return;
+                        };
+                        let discovered = this.get_discovered(&entity.entity_id().key());
+                        let topics: Vec<String> = discovered
+                            .lock()
+                            .unwrap()
+                            .messages
+                            .keys()
+                            .filter(|topic| topic.starts_with("scene"))
+                            .cloned()
+                            .collect();
+                        for topic in topics {
+                            discovered.lock().unwrap().messages.remove(&topic);
+                            this.context
+                                .mqtt
+                                .lock()
+                                .await
+                                .publish(
+                                    &topic,
+                                    "",
+                                    MqttPublishOptions {
+                                        retain: true,
+                                        qos: 1,
+                                        base_topic: Some(this.discovery_topic.clone()),
+                                        ..Default::default()
+                                    },
+                                )
+                                .await;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        this.discover(entity, true).await;
+                    });
+                }),
+            );
+
+            let bus = self.context.event_bus.clone();
+            let this = self.clone();
+            bus.lock().unwrap().on_entity_options_changed(
+                self.context.key,
+                Arc::new(move |data| {
+                    let name = data
+                        .get("entity")
+                        .and_then(|entity| entity.get("name"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    let this = this.clone();
+                    tokio::spawn(async move {
+                        if let Some(entity) = name
+                            .and_then(|name| this.context.zigbee.resolve_entity(&name))
+                        {
+                            this.discover(entity, true).await;
+                        }
+                    });
+                }),
+            );
+
+            let bus = self.context.event_bus.clone();
+            let this = self.clone();
+            bus.lock().unwrap().on_exposes_changed(
+                self.context.key,
+                Arc::new(move |data| {
+                    let ieee = data
+                        .get("device")
+                        .and_then(|device| device.get("ieeeAddr"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    let this = this.clone();
+                    tokio::spawn(async move {
+                        if let Some(ieee) = ieee {
+                            if let Some(device) = this.context.zigbee.resolve_device(&ieee) {
+                                this.discover(device as Arc<dyn Entity>, true).await;
+                                return;
+                            }
+                        }
+                        for device in this
+                            .context
+                            .zigbee
+                            .devices_iterator(utils::device_not_coordinator)
+                        {
+                            this.discover(device as Arc<dyn Entity>, true).await;
                         }
                     });
                 }),
@@ -2043,4 +2563,142 @@ impl HomeAssistant {
             }
         }
     }
+}
+
+/// Upstream `ACTION_PATTERNS` (`homeassistant.ts:31-37`).
+const ACTION_PATTERNS: [&str; 5] = [
+    "^(?<button>(?:button_)?[a-z0-9]+)_(?<action>(?:press|hold|single|double)(?:_release)?)$",
+    "^(?<action>recall|scene)_(?<scene>[0-9]+)$",
+    "^(?<actionPrefix>region_)(?<region>[1-9]|10)_(?<action>enter|leave|occupied|unoccupied)$",
+    "^(?<action>dial_rotate)_(?<direction>left|right)_(?<speed>step|slow|fast)$",
+    "^(?<action>brightness_step|color_temperature_step|color_saturation_step|color_hue_step)(?:_(?<direction>up|down))?$",
+];
+
+fn action_value_template() -> String {
+    let patterns = ACTION_PATTERNS
+        .iter()
+        .map(|pattern| {
+            let rust_pattern = pattern.replace("?<", "?P<");
+            let groups = action_groups(pattern);
+            let groups = groups
+                .iter()
+                .map(|group| format!("\"{group}\""))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{{\"pattern\": '{rust_pattern}', \"groups\": [{groups}]}}")
+        })
+        .collect::<Vec<_>>()
+        .join(",\n");
+
+    format!(
+        "{{% set patterns = [\n{patterns}\n] %}}\n\
+{{% set action_value = value_json.action|default('') %}}\n\
+{{% set ns = namespace(r=[('action', action_value)]) %}}\n\
+{{% for p in patterns %}}\n\
+  {{% set m = action_value|regex_findall(p.pattern) %}}\n\
+  {{% if m[0] is undefined %}}{{% continue %}}{{% endif %}}\n\
+  {{% for key, value in zip(p.groups, m[0]) %}}\n\
+    {{% set ns.r = ns.r|rejectattr(0, 'eq', key)|list + [(key, value)] %}}\n\
+  {{% endfor %}}\n\
+{{% endfor %}}\n\
+{{% if (ns.r|selectattr(0, 'eq', 'actionPrefix')|first) is defined %}}\n\
+  {{% set ns.r = ns.r|rejectattr(0, 'eq', 'action')|list + [('action', ns.r|selectattr(0, 'eq', 'actionPrefix')|map(attribute=1)|first + ns.r|selectattr(0, 'eq', 'action')|map(attribute=1)|first)] %}}\n\
+{{% endif %}}\n\
+{{% set ns.r = ns.r + [('event_type', ns.r|selectattr(0, 'eq', 'action')|map(attribute=1)|first)] %}}\n\
+{{{{dict.from_keys(ns.r|rejectattr(0, 'in', ('action', 'actionPrefix'))|reject('eq', ('event_type', None))|reject('eq', ('event_type', '')))|to_json}}}}"
+    )
+}
+
+fn action_groups(pattern: &str) -> Vec<String> {
+    let mut groups = Vec::new();
+    let mut rest = pattern;
+    while let Some(index) = rest.find("?<") {
+        rest = &rest[index + 2..];
+        if let Some(end) = rest.find('>') {
+            let name = &rest[..end];
+            if name.chars().all(|c| c.is_ascii_alphabetic()) {
+                groups.push(name.to_string());
+            }
+            rest = &rest[end + 1..];
+        } else {
+            break;
+        }
+    }
+    groups
+}
+
+/// Upstream `parseActionValue` (`homeassistant.ts:2425-2450`) for trigger names.
+fn parse_action_value(action: &str) -> Value {
+    // The simplest faithful subset: standard scene/recall wildcard handling.
+    if let Some(rest) = action.strip_prefix("recall_") {
+        if rest == "*" {
+            return json!({"action": "recall", "scene": "wildcard"});
+        }
+        if rest.chars().all(|c| c.is_ascii_digit()) {
+            return json!({"action": "recall", "scene": rest});
+        }
+    }
+    if let Some(rest) = action.strip_prefix("scene_") {
+        if rest == "*" {
+            return json!({"action": "scene", "scene": "wildcard"});
+        }
+        if rest.chars().all(|c| c.is_ascii_digit()) {
+            return json!({"action": "scene", "scene": rest});
+        }
+    }
+    for pattern in ACTION_PATTERNS {
+        if let Some(groups) = simple_pattern_match(pattern, action) {
+            return groups;
+        }
+    }
+    json!({"action": action})
+}
+
+/// Minimal matcher for the non-wildcard ACTION_PATTERNS used by trigger names.
+fn simple_pattern_match(pattern: &str, value: &str) -> Option<Value> {
+    if pattern.starts_with("^(?<action>recall|scene)_") {
+        return None;
+    }
+    if pattern.starts_with("^(?<button>") {
+        let (button, action) = value.split_once('_')?;
+        if !button.is_empty() && !action.is_empty() {
+            return Some(json!({"button": button, "action": action}));
+        }
+        return None;
+    }
+    if pattern.starts_with("^(?<actionPrefix>region_)") {
+        let rest = value.strip_prefix("region_")?;
+        let (region, action) = rest.rsplit_once('_')?;
+        return Some(json!({"action": format!("region_{action}"), "region": region}));
+    }
+    if pattern.starts_with("^(?<action>dial_rotate)_") {
+        let rest = value.strip_prefix("dial_rotate_")?;
+        let mut parts = rest.split('_');
+        return Some(json!({"action": "dial_rotate", "direction": parts.next()?, "speed": parts.next()?}));
+    }
+    if pattern.starts_with("^(?<action>brightness_step") {
+        let action = value.split('_').take(3).collect::<Vec<_>>().join("_");
+        let direction = value
+            .rsplit_once('_')
+            .filter(|(_, direction)| *direction == "up" || *direction == "down")
+            .map(|(_, direction)| direction);
+        return Some(match direction {
+            Some(direction) => json!({"action": action.trim_end_matches(&format!("_{direction}")), "direction": direction}),
+            None => json!({"action": value}),
+        });
+    }
+    None
+}
+
+fn prepare_action_event_types(values: &[String]) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    for value in values {
+        let parsed = parse_action_value(value);
+        if let Some(action) = parsed.get("action").and_then(Value::as_str) {
+            if !action.contains('*') && !result.iter().any(|existing| existing == action) {
+                result.push(action.to_string());
+            }
+        }
+    }
+    result
 }
