@@ -52,7 +52,7 @@ pub struct FromZigbeeConverter {
                 PublishCallback,
                 Value,
                 ConvertMeta,
-            ) -> ConverterFuture<Option<Value>>
+            ) -> ConverterFuture<Result<Option<Value>, String>>
             + Send
             + Sync,
     >,
@@ -69,7 +69,7 @@ pub struct ToZigbeeConverter {
                 PublishCallback,
                 Value,
                 ConvertMeta,
-            ) -> ConverterFuture<Option<Value>>
+            ) -> ConverterFuture<Result<Option<Value>, String>>
             + Send
             + Sync,
     >,

@@ -65,6 +65,34 @@ pub trait Entity: Send + Sync {
 
     fn is_device(&self) -> bool;
 
+    /// Upstream `resolveDefinition(ignoreCache)`; groups have no definition.
+    fn resolve_definition(&self, _ignore_cache: bool) {}
+
+    /// Upstream `device.definition`; groups have none.
+    fn definition(&self) -> Option<zigbee_converters::DefinitionRef> {
+        None
+    }
+
+    /// Upstream `device.interviewed`.
+    fn interviewed(&self) -> bool {
+        true
+    }
+
+    /// Upstream `device.zh`; groups have no herdsman device.
+    fn zh_device(&self) -> Option<Arc<zigbee_apiarist::controller::model::device::Device>> {
+        None
+    }
+
+    /// Upstream `device.zh.lastSeen`.
+    fn last_seen(&self) -> Option<u64> {
+        None
+    }
+
+    /// Upstream `device.zh.linkquality`.
+    fn linkquality(&self) -> Option<u8> {
+        None
+    }
+
     fn is_group(&self) -> bool {
         !self.is_device()
     }

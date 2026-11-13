@@ -228,6 +228,30 @@ impl Device {
 }
 
 impl Entity for Device {
+    fn resolve_definition(&self, ignore_cache: bool) {
+        Device::resolve_definition(self, ignore_cache);
+    }
+
+    fn definition(&self) -> Option<DefinitionRef> {
+        Device::definition(self)
+    }
+
+    fn interviewed(&self) -> bool {
+        Device::interviewed(self)
+    }
+
+    fn zh_device(&self) -> Option<Arc<ZhDevice>> {
+        Some(self.zh.clone())
+    }
+
+    fn last_seen(&self) -> Option<u64> {
+        self.zh.last_seen()
+    }
+
+    fn linkquality(&self) -> Option<u8> {
+        self.zh.linkquality()
+    }
+
     fn entity_id(&self) -> EntityId {
         EntityId::Ieee(self.ieee_addr())
     }
