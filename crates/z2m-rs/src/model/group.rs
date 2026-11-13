@@ -4,6 +4,7 @@
 use std::sync::{Arc, Mutex};
 
 use serde_json::{json, Value};
+use zigbee_apiarist::controller::model::device::Device as ZhDevice;
 use zigbee_apiarist::controller::model::group::Group as ZhGroup;
 
 use crate::model::device::Device;
@@ -86,6 +87,15 @@ impl Group {
             .collect()
     }
 
+    /// Upstream `hasMember(device)` using a herdsman device.
+    pub fn has_member_zh(&self, device: &Arc<ZhDevice>) -> bool {
+        let members = self.zh.members();
+        device
+            .endpoints()
+            .iter()
+            .any(|endpoint| members.iter().any(|member| Arc::ptr_eq(member, endpoint)))
+    }
+
     pub fn is_device(&self) -> bool {
         false
     }
@@ -121,6 +131,13 @@ impl Entity for Group {
 
     fn zh_group(&self) -> Option<Arc<ZhGroup>> {
         Some(self.zh.clone())
+    }
+
+    fn members_devices(&self) -> Vec<Arc<dyn Entity>> {
+        Group::members_devices(self)
+            .into_iter()
+            .map(|device| device as Arc<dyn Entity>)
+            .collect()
     }
 
     fn event_value(&self) -> Value {

@@ -264,3 +264,74 @@ pub fn get_response(request: &Value, data: Value, error: Option<String>) -> Valu
         }
     }
 }
+
+/// Upstream `seconds/minutes/hours` (`utils.ts:287-289`).
+pub fn seconds(value: u64) -> u64 {
+    value.saturating_mul(1000)
+}
+pub fn minutes(value: u64) -> u64 {
+    seconds(value).saturating_mul(60)
+}
+pub fn hours(value: u64) -> u64 {
+    minutes(value).saturating_mul(60)
+}
+
+/// Upstream `utils.sleep(seconds)`.
+pub async fn sleep(seconds: u64) {
+    tokio::time::sleep(std::time::Duration::from_secs(seconds)).await;
+}
+
+/// Upstream `deviceNotCoordinator(device)` (`utils.ts:381-383`).
+pub fn device_not_coordinator(
+    device: &std::sync::Arc<zigbee_apiarist::controller::model::device::Device>,
+) -> bool {
+    device.r#type() != zigbee_apiarist::controller::database::DeviceType::Coordinator
+}
+
+/// Upstream `isAvailabilityEnabledForEntity(entity, settings)` (`utils.ts:249-269`).
+pub fn is_availability_enabled_for_entity(
+    entity: &dyn crate::model::entity::Entity,
+    settings: &Value,
+) -> bool {
+    if entity.is_device()
+        && entity
+            .options()
+            .get("disabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    {
+        return false;
+    }
+
+    if entity.is_group() {
+        return entity
+            .members_devices()
+            .iter()
+            .all(|member| is_availability_enabled_for_entity(member.as_ref(), settings));
+    }
+
+    if let Some(availability) = entity.options().get("availability") {
+        if !availability.is_null() {
+            return match availability {
+                Value::Bool(value) => *value,
+                Value::Object(_) => true,
+                _ => false,
+            };
+        }
+    }
+
+    settings
+        .get("availability")
+        .and_then(|availability| availability.get("enabled"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// Deterministic-enough `Math.random()` replacement for jitter.
+pub fn random_f64() -> f64 {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.subsec_nanos())
+        .unwrap_or(0);
+    (nanos % 1_000_000) as f64 / 1_000_000.0
+}

@@ -119,6 +119,11 @@ pub trait Entity: Send + Sync {
         Vec::new()
     }
 
+    /// Upstream `group.membersDevices()`.
+    fn members_devices(&self) -> Vec<Arc<dyn Entity>> {
+        Vec::new()
+    }
+
     /// Upstream `group.zh`.
     fn zh_group(&self) -> Option<Arc<zigbee_apiarist::controller::model::group::Group>> {
         None
