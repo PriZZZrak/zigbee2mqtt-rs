@@ -18,5 +18,10 @@ pub trait Extension: Send + Sync {
     }
 
     /// Upstream `adjustMessageBeforePublish(entity, message)`.
-    fn adjust_message_before_publish(&mut self, _entity: &str, _message: &mut Value) {}
+    fn adjust_message_before_publish(
+        &mut self,
+        _entity: &dyn crate::model::entity::Entity,
+        _message: &mut Value,
+    ) {
+    }
 }

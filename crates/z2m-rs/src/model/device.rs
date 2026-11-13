@@ -264,6 +264,25 @@ impl Entity for Device {
         Device::endpoint_name(self, endpoint)
     }
 
+    fn device_info(&self) -> Option<Value> {
+        Some(json!({
+            "friendlyName": Device::name(self),
+            "model": Device::definition(self).map(|definition| definition.model.clone()),
+            "ieeeAddr": self.ieee_addr(),
+            "networkAddress": self.zh.network_address(),
+            "type": self.zh.r#type().as_str(),
+            "manufacturerID": self.zh.manufacturer_id(),
+            "powerSource": self.zh.power_source(),
+            "applicationVersion": self.zh.application_version(),
+            "stackVersion": self.zh.stack_version(),
+            "zclVersion": self.zh.zcl_version(),
+            "hardwareVersion": self.zh.hardware_version(),
+            "dateCode": self.zh.date_code(),
+            "softwareBuildID": self.zh.software_build_id(),
+            "manufacturerName": self.zh.manufacturer_name().map(|name| name.split('\u{0}').next().unwrap_or_default().to_string()),
+        }))
+    }
+
     fn entity_id(&self) -> EntityId {
         EntityId::Ieee(self.ieee_addr())
     }

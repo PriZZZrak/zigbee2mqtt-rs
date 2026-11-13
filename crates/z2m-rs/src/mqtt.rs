@@ -4,11 +4,10 @@
 // keeps the upstream publish/retain/subscribe contract used by the bridge.
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use serde_json::{json, Value};
-use tokio::sync::Mutex;
 
 use crate::event_bus::EventBus;
 use zigbee_apiarist::utils::logger::logger;
@@ -21,6 +20,10 @@ pub struct MqttPublishOptions {
     pub skip_log: bool,
     pub skip_receive: bool,
     pub is_entity_state: bool,
+    /// Upstream `properties.messageExpiryInterval` (retention). rumqttc 0.25
+    /// is built without MQTT v5 in this workspace, so it is tracked but not
+    /// sent on the wire yet.
+    pub message_expiry_interval: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +40,9 @@ pub struct Mqtt {
     pub connected: bool,
     pub published_topics: std::collections::HashSet<String>,
     pub retained_messages: BTreeMap<String, RetainedMessage>,
+    /// Upstream tests spy on `mqtt.publish`; this keeps the same observable
+    /// call log when no broker is connected.
+    pub attempted: Vec<(String, String, MqttPublishOptions)>,
     client: Option<AsyncClient>,
     task: Option<tokio::task::JoinHandle<()>>,
 }
@@ -50,6 +56,7 @@ impl Mqtt {
             connected: false,
             published_topics: Default::default(),
             retained_messages: BTreeMap::new(),
+            attempted: Vec::new(),
             client: None,
             task: None,
         }
@@ -112,7 +119,7 @@ impl Mqtt {
                         // Upstream uses `payload.toString()`; lossy UTF-8 keeps
                         // the same contract instead of dropping the message.
                         let payload = String::from_utf8_lossy(&publish.payload).to_string();
-                        event_bus.lock().await.emit_mqtt_message(json!({
+                        event_bus.lock().unwrap().emit_mqtt_message(json!({
                             "topic": publish.topic,
                             "message": payload,
                         }));
@@ -166,13 +173,21 @@ impl Mqtt {
             2 => QoS::ExactlyOnce,
             _ => QoS::AtMostOnce,
         };
+        if topic.contains('+') || topic.contains('#') {
+            logger().error(
+                &format!("Topic '{topic}' includes wildcard characters, skipping publish."),
+                "z2m:mqtt",
+            );
+            return false;
+        }
+        let topic = format!("{}/{}", self.base_topic, topic);
+        self.attempted.push((
+            topic.clone(),
+            String::from_utf8_lossy(&payload).to_string(),
+            options.clone(),
+        ));
         let Some(client) = self.client.as_mut() else {
             return false;
-        };
-        let topic = if topic.contains('/') {
-            topic.to_string()
-        } else {
-            format!("{}/{}", self.base_topic, topic)
         };
         if client
             .publish(&topic, qos, options.retain, payload.clone())
@@ -194,7 +209,7 @@ impl Mqtt {
         }
         self.event_bus
             .lock()
-            .await
+            .unwrap()
             .emit_mqtt_message_published(json!({"topic": topic}));
         true
     }
@@ -231,7 +246,7 @@ impl Mqtt {
 
     /// Upstream `Mqtt.onMessage`.
     pub async fn on_message(&mut self, topic: &str, payload: Value) {
-        self.event_bus.lock().await.emit_mqtt_message(json!({
+        self.event_bus.lock().unwrap().emit_mqtt_message(json!({
             "topic": topic,
             "message": payload,
         }));

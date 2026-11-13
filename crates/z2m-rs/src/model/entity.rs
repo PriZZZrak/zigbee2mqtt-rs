@@ -124,6 +124,16 @@ pub trait Entity: Send + Sync {
         None
     }
 
+    /// Upstream `entity.definition?.model`.
+    fn definition_model(&self) -> Option<String> {
+        self.definition().map(|definition| definition.model.clone())
+    }
+
+    /// Upstream `include_device_information` payload (`controller.ts:408-428`).
+    fn device_info(&self) -> Option<Value> {
+        None
+    }
+
     fn is_group(&self) -> bool {
         !self.is_device()
     }
