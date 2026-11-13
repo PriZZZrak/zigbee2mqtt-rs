@@ -23,7 +23,6 @@ use zigbee_apiarist::controller::model::endpoint::Endpoint as ZhEndpoint;
 use zigbee_apiarist::models::network_options::NetworkOptions;
 use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
 
-use crate::converters::DefinitionRegistry;
 use crate::event_bus::EventBus;
 use crate::model::device::Device;
 use crate::model::entity::Entity;
@@ -33,6 +32,7 @@ use crate::util::data;
 use crate::util::logger::Logger;
 use crate::util::settings::Settings;
 use crate::util::stringify::stringify;
+use zigbee_converters::DefinitionRegistry;
 
 /// Upstream `entityIDRegex` (`zigbee.ts:14`).
 fn split_entity_and_endpoint(id: &str) -> Option<(&str, &str)> {

@@ -8,9 +8,9 @@ use zigbee_apiarist::controller::database::DeviceType;
 use zigbee_apiarist::controller::model::device::{Device as ZhDevice, InterviewState};
 use zigbee_apiarist::controller::model::endpoint::Endpoint;
 
-use crate::converters::{DefinitionRef, DefinitionRegistry, Expose};
 use crate::model::entity::{Entity, EntityId};
 use crate::util::settings::Settings;
+use zigbee_converters::{DefinitionRef, DefinitionRegistry, Expose};
 
 /// Upstream `LINKQUALITY` expose (`model/device.ts:12-17`).
 fn linkquality_expose() -> Expose {
@@ -19,7 +19,7 @@ fn linkquality_expose() -> Expose {
         name: Some("linkquality".to_string()),
         property: Some("linkquality".to_string()),
         description: Some("Link quality (signal strength)".to_string()),
-        access: crate::converters::access::STATE,
+        access: zigbee_converters::access::STATE,
         category: Some("diagnostic".to_string()),
         unit: Some("lqi".to_string()),
         value_min: Some(0.0),
@@ -30,10 +30,9 @@ fn linkquality_expose() -> Expose {
 
 /// Upstream `Device` (`lib/model/device.ts:16`).
 ///
-/// R1 has no `zigbee-herdsman-converters` (AGENTS §2), so `definition` never
-/// exists: `isSupported` is only true for the coordinator and
-/// definition-dependent helpers fall back to their upstream no-definition
-/// branches.
+/// Converter definitions come from the shared host crate. R1 registers no
+/// converter database (AGENTS §5 Q4), so `definition` stays `None` and
+/// definition-dependent helpers follow their upstream no-definition branches.
 pub struct Device {
     pub zh: Arc<ZhDevice>,
     settings: Arc<Mutex<Settings>>,

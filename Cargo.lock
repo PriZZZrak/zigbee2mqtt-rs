@@ -456,6 +456,7 @@ dependencies = [
  "serde_yaml_ng",
  "tokio",
  "zigbee-apiarist",
+ "zigbee-converters",
 ]
 
 [[package]]
@@ -467,6 +468,14 @@ dependencies = [
  "serial2-tokio",
  "socket2",
  "tokio",
+]
+
+[[package]]
+name = "zigbee-converters"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "zigbee-apiarist",
 ]
 
 [[package]]

@@ -5,7 +5,16 @@
 // are separate classes used through `Device | Group` unions. Rust has no
 // inheritance, so the common surface lives in this module.
 
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use serde_json::{json, Value};
+
+/// Upstream `PublishEntityState` (`types/types.d.ts:26`).
+pub type EntityFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+pub type PublishEntityState =
+    Arc<dyn Fn(Arc<dyn Entity>, Value, Option<String>) -> EntityFuture + Send + Sync>;
 
 /// Upstream `entity.ID`: an IEEE address for devices, a numeric group ID for
 /// groups (`model/device.ts:33`, `model/group.ts:10`).

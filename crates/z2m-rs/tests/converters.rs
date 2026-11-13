@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 use serde_json::json;
 use zigbee_apiarist::controller::model::device::Device as ZhDevice;
 
-use z2m_rs::converters::{Definition, DefinitionRegistry, Fingerprint, WhiteLabel};
 use z2m_rs::model::Device;
 use z2m_rs::util::settings::Settings;
+use zigbee_converters::{Definition, DefinitionRegistry, Fingerprint, WhiteLabel};
 
 fn zh_device() -> Arc<ZhDevice> {
     ZhDevice::from_database_entry(&json!({
@@ -133,9 +133,9 @@ fn device_definition_resolution_and_exposes() {
     registry.register(
         Definition::new("TEST", "Acme", "Test device")
             .with_zigbee_model("TEST")
-            .with_exposes(vec![z2m_rs::converters::Expose::binary(
+            .with_exposes(vec![zigbee_converters::Expose::binary(
                 "state",
-                z2m_rs::converters::access::ALL,
+                zigbee_converters::access::ALL,
             )]),
     );
     let settings = Arc::new(Mutex::new(Settings::from_config(

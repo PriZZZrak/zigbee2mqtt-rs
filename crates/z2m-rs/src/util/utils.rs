@@ -188,3 +188,47 @@ fn matches_pattern(pattern: &str, text: &str) -> bool {
         .or_insert_with(|| compiled(pattern))
         .is_match(text)
 }
+
+/// Upstream `isDebouncedOrThrottled(device)` (`utils.ts:293`).
+pub fn is_debounced_or_throttled(entity: &dyn crate::model::entity::Entity) -> bool {
+    let options = entity.options();
+    let truthy = |key: &str| match options.get(key) {
+        Some(Value::Bool(value)) => *value,
+        Some(Value::Number(value)) => value.as_f64().is_some_and(|value| value != 0.0),
+        Some(Value::String(value)) => !value.is_empty(),
+        Some(Value::Array(items)) => !items.is_empty(),
+        Some(Value::Object(map)) => !map.is_empty(),
+        _ => false,
+    };
+    truthy("debounce") || truthy("throttle")
+}
+
+/// Upstream `publishLastSeen(data, settings, allowMessageEmitted, publishEntityState)`
+/// (`utils.ts:295-316`).
+pub async fn publish_last_seen(
+    data: &Value,
+    device: std::sync::Arc<dyn crate::model::entity::Entity>,
+    settings: &Value,
+    allow_message_emitted: bool,
+    publish: &crate::model::entity::PublishEntityState,
+) {
+    let reason = data.get("reason").and_then(Value::as_str).unwrap_or("");
+    let last_seen = settings
+        .get("advanced")
+        .and_then(|advanced| advanced.get("last_seen"))
+        .and_then(Value::as_str)
+        .unwrap_or("disable");
+
+    let allow = (reason != "messageEmitted"
+        || (reason == "messageEmitted" && allow_message_emitted))
+        && !(reason == "messageNonEmitted" && is_debounced_or_throttled(device.as_ref()));
+
+    if !last_seen.is_empty() && last_seen != "disable" && allow {
+        publish(
+            device,
+            serde_json::json!({}),
+            Some("lastSeenChanged".to_string()),
+        )
+        .await;
+    }
+}

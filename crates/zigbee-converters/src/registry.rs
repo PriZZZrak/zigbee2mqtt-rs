@@ -12,8 +12,8 @@ use std::sync::Arc;
 use zigbee_apiarist::controller::database::DeviceType;
 use zigbee_apiarist::controller::model::device::Device as ZhDevice;
 
-use crate::converters::definition::{Definition, DefinitionRef};
-use crate::converters::exposes::Fingerprint;
+use crate::definition::{Definition, DefinitionRef};
+use crate::exposes::Fingerprint;
 
 /// Upstream `normalizeModelID`.
 pub fn normalize_model_id(model_id: &str) -> String {
@@ -177,6 +177,8 @@ impl DefinitionRegistry {
                 replaced.endpoint = definition.endpoint.clone();
                 replaced.configure = definition.configure.clone();
                 replaced.ota = definition.ota.clone();
+                replaced.from_zigbee = definition.from_zigbee.clone();
+                replaced.to_zigbee = definition.to_zigbee.clone();
                 replaced.generated = definition.generated;
                 replaced.white_label = definition.white_label.clone();
                 replaced.fingerprint = definition.fingerprint.clone();

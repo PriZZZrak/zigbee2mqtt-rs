@@ -1,0 +1,11 @@
+[package]
+name = "zigbee-converters"
+version = "0.1.0"
+edition = "2021"
+
+# Rust replacement for `zigbee-herdsman-converters` (shared host only).
+# The converter database and vendor quirks are out of R1 (AGENTS §5 Q4).
+
+[dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }
+zigbee-apiarist = { path = "../zigbee-apiarist" }

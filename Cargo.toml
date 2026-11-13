@@ -2,5 +2,6 @@
 resolver = "2"
 members = [
     "crates/zigbee-apiarist",
+    "crates/zigbee-converters",
     "crates/z2m-rs",
 ]
