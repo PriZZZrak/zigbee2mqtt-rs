@@ -40,7 +40,7 @@ fn device_options_fall_back_to_ieee_addr() {
     let _guard = serial();
     ZhDevice::reset_cache();
 
-    let device = Device::new(
+    let device = Device::without_converters(
         zh_device("Router", "0x0017880104e45519"),
         settings(json!({"mqtt": {"server": "localhost"}})),
     );
@@ -59,7 +59,7 @@ fn device_options_merge_defaults_with_device_settings() {
     let _guard = serial();
     ZhDevice::reset_cache();
 
-    let device = Device::new(
+    let device = Device::without_converters(
         zh_device("Router", "0x0017880104e45519"),
         settings(json!({
             "mqtt": {"server": "localhost"},
@@ -88,7 +88,7 @@ fn filtered_cache_is_read_from_options() {
     let _guard = serial();
     ZhDevice::reset_cache();
 
-    let device = Device::new(
+    let device = Device::without_converters(
         zh_device("Router", "0x0017880104e45519"),
         settings(json!({
             "mqtt": {"server": "localhost"},
@@ -112,7 +112,7 @@ fn coordinator_name_and_support() {
     let _guard = serial();
     ZhDevice::reset_cache();
 
-    let device = Device::new(
+    let device = Device::without_converters(
         zh_device("Coordinator", "0x00124b0024c16b95"),
         settings(json!({"mqtt": {"server": "localhost"}})),
     );
@@ -132,7 +132,7 @@ fn non_coordinator_is_not_supported_without_converters() {
     let _guard = serial();
     ZhDevice::reset_cache();
 
-    let device = Device::new(
+    let device = Device::without_converters(
         zh_device("Router", "0x0017880104e45519"),
         settings(json!({"mqtt": {"server": "localhost"}})),
     );
@@ -146,7 +146,8 @@ fn ensure_in_settings_adds_non_coordinator_devices() {
     ZhDevice::reset_cache();
 
     let settings = settings(json!({"mqtt": {"server": "localhost"}}));
-    let device = Device::new(zh_device("Router", "0x0017880104e45519"), settings.clone());
+    let device =
+        Device::without_converters(zh_device("Router", "0x0017880104e45519"), settings.clone());
 
     device.ensure_in_settings(&mut settings.lock().unwrap());
     assert_eq!(
@@ -157,7 +158,7 @@ fn ensure_in_settings_adds_non_coordinator_devices() {
     // Idempotent: a second call does not panic with "already exists".
     device.ensure_in_settings(&mut settings.lock().unwrap());
 
-    let coordinator = Device::new(
+    let coordinator = Device::without_converters(
         zh_device("Coordinator", "0x00124b0024c16b95"),
         settings.clone(),
     );
@@ -173,7 +174,7 @@ fn endpoint_resolves_numeric_and_default_keys() {
     let _guard = serial();
     ZhDevice::reset_cache();
 
-    let device = Device::new(
+    let device = Device::without_converters(
         zh_device("Router", "0x0017880104e45519"),
         settings(json!({"mqtt": {"server": "localhost"}})),
     );
@@ -197,7 +198,7 @@ fn event_value_snapshot() {
     let _guard = serial();
     ZhDevice::reset_cache();
 
-    let device = Device::new(
+    let device = Device::without_converters(
         zh_device("Router", "0x0017880104e45519"),
         settings(json!({
             "mqtt": {"server": "localhost"},

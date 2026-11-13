@@ -1,10 +1,11 @@
 // Original: .upstream/zigbee2mqtt/lib/zigbee.ts
 // Upstream revision: zigbee2mqtt 2.14.3 (3c841fdf).
 //
-// Bridge-side wrapper around the zigbee-herdsman controller. R1 has no
-// converters (AGENTS §2), so `resolveDefinition()` has no counterpart: the
-// device model stays definition-less and `isSupported` is coordinator-only.
-// Touchlink methods are outside the R1 surface (§4) and are not ported.
+// Bridge-side wrapper around the zigbee-herdsman controller. The shared
+// converter host is ported (`converters/`); R1 registers no converter database,
+// so `resolveDefinition()` returns the upstream "not found" fallback and
+// devices stay definition-less (AGENTS §5 Q4). Touchlink methods are outside
+// the R1 surface (§4) and are not ported.
 
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
@@ -22,6 +23,7 @@ use zigbee_apiarist::controller::model::endpoint::Endpoint as ZhEndpoint;
 use zigbee_apiarist::models::network_options::NetworkOptions;
 use zigbee_apiarist::models::startup_options::{AdapterOptions, ConfigNetworkOptions};
 
+use crate::converters::DefinitionRegistry;
 use crate::event_bus::EventBus;
 use crate::model::device::Device;
 use crate::model::entity::Entity;
@@ -70,6 +72,7 @@ pub struct Zigbee {
     group_lookup: Mutex<std::collections::HashMap<u64, Arc<Group>>>,
     device_lookup: Mutex<std::collections::HashMap<String, Arc<Device>>>,
     coordinator_ieee_addr: Mutex<Option<String>>,
+    converters: Arc<Mutex<DefinitionRegistry>>,
 }
 
 impl Zigbee {
@@ -86,6 +89,7 @@ impl Zigbee {
             logger,
             Mutex::new(None),
             Mutex::new(None),
+            Arc::new(Mutex::new(DefinitionRegistry::new())),
         )
     }
 
@@ -107,6 +111,7 @@ impl Zigbee {
             logger,
             Mutex::new(Some(controller)),
             Mutex::new(coordinator_ieee_addr),
+            Arc::new(Mutex::new(DefinitionRegistry::new())),
         )
     }
 
@@ -116,6 +121,7 @@ impl Zigbee {
         logger: Arc<Mutex<Logger>>,
         herdsman: Mutex<Option<Arc<Controller>>>,
         coordinator_ieee_addr: Mutex<Option<String>>,
+        converters: Arc<Mutex<DefinitionRegistry>>,
     ) -> Arc<Self> {
         let zigbee = Arc::new(Self {
             self_ref: OnceLock::new(),
@@ -126,9 +132,15 @@ impl Zigbee {
             group_lookup: Mutex::new(std::collections::HashMap::new()),
             device_lookup: Mutex::new(std::collections::HashMap::new()),
             coordinator_ieee_addr,
+            converters,
         });
         let _ = zigbee.self_ref.set(Arc::downgrade(&zigbee));
         zigbee
+    }
+
+    /// Converter registry handle (shared with every resolved `Device`).
+    pub fn converters(&self) -> Arc<Mutex<DefinitionRegistry>> {
+        self.converters.clone()
     }
 
     /// Upstream `get zhController()` (`zigbee.ts:27`).
@@ -541,6 +553,7 @@ impl Zigbee {
                 let Some(device) = self.resolve_device(&payload.device.ieee_addr()) else {
                     return;
                 };
+                device.resolve_definition(false);
                 self.log_device_interview(&device, &payload.status);
                 self.event_bus.lock().unwrap().emit_device_interview(json!({
                     "device": device.event_value(),
@@ -551,6 +564,7 @@ impl Zigbee {
                 let Some(device) = self.resolve_device(&payload.device.ieee_addr()) else {
                     return;
                 };
+                device.resolve_definition(false);
                 self.logger
                     .lock()
                     .unwrap()
@@ -593,6 +607,7 @@ impl Zigbee {
         let Some(device) = self.resolve_device(&payload.device.ieee_addr()) else {
             return;
         };
+        device.resolve_definition(false);
 
         let from_coordinator = device.zh.r#type() == DeviceType::Coordinator;
         self.logger.lock().unwrap().debug(
@@ -805,7 +820,11 @@ impl Zigbee {
             Some(device) => device,
             None => {
                 let zh = self.zh_controller()?.get_device_by_ieee_addr(ieee_addr)?;
-                let device = Arc::new(Device::new(zh, self.settings.clone()));
+                let device = Arc::new(Device::new(
+                    zh,
+                    self.settings.clone(),
+                    self.converters.clone(),
+                ));
                 self.device_lookup
                     .lock()
                     .unwrap()

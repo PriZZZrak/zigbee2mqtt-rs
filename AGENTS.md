@@ -168,6 +168,18 @@ Resolved on 2026-11-06:
   state/commands are ported as part of `controller/`. This does not add
   `zigbee-herdsman-converters` or a device catalog to R1; per-device HA
   discovery remains outside the initial R1 surface.
+- **Q4 — converter boundary (2026-11-13):** the R1 exclusion is the converter
+  *database* (`definitions/`, `devices/`, `converters/`, vendor quirks), not the
+  shared converter host. Common files and loading/lookup mechanisms may and
+  should be ported: `access`, `exposes`, `utils`, `modernExtend` pieces as
+  needed, `findByDevice`/`findDefinition`/fingerprint matching, external
+  definition registration, `prepareDefinition`, and the `fromZigbee`/
+  `toZigbee` converter interfaces. With no database registered the lookup
+  falls back to “not found”: unsupported devices stay definition-less and
+  publish/receive follow their upstream fallback branches (e.g.
+  `receive.ts:130-134`). `generateDefinition` (the “unknown device” synthesizer)
+  is a shared mechanism, not the database, and may be ported later; until then
+  the fallback is an explicit not-found, never a stub.
 
 ## 6. Technical constraints
 

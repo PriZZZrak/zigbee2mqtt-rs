@@ -8,8 +8,25 @@ use zigbee_apiarist::controller::database::DeviceType;
 use zigbee_apiarist::controller::model::device::{Device as ZhDevice, InterviewState};
 use zigbee_apiarist::controller::model::endpoint::Endpoint;
 
+use crate::converters::{DefinitionRef, DefinitionRegistry, Expose};
 use crate::model::entity::{Entity, EntityId};
 use crate::util::settings::Settings;
+
+/// Upstream `LINKQUALITY` expose (`model/device.ts:12-17`).
+fn linkquality_expose() -> Expose {
+    Expose {
+        r#type: "numeric".to_string(),
+        name: Some("linkquality".to_string()),
+        property: Some("linkquality".to_string()),
+        description: Some("Link quality (signal strength)".to_string()),
+        access: crate::converters::access::STATE,
+        category: Some("diagnostic".to_string()),
+        unit: Some("lqi".to_string()),
+        value_min: Some(0.0),
+        value_max: Some(255.0),
+        ..Default::default()
+    }
+}
 
 /// Upstream `Device` (`lib/model/device.ts:16`).
 ///
@@ -20,11 +37,34 @@ use crate::util::settings::Settings;
 pub struct Device {
     pub zh: Arc<ZhDevice>,
     settings: Arc<Mutex<Settings>>,
+    converters: Arc<Mutex<DefinitionRegistry>>,
+    definition: Mutex<Option<DefinitionRef>>,
+    definition_model_id: Mutex<Option<String>>,
 }
 
 impl Device {
-    pub fn new(zh: Arc<ZhDevice>, settings: Arc<Mutex<Settings>>) -> Self {
-        Self { zh, settings }
+    pub fn new(
+        zh: Arc<ZhDevice>,
+        settings: Arc<Mutex<Settings>>,
+        converters: Arc<Mutex<DefinitionRegistry>>,
+    ) -> Self {
+        Self {
+            zh,
+            settings,
+            converters,
+            definition: Mutex::new(None),
+            definition_model_id: Mutex::new(None),
+        }
+    }
+
+    /// Convenience constructor for an empty converter registry (AGENTS §5 Q4
+    /// fallback: definition-less devices).
+    pub fn without_converters(zh: Arc<ZhDevice>, settings: Arc<Mutex<Settings>>) -> Self {
+        Self::new(
+            zh,
+            settings,
+            Arc::new(Mutex::new(DefinitionRegistry::new())),
+        )
     }
 
     /// Upstream `get ieeeAddr()` (`model/device.ts:28`).
@@ -74,10 +114,64 @@ impl Device {
             .to_string()
     }
 
-    /// Upstream `get isSupported()` (`model/device.ts:43`). Without converters
-    /// only the coordinator has a non-generated definition.
+    /// Upstream `get isSupported()` (`model/device.ts:43`).
     pub fn is_supported(&self) -> bool {
         self.zh.r#type() == DeviceType::Coordinator
+            || self
+                .definition()
+                .is_some_and(|definition| !definition.generated)
+    }
+
+    /// Upstream `definition` field (`model/device.ts:19`).
+    pub fn definition(&self) -> Option<DefinitionRef> {
+        self.definition.lock().unwrap().clone()
+    }
+
+    /// Upstream `resolveDefinition(ignoreCache = false)`
+    /// (`model/device.ts:69`). Converter lookup is synchronous in this port, so
+    /// the async signature is not needed.
+    pub fn resolve_definition(&self, ignore_cache: bool) {
+        let model_id = self.zh.model_id();
+        let needs_lookup = self.interviewed()
+            && (self.definition().is_none()
+                || *self.definition_model_id.lock().unwrap() != model_id
+                || ignore_cache);
+
+        if !needs_lookup {
+            return;
+        }
+
+        let found = self
+            .converters
+            .lock()
+            .unwrap()
+            .find_by_device(&self.zh, true);
+        *self.definition.lock().unwrap() = found;
+        *self.definition_model_id.lock().unwrap() = model_id;
+    }
+
+    /// Upstream `exposes()` (`model/device.ts:52`).
+    pub fn exposes(&self) -> Result<Vec<Expose>, String> {
+        let definition = self
+            .definition()
+            .ok_or_else(|| "Cannot retreive exposes before definition is resolved".to_string())?;
+
+        let mut exposes = definition
+            .exposes
+            .resolve(&self.zh.gen_basic(), &self.options());
+        exposes.push(linkquality_expose());
+        Ok(exposes)
+    }
+
+    /// Upstream `get otaExtraMetas()` (`model/device.ts:47`).
+    pub fn ota_extra_metas(&self) -> Value {
+        match self
+            .definition()
+            .and_then(|definition| definition.ota.clone())
+        {
+            Some(ota) if ota.is_object() => ota,
+            _ => json!({}),
+        }
     }
 
     /// Upstream `get interviewed()` (`model/device.ts:62`).
