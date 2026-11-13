@@ -41,6 +41,8 @@ pub struct Expose {
     /// Upstream `value_on` / `value_off` for binary/switch exposes.
     pub value_on: Value,
     pub value_off: Value,
+    /// Upstream `homeassistant` expose overrides.
+    pub homeassistant: Value,
     /// Raw upstream fields not modelled yet (e.g. `presets`, `color`).
     pub extra: Value,
 }

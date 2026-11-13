@@ -122,6 +122,24 @@ fn harness() -> Harness {
         Expose::binary("contact", access::STATE),
         Expose::binary("power", access::SET | access::STATE),
         Expose {
+            r#type: "composite".to_string(),
+            name: Some("warning".to_string()),
+            access: access::SET,
+            features: vec![
+                Expose::enumeration("mode", access::SET, &["stop", "emergency", "fire"]),
+                Expose::enumeration("level", access::SET, &["low", "high"]),
+                Expose::numeric("duration", access::SET),
+            ],
+            ..Default::default()
+        },
+        Expose {
+            r#type: "text".to_string(),
+            property: Some("note".to_string()),
+            access: access::SET | access::STATE,
+            label: Some("Note".to_string()),
+            ..Default::default()
+        },
+        Expose {
             r#type: "climate".to_string(),
             name: Some("climate".to_string()),
             access: access::ALL,
@@ -305,6 +323,38 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
     .await
     .expect("binary switch");
     assert_eq!(switch["command_topic"], "zigbee2mqtt/lamp/set/power");
+
+    let siren = config(
+        &harness,
+        &format!("homeassistant/siren/{IEEE}/siren/config"),
+    )
+    .await
+    .expect("siren");
+    assert_eq!(siren["available_tones"], json!(["emergency", "fire"]));
+    assert_eq!(siren["support_volume_set"], true);
+    assert_eq!(siren["support_duration"], true);
+    assert!(siren["command_template"].as_str().unwrap().contains("warning"));
+
+    let text = config(
+        &harness,
+        &format!("homeassistant/text/{IEEE}/note/config"),
+    )
+    .await
+    .expect("text");
+    assert_eq!(text["command_topic"], "zigbee2mqtt/lamp/set/note");
+    assert_eq!(text["state_topic"], "zigbee2mqtt/lamp");
+
+    let bridge = config(
+        &harness,
+        "homeassistant/binary_sensor/0x00124b0024c16b95/connection_state/config",
+    )
+    .await;
+    if bridge.is_none() {
+        panic!("topics: {:?}", harness.mqtt.lock().await.attempted.iter().map(|(t,_,_)| t.clone()).collect::<Vec<_>>());
+    }
+    let bridge = bridge.unwrap();
+    assert_eq!(bridge["device"]["identifiers"][0], "zigbee2mqtt_bridge_0x00124b0024c16b95");
+    assert_eq!(bridge["payload_on"], "online");
 
     let climate = config(
         &harness,

@@ -143,6 +143,11 @@ impl Zigbee {
         self.converters.clone()
     }
 
+    /// Coordinator IEEE address (`zigbee.ts:76`).
+    pub fn coordinator_ieee_addr(&self) -> Option<String> {
+        self.coordinator_ieee_addr.lock().unwrap().clone()
+    }
+
     /// Upstream `get zhController()` (`zigbee.ts:27`).
     pub fn zh_controller(&self) -> Option<Arc<Controller>> {
         self.herdsman.lock().unwrap().clone()

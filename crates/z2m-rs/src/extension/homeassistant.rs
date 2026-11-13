@@ -154,6 +154,7 @@ impl HomeAssistant {
         let mut entries = Vec::new();
         let all_exposes = exposes.clone();
         for expose in &exposes {
+            let start = entries.len();
             match expose.r#type.as_str() {
                 "switch" => {
                     let Some(state) = expose.features.iter().find(|feature| {
@@ -934,6 +935,49 @@ impl HomeAssistant {
                         payload,
                     });
                 }
+                "text" | "composite" | "list" => {
+                    if expose.r#type == "composite" && expose.name.as_deref() == Some("warning") && expose.access & access::SET != 0 {
+                        let mode = expose.features.iter().find(|f| f.r#type == "enum" && f.name.as_deref() == Some("mode"));
+                        let level = expose.features.iter().find(|f| f.r#type == "enum" && f.name.as_deref() == Some("level"));
+                        let duration = expose.features.iter().find(|f| f.r#type == "numeric" && f.name.as_deref() == Some("duration"));
+                        let mut payload = Map::new();
+                        payload.insert("name".into(), Value::Null);
+                        payload.insert("command_topic".into(), Value::Bool(true));
+                        payload.insert("state_topic".into(), Value::Bool(false));
+                        payload.insert("optimistic".into(), Value::Bool(true));
+                        if let Some(mode) = mode {
+                            let tones: Vec<Value> = mode.values.iter().filter(|v| v.as_str() != "stop").cloned().map(Value::String).collect();
+                            if !tones.is_empty() { payload.insert("available_tones".into(), Value::Array(tones)); }
+                        }
+                        if level.is_some() { payload.insert("support_volume_set".into(), Value::Bool(true)); }
+                        if duration.is_some() { payload.insert("support_duration".into(), Value::Bool(true)); }
+                        let level_template = "{% if volume_level is defined %}{% if volume_level | float <= 0.25 %}low{% elif volume_level | float <= 0.5 %}medium{% elif volume_level | float <= 0.75 %}high{% else %}very_high{% endif %}{% else %}medium{% endif %}";
+                        payload.insert("command_template".into(), Value::String(format!("{{\"warning\": {{\"mode\": \"{{{{ tone | default(emergency) }}}}\", \"level\": \"{level_template}\", \"duration\": {{{{ duration | default(10) }}}}}}}}")));
+                        payload.insert("command_off_template".into(), Value::String("{\"warning\": {\"mode\": \"stop\"}}".to_string()));
+                        entries.push(Entry { r#type: "siren".into(), object_id: "siren".into(), payload });
+                        continue;
+                    }
+                    if expose.r#type == "text" && expose.access & access::SET != 0 {
+                        let property = expose.property.clone().unwrap_or_default();
+                        let mut payload = Map::new();
+                        payload.insert("name".into(), json!(expose.label));
+                        payload.insert("state_topic".into(), Value::Bool(expose.access & access::STATE != 0));
+                        payload.insert("value_template".into(), Value::String(state_value_template(&property)));
+                        payload.insert("command_topic".into(), Value::Bool(true));
+                        payload.insert("command_topic_postfix".into(), Value::String(property.clone()));
+                        merge_lookup(&mut payload, "LIST_DISCOVERY_LOOKUP", expose.name.as_deref().unwrap_or(""));
+                        entries.push(Entry { r#type: "text".into(), object_id: property, payload });
+                        continue;
+                    }
+                    if expose.access & access::STATE != 0 {
+                        let property = expose.property.clone().unwrap_or_default();
+                        let mut payload = Map::new();
+                        payload.insert("name".into(), json!(expose.label));
+                        payload.insert("value_template".into(), Value::String(state_value_template_body(&property, &format!("{{{{ value_json[\"{property}\"] | default(,True) | string | truncate(254, True, , 0) }}}}"))));
+                        merge_lookup(&mut payload, "LIST_DISCOVERY_LOOKUP", expose.name.as_deref().unwrap_or(""));
+                        entries.push(Entry { r#type: "sensor".into(), object_id: property, payload });
+                    }
+                }
                 "binary" => {
                     let property = expose.property.clone().unwrap_or_default();
                     let label = expose
@@ -1180,7 +1224,74 @@ impl HomeAssistant {
                 }
                 _ => {}
             }
+
+            let new_entries = &mut entries[start..];
+            if expose.category.as_deref() == Some("config") || expose.category.as_deref() == Some("diagnostic") {
+                let category = expose.category.clone().unwrap_or_default();
+                for entry in new_entries.iter_mut() {
+                    entry.payload.insert("entity_category".into(), json!(category));
+                }
+            }
+            if let Value::Object(ha) = &expose.homeassistant {
+                let apply = |target: &mut Map<String, Value>, ignore_name: bool| {
+                    if let Some(kind) = ha.get("type").and_then(Value::as_str) {
+                        target.insert("__type".into(), json!(kind));
+                    }
+                    let mapping = [
+                        ("schema", "schema"),
+                        ("entityCategory", "entity_category"),
+                        ("deviceClass", "device_class"),
+                        ("enabledByDefault", "enabled_by_default"),
+                        ("icon", "icon"),
+                        ("name", "name"),
+                        ("valueTemplate", "value_template"),
+                    ];
+                    for (source, destination) in mapping {
+                        if ignore_name && destination == "name" { continue; }
+                        match ha.get(source) {
+                            Some(Value::Null) => { target.remove(destination); }
+                            Some(value) => { target.insert(destination.to_string(), value.clone()); }
+                            None => {}
+                        }
+                    }
+                };
+                for entry in new_entries.iter_mut() {
+                    apply(&mut entry.payload, true);
+                    if let Some(overrides) = ha.get(&entry.object_id).and_then(Value::as_object) {
+                        for (key, value) in overrides {
+                            if key == "type" || key == "object_id" { continue; }
+                            match value {
+                                Value::Null => { entry.payload.remove(key); }
+                                Value::Object(device) if key == "device" => {
+                                    if let Some(target) = entry.payload.get_mut("device").and_then(Value::as_object_mut) {
+                                        for (device_key, device_value) in device { target.insert(device_key.clone(), device_value.clone()); }
+                                    }
+                                }
+                                _ => { entry.payload.insert(key.clone(), value.clone()); }
+                            }
+                        }
+                    }
+                    if let Some(kind) = entry.payload.remove("__type") {
+                        if let Some(kind) = kind.as_str() { entry.r#type = kind.to_string(); }
+                    }
+                }
+            }
+            for entry in new_entries.iter_mut() {
+                if (entry.r#type == "binary_sensor" || entry.r#type == "sensor")
+                    && entry.payload.get("entity_category").and_then(Value::as_str) == Some("config")
+                {
+                    entry.payload.insert("entity_category".into(), json!("diagnostic"));
+                }
+                if entry.r#type == "event" {
+                    entry.payload.remove("entity_category");
+                }
+                let ha_name = expose.homeassistant.get("name");
+                if entry.payload.get("device_class").is_some() && ha_name.is_none() {
+                    entry.payload.remove("name");
+                }
+            }
         }
+
         entries
     }
 
@@ -1506,6 +1617,132 @@ impl HomeAssistant {
         }
     }
 
+    /// Upstream `getBridgeEntity` (`homeassistant.ts:2304-2420`).
+    async fn publish_bridge(self: &Arc<Self>) {
+        let settings = self.context.settings_value();
+        let base = settings["mqtt"]["base_topic"].as_str().unwrap_or("zigbee2mqtt");
+        let coordinator_ieee = self
+            .context
+            .zigbee
+            .coordinator_ieee_addr()
+            .unwrap_or_default();
+        let version = self
+            .context
+            .zigbee
+            .get_coordinator_version()
+            .await
+            .unwrap_or(Value::Null);
+        let revision = version
+            .get("meta")
+            .and_then(|meta| meta.get("revision"))
+            .and_then(Value::as_u64)
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+        let coordinator_type = version
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+
+        let device = json!({
+            "identifiers": [format!("zigbee2mqtt_bridge_{coordinator_ieee}")],
+            "name": "Zigbee2MQTT Bridge",
+            "model": "Bridge",
+            "manufacturer": "Zigbee2MQTT",
+            "sw_version": self.version.lock().unwrap().clone(),
+            "hw_version": format!("{coordinator_type} {revision}"),
+        });
+        let origin = self.origin.lock().unwrap().clone();
+
+        let entries: Vec<(&str, &str, Value)> = vec![
+            ("binary_sensor", "connection_state", json!({
+                "name": "Connection state", "device_class": "connectivity", "entity_category": "diagnostic",
+                "state_topic": format!("{base}/bridge/state"), "value_template": "{{ value_json.state }}",
+                "payload_on": "online", "payload_off": "offline", "availability": false,
+            })),
+            ("binary_sensor", "restart_required", json!({
+                "name": "Restart required", "device_class": "problem", "entity_category": "diagnostic",
+                "enabled_by_default": false, "state_topic": format!("{base}/bridge/info"),
+                "value_template": "{{ value_json.restart_required }}", "payload_on": true, "payload_off": false,
+            })),
+            ("button", "restart", json!({
+                "name": "Restart", "device_class": "restart", "state_topic": false,
+                "command_topic": format!("{base}/bridge/request/restart"), "payload_press": "",
+            })),
+            ("select", "log_level", json!({
+                "name": "Log level", "entity_category": "config", "state_topic": format!("{base}/bridge/info"),
+                "value_template": "{{ value_json.log_level | lower }}",
+                "command_topic": format!("{base}/bridge/request/options"),
+                "command_template": "{\"options\": {\"advanced\": {\"log_level\": \"{{ value }}\"} } }",
+                "options": ["error", "warning", "info", "debug"],
+            })),
+            ("sensor", "version", json!({
+                "name": "Version", "icon": "mdi:zigbee", "entity_category": "diagnostic",
+                "state_topic": format!("{base}/bridge/info"), "value_template": "{{ value_json.version }}",
+            })),
+            ("sensor", "coordinator_version", json!({
+                "name": "Coordinator version", "icon": "mdi:chip", "entity_category": "diagnostic",
+                "enabled_by_default": false, "state_topic": format!("{base}/bridge/info"),
+                "value_template": "{{ value_json.coordinator.meta.revision }}",
+            })),
+            ("sensor", "network_map", json!({
+                "name": "Network map", "entity_category": "diagnostic", "enabled_by_default": false,
+                "state_topic": format!("{base}/bridge/response/networkmap"),
+                "value_template": "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}",
+                "json_attributes_topic": format!("{base}/bridge/response/networkmap"),
+                "json_attributes_template": "{{ value_json.data.value | tojson }}",
+            })),
+            ("switch", "permit_join", json!({
+                "name": "Permit join", "icon": "mdi:human-greeting-proximity",
+                "state_topic": format!("{base}/bridge/info"),
+                "value_template": "{{ value_json.permit_join | lower }}",
+                "command_topic": format!("{base}/bridge/request/permit_join"),
+                "state_on": "true", "state_off": "false",
+                "payload_on": "{\"time\": 254}", "payload_off": "{\"time\": 0}",
+            })),
+        ];
+
+        for (kind, object_id, mut payload) in entries {
+            if let Value::Object(map) = &mut payload {
+                map.insert("device".into(), device.clone());
+                map.insert("origin".into(), origin.clone());
+                if map.get("availability").and_then(Value::as_bool) != Some(false) {
+                    map.insert(
+                        "availability".into(),
+                        json!([{"topic": format!("{base}/bridge/state"), "value_template": "{{ value_json.state }}"}]),
+                    );
+                    map.insert("availability_mode".into(), json!("all"));
+                } else {
+                    map.remove("availability");
+                }
+                map.insert(
+                    "unique_id".into(),
+                    json!(format!("{coordinator_ieee}_{object_id}_{base}")),
+                );
+                map.insert("object_id".into(), json!(format!("bridge_{object_id}")));
+                map.insert(
+                    "default_entity_id".into(),
+                    json!(format!("{kind}.bridge_{object_id}")),
+                );
+            }
+            self.context
+                .mqtt
+                .lock()
+                .await
+                .publish(
+                    &format!("{kind}/{coordinator_ieee}/{object_id}/config"),
+                    stringify(&payload),
+                    MqttPublishOptions {
+                        retain: true,
+                        qos: 1,
+                        base_topic: Some(self.discovery_topic.clone()),
+                        ..Default::default()
+                    },
+                )
+                .await;
+        }
+    }
+
     async fn clear_entity(&self, entity: &Arc<dyn Entity>) {
         let id = entity.entity_id().key();
         let discovered = self.discovered.lock().unwrap().remove(&id);
@@ -1595,6 +1832,8 @@ impl Extension for HomeAssistant {
                 format!("zigbee2mqtt_bridge_{coordinator}")
             };
             *self.bridge_identifier.lock().unwrap() = bridge_id;
+
+            self.publish_bridge().await;
 
             let bus = self.context.event_bus.clone();
             let this = self.clone();
