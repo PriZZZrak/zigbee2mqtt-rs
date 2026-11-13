@@ -232,3 +232,35 @@ pub async fn publish_last_seen(
         .await;
     }
 }
+
+/// Upstream `parseJSON(json, fallback)` (`utils.ts`).
+pub fn parse_json(text: &str, fallback: &str) -> Value {
+    serde_json::from_str(text).unwrap_or_else(|_| Value::String(fallback.to_string()))
+}
+
+/// Upstream `getResponse(request, data, error?)` (`utils.ts:117-145`).
+pub fn get_response(request: &Value, data: Value, error: Option<String>) -> Value {
+    match error {
+        Some(error) => {
+            let mut response = serde_json::json!({
+                "data": {},
+                "status": "error",
+                "error": error,
+            });
+            if request.get("transaction").is_some() {
+                response["transaction"] = request["transaction"].clone();
+            }
+            response
+        }
+        None => {
+            let mut response = serde_json::json!({
+                "data": data,
+                "status": "ok",
+            });
+            if request.get("transaction").is_some() {
+                response["transaction"] = request["transaction"].clone();
+            }
+            response
+        }
+    }
+}

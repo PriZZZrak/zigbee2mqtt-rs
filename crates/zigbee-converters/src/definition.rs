@@ -70,6 +70,17 @@ impl OnEventEvent {
 pub type OnEventFn =
     Arc<dyn Fn(OnEventEvent) -> ConverterFuture<Result<(), String>> + Send + Sync>;
 
+/// Upstream `Definition.configure` callback.
+pub type ConfigureFn = Arc<
+    dyn Fn(
+            Arc<zigbee_apiarist::controller::model::device::Device>,
+            Option<Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>>,
+            DefinitionRef,
+        ) -> ConverterFuture<Result<(), String>>
+        + Send
+        + Sync,
+>;
+
 /// Upstream converter `meta` argument.
 #[derive(Clone)]
 pub struct ConvertMeta {
@@ -158,7 +169,9 @@ pub struct Definition {
     pub meta: Value,
     /// Upstream `endpoint` mapping (name → endpoint ID).
     pub endpoint: Vec<(String, u8)>,
-    pub configure: Option<Value>,
+    pub configure: Option<ConfigureFn>,
+    /// Upstream `definition.version` (default `0.0.0`).
+    pub version: String,
     pub ota: Option<Value>,
     pub from_zigbee: Vec<FromZigbeeConverter>,
     pub to_zigbee: Vec<ToZigbeeConverter>,
@@ -193,6 +206,7 @@ impl Definition {
             meta: Value::Null,
             endpoint: Vec::new(),
             configure: None,
+            version: "0.0.0".to_string(),
             ota: None,
             from_zigbee: Vec::new(),
             to_zigbee: Vec::new(),

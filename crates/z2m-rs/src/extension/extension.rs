@@ -16,6 +16,7 @@ use crate::zigbee::Zigbee;
 pub type ExtensionFuture = Pin<Box<dyn Future<Output = Result<(), String>> + Send>>;
 
 /// Shared constructor arguments (`extension.ts:23-41`).
+#[derive(Clone)]
 pub struct ExtensionContext {
     pub zigbee: Arc<Zigbee>,
     pub mqtt: Arc<tokio::sync::Mutex<Mqtt>>,

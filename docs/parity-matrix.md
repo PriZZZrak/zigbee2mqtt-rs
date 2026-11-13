@@ -56,7 +56,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Availability | `lib/extension/availability.ts` | TODO | port scheduled (goal 2026-11-13) |
 | Bind | `lib/extension/bind.ts` | TODO | port scheduled (goal 2026-11-13) |
 | Bridge | `lib/extension/bridge.ts` | TODO | port scheduled (goal 2026-11-13) |
-| Configure | `lib/extension/configure.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Configure | `lib/extension/configure.ts` | PORTED | startup router pass (10s spacing), deviceJoined/interview/lastSeenChanged/reconfigure/MQTT request triggers, force path, `meta.configured` versioning, 3-attempt limit, in-flight guard, response payloads, exposes/devices event |
 | Frontend (protocol/API) | `lib/extension/frontend.ts` | TODO | WS protocol + HTTP API; static assets deferred to OpenWrt packaging |
 | Groups | `lib/extension/groups.ts` | TODO | port scheduled (goal 2026-11-13) |
 | Health | `lib/extension/health.ts` | PORTED | interval timer, `bridge/health` payload (OS load/memory, process uptime/rss, mqtt stats, per-device messages/mps/leave/nwk changes), `reset_on_check`, retain+qos1 |

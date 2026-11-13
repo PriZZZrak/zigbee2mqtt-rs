@@ -176,6 +176,7 @@ impl DefinitionRegistry {
                 replaced.meta = definition.meta.clone();
                 replaced.endpoint = definition.endpoint.clone();
                 replaced.configure = definition.configure.clone();
+                replaced.version = definition.version.clone();
                 replaced.ota = definition.ota.clone();
                 replaced.from_zigbee = definition.from_zigbee.clone();
                 replaced.to_zigbee = definition.to_zigbee.clone();
