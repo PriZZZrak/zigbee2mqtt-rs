@@ -41,9 +41,14 @@ pub enum Event {
 pub type Listener = Arc<dyn Fn(Value) + Send + Sync>;
 
 #[derive(Debug, Default, Clone)]
+pub struct LastSeenChanges {
+    pub messages: u64,
+    pub first: u64,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct DeviceStats {
-    pub last_seen_messages: u64,
-    pub first_last_seen: Option<u64>,
+    pub last_seen_changes: Option<LastSeenChanges>,
     pub leave_counts: u64,
     pub network_address_changes: u64,
 }
@@ -132,8 +137,15 @@ impl EventBus {
             .and_then(Value::as_str)
         {
             let stats = self.stats.devices.entry(ieee.to_string()).or_default();
-            stats.last_seen_messages += 1;
-            stats.first_last_seen.get_or_insert(now_ms());
+            match &mut stats.last_seen_changes {
+                Some(changes) => changes.messages += 1,
+                None => {
+                    stats.last_seen_changes = Some(LastSeenChanges {
+                        messages: 1,
+                        first: now_ms(),
+                    })
+                }
+            }
         }
         self.emit(Event::LastSeenChanged, data);
     }

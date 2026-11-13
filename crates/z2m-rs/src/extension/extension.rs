@@ -23,6 +23,7 @@ pub struct ExtensionContext {
     pub publish_entity_state: PublishEntityState,
     pub event_bus: Arc<std::sync::Mutex<EventBus>>,
     pub logger: Arc<std::sync::Mutex<crate::util::logger::Logger>>,
+    pub settings: Arc<std::sync::Mutex<crate::util::settings::Settings>>,
     pub enable_disable_extension: Arc<
         dyn Fn(bool, String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>>
             + Send
@@ -33,6 +34,13 @@ pub struct ExtensionContext {
         Arc<dyn Fn(Arc<dyn Extension>) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>,
     /// EventBus listener key replacing upstream object identity.
     pub key: usize,
+}
+
+impl ExtensionContext {
+    /// Upstream module-level `settings.get()`.
+    pub fn settings_value(&self) -> Value {
+        self.settings.lock().unwrap().get()
+    }
 }
 
 /// Upstream abstract `Extension` (`extension.ts:1`).

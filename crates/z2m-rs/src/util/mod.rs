@@ -8,5 +8,6 @@ pub mod settings_migration;
 pub mod settings_schema;
 pub mod static_file_server;
 pub mod stringify;
+pub mod system;
 pub mod utils;
 pub mod yaml;

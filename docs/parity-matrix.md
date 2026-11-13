@@ -59,7 +59,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Configure | `lib/extension/configure.ts` | TODO | port scheduled (goal 2026-11-13) |
 | Frontend (protocol/API) | `lib/extension/frontend.ts` | TODO | WS protocol + HTTP API; static assets deferred to OpenWrt packaging |
 | Groups | `lib/extension/groups.ts` | TODO | port scheduled (goal 2026-11-13) |
-| Health | `lib/extension/health.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Health | `lib/extension/health.ts` | PORTED | interval timer, `bridge/health` payload (OS load/memory, process uptime/rss, mqtt stats, per-device messages/mps/leave/nwk changes), `reset_on_check`, retain+qos1 |
 | Home Assistant | `lib/extension/homeassistant.ts` | TODO | full port incl. bridge entities/discovery; per-device discovery works when definitions are registered |
 | Network map | `lib/extension/networkMap.ts` | TODO | port scheduled (goal 2026-11-13) |
 | OnEvent | `lib/extension/onEvent.ts` | PORTED | start/stop, deviceJoined/leave/announce/interview/networkAddressChanged/optionsChanged events, `startCalled` gating, disabled devices skipped; global vendor Legrand hook out of the minimal converter surface |

@@ -117,6 +117,7 @@ async fn dispatches_definition_on_event_and_stops() {
         publish_entity_state: publish,
         event_bus: event_bus.clone(),
         logger,
+        settings: settings.clone(),
         enable_disable_extension: Arc::new(|_, _| Box::pin(async { Ok(()) })),
         restart: Arc::new(|| Box::pin(async {})),
         add_extension: Arc::new(|_| Box::pin(async {})),

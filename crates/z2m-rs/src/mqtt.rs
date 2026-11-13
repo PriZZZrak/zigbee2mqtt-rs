@@ -238,9 +238,11 @@ impl Mqtt {
         })
     }
 
+    /// Upstream `Mqtt.stats` (`mqtt.ts:37-40`).
     pub fn stats(&self) -> Value {
         json!({
             "connected": self.is_connected(),
+            "queued": 0,
         })
     }
 
