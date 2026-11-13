@@ -200,7 +200,10 @@ async fn availability_disabled_via_device_option() {
     assert!(
         mqtt.attempted.is_empty(),
         "unexpected: {:?}",
-        mqtt.attempted.iter().map(|(t, p, _)| (t.clone(), p.clone())).collect::<Vec<_>>()
+        mqtt.attempted
+            .iter()
+            .map(|(t, p, _)| (t.clone(), p.clone()))
+            .collect::<Vec<_>>()
     );
     availability.stop().await.unwrap();
 }

@@ -10,7 +10,7 @@
 // depend on the bridge crate.
 
 mod definition;
-mod exposes;
+pub mod exposes;
 mod registry;
 
 pub use definition::{

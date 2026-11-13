@@ -135,3 +135,17 @@ pub struct WhiteLabel {
     pub description: Option<String>,
     pub fingerprint: Vec<Fingerprint>,
 }
+
+/// Upstream `utils.isLightExpose` (`utils.ts:352`).
+pub fn is_light_expose(expose: &Expose) -> bool {
+    expose.r#type == "light"
+}
+
+impl Expose {
+    pub fn feature_names(&self) -> Vec<&str> {
+        self.features
+            .iter()
+            .filter_map(|feature| feature.name.as_deref())
+            .collect()
+    }
+}

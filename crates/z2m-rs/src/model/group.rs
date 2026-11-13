@@ -87,6 +87,17 @@ impl Group {
             .collect()
     }
 
+    /// Upstream `group.zh.hasMember(endpoint)`.
+    pub fn has_member_endpoint(
+        &self,
+        endpoint: &Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>,
+    ) -> bool {
+        self.zh
+            .members()
+            .iter()
+            .any(|member| Arc::ptr_eq(member, endpoint))
+    }
+
     /// Upstream `hasMember(device)` using a herdsman device.
     pub fn has_member_zh(&self, device: &Arc<ZhDevice>) -> bool {
         let members = self.zh.members();

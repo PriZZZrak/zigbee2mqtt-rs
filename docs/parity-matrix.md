@@ -58,7 +58,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Bridge | `lib/extension/bridge.ts` | TODO | port scheduled (goal 2026-11-13) |
 | Configure | `lib/extension/configure.ts` | PORTED | startup router pass (10s spacing), deviceJoined/interview/lastSeenChanged/reconfigure/MQTT request triggers, force path, `meta.configured` versioning, 3-attempt limit, in-flight guard, response payloads, exposes/devices event |
 | Frontend (protocol/API) | `lib/extension/frontend.ts` | TODO | WS protocol + HTTP API; static assets deferred to OpenWrt packaging |
-| Groups | `lib/extension/groups.ts` | TODO | port scheduled (goal 2026-11-13) |
+| Groups | `lib/extension/groups.ts` | PORTED | state-change optimistic fan-out (device↔group, dedupe, off_state/all-members checks, endpoint suffixes), MQTT group/members add/remove/remove_all with validation, endpoint operations, responses, GroupMembersChanged payloads |
 | Health | `lib/extension/health.ts` | PORTED | interval timer, `bridge/health` payload (OS load/memory, process uptime/rss, mqtt stats, per-device messages/mps/leave/nwk changes), `reset_on_check`, retain+qos1 |
 | Home Assistant | `lib/extension/homeassistant.ts` | TODO | full port incl. bridge entities/discovery; per-device discovery works when definitions are registered |
 | Network map | `lib/extension/networkMap.ts` | TODO | port scheduled (goal 2026-11-13) |
