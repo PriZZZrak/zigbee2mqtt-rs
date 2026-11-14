@@ -243,6 +243,8 @@ const CASES = {
             40: [A, "applies_device_option_overrides_and_null_filtering"],
             41: [A, "device_option_homeassistant_false_disables_discovery"],
             42: [A, "applies_device_option_overrides_and_null_filtering (temperature: null)"],
+            43: [S, "fan discovery mapping (generic)"],
+            44: [A, "discovers_endpoint_entities_with_suffixed_topics (fan_f1)"],
             46: [S, "siren mapping from the warning composite"],
             51: [CDB, "Bosch BTH-RA compatibility mapping lives in the converter DB"],
             54: [S, "user configuration applied after converter mapping"],

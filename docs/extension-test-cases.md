@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 7 | 2 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 45 | 15 | 53 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 46 | 16 | 51 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -414,8 +414,8 @@ Coverage classes:
 | 40 | Should discover devices with overridden user configuration affecting type and object_id | `asserted` | applies_device_option_overrides_and_null_filtering |
 | 41 | Shouldnt discover devices when homeassistant null is set in device options | `asserted` | device_option_homeassistant_false_disables_discovery |
 | 42 | Shouldnt discover sensor when set to null | `asserted` | applies_device_option_overrides_and_null_filtering (temperature: null) |
-| 43 | Should discover devices with fan | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 44 | Should discover fan on a non-first endpoint | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 43 | Should discover devices with fan | `slice` | fan discovery mapping (generic) |
+| 44 | Should discover fan on a non-first endpoint | `asserted` | discovers_endpoint_entities_with_suffixed_topics (fan_f1) |
 | 45 | Should discover speed-controlled fan on a non-first endpoint | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 46 | Should discover siren (HS2WD-E) | `slice` | siren mapping from the warning composite |
 | 47 | Should discover devices with speed-controlled fan | `code` | discovery mapping ported, no dedicated per-device assertion |

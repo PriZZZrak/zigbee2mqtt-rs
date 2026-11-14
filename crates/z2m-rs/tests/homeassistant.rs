@@ -780,6 +780,17 @@ async fn discovers_endpoint_entities_with_suffixed_topics() {
                 ..Default::default()
             });
             exposes.push(Expose {
+                r#type: "fan".to_string(),
+                name: Some("fan".to_string()),
+                endpoint: Some("f1".to_string()),
+                access: access::ALL,
+                features: vec![
+                    Expose::binary("state", access::ALL),
+                    Expose::numeric("speed", access::ALL),
+                ],
+                ..Default::default()
+            });
+            exposes.push(Expose {
                 r#type: "switch".to_string(),
                 name: Some("switch".to_string()),
                 endpoint: Some("2".to_string()),
@@ -814,6 +825,15 @@ async fn discovers_endpoint_entities_with_suffixed_topics() {
     .expect("endpoint cover");
     assert_eq!(cover["state_topic"], "zigbee2mqtt/lamp/left");
     assert_eq!(cover["command_topic"], "zigbee2mqtt/lamp/left/set");
+
+    let fan = config(
+        &harness,
+        &format!("homeassistant/fan/{IEEE}/fan_f1/config"),
+    )
+    .await
+    .expect("endpoint fan");
+    assert_eq!(fan["name"], "F1");
+    assert_eq!(fan["command_topic"], "zigbee2mqtt/lamp/f1/set/state");
 
     let switch = config(
         &harness,
