@@ -121,6 +121,11 @@ fn harness() -> Harness {
         Expose::enumeration("mode", access::SET | access::STATE, &["auto", "manual"]),
         Expose::binary("contact", access::STATE),
         Expose::binary("power", access::SET | access::STATE),
+        Expose::enumeration(
+            "action",
+            access::STATE,
+            &["single", "recall_*", "button_1_press", "brightness_step"],
+        ),
         Expose {
             r#type: "composite".to_string(),
             name: Some("warning".to_string()),
@@ -478,6 +483,32 @@ async fn action_publishes_device_trigger_and_republication() {
         .attempted
         .iter()
         .any(|(topic, payload, _)| topic == "zigbee2mqtt/lamp/action" && payload == "single"));
+}
+
+#[tokio::test]
+async fn experimental_event_entities_prepare_wildcard_action_types() {
+    let _guard = serial();
+    let harness = harness();
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["homeassistant", "experimental_event_entities"], json!(true));
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let event = config(
+        &harness,
+        &format!("homeassistant/event/{IEEE}/action/config"),
+    )
+    .await
+    .expect("event entity");
+    assert_eq!(
+        event["event_types"],
+        json!(["single", "recall", "press", "brightness_step"])
+    );
+    assert!(event["value_template"].as_str().unwrap().contains("patterns"));
 }
 
 #[test]

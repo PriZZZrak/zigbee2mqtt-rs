@@ -1467,7 +1467,27 @@ impl HomeAssistant {
         let mut new_topics = HashSet::new();
         let mut to_publish: Vec<(String, String)> = Vec::new();
 
-        let configs = self.get_configs(&entity);
+        let mut configs = self.get_configs(&entity);
+        let ha_options = entity.options().get("homeassistant").cloned().unwrap_or(Value::Null);
+        if let Value::Object(overrides) = &ha_options {
+            configs.retain(|config| !matches!(overrides.get(&config.object_id), Some(Value::Null)));
+            for config in &mut configs {
+                if let Some(over) = overrides.get(&config.object_id).and_then(Value::as_object) {
+                    if config.r#type == "switch" && over.get("type").and_then(Value::as_str) == Some("light") {
+                        self.context.logger.lock().unwrap().warning(
+                            &format!("Overriding the Home Assistant type of '{}' from switch to light is deprecated and will be removed in a future release, use 'Show as' in Home Assistant instead", entity.name()),
+                            "z2m",
+                        );
+                    }
+                    if let Some(object_id) = over.get("object_id").and_then(Value::as_str) {
+                        config.object_id = object_id.to_string();
+                    }
+                    if let Some(kind) = over.get("type").and_then(Value::as_str) {
+                        config.r#type = kind.to_string();
+                    }
+                }
+            }
+        }
         let device_payload = self.device_payload(&entity);
         let settings = self.context.settings_value();
         let base_topic = format!(
@@ -1647,6 +1667,29 @@ impl HomeAssistant {
                         key.to_string(),
                         Value::String(format!("{base_topic}/{command_prefix}set/{value}")),
                     );
+                }
+            }
+
+            if entity.is_device() {
+                if let Some(definition) = entity.definition() {
+                    if let Some(override_payload) = definition.override_ha_discovery_payload.clone() {
+                        let options = entity.options();
+                        let mut value = Value::Object(payload.clone());
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            override_payload(&mut value, &options);
+                        }));
+                        if result.is_ok() {
+                            if let Value::Object(updated) = value {
+                                payload = updated;
+                            }
+                        }
+                        if result.is_err() {
+                            self.context.logger.lock().unwrap().error(
+                                "Failed to override HA discovery payload",
+                                "z2m",
+                            );
+                        }
+                    }
                 }
             }
 
@@ -2628,68 +2671,71 @@ fn action_groups(pattern: &str) -> Vec<String> {
 }
 
 /// Upstream `parseActionValue` (`homeassistant.ts:2425-2450`) for trigger names.
-fn parse_action_value(action: &str) -> Value {
-    // The simplest faithful subset: standard scene/recall wildcard handling.
-    if let Some(rest) = action.strip_prefix("recall_") {
-        if rest == "*" {
-            return json!({"action": "recall", "scene": "wildcard"});
-        }
-        if rest.chars().all(|c| c.is_ascii_digit()) {
-            return json!({"action": "recall", "scene": rest});
-        }
-    }
-    if let Some(rest) = action.strip_prefix("scene_") {
-        if rest == "*" {
-            return json!({"action": "scene", "scene": "wildcard"});
-        }
-        if rest.chars().all(|c| c.is_ascii_digit()) {
-            return json!({"action": "scene", "scene": rest});
-        }
-    }
-    for pattern in ACTION_PATTERNS {
-        if let Some(groups) = simple_pattern_match(pattern, action) {
-            return groups;
-        }
-    }
-    json!({"action": action})
+fn action_patterns() -> &'static Vec<regex::Regex> {
+    static PATTERNS: OnceLock<Vec<regex::Regex>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        ACTION_PATTERNS
+            .iter()
+            .map(|pattern| {
+                regex::Regex::new(&pattern.replace("?<", "?P<")).expect("valid action pattern")
+            })
+            .collect()
+    })
 }
 
-/// Minimal matcher for the non-wildcard ACTION_PATTERNS used by trigger names.
-fn simple_pattern_match(pattern: &str, value: &str) -> Option<Value> {
-    if pattern.starts_with("^(?<action>recall|scene)_") {
-        return None;
-    }
-    if pattern.starts_with("^(?<button>") {
-        let (button, action) = value.split_once('_')?;
-        if !button.is_empty() && !action.is_empty() {
-            return Some(json!({"button": button, "action": action}));
+/// Upstream `parseActionValue` (`homeassistant.ts:2425-2450`).
+fn parse_action_value(action: &str) -> Value {
+    for pattern in action_patterns() {
+        if let Some(captures) = pattern.captures(action) {
+            let mut groups = Map::new();
+            for name in pattern.capture_names().flatten() {
+                if let Some(value) = captures.name(name) {
+                    groups.insert(name.to_string(), json!(value.as_str()));
+                }
+            }
+            if let Some(prefix) = groups
+                .remove("actionPrefix")
+                .and_then(|value| value.as_str().map(str::to_string))
+            {
+                if let Some(value) = groups.get("action").and_then(Value::as_str) {
+                    groups.insert("action".into(), json!(format!("{prefix}{value}")));
+                }
+            }
+            return Value::Object(groups);
         }
-        return None;
     }
-    if pattern.starts_with("^(?<actionPrefix>region_)") {
-        let rest = value.strip_prefix("region_")?;
-        let (region, action) = rest.rsplit_once('_')?;
-        return Some(json!({"action": format!("region_{action}"), "region": region}));
-    }
-    if pattern.starts_with("^(?<action>dial_rotate)_") {
-        let rest = value.strip_prefix("dial_rotate_")?;
-        let mut parts = rest.split('_');
-        return Some(json!({"action": "dial_rotate", "direction": parts.next()?, "speed": parts.next()?}));
-    }
-    if pattern.starts_with("^(?<action>brightness_step") {
-        let action = value.split('_').take(3).collect::<Vec<_>>().join("_");
-        let direction = value
-            .rsplit_once('_')
-            .filter(|(_, direction)| *direction == "up" || *direction == "down")
-            .map(|(_, direction)| direction);
-        return Some(match direction {
-            Some(direction) => json!({"action": action.trim_end_matches(&format!("_{direction}")), "direction": direction}),
-            None => json!({"action": value}),
+
+    static WILDCARD_SCENE: OnceLock<regex::Regex> = OnceLock::new();
+    let scene = WILDCARD_SCENE.get_or_init(|| {
+        regex::Regex::new(r"^(?P<action>recall|scene)_\*(?:_(?P<endpoint>e1|e2|s1|s2))?$")
+            .expect("valid wildcard scene pattern")
+    });
+    if let Some(captures) = scene.captures(action) {
+        return json!({
+            "action": captures.name("action").map(|value| value.as_str()).unwrap_or(""),
+            "scene": "wildcard",
         });
     }
-    None
-}
 
+    static WILDCARD_REGION: OnceLock<regex::Regex> = OnceLock::new();
+    let region = WILDCARD_REGION.get_or_init(|| {
+        regex::Regex::new(r"^(?P<actionPrefix>region_)\*_(?P<action>enter|leave|occupied|unoccupied)$")
+            .expect("valid wildcard region pattern")
+    });
+    if let Some(captures) = region.captures(action) {
+        let prefix = captures
+            .name("actionPrefix")
+            .map(|value| value.as_str())
+            .unwrap_or("");
+        let action = captures.name("action").map(|value| value.as_str()).unwrap_or("");
+        return json!({
+            "action": format!("{prefix}{action}"),
+            "region": "wildcard",
+        });
+    }
+
+    json!({"action": action})
+}
 fn prepare_action_event_types(values: &[String]) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
     for value in values {

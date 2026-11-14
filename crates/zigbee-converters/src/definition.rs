@@ -176,6 +176,9 @@ pub struct Definition {
     pub from_zigbee: Vec<FromZigbeeConverter>,
     pub to_zigbee: Vec<ToZigbeeConverter>,
     pub on_event: Vec<OnEventFn>,
+    /// Upstream `meta.overrideHaDiscoveryPayload(payload, options)`.
+    pub override_ha_discovery_payload:
+        Option<Arc<dyn Fn(&mut Value, &Value) + Send + Sync>>,
     pub generated: bool,
     pub white_label: Vec<WhiteLabel>,
     pub fingerprint: Vec<Fingerprint>,
@@ -211,6 +214,7 @@ impl Definition {
             from_zigbee: Vec::new(),
             to_zigbee: Vec::new(),
             on_event: Vec::new(),
+            override_ha_discovery_payload: None,
             generated: false,
             white_label: Vec::new(),
             fingerprint: Vec::new(),
