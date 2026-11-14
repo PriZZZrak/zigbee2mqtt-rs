@@ -2589,6 +2589,24 @@ impl Extension for HomeAssistant {
                 .subscribe(&self.status_topic, 0)
                 .await;
 
+            let discovery_wildcard = format!("{}/#", self.discovery_topic);
+            self.context
+                .mqtt
+                .lock()
+                .await
+                .subscribe(&discovery_wildcard, 1)
+                .await;
+            let mqtt_for_unsubscribe = self.context.mqtt.clone();
+            let wildcard = discovery_wildcard.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                mqtt_for_unsubscribe
+                    .lock()
+                    .await
+                    .unsubscribe(&wildcard)
+                    .await;
+            });
+
             for device in self
                 .context
                 .zigbee

@@ -13,7 +13,7 @@ use crate::event_bus::EventBus;
 use zigbee_apiarist::utils::logger::logger;
 
 /// Upstream `MqttPublishOptions`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct MqttPublishOptions {
     pub retain: bool,
     pub qos: u8,
@@ -28,6 +28,21 @@ pub struct MqttPublishOptions {
     pub base_topic: Option<String>,
 }
 
+impl Default for MqttPublishOptions {
+    fn default() -> Self {
+        Self {
+            retain: false,
+            qos: 0,
+            skip_log: false,
+            // Upstream default: skip messages we published ourselves.
+            skip_receive: true,
+            is_entity_state: false,
+            message_expiry_interval: None,
+            base_topic: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RetainedMessage {
     pub topic: String,
@@ -40,7 +55,7 @@ pub struct Mqtt {
     pub base_topic: String,
     pub server: String,
     pub connected: bool,
-    pub published_topics: std::collections::HashSet<String>,
+    pub published_topics: Arc<Mutex<std::collections::HashSet<String>>>,
     pub retained_messages: BTreeMap<String, RetainedMessage>,
     /// Upstream tests spy on `mqtt.publish`; this keeps the same observable
     /// call log when no broker is connected.
@@ -56,7 +71,7 @@ impl Mqtt {
             base_topic: "zigbee2mqtt".to_string(),
             server: "mqtt://localhost:1883".to_string(),
             connected: false,
-            published_topics: Default::default(),
+            published_topics: Arc::new(Mutex::new(std::collections::HashSet::new())),
             retained_messages: BTreeMap::new(),
             attempted: Vec::new(),
             client: None,
@@ -114,10 +129,15 @@ impl Mqtt {
         let (client, mut eventloop) = AsyncClient::new(options, 64);
         let base_topic = self.base_topic.clone();
         let event_bus = self.event_bus.clone();
+        let published_topics = self.published_topics.clone();
+        let connect_client = client.clone();
         let task = tokio::spawn(async move {
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Packet::Publish(publish))) => {
+                        if published_topics.lock().unwrap().remove(&publish.topic) {
+                            continue;
+                        }
                         // Upstream uses `payload.toString()`; lossy UTF-8 keeps
                         // the same contract instead of dropping the message.
                         let payload = String::from_utf8_lossy(&publish.payload).to_string();
@@ -126,7 +146,19 @@ impl Mqtt {
                             "message": payload,
                         }));
                     }
-                    Ok(Event::Incoming(Packet::ConnAck(_))) => {}
+                    Ok(Event::Incoming(Packet::ConnAck(_))) => {
+                        let _ = connect_client
+                            .publish(
+                                format!("{base_topic}/bridge/state"),
+                                QoS::AtLeastOnce,
+                                true,
+                                serde_json::to_vec(&json!({"state": "online"})).unwrap_or_default(),
+                            )
+                            .await;
+                        let _ = connect_client
+                            .subscribe(format!("{base_topic}/#"), QoS::AtLeastOnce)
+                            .await;
+                    }
                     Ok(_) => {}
                     Err(error) => {
                         logger().error(&format!("MQTT error: {error}"), "z2m:mqtt");
@@ -202,7 +234,9 @@ impl Mqtt {
         {
             return false;
         }
-        self.published_topics.insert(topic.clone());
+        if options.skip_receive {
+            self.published_topics.lock().unwrap().insert(topic.clone());
+        }
         if options.retain {
             self.retained_messages.insert(
                 topic.clone(),
@@ -235,6 +269,14 @@ impl Mqtt {
             _ => QoS::AtMostOnce,
         };
         client.subscribe(topic, qos).await.is_ok()
+    }
+
+    /// Upstream `Mqtt.unsubscribe(topic)`.
+    pub async fn unsubscribe(&mut self, topic: &str) -> bool {
+        let Some(client) = self.client.as_mut() else {
+            return false;
+        };
+        client.unsubscribe(topic).await.is_ok()
     }
 
     pub fn is_connected(&self) -> bool {
