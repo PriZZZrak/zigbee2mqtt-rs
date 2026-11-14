@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 7 | 2 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 39 | 15 | 59 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 43 | 15 | 55 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -461,8 +461,8 @@ Coverage classes:
 | 87 | Should clear discovery when group is removed | `slice` | group removal resolves by ID |
 | 88 | Should refresh discovery when device is renamed | `slice` | rename clears and rediscovers (homeassistant_rename) |
 | 89 | Should refresh discovery when group is renamed | `slice` | rename path shared by groups |
-| 90 | Shouldnt refresh discovery when device is renamed and homeassistant_rename is false | `code` | homeassistant_rename=false keeps existing topics |
-| 91 | Should discover update when device supports it | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 90 | Shouldnt refresh discovery when device is renamed and homeassistant_rename is false | `asserted` | keeps_discovery_topics_when_rename_is_not_a_homeassistant_rename |
+| 91 | Should discover update when device supports it | `asserted` | discovers_ota_update_entity_when_definition_has_ota |
 | 92 | Should discover trigger when action is published | `asserted` | action_publishes_device_trigger_and_republication |
 | 93 | Should publish /action for MQTT device trigger | `asserted` | action_publishes_device_trigger_and_republication |
 | 94 | Should publish /action for MQTT device trigger | `slice` | action republish on advanced.output=json |
@@ -472,11 +472,11 @@ Coverage classes:
 | 98 | Should republish payload to postfix topic with lightWithPostfix config | `slice` | endpoint attribute republish in on_publish_entity_state |
 | 99 | Should not republish a light_type select as an endpoint light state | `slice` | endpoint attribute republish skips light_type selects |
 | 100 | Shouldnt crash in onPublishEntityState on group publish | `code` | on_publish_entity_state returns early for groups |
-| 101 | Should clear outdated configs | `code` | on_discovery_message clears outdated configs |
+| 101 | Should clear outdated configs | `asserted` | clears_outdated_discovery_config_from_retained_messages |
 | 102 | Should rediscover group when device is added to it | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 103 | Should discover with json availability payload value_template | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 104 | Should discover with availability offline when device is disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 105 | Should discover last_seen when enabled | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 105 | Should discover last_seen when enabled | `asserted` | discovers_last_seen_when_continuous_format_is_enabled |
 | 106 | Should discover devices with configuration url (zigbee2mqtt-windfront) | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 107 | Should discover devices with configuration url (zigbee2mqtt-frontend) | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 108 | Should rediscover scenes when a scene is changed | `code` | discovery mapping ported, no dedicated per-device assertion |

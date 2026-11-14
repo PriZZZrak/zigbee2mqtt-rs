@@ -41,6 +41,10 @@ fn temp(name: &str) -> std::path::PathBuf {
 }
 
 fn harness() -> Harness {
+    harness_with(|_| {})
+}
+
+fn harness_with(mutate: impl FnOnce(&mut Definition)) -> Harness {
     let database_path = temp("db");
     inject_database(Arc::new(Mutex::new(Database::open(&database_path))));
     ZhDevice::reset_cache();
@@ -224,6 +228,7 @@ fn harness() -> Harness {
             ..Default::default()
         },
     ]);
+    mutate(&mut definition);
     zigbee.converters().lock().unwrap().register(definition);
     device.resolve_definition(false);
 
@@ -626,5 +631,114 @@ async fn device_option_homeassistant_false_disables_discovery() {
             .iter()
             .any(|(topic, _, _)| topic.starts_with(&format!("homeassistant/sensor/{IEEE}/"))),
         "discovery ran despite homeassistant: false"
+    );
+}
+
+#[tokio::test]
+async fn discovers_last_seen_when_continuous_format_is_enabled() {
+    let _guard = serial();
+    let harness = harness();
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["advanced", "last_seen"], json!("ISO_8601"));
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let payload = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/last_seen/config"),
+    )
+    .await
+    .expect("last_seen config");
+    assert_eq!(payload["device_class"], "timestamp");
+    assert_eq!(payload["enabled_by_default"], false);
+    assert_eq!(payload["icon"], "mdi:clock");
+}
+
+#[tokio::test]
+async fn discovers_ota_update_entity_when_definition_has_ota() {
+    let _guard = serial();
+    let harness = harness_with(|definition| definition.ota = Some(json!({})));
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let payload = config(
+        &harness,
+        &format!("homeassistant/update/{IEEE}/update/config"),
+    )
+    .await
+    .expect("update config");
+    assert_eq!(payload["device_class"], "firmware");
+    assert_eq!(payload["entity_category"], "config");
+    assert_eq!(
+        payload["payload_install"],
+        json!(format!("{{\"id\": \"{IEEE}\"}}"))
+    );
+}
+
+#[tokio::test]
+async fn clears_outdated_discovery_config_from_retained_messages() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    let topic = "homeassistant/sensor/0xdeadbeefdeadbeef/temperature/config";
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_mqtt_message(json!({
+            "topic": topic,
+            "message": json!({
+                "state_topic": "zigbee2mqtt/removed",
+                "availability": [{"topic": "zigbee2mqtt/bridge/state"}],
+            })
+            .to_string(),
+        }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    let publish = mqtt
+        .attempted
+        .iter()
+        .find(|(published, _, _)| published == topic)
+        .expect("stale config cleared");
+    assert_eq!(publish.1, "");
+    assert!(publish.2.retain);
+    assert_eq!(publish.2.qos, 1);
+}
+
+#[tokio::test]
+async fn keeps_discovery_topics_when_rename_is_not_a_homeassistant_rename() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_entity_renamed(json!({
+            "entity": {"ID": IEEE, "ieeeAddr": IEEE, "name": "lamp"},
+            "from": "lamp",
+            "to": "lamp2",
+            "homeAssisantRename": false,
+        }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        !mqtt
+            .attempted
+            .iter()
+            .any(|(_, payload, options)| payload.is_empty() && options.retain),
+        "discovery was cleared without homeAssisantRename"
     );
 }
