@@ -59,6 +59,8 @@ pub struct Mqtt {
     pub published_topics: Arc<Mutex<std::collections::HashSet<String>>>,
     /// Publishes currently enqueued in `rumqttc` (upstream `client.queue.length`).
     queued: Arc<AtomicUsize>,
+    /// QoS1/2 publishes awaiting broker acknowledgement.
+    unacked: Arc<Mutex<std::collections::HashSet<u16>>>,
     pub retained_messages: BTreeMap<String, RetainedMessage>,
     /// Upstream tests spy on `mqtt.publish`; this keeps the same observable
     /// call log when no broker is connected.
@@ -76,6 +78,7 @@ impl Mqtt {
             connected: false,
             published_topics: Arc::new(Mutex::new(std::collections::HashSet::new())),
             queued: Arc::new(AtomicUsize::new(0)),
+            unacked: Arc::new(Mutex::new(std::collections::HashSet::new())),
             retained_messages: BTreeMap::new(),
             attempted: Vec::new(),
             client: None,
@@ -134,6 +137,7 @@ impl Mqtt {
         let base_topic = self.base_topic.clone();
         let event_bus = self.event_bus.clone();
         let published_topics = self.published_topics.clone();
+        let unacked = self.unacked.clone();
         let connect_client = client.clone();
         let task = tokio::spawn(async move {
             loop {
@@ -149,6 +153,15 @@ impl Mqtt {
                             "topic": publish.topic,
                             "message": payload,
                         }));
+                    }
+                    Ok(Event::Outgoing(rumqttc::Outgoing::Publish(pkid))) => {
+                        unacked.lock().unwrap().insert(pkid);
+                    }
+                    Ok(Event::Incoming(Packet::PubAck(ack))) => {
+                        unacked.lock().unwrap().remove(&ack.pkid);
+                    }
+                    Ok(Event::Incoming(Packet::PubComp(ack))) => {
+                        unacked.lock().unwrap().remove(&ack.pkid);
                     }
                     Ok(Event::Incoming(Packet::ConnAck(_))) => {
                         let _ = connect_client
@@ -300,7 +313,8 @@ impl Mqtt {
     pub fn stats(&self) -> Value {
         json!({
             "connected": self.is_connected(),
-            "queued": self.queued.load(Ordering::SeqCst),
+            "queued": self.queued.load(Ordering::SeqCst)
+                + self.unacked.lock().unwrap().len(),
         })
     }
 
