@@ -7,7 +7,7 @@ edition = "2021"
 regex = "1"
 serde_json = "1"
 serde_yaml_ng = "0.10"
-tokio = { version = "1", features = ["rt", "sync", "time", "net", "macros"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "net", "macros", "signal"] }
 rumqttc = { version = "0.25", default-features = false }
 zigbee-apiarist = { path = "../zigbee-apiarist" }
 zigbee-converters = { path = "../zigbee-converters" }
