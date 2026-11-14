@@ -30,19 +30,19 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 16 | 3 | 47 | 0 | 31 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 19 | 3 | 44 | 0 | 31 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 48 | 15 | 50 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 51 | 15 | 47 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 3 | 27 | 2 | 78 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
-| receive.test.ts | 34 | 10 | 21 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
+| receive.test.ts | 34 | 13 | 18 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
 
@@ -213,10 +213,10 @@ Coverage classes:
 | 91 | Should allow to create a backup | `adapter` | backup/archive touches the coordinator |
 | 92 | Should return an error when the backup archive cannot be created | `adapter` | backup/archive touches the coordinator |
 | 93 | Should allow to restart | `code` | request handler ported, no dedicated assertion |
-| 94 | Change options and apply - homeassistant | `code` | request handler ported, no dedicated assertion |
+| 94 | Change options and apply - homeassistant | `asserted` | options_apply_homeassistant_and_log_levels |
 | 95 | Change options and apply - log_level | `code` | request handler ported, no dedicated assertion |
-| 96 | Change options and apply - log_debug_namespace_ignore | `code` | request handler ported, no dedicated assertion |
-| 97 | Change options and apply - log_namespaced_levels | `code` | request handler ported, no dedicated assertion |
+| 96 | Change options and apply - log_debug_namespace_ignore | `asserted` | options_apply_homeassistant_and_log_levels |
+| 97 | Change options and apply - log_namespaced_levels | `asserted` | options_apply_homeassistant_and_log_levels |
 | 98 | Change options restart required | `code` | request handler ported, no dedicated assertion |
 | 99 | Change options array | `asserted` | options_apply_arrays_null_and_report_restart_required |
 | 100 | Change options with null | `asserted` | options_apply_arrays_null_and_report_restart_required |
@@ -482,9 +482,9 @@ Coverage classes:
 | 108 | Should rediscover scenes when a scene is changed | `asserted` | scenes_are_discovered_and_rediscovered_on_change |
 | 109 | Should not clear bridge entities unnecessarily | `code` | bridge entities are published once (dedupe) |
 | 110 | Should discover bridge entities | `asserted` | bridge discovery assertions in discovers_numeric_binary_enum_and_switch_entities |
-| 111 | Should remove discovery entries for removed exposes when device options change | `code` | removed exposes clear their topics |
-| 112 | Should rediscover an entity whose expose comes back after it was removed | `code` | exposes coming back trigger rediscovery |
-| 113 | Should publish discovery message when a converter announces changed exposes | `code` | exposes_changed event triggers discover() |
+| 111 | Should remove discovery entries for removed exposes when device options change | `asserted` | exposes_changed_clears_removed_and_rediscovers_returning_entities |
+| 112 | Should rediscover an entity whose expose comes back after it was removed | `asserted` | exposes_changed_clears_removed_and_rediscovers_returning_entities |
+| 113 | Should publish discovery message when a converter announces changed exposes | `asserted` | exposes_changed_clears_removed_and_rediscovers_returning_entities |
 | 114 | Legacy action sensor | `asserted` | legacy_action_sensor_discovers_and_clears_action |
 | 115 | prevents mismatching setting/extension state | `code` | settings/extension mismatch guard |
 
@@ -690,9 +690,9 @@ Coverage classes:
 | 6 | Should allow to disable the legacy integration | `slice` | legacy integration toggle |
 | 7 | Should debounce messages | `asserted` | debounce_publishes_once_with_debounce_reason_and_updates_cache |
 | 8 | Should not bypass the debounce when a message produces no payload | `slice` | no-payload messages do not bypass the debounce |
-| 9 | Should throttle last seen updates from frames that are not emitted as a message | `slice` | receive pipeline covered by the behavioural tests |
-| 10 | Should debounce last seen updates from frames that are not emitted as a message | `slice` | receive pipeline covered by the behavioural tests |
-| 11 | Should publish last seen updates from frames that are not emitted as a message right away without debounce or throttle | `slice` | receive pipeline covered by the behavioural tests |
+| 9 | Should throttle last seen updates from frames that are not emitted as a message | `asserted` | last_seen_from_non_emitted_frame_is_throttled |
+| 10 | Should debounce last seen updates from frames that are not emitted as a message | `asserted` | last_seen_from_non_emitted_frame_is_debounced |
+| 11 | Should publish last seen updates from frames that are not emitted as a message right away without debounce or throttle | `asserted` | last_seen_from_non_emitted_frame_publishes_immediately |
 | 12 | Should debounce and retain messages when set via device_options | `slice` | debounce/retain via device options |
 | 13 | Should debounce messages only with the same payload values for provided debounce_ignore keys | `asserted` | payload_conflict_uses_debounce_ignore |
 | 14 | Should NOT publish old messages from State cache during debouncing | `slice` | state cache not republished during debounce |

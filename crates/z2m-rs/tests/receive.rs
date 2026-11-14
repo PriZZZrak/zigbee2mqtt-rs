@@ -361,3 +361,106 @@ fn payload_conflict_uses_debounce_ignore() {
         None
     ));
 }
+
+#[tokio::test]
+async fn last_seen_from_non_emitted_frame_publishes_immediately() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "advanced": {"last_seen": "ISO_8601"},
+        "devices": {IEEE: {"friendly_name": "lamp"}},
+    }));
+    let device = harness.zigbee.resolve_device(IEEE).unwrap();
+
+    // Controller-level handler: `publishLastSeen` must publish every
+    // `messageNonEmitted` event when the device has no debounce/throttle.
+    let published: Recorded = Arc::new(Mutex::new(Vec::new()));
+    let sink = published.clone();
+    let publish: z2m_rs::model::entity::PublishEntityState =
+        Arc::new(move |_entity, payload, reason| {
+            let sink = sink.clone();
+            Box::pin(async move {
+                sink.lock().unwrap().push((payload, reason));
+            })
+        });
+
+    for _ in 0..2 {
+        z2m_rs::util::utils::publish_last_seen(
+            &json!({
+                "device": {"ieeeAddr": IEEE, "name": "lamp"},
+                "reason": "messageNonEmitted",
+            }),
+            device.clone() as Arc<dyn z2m_rs::model::entity::Entity>,
+            &json!({"advanced": {"last_seen": "ISO_8601"}}),
+            false,
+            &publish,
+        )
+        .await;
+    }
+
+    let published = published.lock().unwrap();
+    assert_eq!(published.len(), 2, "{published:?}");
+    assert_eq!(published[0].0, json!({}));
+    assert_eq!(published[0].1.as_deref(), Some("lastSeenChanged"));
+}
+
+#[tokio::test]
+async fn last_seen_from_non_emitted_frame_is_debounced() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "advanced": {"last_seen": "ISO_8601"},
+        "devices": {IEEE: {"friendly_name": "lamp", "debounce": 1}},
+    }));
+
+    for _ in 0..2 {
+        harness
+            .event_bus
+            .lock()
+            .unwrap()
+            .emit_last_seen_changed(json!({
+                "device": {"ieeeAddr": IEEE, "name": "lamp"},
+                "reason": "messageNonEmitted",
+            }));
+    }
+    tokio::time::sleep(Duration::from_millis(1300)).await;
+
+    let recorded = harness.recorded.lock().unwrap();
+    assert_eq!(recorded.len(), 1, "{recorded:?}");
+    assert_eq!(recorded[0].1.as_deref(), Some("publishDebounce"));
+}
+
+#[tokio::test]
+async fn last_seen_from_non_emitted_frame_is_throttled() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "advanced": {"last_seen": "ISO_8601"},
+        "devices": {IEEE: {"friendly_name": "lamp", "throttle": 1}},
+    }));
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_last_seen_changed(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "reason": "messageNonEmitted",
+        }));
+    wait_for_publishes(&harness.recorded, 1).await;
+    assert_eq!(
+        harness.recorded.lock().unwrap()[0].1.as_deref(),
+        Some("publishThrottle")
+    );
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_last_seen_changed(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "reason": "messageNonEmitted",
+        }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(harness.recorded.lock().unwrap().len(), 1);
+}

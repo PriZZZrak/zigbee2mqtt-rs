@@ -1051,3 +1051,90 @@ async fn scenes_are_discovered_and_rediscovered_on_change() {
         "scene was not rediscovered"
     );
 }
+
+#[tokio::test]
+async fn exposes_changed_clears_removed_and_rediscovers_returning_entities() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Dynamic(Arc::new(|_device, options| {
+            let mut exposes = vec![Expose::numeric("temperature", access::STATE)];
+            if options
+                .get("expose_humidity")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                exposes.push(Expose::numeric("humidity", access::STATE));
+            }
+            exposes
+        }));
+    });
+    {
+        let mut settings = harness.context.settings.lock().unwrap();
+        settings.set(&["devices", IEEE, "expose_humidity"], json!(true));
+    }
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    assert!(
+        config(
+            &harness,
+            &format!("homeassistant/sensor/{IEEE}/humidity/config")
+        )
+        .await
+        .is_some()
+    );
+
+    // Upstream `Should remove discovery entries for removed exposes when device
+    // options change` + `exposes_changed` triggering rediscovery.
+    {
+        let mut settings = harness.context.settings.lock().unwrap();
+        settings.set(&["devices", IEEE, "expose_humidity"], json!(false));
+    }
+    harness.mqtt.lock().await.attempted.clear();
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_exposes_changed(json!({
+            "device": {"ieeeAddr": IEEE, "friendly_name": "lamp"},
+        }));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    {
+        let mqtt = harness.mqtt.lock().await;
+        let cleared = mqtt
+            .attempted
+            .iter()
+            .find(|(topic, _, _)| topic == &format!("homeassistant/sensor/{IEEE}/humidity/config"))
+            .expect("removed expose cleared");
+        assert_eq!(cleared.1, "");
+        assert!(cleared.2.retain);
+    }
+
+    // Upstream `Should rediscover an entity whose expose comes back after it was
+    // removed`.
+    {
+        let mut settings = harness.context.settings.lock().unwrap();
+        settings.set(&["devices", IEEE, "expose_humidity"], json!(true));
+    }
+    harness.mqtt.lock().await.attempted.clear();
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_exposes_changed(json!({
+            "device": {"ieeeAddr": IEEE, "friendly_name": "lamp"},
+        }));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    let humidity = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/humidity/config"),
+    )
+    .await
+    .expect("humidity rediscovered");
+    assert_eq!(
+        humidity["value_template"],
+        "{% if \"humidity\" in value_json %}{{ value_json[\"humidity\"] }}{% endif %}"
+    );
+}

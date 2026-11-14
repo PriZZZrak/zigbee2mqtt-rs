@@ -128,6 +128,16 @@ Known deviations:
   without a default response, matching upstream (only `ZclStatusError` sets
   `defaultResponse`).
 
+### Extension adapter-class cases (63) — pending user-coordinated HIL
+
+The `adapter` class in `docs/extension-test-cases.md` (63 of 598 upstream
+extension cases: permit join, interview, install code, reporting, backup,
+adapter-backed bind and ping timers) cannot be executed without a real
+coordinator. Those rows are **HARDWARE_PENDING**: no run is claimed. Running
+them needs an explicit redeploy of the Routerich AX3000 + Dongle-P test unit
+coordinated with the user (AGENTS §1, §9); destructive commissioning stays
+forbidden (§3.11).
+
 Coordinator-only HIL smoke with `ZStackRuntimeAdapter` is **not yet recorded**.
 Per AGENTS §1/§6 the test router currently runs the Node.js Zigbee2MQTT, so a
 hardware run needs an explicit redeploy and user coordination; no destructive
@@ -142,5 +152,5 @@ declares none; that is why OTA stays out of R1 rather than being stubbed.
 1. `Frame`, `Buffalo`, `Zcl.Utils`, `Zdo` differential fixtures against
    `zigbee-herdsman@11.2.0`.
 2. ZNP transcript replay (chunks → writes/received/errors).
-3. MQTT bridge transcript once the controller slice exists.
+3. Real-broker MQTT transcript (done: `docs/mqtt-broker-differential.md`); reconnect/offline transitions still missing.
 4. HIL record for start/resume, permit join, reboot recovery.

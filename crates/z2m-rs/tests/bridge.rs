@@ -32,6 +32,7 @@ struct Harness {
     mqtt: Arc<tokio::sync::Mutex<Mqtt>>,
     event_bus: Arc<Mutex<EventBus>>,
     published: Arc<Mutex<Vec<(String, Value)>>>,
+    enable_calls: Arc<Mutex<Vec<(bool, String)>>>,
     database_path: std::path::PathBuf,
     state_path: std::path::PathBuf,
 }
@@ -115,6 +116,8 @@ fn harness() -> Harness {
     )));
     let mqtt = Arc::new(tokio::sync::Mutex::new(Mqtt::new(event_bus.clone())));
     let published = Arc::new(Mutex::new(Vec::new()));
+    let enable_calls = Arc::new(Mutex::new(Vec::new()));
+    let enable_sink = enable_calls.clone();
     let sink = published.clone();
     let publish: PublishEntityState = Arc::new(move |entity, payload, _reason| {
         let sink = sink.clone();
@@ -132,7 +135,13 @@ fn harness() -> Harness {
             event_bus: event_bus.clone(),
             logger,
             settings,
-            enable_disable_extension: Arc::new(|_, _| Box::pin(async { Ok(()) })),
+            enable_disable_extension: Arc::new(move |enabled, name| {
+                let sink = enable_sink.clone();
+                Box::pin(async move {
+                    sink.lock().unwrap().push((enabled, name));
+                    Ok(())
+                })
+            }),
             restart: Arc::new(|| Box::pin(async {})),
             add_extension: Arc::new(|_| Box::pin(async {})),
             key: 8,
@@ -140,6 +149,7 @@ fn harness() -> Harness {
         mqtt,
         event_bus,
         published,
+        enable_calls,
         database_path,
         state_path,
     }
@@ -517,4 +527,48 @@ async fn bridge_info_reports_the_real_runtime_version() {
             .is_some_and(|version| version.chars().next().is_some_and(|c| c.is_ascii_digit())),
         "{node_version}"
     );
+}
+
+#[tokio::test]
+async fn options_apply_homeassistant_and_log_levels() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Upstream `Change options and apply - homeassistant`.
+    send(
+        &harness,
+        "options",
+        json!({"options": {"homeassistant": {"enabled": true}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(
+        harness.enable_calls.lock().unwrap().as_slice(),
+        [(true, "HomeAssistant".to_string())]
+    );
+
+    // Upstream `Change options and apply - log_level / log_debug_namespace_ignore
+    // / log_namespaced_levels`.
+    send(
+        &harness,
+        "options",
+        json!({"options": {"advanced": {
+            "log_level": "debug",
+            "log_namespaced_levels": {"zh:zstack": "warning"},
+            "log_debug_namespace_ignore": "^zh:.*",
+        }}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    let logger = harness.context.logger.lock().unwrap();
+    assert_eq!(logger.level, "debug");
+    assert_eq!(
+        logger.namespaced_levels.get("zh:zstack").map(String::as_str),
+        Some("warning")
+    );
+    assert_eq!(logger.get_debug_namespace_ignore(), "^zh:.*");
 }
