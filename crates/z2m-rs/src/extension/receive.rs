@@ -375,6 +375,19 @@ impl Receive {
             }
         }
 
+        if let (Some(definition), Value::Object(map)) = (device.definition(), &mut payload) {
+            let options = device.options();
+            let basic = device
+                .zh_device()
+                .map(|zh| zh.gen_basic())
+                .unwrap_or(Value::Null);
+            for error in zigbee_converters::utils::post_process_converted_from_zigbee_message(
+                &definition, map, &options, &basic,
+            ) {
+                self.logger.lock().unwrap().error(&error, "z2m");
+            }
+        }
+
         if !utils::object_is_empty(&payload) {
             self.publish(device, payload, None).await;
         } else if self.applied()["advanced"]["last_seen"]

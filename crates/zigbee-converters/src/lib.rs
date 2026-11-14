@@ -12,6 +12,7 @@
 mod definition;
 pub mod exposes;
 mod registry;
+pub mod utils;
 
 pub use definition::{
     to_zigbee, ConvertData, ConvertMeta, ConverterFuture, Definition, DefinitionRef,

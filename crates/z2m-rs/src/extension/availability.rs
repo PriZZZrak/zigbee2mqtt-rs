@@ -528,6 +528,7 @@ impl Availability {
                 };
                 let meta = zigbee_converters::ToMeta {
                     endpoint_name: None,
+                    members_state: Value::Null,
                     options: device.options(),
                     message: state.clone(),
                     device: device.zh_device(),

@@ -332,8 +332,22 @@ impl Publish {
             }
 
             let converter = converters[converter_index].clone();
+            let members_state = if let Some(group) = entity.zh_group() {
+                let mut members = Map::new();
+                for member in group.members() {
+                    let ieee = member.device_ieee_address.lock().unwrap().clone();
+                    if let Some(member_entity) = self.zigbee.resolve_entity(&ieee) {
+                        members.insert(ieee, self.state.lock().unwrap().get(&member_entity.entity_id()));
+                    }
+                }
+                Value::Object(members)
+            } else {
+                Value::Null
+            };
+
             let meta = ToMeta {
                 endpoint_name: endpoint_name.clone(),
+                members_state,
                 options: entity.options(),
                 message: message.clone(),
                 device: entity.zh_device(),

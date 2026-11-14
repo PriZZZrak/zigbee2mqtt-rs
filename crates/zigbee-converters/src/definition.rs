@@ -130,6 +130,8 @@ pub struct ToMeta {
     pub options: Value,
     pub message: Value,
     pub device: Option<Arc<zigbee_apiarist::controller::model::device::Device>>,
+    /// Upstream `membersState` for groups.
+    pub members_state: Value,
     pub state: Value,
     pub mapped: DefinitionRef,
     pub publish: Option<PublishCallback>,
