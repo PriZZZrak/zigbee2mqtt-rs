@@ -118,6 +118,10 @@ const CASES = {
             40: [A, "group_add_and_rename_device"],
             43: [A, "group_add_and_rename_device"],
             68: [A, "group_add_and_rename_device"],
+            99: [A, "options_apply_arrays_null_and_report_restart_required"],
+            100: [A, "options_apply_arrays_null_and_report_restart_required"],
+            102: [A, "options_apply_arrays_null_and_report_restart_required"],
+            103: [S, "consecutive options requests in the same test"],
             105: [A, "definitions_include_custom_clusters"],
             106: [A, "definitions_include_custom_clusters"],
             ...Object.fromEntries(

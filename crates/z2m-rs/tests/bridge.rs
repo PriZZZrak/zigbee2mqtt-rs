@@ -372,3 +372,57 @@ async fn force_remove_device_without_adapter() {
         None
     );
 }
+
+#[tokio::test]
+async fn options_apply_arrays_null_and_report_restart_required() {
+    let _guard = serial();
+    let harness = harness();
+    {
+        let mut settings = harness.context.settings.lock().unwrap();
+        settings.set(&["advanced", "ext_pan_id"], json!([221, 221, 221, 221, 221, 221, 221, 221]));
+        settings.set(&["serial"], json!({"disable_led": false, "port": "/dev/dummy"}));
+    }
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Upstream `Change options array`.
+    send(
+        &harness,
+        "options",
+        json!({"options": {"advanced": {"ext_pan_id": [220, 221, 221, 221, 221, 221, 221, 221]}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["restart_required"], true);
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["advanced"]["ext_pan_id"],
+        json!([220, 221, 221, 221, 221, 221, 221, 221])
+    );
+
+    // Upstream `Change options with null`.
+    send(
+        &harness,
+        "options",
+        json!({"options": {"serial": {"disable_led": false, "port": null}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["restart_required"], true);
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["serial"],
+        json!({"disable_led": false})
+    );
+
+    // Upstream `Change options not valid against schema`.
+    send(
+        &harness,
+        "options",
+        json!({"options": {"advanced": {"log_level": "not-a-level"}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert!(!payload["error"].as_str().unwrap_or_default().is_empty());
+}

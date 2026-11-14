@@ -30,7 +30,7 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 11 | 2 | 53 | 0 | 31 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 14 | 3 | 49 | 0 | 31 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
@@ -218,11 +218,11 @@ Coverage classes:
 | 96 | Change options and apply - log_debug_namespace_ignore | `code` | request handler ported, no dedicated assertion |
 | 97 | Change options and apply - log_namespaced_levels | `code` | request handler ported, no dedicated assertion |
 | 98 | Change options restart required | `code` | request handler ported, no dedicated assertion |
-| 99 | Change options array | `code` | request handler ported, no dedicated assertion |
-| 100 | Change options with null | `code` | request handler ported, no dedicated assertion |
+| 99 | Change options array | `asserted` | options_apply_arrays_null_and_report_restart_required |
+| 100 | Change options with null | `asserted` | options_apply_arrays_null_and_report_restart_required |
 | 101 | Change options invalid payload | `code` | request handler ported, no dedicated assertion |
-| 102 | Change options not valid against schema | `code` | request handler ported, no dedicated assertion |
-| 103 | Change options consecutively, check restart required | `code` | request handler ported, no dedicated assertion |
+| 102 | Change options not valid against schema | `asserted` | options_apply_arrays_null_and_report_restart_required |
+| 103 | Change options consecutively, check restart required | `slice` | consecutive options requests in the same test |
 | 104 | Icon link handling | `code` | request handler ported, no dedicated assertion |
 | 105 | Should publish bridge info, devices and definitions when a device with custom_clusters joined | `asserted` | definitions_include_custom_clusters |
 | 106 | Should publish bridge info, devices and definitions when a device with custom_clusters is reconfigured | `asserted` | definitions_include_custom_clusters |
