@@ -490,3 +490,31 @@ async fn logging_publishes_to_mqtt_with_dedupe_and_connection_guard() {
         .iter()
         .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/logging"));
 }
+
+#[tokio::test]
+async fn bridge_info_reports_the_real_runtime_version() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    let mqtt = harness.mqtt.lock().await;
+    let (_, payload, _) = mqtt
+        .attempted
+        .iter()
+        .rev()
+        .find(|(topic, _, _)| topic == "zigbee2mqtt/bridge/info")
+        .expect("bridge info");
+    let payload: Value = serde_json::from_str(payload).unwrap();
+    let node_version = payload["os"]["node_version"]
+        .as_str()
+        .expect("os.node_version string");
+    assert!(node_version.starts_with("rustc "), "{node_version}");
+    assert!(
+        node_version
+            .split_whitespace()
+            .nth(1)
+            .is_some_and(|version| version.chars().next().is_some_and(|c| c.is_ascii_digit())),
+        "{node_version}"
+    );
+}

@@ -183,6 +183,9 @@ Remaining gaps (tracked, do not hide):
 - onboarding unzip (`lib/util/onboarding.ts`) is not ported; only the backup
   ZIP path uses the `zip` crate today.
 - HIL on the Routerich AX3000 + Dongle-P has not been executed.
+- `bridge/info.os.node_version` reports the Rust toolchain version
+  (`rustc X.Y.Z`) because there is no Node runtime; upstream reports
+  `process.version`.
 
 ## 5. Dependency update procedure
 

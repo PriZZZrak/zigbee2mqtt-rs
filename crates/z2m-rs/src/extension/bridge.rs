@@ -1297,7 +1297,7 @@ impl Extension for Bridge {
             let (cpu_models, cpu_count) = system::cpu_summary();
             *self.os_info.lock().unwrap() = json!({
                 "version": system::os_version(),
-                "node_version": "rust",
+                "node_version": env!("Z2M_RUSTC_VERSION"),
                 "cpus": format!("{cpu_models} (x{cpu_count})"),
                 "memory_mb": system::total_memory_mb(),
             });
