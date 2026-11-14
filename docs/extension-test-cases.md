@@ -37,12 +37,12 @@ Coverage classes:
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 51 | 15 | 47 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 54 | 15 | 44 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 3 | 27 | 2 | 78 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
-| receive.test.ts | 34 | 13 | 18 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
+| receive.test.ts | 34 | 14 | 17 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
 
@@ -450,7 +450,7 @@ Coverage classes:
 | 76 | Shouldt discover when already discovered | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 77 | Should discover when not discovered yet | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 78 | Shouldnt discover when device leaves | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 79 | Should discover when options change | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 79 | Should discover when options change | `asserted` | entity_options_changed_republishes_discovery |
 | 80 | Should send all status when home assistant comes online (default topic) | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 81 | Should send all status when home assistant comes online | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 82 | Should keep the versions of an update payload that already has them | `code` | discovery mapping ported, no dedicated per-device assertion |
@@ -471,9 +471,9 @@ Coverage classes:
 | 97 | Should enable experimental event entities | `asserted` | experimental_event_entities_prepare_wildcard_action_types |
 | 98 | Should republish payload to postfix topic with lightWithPostfix config | `asserted` | endpoint_state_publish_is_split_per_endpoint_topic |
 | 99 | Should not republish a light_type select as an endpoint light state | `asserted` | light_type_select_is_not_republished_as_endpoint_state |
-| 100 | Shouldnt crash in onPublishEntityState on group publish | `code` | on_publish_entity_state returns early for groups |
+| 100 | Shouldnt crash in onPublishEntityState on group publish | `asserted` | group_state_publish_does_not_republish_endpoint_states |
 | 101 | Should clear outdated configs | `asserted` | clears_outdated_discovery_config_from_retained_messages |
-| 102 | Should rediscover group when device is added to it | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 102 | Should rediscover group when device is added to it | `asserted` | group_members_changed_rediscovers_the_group |
 | 103 | Should discover with json availability payload value_template | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 104 | Should discover with availability offline when device is disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 105 | Should discover last_seen when enabled | `asserted` | discovers_last_seen_when_continuous_format_is_enabled |
@@ -712,7 +712,7 @@ Coverage classes:
 | 28 | Should not handle messages from coordinator | `slice` | receive pipeline covered by the behavioural tests |
 | 29 | Should not handle messages from still interviewing devices with unknown definition | `asserted` | definition_less_device_skips_message_and_publishes_last_seen |
 | 30 | Should handle a command | `slice` | command messages are ignored |
-| 31 | Should add elapsed | `slice` | elapsed timing |
+| 31 | Should add elapsed | `asserted` | elapsed_is_added_from_the_second_message_onwards |
 | 32 | Should log when message is from supported device but has no converters | `asserted` | unsupported_cluster_publishes_last_seen_only |
 | 33 | Should report correct energy and power values for different versions of SP600 | `converter-db` | SP600 per-version payloads live in the converter DB |
 | 34 | Should emit DevicesChanged event when a converter announces changed exposes | `code` | exposes_changed event on converter announce |

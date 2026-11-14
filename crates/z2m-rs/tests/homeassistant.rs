@@ -95,12 +95,14 @@ fn harness_with(mutate: impl FnOnce(&mut Definition)) -> Harness {
         })
         .unwrap(),
     );
+    let _group = controller.create_group(1).unwrap();
 
     let settings = Arc::new(Mutex::new(Settings::from_config(json!({
         "mqtt": {"server": "localhost"},
         "homeassistant": {"enabled": true},
         "availability": {"enabled": true},
         "devices": {IEEE: {"friendly_name": "lamp"}},
+        "groups": {"1": {"friendly_name": "kitchen"}},
     }))));
     let event_bus = Arc::new(Mutex::new(EventBus::new()));
     let logger = Arc::new(Mutex::new(Logger::new()));
@@ -1136,5 +1138,115 @@ async fn exposes_changed_clears_removed_and_rediscovers_returning_entities() {
     assert_eq!(
         humidity["value_template"],
         "{% if \"humidity\" in value_json %}{{ value_json[\"humidity\"] }}{% endif %}"
+    );
+}
+
+#[tokio::test]
+async fn group_members_changed_rediscovers_the_group() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    assert!(
+        !harness
+            .mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic.starts_with("homeassistant/light/")
+                && !topic.contains(IEEE)),
+        "empty group must not be discovered"
+    );
+
+    let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+    let group = harness.context.zigbee.group_by_id(1).unwrap();
+    group.zh.add_member(&device.zh.endpoints()[0]);
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_group_members_changed(json!({"group": {"ID": 1, "name": "kitchen"}}));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    let light = mqtt
+        .attempted
+        .iter()
+        .find(|(topic, _, _)| {
+            topic.starts_with("homeassistant/light/") && topic.ends_with("/light/config")
+                && !topic.contains(IEEE)
+        })
+        .expect("group light discovered");
+    let payload: Value = serde_json::from_str(&light.1).unwrap();
+    let members = payload["group"].as_array().expect("group unique ids");
+    assert!(!members.is_empty());
+    assert_eq!(payload["device"]["name"], "kitchen");
+}
+
+#[tokio::test]
+async fn entity_options_changed_republishes_discovery() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["devices", IEEE, "friendly_name"], json!("lamp2"));
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_entity_options_changed(json!({
+            "entity": {"name": "lamp2", "ieeeAddr": IEEE, "ID": IEEE},
+        }));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    let payload = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("rediscovered after options change");
+    assert_eq!(payload["device"]["name"], "lamp2");
+}
+
+#[tokio::test]
+async fn group_state_publish_does_not_republish_endpoint_states() {
+    let _guard = serial();
+    let harness = harness();
+    let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+    harness
+        .context
+        .zigbee
+        .group_by_id(1)
+        .unwrap()
+        .zh
+        .add_member(&device.zh.endpoints()[0]);
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
+        "entity": {"name": "kitchen", "ID": 1},
+        "message": {"state_l1": "ON"},
+    }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        !mqtt
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic.contains("kitchen/")),
+        "group publish was split per endpoint: {:?}",
+        mqtt.attempted
     );
 }

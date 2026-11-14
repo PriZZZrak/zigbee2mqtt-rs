@@ -1687,24 +1687,29 @@ impl HomeAssistant {
             let unique_id = payload["unique_id"].as_str().unwrap_or_default().to_string();
             if entity.is_device() {
                 if let Some(zh) = entity.zh_device() {
-                    for endpoint in zh.endpoints() {
-                        let Some(name) = entity.endpoint_name(&endpoint) else {
-                            continue;
-                        };
-                        if config.object_id.ends_with(&format!("_{name}"))
-                            || (config.object_id == name)
-                        {
-                            let member_key = format!(
-                                "{}_{}_{}",
-                                entity.entity_id().key(),
-                                endpoint.ID,
-                                config.r#type
-                            );
-                            self.group_member_lookup
-                                .lock()
-                                .unwrap()
-                                .insert(member_key, unique_id.clone());
-                        }
+                    let endpoints = zh.endpoints();
+                    // Upstream stores the entry's endpoint: the suffixed one when the
+                    // object id names it, otherwise the device default endpoint
+                    // (first endpoint), mirroring `entity.endpoint(endpointName)`.
+                    let mut target = endpoints.iter().find(|endpoint| {
+                        entity
+                            .endpoint_name(endpoint)
+                            .is_some_and(|name| config.object_id.ends_with(&format!("_{name}")))
+                    });
+                    if target.is_none() {
+                        target = endpoints.first();
+                    }
+                    if let Some(endpoint) = target {
+                        let member_key = format!(
+                            "{}_{}_{}",
+                            entity.entity_id().key(),
+                            endpoint.ID,
+                            config.r#type
+                        );
+                        self.group_member_lookup
+                            .lock()
+                            .unwrap()
+                            .insert(member_key, unique_id.clone());
                     }
                 }
             } else if entity.is_group() {

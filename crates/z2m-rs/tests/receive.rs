@@ -464,3 +464,31 @@ async fn last_seen_from_non_emitted_frame_is_throttled() {
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert_eq!(harness.recorded.lock().unwrap().len(), 1);
 }
+
+#[tokio::test]
+async fn elapsed_is_added_from_the_second_message_onwards() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "advanced": {"last_seen": "ISO_8601", "elapsed": true},
+    }));
+    register_on_off_converter(&harness.zigbee);
+
+    for _ in 0..2 {
+        harness
+            .event_bus
+            .lock()
+            .unwrap()
+            .emit_device_message(message("genOnOff", json!({"onOff": 1})));
+        tokio::time::sleep(Duration::from_millis(60)).await;
+    }
+    wait_for_publishes(&harness.recorded, 2).await;
+
+    let recorded = harness.recorded.lock().unwrap();
+    assert_eq!(recorded[0].0, json!({"state": "ON"}));
+    assert_eq!(recorded[1].0["state"], "ON");
+    let elapsed = recorded[1].0["elapsed"]
+        .as_u64()
+        .expect("elapsed on the second message");
+    assert!(elapsed >= 40, "elapsed {elapsed} too small");
+}
