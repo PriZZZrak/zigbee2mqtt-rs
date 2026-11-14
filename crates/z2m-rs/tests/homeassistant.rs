@@ -62,7 +62,7 @@ fn harness_with(mutate: impl FnOnce(&mut Definition)) -> Harness {
         None,
     )
     .unwrap();
-    ZhDevice::create(
+    let zh_device = ZhDevice::create(
         DeviceType::Router,
         IEEE,
         1234,
@@ -74,6 +74,7 @@ fn harness_with(mutate: impl FnOnce(&mut Definition)) -> Harness {
         None,
     )
     .unwrap();
+    zh_device.create_endpoint(1).unwrap();
 
     let controller = Arc::new(
         Controller::new(ControllerOptions {
@@ -934,5 +935,119 @@ async fn legacy_action_sensor_discovers_and_clears_action() {
             .any(|payload| payload == &json!({"action": ""})),
         "legacy action was not cleared: {:?}",
         harness.published.lock().unwrap()
+    );
+}
+
+#[tokio::test]
+async fn light_type_select_is_not_republished_as_endpoint_state() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        if let zigbee_converters::Exposes::Static(exposes) = &mut definition.exposes {
+            exposes.push(Expose {
+                r#type: "light".to_string(),
+                name: Some("light".to_string()),
+                endpoint: Some("l1".to_string()),
+                access: access::ALL,
+                features: vec![
+                    Expose::binary("state", access::ALL),
+                    Expose::numeric("brightness", access::ALL),
+                ],
+                ..Default::default()
+            });
+            exposes.push(Expose {
+                r#type: "enum".to_string(),
+                name: Some("light_type".to_string()),
+                property: Some("light_type".to_string()),
+                access: access::SET | access::STATE,
+                values: vec!["light".to_string(), "switch".to_string()],
+                ..Default::default()
+            });
+        }
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    // The `light_type` select is discovered on the select platform.
+    assert!(config(
+        &harness,
+        &format!("homeassistant/select/{IEEE}/light_type/config")
+    )
+    .await
+    .is_some());
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
+        "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+        "message": {"light_type": "switch", "state_l1": "ON"},
+    }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        mqtt
+            .attempted
+            .iter()
+            .any(|(topic, payload, _)| topic == "zigbee2mqtt/lamp/l1"
+                && payload == r#"{"state":"ON"}"#),
+        "endpoint state missing: {:?}",
+        mqtt.attempted
+    );
+    assert!(
+        !mqtt
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic == "zigbee2mqtt/lamp/type"),
+        "light_type select was republished as endpoint state"
+    );
+}
+
+#[tokio::test]
+async fn scenes_are_discovered_and_rediscovered_on_change() {
+    let _guard = serial();
+    let harness = harness();
+    {
+        let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+        let endpoint = device.zh.endpoints()[0].clone();
+        *endpoint.meta.lock().unwrap() = json!({"scenes": {"1_0": {"name": "Relax"}}});
+    }
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let scene = config(
+        &harness,
+        &format!("homeassistant/scene/{IEEE}/scene_1/config"),
+    )
+    .await
+    .expect("scene config");
+    assert_eq!(scene["payload_on"], json!("{ \"scene_recall\": 1 }"));
+    assert_eq!(scene["name"], "Relax");
+
+    harness.mqtt.lock().await.attempted.clear();
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_scenes_changed(json!({
+            "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+        }));
+    // The handler clears the scene topics, waits 2s (upstream) and rediscovers.
+    tokio::time::sleep(Duration::from_millis(2600)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        mqtt.attempted.iter().any(|(topic, payload, options)| topic
+            == &format!("homeassistant/scene/{IEEE}/scene_1/config")
+            && payload.is_empty()
+            && options.retain),
+        "scene topic was not cleared: {:?}",
+        mqtt.attempted
+    );
+    assert!(
+        mqtt.attempted
+            .iter()
+            .any(|(topic, payload, _)| topic
+                == &format!("homeassistant/scene/{IEEE}/scene_1/config")
+                && !payload.is_empty()),
+        "scene was not rediscovered"
     );
 }

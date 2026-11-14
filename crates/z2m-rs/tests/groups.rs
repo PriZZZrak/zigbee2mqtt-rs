@@ -24,6 +24,7 @@ use z2m_rs::util::settings::Settings;
 use z2m_rs::zigbee::Zigbee;
 
 const IEEE: &str = "0x0017880104e45519";
+const IEEE2: &str = "0x0017880104e45520";
 
 type Published = Arc<Mutex<Vec<(String, Value, Option<String>)>>>;
 
@@ -93,12 +94,29 @@ fn harness() -> Harness {
         })
         .unwrap(),
     );
+    let bulb = ZhDevice::create(
+        DeviceType::Router,
+        IEEE2,
+        5678,
+        None,
+        Some("Bulb".to_string()),
+        Some("Mains (single phase)".to_string()),
+        Some("BULB".to_string()),
+        InterviewState::Successful,
+        None,
+    )
+    .unwrap();
+    let bulb_endpoint = bulb.create_endpoint(1).unwrap();
     let group = controller.create_group(1).unwrap();
     group.add_member(&device.endpoints()[0]);
+    group.add_member(&bulb_endpoint);
 
     let settings = Arc::new(Mutex::new(Settings::from_config(json!({
         "mqtt": {"server": "localhost"},
-        "devices": {IEEE: {"friendly_name": "lamp"}},
+        "devices": {
+            IEEE: {"friendly_name": "lamp"},
+            IEEE2: {"friendly_name": "bulb"},
+        },
         "groups": {"1": {"friendly_name": "kitchen", "optimistic": true}},
     }))));
     let event_bus = Arc::new(Mutex::new(EventBus::new()));
@@ -109,7 +127,22 @@ fn harness() -> Harness {
         settings.clone(),
         logger.clone(),
     );
-    let _ = zigbee.resolve_device(IEEE);
+    let bulb = zigbee.resolve_device(IEEE2).unwrap();
+    let mut definition = zigbee_converters::Definition::new("BULB", "Acme", "Bulb")
+        .with_zigbee_model("BULB");
+    definition.exposes = zigbee_converters::Exposes::Static(vec![zigbee_converters::Expose {
+        r#type: "light".to_string(),
+        name: Some("light".to_string()),
+        access: zigbee_converters::access::ALL,
+        features: vec![
+            zigbee_converters::Expose::binary("state", zigbee_converters::access::ALL),
+            zigbee_converters::Expose::numeric("brightness", zigbee_converters::access::ALL),
+            zigbee_converters::Expose::numeric("color_temp", zigbee_converters::access::ALL),
+        ],
+        ..Default::default()
+    }]);
+    zigbee.converters().lock().unwrap().register(definition);
+    let _ = bulb.resolve_definition(false);
     let _ = zigbee.resolve_group(1);
     let state_path = temp("state.json");
     let state = Arc::new(Mutex::new(State::with_file(
@@ -268,4 +301,35 @@ async fn unknown_group_and_device_errors() {
         payload["error"],
         "Device '0xdeadbeefdeadbeef' does not exist"
     );
+}
+
+#[tokio::test]
+async fn member_state_filtering_uses_member_exposes() {
+    let _guard = serial();
+    let harness = harness();
+    let groups = Groups::new(harness.context.clone());
+    groups.clone().start().await.unwrap();
+
+    // The group payload carries color_temp; the definition-less lamp must not
+    // receive it, the bulb (which exposes color_temp) must.
+    harness.event_bus.lock().unwrap().emit_state_change(json!({
+        "entity": {"ID": 1, "name": "kitchen"},
+        "from": {},
+        "to": {"state": "ON", "color_temp": 50},
+        "update": {"state": "ON", "color_temp": 50},
+        "reason": "devicePublish",
+    }));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    let published = harness.published.lock().unwrap();
+    let bulb = published
+        .iter()
+        .find(|(name, _, _)| name == "bulb")
+        .expect("bulb member state");
+    assert_eq!(bulb.1, json!({"state": "ON", "color_temp": 50}));
+    let lamp = published
+        .iter()
+        .find(|(name, _, _)| name == "lamp")
+        .expect("lamp member state");
+    assert_eq!(lamp.1, json!({"state": "ON"}));
 }

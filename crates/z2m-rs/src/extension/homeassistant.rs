@@ -1640,23 +1640,6 @@ impl HomeAssistant {
             }
 
             payload.insert("device".into(), device_payload.clone());
-            if entity.is_device() {
-                if let Some(endpoint) = entity.endpoint(None) {
-                    let member_key = format!("{}_{}_{}", entity.entity_id().key(), endpoint.ID, config.r#type);
-                    self.group_member_lookup.lock().unwrap().insert(member_key, payload["unique_id"].as_str().unwrap_or_default().to_string());
-                }
-            } else if entity.is_group() {
-                let mut member_ids = Vec::new();
-                for member in entity.zh_group().map(|group| group.members()).unwrap_or_default() {
-                    let key = format!("{}_{}_{}", member.device_ieee_address.lock().unwrap(), member.ID, config.r#type);
-                    if let Some(unique) = self.group_member_lookup.lock().unwrap().get(&key) {
-                        member_ids.push(Value::String(unique.clone()));
-                    }
-                }
-                if !member_ids.is_empty() {
-                    payload.insert("group".into(), Value::Array(member_ids));
-                }
-            }
             payload.insert("origin".into(), self.origin.lock().unwrap().clone());
 
             let mut object_id = device_payload["name"]
@@ -1670,6 +1653,12 @@ impl HomeAssistant {
                 }
             } else if !config.object_id.starts_with(&config.r#type) {
                 object_id = format!("{object_id}_{}", config.object_id);
+            }
+            if let Some(postfix) = payload
+                .remove("object_id_postfix")
+                .and_then(|value| value.as_str().map(str::to_string))
+            {
+                object_id.push_str(&postfix);
             }
             payload.insert("object_id".into(), json!(object_id));
             payload.insert(
@@ -1691,6 +1680,50 @@ impl HomeAssistant {
                         .unwrap_or("zigbee2mqtt")
                 )),
             );
+
+            // Upstream fills `groupMemberLookup` per discovered endpoint after the
+            // unique id exists, and groups reuse it for HA entity grouping
+            // (homeassistant.ts:1857-1878).
+            let unique_id = payload["unique_id"].as_str().unwrap_or_default().to_string();
+            if entity.is_device() {
+                if let Some(zh) = entity.zh_device() {
+                    for endpoint in zh.endpoints() {
+                        let Some(name) = entity.endpoint_name(&endpoint) else {
+                            continue;
+                        };
+                        if config.object_id.ends_with(&format!("_{name}"))
+                            || (config.object_id == name)
+                        {
+                            let member_key = format!(
+                                "{}_{}_{}",
+                                entity.entity_id().key(),
+                                endpoint.ID,
+                                config.r#type
+                            );
+                            self.group_member_lookup
+                                .lock()
+                                .unwrap()
+                                .insert(member_key, unique_id.clone());
+                        }
+                    }
+                }
+            } else if entity.is_group() {
+                let mut member_ids = Vec::new();
+                for member in entity.zh_group().map(|group| group.members()).unwrap_or_default() {
+                    let key = format!(
+                        "{}_{}_{}",
+                        member.device_ieee_address.lock().unwrap(),
+                        member.ID,
+                        config.r#type
+                    );
+                    if let Some(unique) = self.group_member_lookup.lock().unwrap().get(&key) {
+                        member_ids.push(Value::String(unique.clone()));
+                    }
+                }
+                if !member_ids.is_empty() {
+                    payload.insert("group".into(), Value::Array(member_ids));
+                }
+            }
 
             if payload.get("availability").is_none()
                 || payload.get("availability").and_then(Value::as_bool) != Some(false)

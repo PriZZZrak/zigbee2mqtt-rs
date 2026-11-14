@@ -35,9 +35,9 @@ Coverage classes:
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
-| groups.test.ts | 40 | 7 | 2 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
+| groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 46 | 16 | 51 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 48 | 15 | 50 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -356,7 +356,7 @@ Coverage classes:
 | 37 | Error when adding a non-existing endpoint | `code` | unknown endpoint response |
 | 38 | Error when invalid payload | `asserted` | invalid payload response |
 | 39 | Error when add/remove with invalid payload | `slice` | invalid payload for add/remove |
-| 40 | Should only include relevant properties when publishing member states | `slice` | member state filtering |
+| 40 | Should only include relevant properties when publishing member states | `asserted` | member_state_filtering_uses_member_exposes |
 
 ## health.test.ts
 
@@ -470,7 +470,7 @@ Coverage classes:
 | 96 | Should not discover device_automation when disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 97 | Should enable experimental event entities | `asserted` | experimental_event_entities_prepare_wildcard_action_types |
 | 98 | Should republish payload to postfix topic with lightWithPostfix config | `asserted` | endpoint_state_publish_is_split_per_endpoint_topic |
-| 99 | Should not republish a light_type select as an endpoint light state | `slice` | endpoint attribute republish skips light_type selects |
+| 99 | Should not republish a light_type select as an endpoint light state | `asserted` | light_type_select_is_not_republished_as_endpoint_state |
 | 100 | Shouldnt crash in onPublishEntityState on group publish | `code` | on_publish_entity_state returns early for groups |
 | 101 | Should clear outdated configs | `asserted` | clears_outdated_discovery_config_from_retained_messages |
 | 102 | Should rediscover group when device is added to it | `code` | discovery mapping ported, no dedicated per-device assertion |
@@ -479,7 +479,7 @@ Coverage classes:
 | 105 | Should discover last_seen when enabled | `asserted` | discovers_last_seen_when_continuous_format_is_enabled |
 | 106 | Should discover devices with configuration url (zigbee2mqtt-windfront) | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 107 | Should discover devices with configuration url (zigbee2mqtt-frontend) | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 108 | Should rediscover scenes when a scene is changed | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 108 | Should rediscover scenes when a scene is changed | `asserted` | scenes_are_discovered_and_rediscovered_on_change |
 | 109 | Should not clear bridge entities unnecessarily | `code` | bridge entities are published once (dedupe) |
 | 110 | Should discover bridge entities | `asserted` | bridge discovery assertions in discovers_numeric_binary_enum_and_switch_entities |
 | 111 | Should remove discovery entries for removed exposes when device options change | `code` | removed exposes clear their topics |
