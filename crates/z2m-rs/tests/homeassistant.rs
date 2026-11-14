@@ -121,6 +121,20 @@ fn harness() -> Harness {
         Expose::enumeration("mode", access::SET | access::STATE, &["auto", "manual"]),
         Expose::binary("contact", access::STATE),
         Expose::binary("power", access::SET | access::STATE),
+        Expose {
+            homeassistant: json!({
+                "type": "sensor",
+                "entityCategory": "diagnostic",
+                "deviceClass": "voltage",
+                "enabledByDefault": false,
+                "icon": "mdi:flash",
+            }),
+            ..Expose::numeric("voltage", access::STATE)
+        },
+        Expose {
+            homeassistant: json!({"name": null}),
+            ..Expose::binary("tamper", access::STATE)
+        },
         Expose::enumeration(
             "action",
             access::STATE,
@@ -521,4 +535,96 @@ fn adjust_message_copies_hue_and_saturation() {
     ha.adjust_message_before_publish(device.as_ref(), &mut message);
     assert_eq!(message["color"]["h"], 100);
     assert_eq!(message["color"]["s"], 50);
+}
+
+#[tokio::test]
+async fn applies_expose_metadata_and_null_name() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    // Upstream `Should apply expose-level Home Assistant discovery metadata`.
+    let voltage = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/voltage/config"),
+    )
+    .await
+    .expect("voltage config");
+    assert_eq!(voltage["device_class"], "voltage");
+    assert_eq!(voltage["enabled_by_default"], false);
+    assert_eq!(voltage["entity_category"], "diagnostic");
+    assert_eq!(voltage["icon"], "mdi:flash");
+    assert!(voltage.get("type").is_none());
+
+    // Upstream `Should set discovery name to null when expose specifies
+    // homeassistant name null`.
+    let tamper = config(
+        &harness,
+        &format!("homeassistant/binary_sensor/{IEEE}/tamper/config"),
+    )
+    .await
+    .expect("tamper config");
+    assert!(tamper.as_object().unwrap().contains_key("name"));
+    assert!(tamper["name"].is_null());
+}
+
+#[tokio::test]
+async fn applies_device_option_overrides_and_null_filtering() {
+    let _guard = serial();
+    let harness = harness();
+    {
+        let mut settings = harness.context.settings.lock().unwrap();
+        settings.set(
+            &["devices", IEEE, "homeassistant"],
+            json!({
+                "temperature": null,
+                "voltage": {"object_id": "custom_voltage", "type": "sensor"},
+            }),
+        );
+    }
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    // A null per-object override removes that entity entirely.
+    assert!(config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config")
+    )
+    .await
+    .is_none());
+
+    // object_id override changes the discovery topic.
+    let custom = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/custom_voltage/config"),
+    )
+    .await
+    .expect("overridden object id");
+    // Upstream prefixes the payload object_id with the device name
+    // (`homeassistant.ts:1836-1841`); the topic uses the overridden id.
+    assert_eq!(custom["object_id"], "lamp_custom_voltage");
+}
+
+#[tokio::test]
+async fn device_option_homeassistant_false_disables_discovery() {
+    let _guard = serial();
+    let harness = harness();
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["devices", IEEE, "homeassistant"], json!(false));
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        !mqtt
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic.starts_with(&format!("homeassistant/sensor/{IEEE}/"))),
+        "discovery ran despite homeassistant: false"
+    );
 }

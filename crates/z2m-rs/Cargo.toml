@@ -22,4 +22,4 @@ rustls-rustcrypto = "0.1.0-pre.0"
 rustls-pemfile = "2"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "test-util"] }

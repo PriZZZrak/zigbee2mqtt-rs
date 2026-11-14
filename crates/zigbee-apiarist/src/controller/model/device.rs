@@ -564,6 +564,11 @@ impl Device {
         *self.last_seen.lock().unwrap() = Some(crate::utils::datetime::now_ms());
     }
 
+    /// Upstream `device.lastSeen = value` (public mutable field).
+    pub fn set_last_seen(&self, value: Option<u64>) {
+        *self.last_seen.lock().unwrap() = value;
+    }
+
     fn reset_pending_request_timeout(&self) {
         let interval = self.checkin_interval().unwrap_or(0);
         *self.pending_request_timeout.lock().unwrap() = interval * 1000;

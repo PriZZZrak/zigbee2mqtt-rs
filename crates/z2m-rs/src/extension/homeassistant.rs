@@ -1286,12 +1286,13 @@ impl HomeAssistant {
                     entry.payload.insert("entity_category".into(), json!(category));
                 }
             }
+            // Upstream `applyHomeAssistantExposeMetadata` (`homeassistant.ts:404-440`).
             if let Value::Object(ha) = &expose.homeassistant {
-                let apply = |target: &mut Map<String, Value>, ignore_name: bool| {
+                for entry in new_entries.iter_mut() {
                     if let Some(kind) = ha.get("type").and_then(Value::as_str) {
-                        target.insert("__type".into(), json!(kind));
+                        entry.r#type = kind.to_string();
                     }
-                    let mapping = [
+                    for (source, destination) in [
                         ("schema", "schema"),
                         ("entityCategory", "entity_category"),
                         ("deviceClass", "device_class"),
@@ -1299,34 +1300,18 @@ impl HomeAssistant {
                         ("icon", "icon"),
                         ("name", "name"),
                         ("valueTemplate", "value_template"),
-                    ];
-                    for (source, destination) in mapping {
-                        if ignore_name && destination == "name" { continue; }
+                    ] {
                         match ha.get(source) {
-                            Some(Value::Null) => { target.remove(destination); }
-                            Some(value) => { target.insert(destination.to_string(), value.clone()); }
+                            // `valueTemplate: null` deletes; `name: null` is kept as an
+                            // explicit null so Home Assistant falls back to the device name.
+                            Some(Value::Null) if destination == "value_template" => {
+                                entry.payload.remove(destination);
+                            }
+                            Some(value) => {
+                                entry.payload.insert(destination.to_string(), value.clone());
+                            }
                             None => {}
                         }
-                    }
-                };
-                for entry in new_entries.iter_mut() {
-                    apply(&mut entry.payload, true);
-                    if let Some(overrides) = ha.get(&entry.object_id).and_then(Value::as_object) {
-                        for (key, value) in overrides {
-                            if key == "type" || key == "object_id" { continue; }
-                            match value {
-                                Value::Null => { entry.payload.remove(key); }
-                                Value::Object(device) if key == "device" => {
-                                    if let Some(target) = entry.payload.get_mut("device").and_then(Value::as_object_mut) {
-                                        for (device_key, device_value) in device { target.insert(device_key.clone(), device_value.clone()); }
-                                    }
-                                }
-                                _ => { entry.payload.insert(key.clone(), value.clone()); }
-                            }
-                        }
-                    }
-                    if let Some(kind) = entry.payload.remove("__type") {
-                        if let Some(kind) = kind.as_str() { entry.r#type = kind.to_string(); }
                     }
                 }
             }
@@ -1494,8 +1479,13 @@ impl HomeAssistant {
                 || entity
                     .options()
                     .get("homeassistant")
-                    .map(|value| !value.as_bool().unwrap_or(false))
-                    .unwrap_or(false))
+                    .is_some_and(|value| match value {
+                        Value::Bool(value) => !*value,
+                        Value::Null => true,
+                        Value::Number(value) => value.as_f64() == Some(0.0),
+                        Value::String(value) => value.is_empty(),
+                        _ => false,
+                    }))
         {
             return;
         }
@@ -1733,6 +1723,46 @@ impl HomeAssistant {
                             );
                         }
                     }
+                }
+            }
+
+            // Upstream user-configuration override (`homeassistant.ts:2014-2050`):
+            // applied after converter compatibility mappings so per-device
+            // configuration stays the final authority.
+            if let Value::Object(options) = &ha_options {
+                let add = |target: &mut Map<String, Value>, source: &Map<String, Value>, ignore_name: bool| {
+                    for (key, value) in source {
+                        if key == "type" || key == "object_id" {
+                            continue;
+                        }
+                        if ignore_name && key == "name" {
+                            continue;
+                        }
+                        match value {
+                            Value::Null => {
+                                target.remove(key);
+                            }
+                            Value::Object(device) if key == "device" => {
+                                if let Some(target_device) =
+                                    target.get_mut("device").and_then(Value::as_object_mut)
+                                {
+                                    for (device_key, device_value) in device {
+                                        target_device
+                                            .insert(device_key.clone(), device_value.clone());
+                                    }
+                                }
+                            }
+                            other => {
+                                target.insert(key.clone(), other.clone());
+                            }
+                        }
+                    }
+                };
+                add(&mut payload, options, true);
+                if let Some(Value::Object(per_object)) =
+                    options.get(&config.object_id)
+                {
+                    add(&mut payload, per_object, false);
                 }
             }
 
@@ -2857,4 +2887,65 @@ fn prepare_action_event_types(values: &[String]) -> Vec<String> {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod action_value_tests {
+    use super::parse_action_value;
+    use serde_json::json;
+
+    /// Upstream `it.each` table (`homeassistant.test.ts:807-816`), verbatim.
+    #[test]
+    fn parses_action_names_like_upstream() {
+        let cases = [
+            ("recall_1", json!({"action": "recall", "scene": "1"})),
+            ("recall_*", json!({"action": "recall", "scene": "wildcard"})),
+            ("on", json!({"action": "on"})),
+            ("on_1", json!({"action": "on_1"})),
+            ("release_left", json!({"action": "release_left"})),
+            ("region_1_enter", json!({"action": "region_enter", "region": "1"})),
+            ("region_*_leave", json!({"action": "region_leave", "region": "wildcard"})),
+            ("left_press", json!({"action": "press", "button": "left"})),
+            ("left_press_release", json!({"action": "press_release", "button": "left"})),
+            ("1_single", json!({"action": "single", "button": "1"})),
+            ("2_single", json!({"action": "single", "button": "2"})),
+            ("1_double", json!({"action": "double", "button": "1"})),
+            ("1_hold", json!({"action": "hold", "button": "1"})),
+            ("right_hold", json!({"action": "hold", "button": "right"})),
+            ("right_hold_release", json!({"action": "hold_release", "button": "right"})),
+            (
+                "button_4_hold_release",
+                json!({"action": "hold_release", "button": "button_4"}),
+            ),
+            ("scene_1", json!({"action": "scene", "scene": "1"})),
+            ("scene_10", json!({"action": "scene", "scene": "10"})),
+            ("scene_4", json!({"action": "scene", "scene": "4"})),
+            (
+                "dial_rotate_left_step",
+                json!({"action": "dial_rotate", "direction": "left", "speed": "step"}),
+            ),
+            (
+                "dial_rotate_right_fast",
+                json!({"action": "dial_rotate", "direction": "right", "speed": "fast"}),
+            ),
+            ("brightness_step_up", json!({"action": "brightness_step", "direction": "up"})),
+            ("brightness_stop", json!({"action": "brightness_stop"})),
+            (
+                "color_temperature_step_up",
+                json!({"action": "color_temperature_step", "direction": "up"}),
+            ),
+            (
+                "color_saturation_step_up",
+                json!({"action": "color_saturation_step", "direction": "up"}),
+            ),
+            (
+                "color_hue_step_up",
+                json!({"action": "color_hue_step", "direction": "up"}),
+            ),
+        ];
+
+        for (action, expected) in cases {
+            assert_eq!(parse_action_value(action), expected, "action {action}");
+        }
+    }
 }

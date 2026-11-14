@@ -240,3 +240,118 @@ async fn rename_publishes_empty_retained_availability() {
 
     availability.stop().await.unwrap();
 }
+
+#[tokio::test(start_paused = true)]
+async fn passive_device_publishes_offline_after_timeout_and_online_on_last_seen() {
+    let _guard = serial();
+    let harness = harness(true, json!({"timeout": 1}));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    tokio::task::yield_now().await;
+
+    let device = harness.zigbee.resolve_device(IEEE).unwrap();
+    device.zh.update_last_seen();
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_last_seen_changed(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "reason": "messageEmitted",
+        }));
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    device.zh.update_last_seen();
+
+    {
+        let mqtt = harness.mqtt.lock().await;
+        let last = mqtt
+            .attempted
+            .iter()
+            .filter(|(topic, _, _)| topic == "zigbee2mqtt/lamp/availability")
+            .last()
+            .expect("availability published");
+        assert_eq!(last.1, r#"{"state":"online"}"#);
+    }
+    harness.mqtt.lock().await.attempted.clear();
+
+    // Make the device stale on the wall clock; the clock below is paused, so
+    // only the timer's own scheduled deadline can fire.
+    device.zh.set_last_seen(Some(
+        zigbee_apiarist::utils::datetime::now_ms() - 2 * 60 * 1000,
+    ));
+
+    // Passive timeout is 1 minute plus the upstream 1s grace.
+    tokio::time::advance(Duration::from_secs(63)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+
+    let mqtt = harness.mqtt.lock().await;
+    let last = mqtt
+        .attempted
+        .iter()
+        .filter(|(topic, _, _)| topic == "zigbee2mqtt/lamp/availability")
+        .last()
+        .expect("offline republished after timeout");
+    assert_eq!(last.1, r#"{"state":"offline"}"#);
+    assert!(last.2.retain);
+    assert_eq!(last.2.qos, 1);
+    drop(mqtt);
+
+    availability.stop().await.unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn device_timeout_option_controls_the_timer() {
+    let _guard = serial();
+    let harness = harness(true, json!({"timeout": 5}));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    tokio::task::yield_now().await;
+
+    let device = harness.zigbee.resolve_device(IEEE).unwrap();
+    device.zh.update_last_seen();
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_last_seen_changed(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "reason": "messageEmitted",
+        }));
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    device.zh.update_last_seen();
+    harness.mqtt.lock().await.attempted.clear();
+
+    // The 5 minute device option wins over the 25h passive default: nothing is
+    // published within the first 2 minutes.
+    tokio::time::advance(Duration::from_secs(2 * 60)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        harness.mqtt.lock().await.attempted.is_empty(),
+        "published before the configured timeout"
+    );
+
+    device.zh.set_last_seen(Some(
+        zigbee_apiarist::utils::datetime::now_ms() - 6 * 60 * 1000,
+    ));
+    tokio::time::advance(Duration::from_secs(4 * 60)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    let mqtt = harness.mqtt.lock().await;
+    assert!(mqtt
+        .attempted
+        .iter()
+        .any(|(topic, payload, _)| topic == "zigbee2mqtt/lamp/availability"
+            && payload == r#"{"state":"offline"}"#));
+    drop(mqtt);
+
+    availability.stop().await.unwrap();
+}
