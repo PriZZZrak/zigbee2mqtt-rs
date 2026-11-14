@@ -135,7 +135,7 @@ impl HomeAssistant {
     }
 
     fn get_configs(&self, entity: &Arc<dyn Entity>) -> Vec<Entry> {
-        let exposes: Vec<Expose> = if entity.is_device() {
+        let all_exposes: Vec<Expose> = if entity.is_device() {
             entity
                 .zh_device()
                 .and_then(|zh| self.context.zigbee.resolve_device(&zh.ieee_addr()))
@@ -154,9 +154,52 @@ impl HomeAssistant {
                 })
                 .collect()
         };
+        let exposes: Vec<Expose> = if entity.is_device() {
+            all_exposes.clone()
+        } else {
+            // Group exposes are merged by type so light features from all
+            // members drive a single discovery entry (`homeassistant.ts:1650-1685`).
+            let mut grouped: Vec<Expose> = Vec::new();
+            for expose in all_exposes
+                .iter()
+                .filter(|expose| ["light", "switch", "lock", "cover"].contains(&expose.r#type.as_str()))
+            {
+                let mut key = expose.r#type.clone();
+                if ["switch", "lock", "cover"].contains(&expose.r#type.as_str())
+                    && expose.endpoint.is_some()
+                {
+                    if let Some(state) = expose
+                        .features
+                        .iter()
+                        .find(|feature| feature.name.as_deref() == Some("state"))
+                    {
+                        key.push_str(state.property.as_deref().unwrap_or(""));
+                    }
+                }
+                if let Some(existing) = grouped.iter_mut().find(|existing| {
+                    existing.r#type == expose.r#type
+                        && (existing.features.first().and_then(|f| f.property.clone())
+                            == expose.features.first().and_then(|f| f.property.clone()))
+                }) {
+                    for feature in &expose.features {
+                        if existing
+                            .features
+                            .iter()
+                            .any(|f| f.name == feature.name)
+                        {
+                            continue;
+                        }
+                        existing.features.push(feature.clone());
+                    }
+                } else {
+                    let _ = key;
+                    grouped.push(expose.clone());
+                }
+            }
+            grouped
+        };
 
         let mut entries = Vec::new();
-        let all_exposes = exposes.clone();
         for expose in &exposes {
             let start = entries.len();
             match expose.r#type.as_str() {
