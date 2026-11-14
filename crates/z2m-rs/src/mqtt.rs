@@ -4,6 +4,7 @@
 // keeps the upstream publish/retain/subscribe contract used by the bridge.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
@@ -56,6 +57,8 @@ pub struct Mqtt {
     pub server: String,
     pub connected: bool,
     pub published_topics: Arc<Mutex<std::collections::HashSet<String>>>,
+    /// Publishes currently enqueued in `rumqttc` (upstream `client.queue.length`).
+    queued: Arc<AtomicUsize>,
     pub retained_messages: BTreeMap<String, RetainedMessage>,
     /// Upstream tests spy on `mqtt.publish`; this keeps the same observable
     /// call log when no broker is connected.
@@ -72,6 +75,7 @@ impl Mqtt {
             server: "mqtt://localhost:1883".to_string(),
             connected: false,
             published_topics: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            queued: Arc::new(AtomicUsize::new(0)),
             retained_messages: BTreeMap::new(),
             attempted: Vec::new(),
             client: None,
@@ -219,6 +223,8 @@ impl Mqtt {
             .clone()
             .unwrap_or_else(|| self.base_topic.clone());
         let topic = format!("{}/{}", base_topic, topic);
+        self.queued.fetch_add(1, Ordering::SeqCst);
+        let _pending = PendingPublish(self.queued.clone());
         self.attempted.push((
             topic.clone(),
             String::from_utf8_lossy(&payload).to_string(),
@@ -294,7 +300,7 @@ impl Mqtt {
     pub fn stats(&self) -> Value {
         json!({
             "connected": self.is_connected(),
-            "queued": 0,
+            "queued": self.queued.load(Ordering::SeqCst),
         })
     }
 
@@ -319,4 +325,12 @@ fn parse_server(server: &str) -> Result<(String, u16), String> {
         .parse::<u16>()
         .map_err(|_| format!("Invalid MQTT port in '{server}'"))?;
     Ok((host.to_string(), port))
+}
+
+struct PendingPublish(Arc<AtomicUsize>);
+
+impl Drop for PendingPublish {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }

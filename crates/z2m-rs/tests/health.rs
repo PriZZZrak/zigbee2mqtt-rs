@@ -102,6 +102,7 @@ async fn publishes_bridge_health_payload() {
     assert!(payload["process"]["uptime_sec"].is_number());
     assert_eq!(payload["mqtt"]["published"], 5);
     assert_eq!(payload["mqtt"]["received"], 2);
+    assert!(payload["mqtt"]["queued"].is_number());
     assert_eq!(payload["devices"]["0x0017880104e45519"]["messages"], 10);
     assert_eq!(payload["devices"]["0x0017880104e45519"]["leave_count"], 1);
     assert_eq!(
