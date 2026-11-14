@@ -18,6 +18,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_rustls::TlsAcceptor;
 use tokio_tungstenite::{accept_hdr_async, WebSocketStream};
 
 use crate::extension::extension::{Extension, ExtensionContext, ExtensionFuture};
@@ -268,14 +269,10 @@ impl Extension for Frontend {
             if !settings["frontend"]["enabled"].as_bool().unwrap_or(false) {
                 return Err("Frontend extension created with setting 'enabled: false'".to_string());
             }
-            if settings["frontend"]["ssl_key"].as_str().is_some()
-                || settings["frontend"]["ssl_cert"].as_str().is_some()
-            {
-                return Err(
-                    "Frontend TLS is not available: a pure-Rust build cannot use a C crypto provider (AGENTS §6)"
-                        .to_string(),
-                );
-            }
+            let tls_acceptor = match build_tls_acceptor(&settings, &self.context.logger) {
+                Ok(acceptor) => acceptor,
+                Err(error) => return Err(error),
+            };
             if settings["frontend"]["disable_ui_serving"]
                 .as_bool()
                 .unwrap_or(false)
@@ -324,8 +321,23 @@ impl Extension for Frontend {
                                     let this = this.clone();
                                     let api_path = api_path.clone();
                                     let auth_token = auth_token.clone();
+                                    let tls = tls_acceptor.clone();
+                                    let logger = this.context.logger.clone();
                                     tokio::spawn(async move {
-                                        let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                        match tls {
+                                            Some(acceptor) => match acceptor.accept(stream).await {
+                                                Ok(tls_stream) => {
+                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token).await;
+                                                }
+                                                Err(error) => logger.lock().unwrap().error(
+                                                    &format!("TLS handshake failed: {error}"),
+                                                    "z2m",
+                                                ),
+                                            },
+                                            None => {
+                                                let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                            }
+                                        }
                                     });
                                 }
                             }
@@ -361,8 +373,23 @@ impl Extension for Frontend {
                                     let this = this.clone();
                                     let api_path = api_path.clone();
                                     let auth_token = auth_token.clone();
+                                    let tls = tls_acceptor.clone();
+                                    let logger = this.context.logger.clone();
                                     tokio::spawn(async move {
-                                        let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                        match tls {
+                                            Some(acceptor) => match acceptor.accept(stream).await {
+                                                Ok(tls_stream) => {
+                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token).await;
+                                                }
+                                                Err(error) => logger.lock().unwrap().error(
+                                                    &format!("TLS handshake failed: {error}"),
+                                                    "z2m",
+                                                ),
+                                            },
+                                            None => {
+                                                let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                            }
+                                        }
                                     });
                                 }
                             }
@@ -400,8 +427,23 @@ impl Extension for Frontend {
                                     let this = this.clone();
                                     let api_path = api_path.clone();
                                     let auth_token = auth_token.clone();
+                                    let tls = tls_acceptor.clone();
+                                    let logger = this.context.logger.clone();
                                     tokio::spawn(async move {
-                                        let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                        match tls {
+                                            Some(acceptor) => match acceptor.accept(stream).await {
+                                                Ok(tls_stream) => {
+                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token).await;
+                                                }
+                                                Err(error) => logger.lock().unwrap().error(
+                                                    &format!("TLS handshake failed: {error}"),
+                                                    "z2m",
+                                                ),
+                                            },
+                                            None => {
+                                                let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                            }
+                                        }
                                     });
                                 }
                             }
@@ -447,4 +489,57 @@ impl Extension for Frontend {
             Ok(())
         })
     }
+}
+
+/// Upstream `hasSSL` + `createSecureServer` (`frontend.ts:56-108`).
+fn build_tls_acceptor(
+    settings: &Value,
+    logger: &Arc<Mutex<crate::util::logger::Logger>>,
+) -> Result<Option<TlsAcceptor>, String> {
+    use std::io::BufReader;
+
+    let key = settings["frontend"]["ssl_key"].as_str().filter(|value| !value.is_empty());
+    let cert = settings["frontend"]["ssl_cert"].as_str().filter(|value| !value.is_empty());
+
+    let has = |value: Option<&str>, name: &str| -> bool {
+        let Some(path) = value else {
+            return false;
+        };
+        if std::path::Path::new(path).exists() {
+            return true;
+        }
+        logger.lock().unwrap().error(
+            &format!("Defined {name} '{path}' file path does not exists, server won't be secured."),
+            "z2m",
+        );
+        false
+    };
+
+    let (key, cert) = (has(key, "ssl_key"), has(cert, "ssl_cert"));
+    if !key || !cert {
+        return Ok(None);
+    }
+    let key = settings["frontend"]["ssl_key"].as_str().unwrap();
+    let cert = settings["frontend"]["ssl_cert"].as_str().unwrap();
+
+    let certs = rustls_pemfile::certs(&mut BufReader::new(
+        std::fs::File::open(cert).map_err(|error| error.to_string())?,
+    ))
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(|error| error.to_string())?;
+    let private_key = rustls_pemfile::private_key(&mut BufReader::new(
+        std::fs::File::open(key).map_err(|error| error.to_string())?,
+    ))
+    .map_err(|error| error.to_string())?
+    .ok_or_else(|| "No private key found in ssl_key".to_string())?;
+
+    let provider = Arc::new(rustls_rustcrypto::provider());
+    let config = rustls::ServerConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|error| error.to_string())?
+        .with_no_client_auth()
+        .with_single_cert(certs, private_key)
+        .map_err(|error| error.to_string())?;
+
+    Ok(Some(TlsAcceptor::from(Arc::new(config))))
 }

@@ -1166,7 +1166,12 @@ impl Bridge {
             .zigbee
             .devices_iterator(|device| device.custom_clusters().len() > 0)
         {
-            custom_clusters.insert(device.ieee_addr(), json!({}));
+            custom_clusters.insert(
+                device.ieee_addr(),
+                zigbee_apiarist::zspec::zcl::utils::custom_clusters_json(
+                    &device.zh.custom_clusters(),
+                ),
+            );
         }
 
         let payload = json!({

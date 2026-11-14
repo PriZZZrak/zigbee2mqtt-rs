@@ -17,6 +17,9 @@ Last verified against crates.io: **2026-11-09**.
 | `regex` | `1` | 1.13.1 | 1.13.1 | current; imported only by `z2m_rs::util::settings_schema` (Ajv wrapper) and `z2m_rs::util::utils` (`filterProperties`) |
 | `tokio-tungstenite` | `0.30` | 0.30.0 | 0.30.0 | handshake only; `z2m_rs::extension::frontend` |
 | `futures-util` | `0.3` | 0.3.x | current | sink/stream helpers in `frontend` |
+| `rustls` / `tokio-rustls` | `0.23` / `0.26` | 0.23.46 / 0.26.6 | current | frontend TLS; default features off (no aws-lc/ring) |
+| `rustls-rustcrypto` | `0.1.0-pre.0` | 0.1.0-pre.0 | pre-release | pure-Rust RustCrypto CryptoProvider used by frontend TLS |
+| `rustls-pemfile` | `2` | 2.2.0 | current | certificate/key parsing for frontend TLS |
 | `socket2` | `0.6` | 0.6.5 | 0.6.5 | current |
 | `serial2-tokio` | `0.1` | 0.1.26 | 0.1.26 | current |
 

@@ -266,3 +266,87 @@ async fn unix_socket_frontend_serves_websocket() {
     frontend.stop().await.unwrap();
     let _ = std::fs::remove_file(socket_path);
 }
+
+#[derive(Debug)]
+struct NoVerify;
+
+impl rustls::client::danger::ServerCertVerifier for NoVerify {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        rustls_rustcrypto::provider()
+            .signature_verification_algorithms
+            .supported_schemes()
+    }
+}
+
+#[tokio::test]
+async fn tls_frontend_serves_websocket() {
+    let harness = harness_with_host(None, "127.0.0.1");
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    {
+        let mut settings = harness.context.settings.lock().unwrap();
+        settings.set(
+            &["frontend", "ssl_key"],
+            json!(fixtures.join("tls.key").display().to_string()),
+        );
+        settings.set(
+            &["frontend", "ssl_cert"],
+            json!(fixtures.join("tls.crt").display().to_string()),
+        );
+    }
+    let frontend = Frontend::new(harness.context.clone());
+    frontend.clone().start().await.unwrap();
+    let addr = frontend.bound_addr().unwrap();
+
+    let provider = Arc::new(rustls_rustcrypto::provider());
+    let config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(NoVerify))
+        .with_no_client_auth();
+    let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
+    let stream = TcpStream::connect(addr).await.unwrap();
+    let server_name = rustls::pki_types::ServerName::try_from("localhost").unwrap();
+    let tls = connector.connect(server_name, stream).await.unwrap();
+    let (mut socket, _) = tokio_tungstenite::client_async("wss://localhost/api", tls)
+        .await
+        .unwrap();
+    socket
+        .send(Message::Text(
+            json!({"topic": "lamp/set", "payload": {"state": "ON"}})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+    frontend.stop().await.unwrap();
+}

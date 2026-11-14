@@ -11,6 +11,8 @@ use zigbee_apiarist::controller::model::device::{Device as ZhDevice, InterviewSt
 use zigbee_apiarist::controller::model::entity::inject_database;
 use zigbee_apiarist::controller::model::group::Group as ZhGroup;
 use zigbee_apiarist::controller::model::test_support::serial;
+use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
+use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
 use zigbee_apiarist::models::network_options::NetworkOptions;
 
 use z2m_rs::event_bus::EventBus;
@@ -182,6 +184,7 @@ async fn response(harness: &Harness, request: &str) -> Value {
 async fn start_publishes_bridge_topics() {
     let _guard = serial();
     let harness = harness();
+
     let bridge = Bridge::new(harness.context.clone());
     bridge.clone().start().await.unwrap();
 
@@ -310,6 +313,42 @@ async fn group_add_and_rename_device() {
         .any(|(topic, payload, options)| topic == "zigbee2mqtt/lamp"
             && payload.is_empty()
             && options.retain));
+}
+
+#[tokio::test]
+async fn definitions_include_custom_clusters() {
+    let _guard = serial();
+    let harness = harness();
+    let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+    let mut cluster = Cluster::new("manuSpecificTest", 0xfc00);
+    cluster
+        .attributes
+        .insert("mode".to_string(), Attribute::new("mode", 0x0000, DataType::UINT8));
+    device
+        .zh
+        .add_custom_cluster("manuSpecificTest", cluster)
+        .unwrap();
+
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    let mqtt = harness.mqtt.lock().await;
+    let payload: Value = serde_json::from_str(
+        &mqtt
+            .attempted
+            .iter()
+            .find(|(topic, _, _)| topic == "zigbee2mqtt/bridge/definitions")
+            .unwrap()
+            .1,
+    )
+    .unwrap();
+    let cluster = &payload["custom_clusters"][IEEE]["manuSpecificTest"];
+    assert_eq!(cluster["name"], "manuSpecificTest", "payload={}", payload["custom_clusters"]);
+    assert_eq!(cluster["ID"], 0xfc00);
+    assert_eq!(cluster["attributes"]["mode"]["name"], "mode");
+    assert_eq!(cluster["attributes"]["mode"]["ID"], 0);
+    assert_eq!(cluster["attributes"]["mode"]["type"], 32);
+    assert_eq!(cluster["attributes"]["mode"]["read"], true);
 }
 
 #[tokio::test]

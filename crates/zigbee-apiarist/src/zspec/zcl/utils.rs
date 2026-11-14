@@ -1344,3 +1344,96 @@ pub fn clusters_json() -> serde_json::Value {
     serde_json::from_str(include_str!("definition/clusters.json"))
         .expect("generated ZCL cluster catalog must be valid JSON")
 }
+
+fn data_type_id(data_type: DataType) -> u8 {
+    (0u8..=255)
+        .find(|value| DataType::from_u8(*value) == Some(data_type))
+        .unwrap_or(0)
+}
+
+fn attribute_json(attribute: &Attribute) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    map.insert("name".to_string(), serde_json::json!(attribute.name));
+    map.insert("ID".to_string(), serde_json::json!(attribute.ID));
+    map.insert(
+        "type".to_string(),
+        serde_json::json!(data_type_id(attribute.r#type)),
+    );
+    map.insert("write".to_string(), serde_json::json!(attribute.write));
+    map.insert("read".to_string(), serde_json::json!(attribute.read));
+    map.insert("required".to_string(), serde_json::json!(attribute.required));
+    if let Some(default) = &attribute.default {
+        map.insert("default".to_string(), default.to_json());
+    }
+    if let Some(value) = attribute.min {
+        map.insert("min".to_string(), serde_json::json!(value));
+    }
+    if let Some(value) = attribute.max {
+        map.insert("max".to_string(), serde_json::json!(value));
+    }
+    if let Some(value) = attribute.manufacturerCode {
+        map.insert("manufacturerCode".to_string(), serde_json::json!(value));
+    }
+    serde_json::Value::Object(map)
+}
+
+fn command_json(command: &Command) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    map.insert("name".to_string(), serde_json::json!(command.name));
+    map.insert("ID".to_string(), serde_json::json!(command.ID));
+    map.insert("required".to_string(), serde_json::json!(command.required));
+    if let Some(response) = command.response {
+        map.insert("response".to_string(), serde_json::json!(response));
+    }
+    let parameters: Vec<serde_json::Value> = command
+        .parameters
+        .iter()
+        .map(|parameter| {
+            serde_json::json!({
+                "name": parameter.name,
+                "type": data_type_id(parameter.r#type),
+            })
+        })
+        .collect();
+    map.insert(
+        "parameters".to_string(),
+        serde_json::Value::Array(parameters),
+    );
+    serde_json::Value::Object(map)
+}
+
+/// Upstream `device.customClusters` serialization for `bridge/definitions`.
+pub fn custom_clusters_json(clusters: &CustomClusters) -> serde_json::Value {
+    let mut result = serde_json::Map::new();
+    for cluster in clusters.clusters() {
+        let mut attributes = serde_json::Map::new();
+        for (name, attribute) in &cluster.attributes {
+            attributes.insert(name.clone(), attribute_json(attribute));
+        }
+        let mut commands = serde_json::Map::new();
+        for (name, command) in &cluster.commands {
+            commands.insert(name.clone(), command_json(command));
+        }
+        let mut commands_response = serde_json::Map::new();
+        for (name, command) in &cluster.commandsResponse {
+            commands_response.insert(name.clone(), command_json(command));
+        }
+        let mut entry = serde_json::Map::new();
+        entry.insert("name".to_string(), serde_json::json!(cluster.name));
+        entry.insert("ID".to_string(), serde_json::json!(cluster.ID));
+        if let Some(code) = cluster.manufacturerCode {
+            entry.insert("manufacturerCode".to_string(), serde_json::json!(code));
+        }
+        entry.insert(
+            "attributes".to_string(),
+            serde_json::Value::Object(attributes),
+        );
+        entry.insert("commands".to_string(), serde_json::Value::Object(commands));
+        entry.insert(
+            "commandsResponse".to_string(),
+            serde_json::Value::Object(commands_response),
+        );
+        result.insert(cluster.name.clone(), serde_json::Value::Object(entry));
+    }
+    serde_json::Value::Object(result)
+}
