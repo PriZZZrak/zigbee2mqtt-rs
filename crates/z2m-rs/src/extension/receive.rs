@@ -30,6 +30,7 @@ struct DebounceState {
 
 /// Upstream `Receive` (`lib/extension/receive.ts:14`).
 pub struct Receive {
+    context: crate::extension::extension::ExtensionContext,
     event_bus: Arc<Mutex<EventBus>>,
     zigbee: Arc<Zigbee>,
     settings: Arc<Mutex<Settings>>,
@@ -43,21 +44,15 @@ pub struct Receive {
 
 impl Receive {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        event_bus: Arc<Mutex<EventBus>>,
-        zigbee: Arc<Zigbee>,
-        settings: Arc<Mutex<Settings>>,
-        logger: Arc<Mutex<Logger>>,
-        state: Arc<Mutex<State>>,
-        publish_entity_state: PublishEntityState,
-    ) -> Arc<Self> {
+    pub fn new(context: crate::extension::extension::ExtensionContext) -> Arc<Self> {
         Arc::new(Self {
-            event_bus,
-            zigbee,
-            settings,
-            logger,
-            state,
-            publish_entity_state,
+            event_bus: context.event_bus.clone(),
+            zigbee: context.zigbee.clone(),
+            settings: context.settings.clone(),
+            logger: context.logger.clone(),
+            state: context.state.clone(),
+            publish_entity_state: context.publish_entity_state.clone(),
+            context,
             elapsed: Mutex::new(HashMap::new()),
             debouncers: Mutex::new(HashMap::new()),
             throttlers: Mutex::new(HashMap::new()),
@@ -539,5 +534,25 @@ fn merge(target: &mut Value, update: Value) {
         for (key, value) in update {
             target.insert(key, value);
         }
+    }
+}
+
+impl crate::extension::extension::Extension for Receive {
+    fn name(&self) -> &'static str {
+        "Receive"
+    }
+
+    fn context(&self) -> &crate::extension::extension::ExtensionContext {
+        &self.context
+    }
+
+    fn start(
+        self: Arc<Self>,
+    ) -> crate::extension::extension::ExtensionFuture {
+        let this = self.clone();
+        Box::pin(async move {
+            this.attach(this.context.key);
+            Ok(())
+        })
     }
 }

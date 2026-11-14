@@ -18,6 +18,7 @@ use zigbee_apiarist::controller::model::test_support::serial;
 use zigbee_apiarist::models::network_options::NetworkOptions;
 
 use z2m_rs::event_bus::EventBus;
+use z2m_rs::extension::extension::ExtensionContext;
 use z2m_rs::extension::receive::Receive;
 use z2m_rs::model::entity::PublishEntityState;
 use z2m_rs::state::State;
@@ -129,14 +130,20 @@ fn harness(configuration: Value) -> Harness {
         })
     });
 
-    let receive = Receive::new(
-        event_bus.clone(),
-        zigbee.clone(),
+    let context = ExtensionContext {
+        zigbee: zigbee.clone(),
+        mqtt: Arc::new(tokio::sync::Mutex::new(z2m_rs::mqtt::Mqtt::new(event_bus.clone()))),
+        state: state.clone(),
+        publish_entity_state: publish.clone(),
+        event_bus: event_bus.clone(),
+        logger: logger.clone(),
         settings,
-        logger.clone(),
-        state.clone(),
-        publish,
-    );
+        enable_disable_extension: Arc::new(|_, _| Box::pin(async { Ok(()) })),
+        restart: Arc::new(|| Box::pin(async {})),
+        add_extension: Arc::new(|_| Box::pin(async {})),
+        key: 1,
+    };
+    let receive = Receive::new(context);
     receive.attach(1);
 
     Harness {

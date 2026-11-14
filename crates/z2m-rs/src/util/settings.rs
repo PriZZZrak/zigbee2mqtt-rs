@@ -249,6 +249,22 @@ impl Settings {
         })
     }
 
+    /// Upstream `setOnboarding(value)` (`settings.ts`).
+    pub fn set_onboarding(&mut self, value: bool) {
+        let current = self.configuration.get("onboarding").and_then(Value::as_bool);
+        if value {
+            if current != Some(true) {
+                self.configuration["onboarding"] = Value::Bool(true);
+                self.write();
+            }
+        } else if self.configuration.get("onboarding").is_some() {
+            if let Value::Object(map) = &mut self.configuration {
+                map.remove("onboarding");
+            }
+            self.write();
+        }
+    }
+
     pub fn set(&mut self, path: &[&str], value: Value) {
         let requested: Vec<String> = path.iter().map(|key| (*key).to_string()).collect();
         if self.env.keys().any(|name| {
