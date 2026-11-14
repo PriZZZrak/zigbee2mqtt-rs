@@ -87,12 +87,18 @@ async fn check_dependency_version() {
 #[test]
 fn to_local_iso_string() {
     let date = 1755644130000i64; // 2025-08-19T23:15:30Z approx
-                                 // Upstream mocks Date.getTimezoneOffset; Rust has no built-in TZ offset,
-                                 // so the implementation must accept an offset parameter or use a crate.
-                                 // Assertions kept as shape checks.
     let s1 = utils::format_date(date, "ISO_8601_local");
     let s2 = utils::format_date(date, "ISO_8601_local");
-    assert!(s1.ends_with("-01:00") || s1.ends_with("+01:00"));
+    assert_eq!(s1, s2);
+    // Upstream `toLocalISOString` keeps milliseconds and the numeric offset:
+    // YYYY-MM-DDTHH:MM:SS.sss+hh:mm (offset comes from the host timezone).
+    let body = s1.strip_suffix('Z').unwrap_or(&s1);
+    let (_, offset) = body.rsplit_once(['+', '-']).expect("offset");
+    assert_eq!(offset.len(), 5, "offset {offset} in {s1}");
+    assert!(body.contains(['.', 'T']));
+    let (time, millis_and_offset) = body.split_once('.').expect("milliseconds");
+    assert_eq!(millis_and_offset.len(), 3 + 1 + 5, "{s1}");
+    assert_eq!(time.len(), "2025-08-19T23:15:30".len(), "{s1}");
 }
 
 #[test]

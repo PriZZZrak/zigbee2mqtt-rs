@@ -120,7 +120,7 @@ impl Controller {
             .unwrap_or("disable");
         if entity.is_device() && last_seen != "disable" {
             if let Some(timestamp) = entity.last_seen() {
-                message["last_seen"] = json!(utils::format_date(timestamp as i64, last_seen));
+                message["last_seen"] = utils::format_last_seen(timestamp as i64, last_seen);
             }
         }
 

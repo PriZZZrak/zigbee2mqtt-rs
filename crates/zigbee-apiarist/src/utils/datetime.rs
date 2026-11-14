@@ -14,6 +14,26 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Local UTC offset in seconds for a timestamp, DST-aware
+/// (upstream `new Date(ms).getTimezoneOffset()` inverse, used by
+/// `toLocalISOString` in zigbee2mqtt `lib/util/utils.ts`).
+#[cfg(unix)]
+pub fn local_offset_seconds(time_ms: i64) -> i64 {
+    let seconds = time_ms.div_euclid(1000) as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    let result = unsafe { libc::localtime_r(&seconds, &mut tm) };
+    if result.is_null() {
+        0
+    } else {
+        tm.tm_gmtoff as i64
+    }
+}
+
+#[cfg(not(unix))]
+pub fn local_offset_seconds(_time_ms: i64) -> i64 {
+    0
+}
+
 /// Upstream `new Date().toISOString()`.
 pub fn now_iso8601() -> String {
     let elapsed = SystemTime::now()

@@ -1611,6 +1611,7 @@ dependencies = [
 name = "zigbee-apiarist"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "serde",
  "serde_json",
  "serial2-tokio",

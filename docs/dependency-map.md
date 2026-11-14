@@ -24,6 +24,7 @@ Last verified against crates.io / `Cargo.lock`: **2026-11-14**.
 | `rustls-rustcrypto` | `0.1.0-pre.0` | 0.1.0-pre.0 | 0.1.0-pre.0 (pre-release) | pure-Rust RustCrypto `CryptoProvider` used by frontend TLS |
 | `rustls-pemfile` | `2` | 2.2.0 | 2.2.0 | certificate/key parsing for frontend TLS |
 | `socket2` | `0.6` | 0.6.5 | 0.6.5 | current |
+| `libc` | `0.2` (unix only) | 0.2.191 | 0.2.191 | current; OS bindings for serial modem lines and `localtime_r` (no C crypto/codec) |
 | `serial2-tokio` | `0.1` | 0.1.26 | 0.1.26 | current; `unix`/`windows` features are cfg-gated in the manifest |
 
 Notes:
@@ -101,6 +102,7 @@ module:
 | `serde_yaml_ng` | `crates/z2m-rs/src/util/yaml.rs` |
 | `regex` | `crates/z2m-rs/src/util/settings_schema.rs` (Ajv wrapper), `crates/z2m-rs/src/util/utils.rs` (`filterProperties`) |
 | `serial2-tokio` | `crates/zigbee-apiarist/src/adapter/transport.rs` (tests may use `SerialPort::pair`) |
+| `libc` | `crates/zigbee-apiarist/src/adapter/transport.rs` (modem lines), `crates/zigbee-apiarist/src/utils/datetime.rs` (`localtime_r` offset) |
 | `socket2` | `crates/zigbee-apiarist/src/adapter/transport.rs` |
 | `zip` | `crates/z2m-rs/src/extension/bridge.rs` (backup archive) |
 | `base64` | `crates/z2m-rs/src/util/utils.rs` (icon data URLs), `crates/z2m-rs/src/extension/bridge.rs` (backup payload) |

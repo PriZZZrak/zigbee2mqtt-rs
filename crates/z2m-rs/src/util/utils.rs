@@ -57,7 +57,7 @@ fn pad(value: u32) -> String {
 
 /// Upstream `toLocalISOString` with a fixed UTC+1 local zone.
 fn to_local_iso_string(time_ms: i64) -> String {
-    let offset_seconds = 3600i64;
+    let offset_seconds = zigbee_apiarist::utils::datetime::local_offset_seconds(time_ms);
     let local_ms = time_ms + offset_seconds * 1000;
     let (days, rem_ms) = (
         local_ms.div_euclid(86_400_000),
@@ -68,16 +68,18 @@ fn to_local_iso_string(time_ms: i64) -> String {
     let hour = total_seconds / 3600;
     let minute = (total_seconds % 3600) / 60;
     let second = total_seconds % 60;
+    let millis = rem_ms % 1000;
     let sign = if offset_seconds >= 0 { "+" } else { "-" };
     let offset = offset_seconds.abs();
 
     format!(
-        "{year}-{}-{}T{}:{}:{}{sign}{}:{}",
+        "{year}-{}-{}T{}:{}:{}.{:03}{sign}{}:{}",
         pad(month as u32),
         pad(day as u32),
         pad(hour as u32),
         pad(minute as u32),
         pad(second as u32),
+        millis,
         pad((offset / 3600) as u32),
         pad(((offset % 3600) / 60) as u32)
     )
@@ -540,6 +542,16 @@ pub fn humanize_duration(diff_ms: i64) -> String {
 pub fn relative_time(time_ms: i64) -> String {
     let now = zigbee_apiarist::utils::datetime::now_ms() as i64;
     format!("{} ago", humanize_duration(now - time_ms))
+}
+
+/// Upstream `formatDate` keeps numbers for `epoch` and strings otherwise
+/// (`utils.ts:60-84`); used for the device `last_seen` payload field.
+pub fn format_last_seen(time: i64, kind: &str) -> serde_json::Value {
+    if kind == "epoch" {
+        serde_json::Value::from(time)
+    } else {
+        serde_json::Value::String(format_date(time, kind))
+    }
 }
 
 pub fn format_date_relative(time: i64) -> String {

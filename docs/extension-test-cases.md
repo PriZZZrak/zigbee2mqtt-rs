@@ -42,7 +42,7 @@ Coverage classes:
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 3 | 27 | 2 | 78 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
-| receive.test.ts | 34 | 7 | 24 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
+| receive.test.ts | 34 | 10 | 21 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
 
@@ -705,9 +705,9 @@ Coverage classes:
 | 21 | Should handle a zigbee message with voltage 2990 | `converter-db` | SP600 voltage correction lives in the converter DB |
 | 22 | Should publish 1 message when converted twice | `slice` | single publish for duplicate conversions |
 | 23 | Should publish 1 message when converted twice | `slice` | single publish for duplicate conversions |
-| 24 | Should publish last_seen epoch | `slice` | last_seen epoch |
-| 25 | Should publish last_seen ISO_8601 | `slice` | last_seen ISO_8601 |
-| 26 | Should publish last_seen ISO_8601_local | `slice` | last_seen ISO_8601_local |
+| 24 | Should publish last_seen epoch | `asserted` | tests/last_seen.rs last_seen_epoch_is_published_as_a_number |
+| 25 | Should publish last_seen ISO_8601 | `asserted` | tests/last_seen.rs last_seen_iso_8601_is_published_as_a_utc_string |
+| 26 | Should publish last_seen ISO_8601_local | `asserted` | tests/last_seen.rs last_seen_iso_8601_local_is_published_with_an_offset |
 | 27 | Should handle messages from Xiaomi router devices | `slice` | receive pipeline covered by the behavioural tests |
 | 28 | Should not handle messages from coordinator | `slice` | receive pipeline covered by the behavioural tests |
 | 29 | Should not handle messages from still interviewing devices with unknown definition | `asserted` | definition_less_device_skips_message_and_publishes_last_seen |
