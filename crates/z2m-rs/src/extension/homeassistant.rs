@@ -2328,7 +2328,14 @@ impl Extension for HomeAssistant {
                         {
                             if let Some(device) = this.context.zigbee.resolve_device(ieee) {
                                 let device = device as Arc<dyn Entity>;
-                                this.clear_entity(&device).await;
+                                let rename = data
+                                    .get("homeAssisantRename")
+                                    .and_then(Value::as_bool)
+                                    .unwrap_or(false);
+                                if rename {
+                                    this.clear_entity(&device).await;
+                                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                }
                                 this.discover(device.clone(), true).await;
                                 let triggers: Vec<String> = this
                                     .get_discovered(&device.entity_id().key())

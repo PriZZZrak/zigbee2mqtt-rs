@@ -161,12 +161,14 @@ impl Frontend {
         }
     }
 
-    async fn handle_socket(
+    async fn handle_socket<S>(
         self: &Arc<Self>,
-        socket: WebSocketStream<TcpStream>,
+        socket: WebSocketStream<S>,
         id: u64,
         mut receiver: mpsc::UnboundedReceiver<Message>,
-    ) {
+    ) where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static
+    {
         let (mut sink, mut stream) = socket.split();
         let writer = tokio::spawn(async move {
             while let Some(message) = receiver.recv().await {
@@ -206,13 +208,16 @@ impl Frontend {
         self.clients.lock().unwrap().remove(&id);
     }
 
-    async fn serve(
+    async fn serve<S>(
         this: Arc<Self>,
-        stream: TcpStream,
+        stream: S,
         clients: Clients,
         api_path: String,
         auth_token: Option<String>,
-    ) -> Result<(), String> {
+    ) -> Result<(), String>
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+    {
         let callback =
             move |request: &Request, response: Response| -> Result<Response, ErrorResponse> {
                 if request.uri().path() != api_path {
@@ -299,44 +304,111 @@ impl Extension for Frontend {
             let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
             *self.shutdown.lock().unwrap() = Some(shutdown_tx);
 
-            let listener = TcpListener::bind(if host.is_empty() {
-                format!("0.0.0.0:{port}")
-            } else {
-                format!("{host}:{port}")
-            })
-            .await
-            .map_err(|error| error.to_string())?;
-            *self.bound.lock().unwrap() = listener.local_addr().ok();
-            self.context.logger.lock().unwrap().info(
-                &format!(
-                    "Started frontend on port {}",
-                    if host.is_empty() {
-                        port.to_string()
+            let task = {
+                #[cfg(unix)]
+                if host.starts_with('/') {
+                    let _ = std::fs::remove_file(&host);
+                    let listener = tokio::net::UnixListener::bind(&host)
+                        .map_err(|error| error.to_string())?;
+                    self.context.logger.lock().unwrap().info(
+                        &format!("Started frontend on socket {host}"),
+                        "z2m",
+                    );
+                    tokio::spawn(async move {
+                        loop {
+                            tokio::select! {
+                                _ = &mut shutdown_rx => break,
+                                accepted = listener.accept() => {
+                                    let Ok((stream, _)) = accepted else { continue };
+                                    let clients = clients.clone();
+                                    let this = this.clone();
+                                    let api_path = api_path.clone();
+                                    let auth_token = auth_token.clone();
+                                    tokio::spawn(async move {
+                                        let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                    });
+                                }
+                            }
+                        }
+                    })
+                } else {
+                    let listener = TcpListener::bind(if host.is_empty() {
+                        format!("0.0.0.0:{port}")
                     } else {
                         format!("{host}:{port}")
-                    }
-                ),
-                "z2m",
-            );
-
-            let task = tokio::spawn(async move {
-                loop {
-                    tokio::select! {
-                        _ = &mut shutdown_rx => break,
-                        accepted = listener.accept() => {
-                            let Ok((stream, _)) = accepted else { continue };
-                            let clients = clients.clone();
-                            let this = this.clone();
-                            let api_path = api_path.clone();
-                            let auth_token = auth_token.clone();
-                            tokio::spawn(async move {
-                                let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
-                            });
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+                    *self.bound.lock().unwrap() = listener.local_addr().ok();
+                    self.context.logger.lock().unwrap().info(
+                        &format!(
+                            "Started frontend on port {}",
+                            if host.is_empty() {
+                                port.to_string()
+                            } else {
+                                format!("{host}:{port}")
+                            }
+                        ),
+                        "z2m",
+                    );
+                    tokio::spawn(async move {
+                        loop {
+                            tokio::select! {
+                                _ = &mut shutdown_rx => break,
+                                accepted = listener.accept() => {
+                                    let Ok((stream, _)) = accepted else { continue };
+                                    let clients = clients.clone();
+                                    let this = this.clone();
+                                    let api_path = api_path.clone();
+                                    let auth_token = auth_token.clone();
+                                    tokio::spawn(async move {
+                                        let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                    });
+                                }
+                            }
                         }
-                    }
+                    })
                 }
-            });
-            *self.task.lock().unwrap() = Some(task);
+                #[cfg(not(unix))]
+                {
+                    let listener = TcpListener::bind(if host.is_empty() {
+                        format!("0.0.0.0:{port}")
+                    } else {
+                        format!("{host}:{port}")
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+                    *self.bound.lock().unwrap() = listener.local_addr().ok();
+                    self.context.logger.lock().unwrap().info(
+                        &format!(
+                            "Started frontend on port {}",
+                            if host.is_empty() {
+                                port.to_string()
+                            } else {
+                                format!("{host}:{port}")
+                            }
+                        ),
+                        "z2m",
+                    );
+                    tokio::spawn(async move {
+                        loop {
+                            tokio::select! {
+                                _ = &mut shutdown_rx => break,
+                                accepted = listener.accept() => {
+                                    let Ok((stream, _)) = accepted else { continue };
+                                    let clients = clients.clone();
+                                    let this = this.clone();
+                                    let api_path = api_path.clone();
+                                    let auth_token = auth_token.clone();
+                                    tokio::spawn(async move {
+                                        let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                    });
+                                }
+                            }
+                        }
+                    })
+                }
+            };
 
             let bus = self.context.event_bus.clone();
             let this = self.clone();

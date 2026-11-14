@@ -27,7 +27,11 @@ struct Harness {
 }
 
 fn harness(auth_token: Option<&str>) -> Harness {
-    let mut frontend = json!({"enabled": true, "port": 0, "base_url": "/", "host": "127.0.0.1"});
+    harness_with_host(auth_token, "127.0.0.1")
+}
+
+fn harness_with_host(auth_token: Option<&str>, host: &str) -> Harness {
+    let mut frontend = json!({"enabled": true, "port": 0, "base_url": "/", "host": host});
     if let Some(token) = auth_token {
         frontend["auth_token"] = json!(token);
     }
@@ -228,4 +232,37 @@ async fn stop_sends_offline_state() {
     let frame = next_json(&mut socket).await;
     assert_eq!(frame["topic"], "bridge/state");
     assert_eq!(frame["payload"]["state"], "offline");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn unix_socket_frontend_serves_websocket() {
+    let socket_path = std::env::temp_dir().join(format!(
+        "z2m-frontend-{}-{}.sock",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let path = socket_path.to_string_lossy().to_string();
+    let harness = harness_with_host(None, &path);
+    let frontend = Frontend::new(harness.context.clone());
+    frontend.clone().start().await.unwrap();
+
+    let stream = tokio::net::UnixStream::connect(&socket_path).await.unwrap();
+    let (mut socket, _) = tokio_tungstenite::client_async("ws://localhost/api", stream)
+        .await
+        .unwrap();
+    socket
+        .send(Message::Text(
+            json!({"topic": "lamp/set", "payload": {"state": "ON"}})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+
+    frontend.stop().await.unwrap();
+    let _ = std::fs::remove_file(socket_path);
 }
