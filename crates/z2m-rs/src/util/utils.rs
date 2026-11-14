@@ -443,12 +443,17 @@ pub fn match_base64_file(value: &str) -> Option<(String, String)> {
     Some((extension.to_string(), data.to_string()))
 }
 
-/// Upstream `saveBase64DeviceIcon(match)` (`utils.ts:396-403`).
-pub fn save_base64_device_icon(extension: &str, data: &str) -> Result<String, String> {
+/// MD5 hex digest (upstream `crypto.createHash("md5")`).
+pub fn md5_hex(input: &[u8]) -> String {
     use md5::{Digest, Md5};
 
-    let digest = Md5::digest(data.as_bytes());
-    let hash: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    let digest = Md5::digest(input);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Upstream `saveBase64DeviceIcon(match)` (`utils.ts:396-403`).
+pub fn save_base64_device_icon(extension: &str, data: &str) -> Result<String, String> {
+    let hash = md5_hex(data.as_bytes());
     let file_settings = format!("device_icons/{hash}.{extension}");
     let path = crate::util::data::join_path(&file_settings);
     if let Some(parent) = path.parent() {
@@ -466,40 +471,99 @@ pub fn to_network_address_hex(value: u64) -> String {
     format!("0x{:04x}", value)
 }
 
-/// Upstream `formatDate(..., "relative")` (`utils.ts:68-85`).
-pub fn relative_time(time_ms: i64) -> String {
-    let now = zigbee_apiarist::utils::datetime::now_ms() as i64;
-    let diff = (now - time_ms).max(0);
-    let units: [(i64, &str); 6] = [
-        (365 * 24 * 3600 * 1000, "year"),
-        (30 * 24 * 3600 * 1000, "month"),
-        (7 * 24 * 3600 * 1000, "week"),
-        (24 * 3600 * 1000, "day"),
-        (3600 * 1000, "hour"),
-        (60 * 1000, "minute"),
+/// Upstream `humanizeDuration(diff, {language: "en", largest: 2, round: true})`
+/// as used by `formatDate(..., "relative")` (`utils.ts:68-85`).
+pub fn humanize_duration(diff_ms: i64) -> String {
+    const YEAR: f64 = 365.25 * 24.0 * 3600.0 * 1000.0;
+    const MONTH: f64 = 30.4375 * 24.0 * 3600.0 * 1000.0;
+    const WEEK: f64 = 7.0 * 24.0 * 3600.0 * 1000.0;
+    const DAY: f64 = 24.0 * 3600.0 * 1000.0;
+    const HOUR: f64 = 3600.0 * 1000.0;
+    const MINUTE: f64 = 60.0 * 1000.0;
+    const SECOND: f64 = 1000.0;
+
+    let mut remaining = diff_ms.max(0) as f64;
+    if remaining < SECOND {
+        let milliseconds = remaining.round() as i64;
+        return format!(
+            "{milliseconds} millisecond{}",
+            if milliseconds == 1 { "" } else { "s" }
+        );
+    }
+
+    let units = [
+        (YEAR, "year"),
+        (MONTH, "month"),
+        (WEEK, "week"),
+        (DAY, "day"),
+        (HOUR, "hour"),
+        (MINUTE, "minute"),
+        (SECOND, "second"),
     ];
-    let mut remaining = diff;
-    let mut parts = Vec::new();
-    for (size, name) in units {
-        if remaining >= size && parts.len() < 2 {
-            let count = remaining / size;
-            remaining %= size;
-            parts.push(format!(
-                "{count} {name}{}",
-                if count == 1 { "" } else { "s" }
-            ));
+    let mut parts: Vec<(f64, &str)> = Vec::new();
+    for &(size, name) in units.iter() {
+        if remaining < size {
+            continue;
+        }
+        let count = (remaining / size).floor();
+        remaining -= count * size;
+        parts.push((count, name));
+        if parts.len() == 2 {
+            break;
         }
     }
-    if parts.is_empty() {
-        let seconds = diff / 1000;
-        parts.push(format!(
-            "{seconds} second{}",
-            if seconds == 1 { "" } else { "s" }
-        ));
+
+    // `round: true` rounds the smallest displayed unit.
+    if let Some(&(_, name)) = parts.last() {
+        let unit = units
+            .iter()
+            .find(|(_, known)| *known == name)
+            .map(|(size, _)| *size)
+            .unwrap_or(SECOND);
+        if remaining >= unit / 2.0 {
+            if let Some((count, _)) = parts.last_mut() {
+                *count += 1.0;
+            }
+        }
     }
-    format!("{} ago", parts.join(", "))
+
+    parts
+        .iter()
+        .map(|(count, name)| {
+            let count = *count as i64;
+            format!("{count} {name}{}", if count == 1 { "" } else { "s" })
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub fn relative_time(time_ms: i64) -> String {
+    let now = zigbee_apiarist::utils::datetime::now_ms() as i64;
+    format!("{} ago", humanize_duration(now - time_ms))
 }
 
 pub fn format_date_relative(time: i64) -> String {
     format_date(time, "relative")
+}
+
+#[cfg(test)]
+mod duration_tests {
+    use super::humanize_duration;
+
+    /// Upstream `humanizeDuration(ms, {language: "en", largest: 2, round: true})`.
+    #[test]
+    fn humanizes_like_upstream() {
+        assert_eq!(humanize_duration(600), "600 milliseconds");
+        assert_eq!(humanize_duration(1_000), "1 second");
+        assert_eq!(humanize_duration(1_400), "1 second");
+        assert_eq!(humanize_duration(1_500), "2 seconds");
+        assert_eq!(humanize_duration(90 * 60 * 1000), "1 hour, 30 minutes");
+        assert_eq!(humanize_duration(45 * 24 * 3600 * 1000), "1 month, 2 weeks");
+        assert_eq!(humanize_duration(24 * 3600 * 1000), "1 day");
+        assert_eq!(
+            humanize_duration((2.0 * 365.25 * 24.0 * 3600.0 * 1000.0) as i64),
+            "2 years"
+        );
+        assert_eq!(humanize_duration(-5), "0 milliseconds");
+    }
 }
