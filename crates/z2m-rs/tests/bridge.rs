@@ -426,3 +426,67 @@ async fn options_apply_arrays_null_and_report_restart_required() {
     assert_eq!(payload["status"], "error", "{payload}");
     assert!(!payload["error"].as_str().unwrap_or_default().is_empty());
 }
+
+#[tokio::test]
+async fn logging_publishes_to_mqtt_with_dedupe_and_connection_guard() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Not connected: log lines stay local (upstream transport guard).
+    harness
+        .context
+        .logger
+        .lock()
+        .unwrap()
+        .info("not connected", "z2m");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/logging"));
+
+    harness.mqtt.lock().await.connected = true;
+
+    {
+        let mut logger = harness.context.logger.lock().unwrap();
+        logger.info("this is a test", "z2m");
+        logger.info("this is a test", "z2m"); // duplicate, must not publish twice
+    }
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    {
+        let mqtt = harness.mqtt.lock().await;
+        let published: Vec<&(String, String, z2m_rs::mqtt::MqttPublishOptions)> = mqtt
+            .attempted
+            .iter()
+            .filter(|(topic, _, _)| topic == "zigbee2mqtt/bridge/logging")
+            .collect();
+        assert_eq!(published.len(), 1, "{:?}", published);
+        let payload: Value = serde_json::from_str(&published[0].1).unwrap();
+        assert_eq!(
+            payload,
+            json!({"message": "this is a test", "level": "info", "namespace": "z2m"})
+        );
+    }
+
+    harness.mqtt.lock().await.attempted.clear();
+    harness
+        .context
+        .logger
+        .lock()
+        .unwrap()
+        .debug("this is a test", "z2m");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/logging"));
+}

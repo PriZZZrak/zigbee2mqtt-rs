@@ -1258,6 +1258,13 @@ impl Extension for Bridge {
                 .lock()
                 .unwrap()
                 .set_log_listener(Arc::new(move |level, message, namespace| {
+                    // Upstream log transport only publishes while the MQTT client
+                    // is connected (bridge.ts logging transport).
+                    if let Ok(client) = mqtt.try_lock() {
+                        if !client.is_connected() {
+                            return;
+                        }
+                    }
                     if !debug_to_frontend && level == "debug" {
                         return;
                     }

@@ -30,6 +30,7 @@ struct Harness {
     context: ExtensionContext,
     mqtt: Arc<tokio::sync::Mutex<Mqtt>>,
     event_bus: Arc<Mutex<EventBus>>,
+    published: Arc<Mutex<Vec<Value>>>,
     database_path: std::path::PathBuf,
     state_path: std::path::PathBuf,
 }
@@ -117,7 +118,14 @@ fn harness_with(mutate: impl FnOnce(&mut Definition)) -> Harness {
         state_path.clone(),
     )));
     let mqtt = Arc::new(tokio::sync::Mutex::new(Mqtt::new(event_bus.clone())));
-    let publish: PublishEntityState = Arc::new(|_e, _p, _r| Box::pin(async {}));
+    let published = Arc::new(Mutex::new(Vec::new()));
+    let sink = published.clone();
+    let publish: PublishEntityState = Arc::new(move |_entity, payload, _reason| {
+        let sink = sink.clone();
+        Box::pin(async move {
+            sink.lock().unwrap().push(payload);
+        })
+    });
 
     let mut definition = Definition::new("TEST", "Acme", "Test device").with_zigbee_model("TEST");
     definition.exposes = zigbee_converters::Exposes::Static(vec![
@@ -248,6 +256,7 @@ fn harness_with(mutate: impl FnOnce(&mut Definition)) -> Harness {
         },
         mqtt,
         event_bus,
+        published,
         database_path,
         state_path,
     }
@@ -740,5 +749,170 @@ async fn keeps_discovery_topics_when_rename_is_not_a_homeassistant_rename() {
             .iter()
             .any(|(_, payload, options)| payload.is_empty() && options.retain),
         "discovery was cleared without homeAssisantRename"
+    );
+}
+
+#[tokio::test]
+async fn discovers_endpoint_entities_with_suffixed_topics() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        if let zigbee_converters::Exposes::Static(exposes) = &mut definition.exposes {
+            exposes.push(Expose {
+                r#type: "light".to_string(),
+                name: Some("light".to_string()),
+                endpoint: Some("l1".to_string()),
+                access: access::ALL,
+                features: vec![
+                    Expose::binary("state", access::ALL),
+                    Expose::numeric("brightness", access::ALL),
+                ],
+                ..Default::default()
+            });
+            exposes.push(Expose {
+                r#type: "cover".to_string(),
+                name: Some("cover".to_string()),
+                endpoint: Some("left".to_string()),
+                access: access::ALL,
+                features: vec![
+                    Expose::binary("state", access::ALL),
+                    Expose::numeric("position", access::ALL),
+                ],
+                ..Default::default()
+            });
+            exposes.push(Expose {
+                r#type: "switch".to_string(),
+                name: Some("switch".to_string()),
+                endpoint: Some("2".to_string()),
+                access: access::ALL,
+                features: vec![Expose {
+                    property: Some("state_l2".to_string()),
+                    ..Expose::binary("state", access::ALL)
+                }],
+                ..Default::default()
+            });
+        }
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    // Upstream appends the endpoint name to object_id, name and topics.
+    let light = config(
+        &harness,
+        &format!("homeassistant/light/{IEEE}/light_l1/config"),
+    )
+    .await
+    .expect("endpoint light");
+    assert_eq!(light["name"], "L1");
+    assert_eq!(light["state_topic"], "zigbee2mqtt/lamp/l1");
+    assert_eq!(light["command_topic"], "zigbee2mqtt/lamp/l1/set");
+
+    let cover = config(
+        &harness,
+        &format!("homeassistant/cover/{IEEE}/cover_left/config"),
+    )
+    .await
+    .expect("endpoint cover");
+    assert_eq!(cover["state_topic"], "zigbee2mqtt/lamp/left");
+    assert_eq!(cover["command_topic"], "zigbee2mqtt/lamp/left/set");
+
+    let switch = config(
+        &harness,
+        &format!("homeassistant/switch/{IEEE}/switch_2/config"),
+    )
+    .await
+    .expect("endpoint switch");
+    assert_eq!(switch["command_topic"], "zigbee2mqtt/lamp/2/set");
+    assert_eq!(switch["value_template"], "{% if \"state_l2\" in value_json %}{{ value_json[\"state_l2\"] }}{% endif %}");
+}
+
+#[tokio::test]
+async fn endpoint_state_publish_is_split_per_endpoint_topic() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        if let zigbee_converters::Exposes::Static(exposes) = &mut definition.exposes {
+            exposes.push(Expose {
+                r#type: "light".to_string(),
+                name: Some("light".to_string()),
+                endpoint: Some("l1".to_string()),
+                access: access::ALL,
+                features: vec![
+                    Expose::binary("state", access::ALL),
+                    Expose::numeric("brightness", access::ALL),
+                ],
+                ..Default::default()
+            });
+        }
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
+        "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+        "message": {"state": "ON", "state_l1": "ON", "brightness_l1": 42},
+    }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    let published = mqtt
+        .attempted
+        .iter()
+        .find(|(topic, _, _)| topic == "zigbee2mqtt/lamp/l1")
+        .expect("endpoint state published");
+    let payload: Value = serde_json::from_str(&published.1).unwrap();
+    assert_eq!(payload, json!({"state": "ON", "brightness": 42}));
+}
+
+#[tokio::test]
+async fn legacy_action_sensor_discovers_and_clears_action() {
+    let _guard = serial();
+    let harness = harness();
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["homeassistant", "legacy_action_sensor"], json!(true));
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    // Upstream `Legacy action sensor`: the action enum is discovered as a sensor
+    // instead of an event entity.
+    let sensor = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/action/config"),
+    )
+    .await
+    .expect("legacy action sensor");
+    assert_eq!(
+        sensor["value_template"],
+        "{% if \"action\" in value_json %}{{ value_json[\"action\"] }}{% endif %}"
+    );
+    assert!(config(
+        &harness,
+        &format!("homeassistant/event/{IEEE}/action/config")
+    )
+    .await
+    .is_none());
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_publish_entity_state(json!({
+            "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+            "message": {"action": "single"},
+        }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    assert!(
+        harness
+            .published
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|payload| payload == &json!({"action": ""})),
+        "legacy action was not cleared: {:?}",
+        harness.published.lock().unwrap()
     );
 }

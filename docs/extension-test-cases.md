@@ -30,14 +30,14 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 14 | 3 | 49 | 0 | 31 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 16 | 3 | 47 | 0 | 31 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 7 | 2 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 43 | 15 | 55 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 45 | 15 | 53 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -123,9 +123,9 @@ Coverage classes:
 | 1 | Should publish bridge info on startup | `asserted` | start_publishes_bridge_topics |
 | 2 | Should publish devices on startup | `asserted` | start_publishes_bridge_topics |
 | 3 | Should publish definitions on startup | `asserted` | start_publishes_bridge_topics |
-| 4 | Should log to MQTT | `code` | request handler ported, no dedicated assertion |
+| 4 | Should log to MQTT | `asserted` | logging_publishes_to_mqtt_with_dedupe_and_connection_guard |
 | 5 | Should log to MQTT including debug when enabled | `code` | request handler ported, no dedicated assertion |
-| 6 | Shouldnt log to MQTT when not connected | `code` | request handler ported, no dedicated assertion |
+| 6 | Shouldnt log to MQTT when not connected | `asserted` | logging_publishes_to_mqtt_with_dedupe_and_connection_guard (connection guard) |
 | 7 | Should publish groups on startup | `asserted` | start_publishes_bridge_topics |
 | 8 | Should publish event when device joined | `code` | request handler ported, no dedicated assertion |
 | 9 | Should publish devices when device joined | `code` | request handler ported, no dedicated assertion |
@@ -434,7 +434,7 @@ Coverage classes:
 | 60 | Should discover climate with cooling-only setpoint | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 61 | Should map emergency_heating to heat for climate | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 62 | Should discover devices with cover_position | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 63 | Should discover dual cover devices | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 63 | Should discover dual cover devices | `slice` | endpoint cover discovery (cover_left) is asserted |
 | 64 | Should derive direction-aware cover state from position for motor_state covers | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 65 | Should preserve motor_state and state fallback for covers without position | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 66 | Should discover an infrared emitter entity | `code` | discovery mapping ported, no dedicated per-device assertion |
@@ -469,7 +469,7 @@ Coverage classes:
 | 95 | Should publish /action for MQTT device trigger | `slice` | action republish on advanced.output=json |
 | 96 | Should not discover device_automation when disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 97 | Should enable experimental event entities | `asserted` | experimental_event_entities_prepare_wildcard_action_types |
-| 98 | Should republish payload to postfix topic with lightWithPostfix config | `slice` | endpoint attribute republish in on_publish_entity_state |
+| 98 | Should republish payload to postfix topic with lightWithPostfix config | `asserted` | endpoint_state_publish_is_split_per_endpoint_topic |
 | 99 | Should not republish a light_type select as an endpoint light state | `slice` | endpoint attribute republish skips light_type selects |
 | 100 | Shouldnt crash in onPublishEntityState on group publish | `code` | on_publish_entity_state returns early for groups |
 | 101 | Should clear outdated configs | `asserted` | clears_outdated_discovery_config_from_retained_messages |
@@ -485,7 +485,7 @@ Coverage classes:
 | 111 | Should remove discovery entries for removed exposes when device options change | `code` | removed exposes clear their topics |
 | 112 | Should rediscover an entity whose expose comes back after it was removed | `code` | exposes coming back trigger rediscovery |
 | 113 | Should publish discovery message when a converter announces changed exposes | `code` | exposes_changed event triggers discover() |
-| 114 | Legacy action sensor | `code` | legacy action sensor |
+| 114 | Legacy action sensor | `asserted` | legacy_action_sensor_discovers_and_clears_action |
 | 115 | prevents mismatching setting/extension state | `code` | settings/extension mismatch guard |
 
 ## networkMap.test.ts

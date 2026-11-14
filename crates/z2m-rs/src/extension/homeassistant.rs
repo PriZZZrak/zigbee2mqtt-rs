@@ -210,16 +210,8 @@ impl HomeAssistant {
                         continue;
                     };
                     let property = state.property.clone().unwrap_or_default();
-                    let mut payload = Map::new();
-                    payload.insert("name".into(), Value::Null);
-                    payload.insert("payload_off".into(), state.value_off.clone());
-                    payload.insert("payload_on".into(), state.value_on.clone());
-                    payload.insert(
-                        "value_template".into(),
-                        Value::String(state_value_template(&property)),
-                    );
-                    payload.insert("command_topic".into(), Value::Bool(true));
-                    if [
+                    let endpoint = expose.endpoint.clone();
+                    let config_switch = [
                         "auto_lock",
                         "away_mode",
                         "comfort_smiley",
@@ -229,8 +221,26 @@ impl HomeAssistant {
                         "valve_detection",
                         "window_detection",
                     ]
-                    .contains(&property.as_str())
-                    {
+                    .contains(&property.as_str());
+                    let mut payload = Map::new();
+                    payload.insert(
+                        "name".into(),
+                        match &endpoint {
+                            Some(endpoint) => json!(crate::util::utils::capitalize(endpoint)),
+                            None => Value::Null,
+                        },
+                    );
+                    payload.insert("payload_off".into(), state.value_off.clone());
+                    payload.insert("payload_on".into(), state.value_on.clone());
+                    payload.insert(
+                        "value_template".into(),
+                        Value::String(state_value_template(&property)),
+                    );
+                    payload.insert("command_topic".into(), Value::Bool(true));
+                    if let Some(endpoint) = &endpoint {
+                        payload.insert("command_topic_prefix".into(), json!(endpoint));
+                    }
+                    if config_switch {
                         payload.insert(
                             "name".into(),
                             expose
@@ -247,9 +257,17 @@ impl HomeAssistant {
                         payload.insert("state_on".into(), state.value_on.clone());
                         merge_lookup(&mut payload, "CONFIG_SWITCH_DISCOVERY_LOOKUP", &property);
                     }
+                    let object_id = if config_switch {
+                        property.clone()
+                    } else {
+                        match &endpoint {
+                            Some(endpoint) => format!("switch_{endpoint}"),
+                            None => "switch".to_string(),
+                        }
+                    };
                     entries.push(Entry {
                         r#type: "switch".into(),
-                        object_id: "switch".into(),
+                        object_id,
                         payload,
                     });
                 }
@@ -273,9 +291,19 @@ impl HomeAssistant {
                         continue;
                     };
 
+                    let endpoint = expose.endpoint.clone();
                     let mut payload = Map::new();
-                    payload.insert("name".into(), Value::Null);
+                    payload.insert(
+                        "name".into(),
+                        match &endpoint {
+                            Some(endpoint) => json!(crate::util::utils::capitalize(endpoint)),
+                            None => Value::Null,
+                        },
+                    );
                     payload.insert("state_topic".into(), Value::Bool(false));
+                    if let Some(endpoint) = &endpoint {
+                        payload.insert("command_topic_prefix".into(), json!(endpoint));
+                    }
                     payload.insert("temperature_unit".into(), json!("C"));
                     if let Some(step) = primary.value_step {
                         payload.insert("temp_step".into(), Value::from(step));
@@ -580,7 +608,10 @@ impl HomeAssistant {
 
                     entries.push(Entry {
                         r#type: "climate".into(),
-                        object_id: "climate".into(),
+                        object_id: match &endpoint {
+                            Some(endpoint) => format!("climate_{endpoint}"),
+                            None => "climate".to_string(),
+                        },
                         payload,
                     });
                 }
@@ -632,8 +663,15 @@ impl HomeAssistant {
                         xy.is_some() && hs.is_some() && hs < xy
                     });
 
+                    let endpoint = expose.endpoint.clone();
                     let mut payload = Map::new();
-                    payload.insert("name".into(), Value::Null);
+                    payload.insert(
+                        "name".into(),
+                        match &endpoint {
+                            Some(endpoint) => json!(crate::util::utils::capitalize(endpoint)),
+                            None => Value::Null,
+                        },
+                    );
                     payload.insert("brightness".into(), Value::Bool(has_brightness));
                     payload.insert("schema".into(), json!("json"));
                     payload.insert("command_topic".into(), Value::Bool(true));
@@ -693,9 +731,16 @@ impl HomeAssistant {
                         payload.insert("effect".into(), Value::Bool(true));
                         payload.insert("effect_list".into(), Value::Array(effects));
                     }
+                    if let Some(endpoint) = &endpoint {
+                        payload.insert("command_topic_prefix".into(), json!(endpoint));
+                        payload.insert("state_topic_postfix".into(), json!(endpoint));
+                    }
                     entries.push(Entry {
                         r#type: "light".into(),
-                        object_id: "light".into(),
+                        object_id: match &endpoint {
+                            Some(endpoint) => format!("light_{endpoint}"),
+                            None => "light".to_string(),
+                        },
                         payload,
                     });
                 }
@@ -707,9 +752,19 @@ impl HomeAssistant {
                     else {
                         continue;
                     };
+                    let endpoint = expose.endpoint.clone();
                     let mut payload = Map::new();
-                    payload.insert("name".into(), Value::Null);
+                    payload.insert(
+                        "name".into(),
+                        match &endpoint {
+                            Some(endpoint) => json!(crate::util::utils::capitalize(endpoint)),
+                            None => Value::Null,
+                        },
+                    );
                     payload.insert("command_topic".into(), Value::Bool(true));
+                    if let Some(endpoint) = &endpoint {
+                        payload.insert("command_topic_prefix".into(), json!(endpoint));
+                    }
                     payload.insert(
                         "value_template".into(),
                         Value::String(state_value_template(
@@ -720,7 +775,10 @@ impl HomeAssistant {
                     payload.insert("state_unlocked".into(), state.value_off.clone());
                     entries.push(Entry {
                         r#type: "lock".into(),
-                        object_id: "lock".into(),
+                        object_id: match &endpoint {
+                            Some(endpoint) => format!("lock_{endpoint}"),
+                            None => "lock".to_string(),
+                        },
                         payload,
                     });
                 }
@@ -750,10 +808,21 @@ impl HomeAssistant {
                         expose.r#type == "binary" && expose.name.as_deref() == Some("running")
                     });
 
+                    let endpoint = expose.endpoint.clone();
                     let mut payload = Map::new();
-                    payload.insert("name".into(), Value::Null);
+                    payload.insert(
+                        "name".into(),
+                        match &endpoint {
+                            Some(endpoint) => json!(crate::util::utils::capitalize(endpoint)),
+                            None => Value::Null,
+                        },
+                    );
                     payload.insert("command_topic".into(), Value::Bool(true));
                     payload.insert("state_topic".into(), Value::Bool(true));
+                    if let Some(endpoint) = &endpoint {
+                        payload.insert("command_topic_prefix".into(), json!(endpoint));
+                        payload.insert("state_topic_postfix".into(), json!(endpoint));
+                    }
 
                     if let Some(running) = running {
                         if let Some(position) = position {
@@ -854,7 +923,10 @@ impl HomeAssistant {
                     }
                     entries.push(Entry {
                         r#type: "cover".into(),
-                        object_id: "cover".into(),
+                        object_id: match &endpoint {
+                            Some(endpoint) => format!("cover_{endpoint}"),
+                            None => "cover".to_string(),
+                        },
                         payload,
                     });
                 }
@@ -874,10 +946,20 @@ impl HomeAssistant {
                         .features
                         .iter()
                         .find(|f| f.r#type == "numeric" && f.name.as_deref() == Some("speed"));
+                    let endpoint = expose.endpoint.clone();
                     let mut payload = Map::new();
-                    payload.insert("name".into(), Value::Null);
+                    payload.insert(
+                        "name".into(),
+                        match &endpoint {
+                            Some(endpoint) => json!(crate::util::utils::capitalize(endpoint)),
+                            None => Value::Null,
+                        },
+                    );
                     payload.insert("command_topic".into(), Value::Bool(true));
                     payload.insert("state_topic".into(), Value::Bool(true));
+                    if let Some(endpoint) = &endpoint {
+                        payload.insert("command_topic_prefix".into(), json!(endpoint));
+                    }
                     if let Some(mode) = mode {
                         let property = mode.property.as_deref().unwrap_or("fan_mode");
                         let speeds: Vec<Value> = std::iter::once("off".to_string())
@@ -978,7 +1060,10 @@ impl HomeAssistant {
                     }
                     entries.push(Entry {
                         r#type: "fan".into(),
-                        object_id: "fan".into(),
+                        object_id: match &endpoint {
+                            Some(endpoint) => format!("fan_{endpoint}"),
+                            None => "fan".to_string(),
+                        },
                         payload,
                     });
                 }
@@ -2162,20 +2247,26 @@ impl HomeAssistant {
                 .cloned()
                 .collect();
             for topic in topics {
+                // Discovered topics are stored relative to the discovery root:
+                // `{component}/{id}/{object_id}/config`.
                 let Some((component, rest)) = topic.split_once('/') else {
                     continue;
                 };
-                if component != "light" && component != "cover" {
-                    continue;
-                }
-                let object_id = rest.split('/').next().unwrap_or("");
-                let endpoint = object_id
-                    .rsplit_once('_')
-                    .map(|(_, endpoint)| endpoint)
+                let object_id = rest
+                    .strip_suffix("/config")
+                    .and_then(|rest| rest.split_once('/'))
+                    .map(|(_, object_id)| object_id)
                     .unwrap_or("");
-                if endpoint.is_empty() {
+                // Only endpoint lights/covers (`light_l1`, `cover_left`); a
+                // `light_type` select shares the prefix but lives on `select`.
+                let endpoint = match component {
+                    "light" => object_id.strip_prefix("light_"),
+                    "cover" => object_id.strip_prefix("cover_"),
+                    _ => None,
+                };
+                let Some(endpoint) = endpoint.filter(|endpoint| !endpoint.is_empty()) else {
                     continue;
-                }
+                };
                 let suffix = format!("_{endpoint}");
                 let mut payload = Map::new();
                 for (key, value) in message.as_object().cloned().unwrap_or_default() {
