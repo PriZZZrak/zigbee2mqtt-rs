@@ -2301,14 +2301,26 @@ impl Extension for HomeAssistant {
                 Arc::new(move |data| {
                     let this = this.clone();
                     tokio::spawn(async move {
-                        if let Some(ieee) = data
-                            .get("entity")
+                        let entity = data.get("entity");
+                        let ieee = entity
                             .and_then(|entity| entity.get("ieeeAddr"))
                             .and_then(Value::as_str)
-                        {
-                            if let Some(device) = this.context.zigbee.resolve_device(ieee) {
-                                this.clear_entity(&(device as Arc<dyn Entity>)).await;
-                            }
+                            .map(str::to_string);
+                        let id = entity
+                            .and_then(|entity| entity.get("ID"))
+                            .map(|id| {
+                                id.as_str()
+                                    .map(str::to_string)
+                                    .unwrap_or_else(|| id.to_string())
+                            });
+                        let resolved = ieee
+                            .and_then(|ieee| this.context.zigbee.resolve_device(&ieee))
+                            .map(|device| device as Arc<dyn Entity>)
+                            .or_else(|| {
+                                id.and_then(|id| this.context.zigbee.resolve_entity(&id))
+                            });
+                        if let Some(entity) = resolved {
+                            this.clear_entity(&entity).await;
                         }
                     });
                 }),
@@ -2408,6 +2420,36 @@ impl Extension for HomeAssistant {
                     });
                 }),
             );
+
+            for register in 0..2 {
+                let bus = self.context.event_bus.clone();
+                let this = self.clone();
+                let mut bus = bus.lock().unwrap();
+                let callback: crate::event_bus::Listener = Arc::new(move |data| {
+                    let ieee = data
+                        .get("device")
+                        .and_then(|device| device.get("ieeeAddr"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    let this = this.clone();
+                    tokio::spawn(async move {
+                        if let Some(device) =
+                            ieee.and_then(|ieee| this.context.zigbee.resolve_device(&ieee))
+                        {
+                            let id = device.entity_id().key();
+                            let discovered = this.get_discovered(&id).lock().unwrap().discovered;
+                            if !discovered {
+                                this.discover(device as Arc<dyn Entity>, true).await;
+                            }
+                        }
+                    });
+                });
+                if register == 0 {
+                    bus.on_device_announce(self.context.key, callback);
+                } else {
+                    bus.on_device_interview(self.context.key, callback);
+                }
+            }
 
             let bus = self.context.event_bus.clone();
             let this = self.clone();
