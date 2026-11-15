@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 69 | 14 | 30 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 70 | 14 | 29 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -456,7 +456,7 @@ Coverage classes:
 | 82 | Should keep the versions of an update payload that already has them | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 83 | Shouldnt send all status when home assistant comes offline | `asserted` | status_offline_or_other_topics_do_not_republish |
 | 84 | Shouldnt send all status when home assistant comes online with different topic | `asserted` | status_offline_or_other_topics_do_not_republish |
-| 85 | Should discover devices with availability | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 85 | Should discover devices with availability | `asserted` | availability_entries_cover_bridge_and_entity_topics |
 | 86 | Should clear discovery when device is removed | `asserted` | clears_discovery_on_entity_removed |
 | 87 | Should clear discovery when group is removed | `slice` | group removal resolves by ID |
 | 88 | Should refresh discovery when device is renamed | `asserted` | homeassistant_rename_clears_and_republishes_discovery |

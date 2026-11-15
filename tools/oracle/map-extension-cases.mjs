@@ -307,6 +307,7 @@ const CASES = {
             81: [S, "status republish uses the configured status_topic"],
             83: [A, "status_offline_or_other_topics_do_not_republish"],
             84: [A, "status_offline_or_other_topics_do_not_republish"],
+            85: [A, "availability_entries_cover_bridge_and_entity_topics"],
             86: [A, "clears_discovery_on_entity_removed"],
             87: [S, "group removal resolves by ID"],
             90: [A, "keeps_discovery_topics_when_rename_is_not_a_homeassistant_rename"],

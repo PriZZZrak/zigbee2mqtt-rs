@@ -1667,3 +1667,51 @@ async fn precision_options_do_not_change_discovery_payloads() {
     let template = payload["value_template"].as_str().unwrap();
     assert!(!template.contains("round"));
 }
+
+#[tokio::test]
+async fn availability_entries_cover_bridge_and_entity_topics() {
+    let _guard = serial();
+    let harness = harness();
+    {
+        let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+        harness
+            .context
+            .zigbee
+            .group_by_id(1)
+            .unwrap()
+            .zh
+            .add_member(&device.zh.endpoints()[0]);
+    }
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let temperature = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("temperature config");
+    let availability = temperature["availability"].as_array().unwrap();
+    assert_eq!(availability.len(), 2, "{availability:?}");
+    assert_eq!(availability[0]["topic"], "zigbee2mqtt/bridge/state");
+    assert_eq!(availability[1]["topic"], "zigbee2mqtt/lamp/availability");
+    for entry in availability {
+        assert_eq!(entry["value_template"], "{{ value_json.state }}");
+    }
+    assert_eq!(temperature["availability_mode"], "all");
+
+    // Group discovery uses the group state topic for its availability entry.
+    let mqtt = harness.mqtt.lock().await;
+    let group_light = mqtt
+        .attempted
+        .iter()
+        .filter(|(topic, payload, _)| {
+            topic.starts_with("homeassistant/light/") && !payload.is_empty()
+        })
+        .filter_map(|(_, payload, _)| serde_json::from_str::<Value>(payload).ok())
+        .find(|payload| payload["device"]["name"] == "kitchen")
+        .expect("group light discovery");
+    let availability = group_light["availability"].as_array().unwrap();
+    assert_eq!(availability[1]["topic"], "zigbee2mqtt/kitchen/availability");
+    assert_eq!(group_light["availability_mode"], "all");
+}
