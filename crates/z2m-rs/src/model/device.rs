@@ -190,12 +190,28 @@ impl Device {
         }
     }
 
-    /// Upstream `endpoint(key)` (`model/device.ts:99`). Endpoint *names* require
-    /// a converter definition and therefore resolve to `None` in R1.
+    /// Upstream `definition.endpoint(zhDevice)` mapping (name → endpoint ID).
+    fn definition_endpoints(&self) -> Vec<(String, u8)> {
+        self.definition()
+            .map(|definition| definition.endpoint.clone())
+            .unwrap_or_default()
+    }
+
+    /// Upstream `endpoint(key)` (`model/device.ts:99-114`).
     pub fn endpoint(&self, key: Option<&str>) -> Option<Arc<Endpoint>> {
         let key = key.unwrap_or("default");
 
-        if let Ok(id) = key.parse::<u8>() {
+        if !key.is_empty() {
+            if let Ok(id) = key.parse::<u8>() {
+                return self.zh.get_endpoint(id);
+            }
+        }
+
+        if let Some((_, id)) = self
+            .definition_endpoints()
+            .into_iter()
+            .find(|(name, _)| name == key)
+        {
             return self.zh.get_endpoint(id);
         }
 
@@ -206,16 +222,26 @@ impl Device {
         None
     }
 
-    /// Upstream `endpointName(endpoint)` (`model/device.ts:117`); definition
-    /// based, so always `None` in R1.
-    pub fn endpoint_name(&self, _endpoint: &Endpoint) -> Option<String> {
-        None
+    /// Upstream `endpointName(endpoint)` (`model/device.ts:117-131`).
+    pub fn endpoint_name(&self, endpoint: &Endpoint) -> Option<String> {
+        let name = self
+            .definition_endpoints()
+            .into_iter()
+            .find(|(_, id)| *id == endpoint.ID)
+            .map(|(name, _)| name);
+        match name.as_deref() {
+            Some("default") | None => None,
+            Some(_) => name,
+        }
     }
 
-    /// Upstream `getEndpointNames()` (`model/device.ts:135`); definition based,
-    /// so empty in R1.
+    /// Upstream `getEndpointNames()` (`model/device.ts:135-147`).
     pub fn get_endpoint_names(&self) -> Vec<String> {
-        Vec::new()
+        self.definition_endpoints()
+            .into_iter()
+            .map(|(name, _)| name)
+            .filter(|name| name != "default")
+            .collect()
     }
 
     pub fn is_device(&self) -> bool {

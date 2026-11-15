@@ -12,6 +12,7 @@ use zigbee_apiarist::controller::model::test_support::serial;
 
 use z2m_rs::model::{Device, Entity, EntityId};
 use z2m_rs::util::settings::Settings;
+use zigbee_converters::{Definition, DefinitionRegistry};
 
 fn zh_device(r#type: &str, ieee: &str) -> Arc<ZhDevice> {
     ZhDevice::from_database_entry(&json!({
@@ -189,8 +190,52 @@ fn endpoint_resolves_numeric_and_default_keys() {
         Some(2)
     );
     assert!(device.endpoint(Some("3")).is_none());
-    // Endpoint names come from converter definitions, absent in R1.
+    // Endpoint names come from converter definitions; without one they are
+    // unknown.
     assert!(device.endpoint(Some("l1")).is_none());
+}
+
+#[test]
+fn endpoint_names_come_from_the_definition_mapping() {
+    let _guard = serial();
+    ZhDevice::reset_cache();
+
+    let registry = Arc::new(Mutex::new(DefinitionRegistry::new()));
+    let mut definition = Definition::new("TEST", "Acme", "Test").with_zigbee_model("TEST");
+    definition.endpoint = vec![
+        ("default".to_string(), 1),
+        ("left".to_string(), 1),
+        ("right".to_string(), 2),
+    ];
+    registry.lock().unwrap().register(definition);
+
+    let device = Device::new(
+        zh_device("Router", "0x0017880104e45519"),
+        settings(json!({"mqtt": {"server": "localhost"}})),
+        registry,
+    );
+    device.resolve_definition(false);
+    assert!(device.definition().is_some());
+
+    assert_eq!(
+        device.endpoint(Some("default")).map(|endpoint| endpoint.ID),
+        Some(1)
+    );
+    assert_eq!(
+        device.endpoint(Some("left")).map(|endpoint| endpoint.ID),
+        Some(1)
+    );
+    assert_eq!(
+        device.endpoint(Some("right")).map(|endpoint| endpoint.ID),
+        Some(2)
+    );
+    assert!(device.endpoint(Some("missing")).is_none());
+
+    let right = device.endpoint(Some("right")).unwrap();
+    assert_eq!(device.endpoint_name(&right).as_deref(), Some("right"));
+    let default = device.endpoint(None).unwrap();
+    assert_eq!(device.endpoint_name(&default), None);
+    assert_eq!(device.get_endpoint_names(), vec!["left", "right"]);
 }
 
 #[test]
