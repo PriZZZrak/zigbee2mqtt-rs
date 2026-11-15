@@ -280,7 +280,7 @@ async fn config(harness: &Harness, topic: &str) -> Option<Value> {
             .await
             .attempted
             .iter()
-            .find(|(published, _, _)| published == topic)
+            .find(|(published, payload, _)| published == topic && !payload.is_empty())
             .map(|(_, payload, _)| payload.clone())
         {
             return Some(serde_json::from_str(&payload).unwrap());
@@ -1517,4 +1517,126 @@ async fn configuration_switches_are_config_entities() {
     assert_eq!(payload["entity_category"], "config");
     assert_eq!(payload["icon"], "mdi:window-open-variant");
     assert_eq!(payload["name"], "Window detection");
+}
+
+#[tokio::test(start_paused = true)]
+async fn homeassistant_rename_clears_and_republishes_discovery() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["devices", IEEE, "friendly_name"], json!("lamp2"));
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_entity_renamed(json!({
+            "entity": {"ID": IEEE, "ieeeAddr": IEEE, "name": "lamp2"},
+            "from": "lamp",
+            "to": "lamp2",
+            "homeAssisantRename": true,
+        }));
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    tokio::time::advance(Duration::from_secs(3)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+
+    {
+        let mqtt = harness.mqtt.lock().await;
+        let cleared = mqtt
+            .attempted
+            .iter()
+            .find(|(topic, payload, options)| {
+                topic == &format!("homeassistant/sensor/{IEEE}/temperature/config")
+                    && payload.is_empty()
+                    && options.retain
+            })
+            .expect("old discovery topic cleared");
+        assert_eq!(cleared.1, "");
+    }
+
+    let republished = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("rediscovered after rename");
+    assert_eq!(republished["device"]["name"], "lamp2");
+    assert_eq!(republished["object_id"], "lamp2_temperature");
+}
+
+#[tokio::test(start_paused = true)]
+async fn group_rename_clears_and_republishes_discovery() {
+    let _guard = serial();
+    let harness = harness();
+    {
+        let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+        harness
+            .context
+            .zigbee
+            .group_by_id(1)
+            .unwrap()
+            .zh
+            .add_member(&device.zh.endpoints()[0]);
+    }
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    assert!(config(
+        &harness,
+        &format!("homeassistant/light/{IEEE}/light/config")
+    )
+    .await
+    .is_some());
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["groups", "1", "friendly_name"], json!("kitchen2"));
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_entity_renamed(json!({
+            "entity": {"ID": 1, "name": "kitchen2"},
+            "from": "kitchen",
+            "to": "kitchen2",
+            "homeAssisantRename": true,
+        }));
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    tokio::time::advance(Duration::from_secs(3)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        mqtt.attempted
+            .iter()
+            .any(|(_, payload, options)| payload.is_empty() && options.retain),
+        "group discovery topics were not cleared"
+    );
+    let rediscovered = mqtt
+        .attempted
+        .iter()
+        .filter(|(topic, payload, _)| {
+            topic.starts_with("homeassistant/light/") && !payload.is_empty()
+        })
+        .filter_map(|(_, payload, _)| serde_json::from_str::<Value>(payload).ok())
+        .any(|payload| payload["device"]["name"] == "kitchen2");
+    assert!(rediscovered, "group was not rediscovered with the new name");
 }

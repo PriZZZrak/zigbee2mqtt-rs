@@ -33,6 +33,7 @@ struct Harness {
     event_bus: Arc<Mutex<EventBus>>,
     published: Arc<Mutex<Vec<(String, Value)>>>,
     enable_calls: Arc<Mutex<Vec<(bool, String)>>>,
+    restarts: Arc<Mutex<usize>>,
     database_path: std::path::PathBuf,
     state_path: std::path::PathBuf,
 }
@@ -118,6 +119,8 @@ fn harness() -> Harness {
     let mqtt = Arc::new(tokio::sync::Mutex::new(Mqtt::new(event_bus.clone())));
     let published = Arc::new(Mutex::new(Vec::new()));
     let enable_calls = Arc::new(Mutex::new(Vec::new()));
+    let restarts = Arc::new(Mutex::new(0usize));
+    let restart_sink = restarts.clone();
     let enable_sink = enable_calls.clone();
     let sink = published.clone();
     let publish: PublishEntityState = Arc::new(move |entity, payload, _reason| {
@@ -143,7 +146,12 @@ fn harness() -> Harness {
                     Ok(())
                 })
             }),
-            restart: Arc::new(|| Box::pin(async {})),
+            restart: Arc::new(move || {
+                let sink = restart_sink.clone();
+                Box::pin(async move {
+                    *sink.lock().unwrap() += 1;
+                })
+            }),
             add_extension: Arc::new(|_| Box::pin(async {})),
             key: 8,
         },
@@ -151,6 +159,7 @@ fn harness() -> Harness {
         event_bus,
         published,
         enable_calls,
+        restarts,
         database_path,
         state_path,
     }
@@ -1065,4 +1074,27 @@ async fn options_blocklist_and_device_option_variants() {
     assert!(path.exists(), "{}", path.display());
     let _ = std::fs::remove_file(&path);
     let _ = std::fs::remove_dir(path.parent().unwrap());
+}
+
+#[tokio::test]
+async fn restart_request_triggers_the_restart_callback() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "restart", json!("")).await;
+    let payload = response(&harness, "restart").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert!(harness
+        .context
+        .logger
+        .lock()
+        .unwrap()
+        .winston_logs
+        .iter()
+        .any(|(_, line)| line.contains("Restarting Zigbee2MQTT")));
+    // The callback fires after the upstream 500 ms response delay.
+    tokio::time::sleep(Duration::from_millis(650)).await;
+    assert_eq!(*harness.restarts.lock().unwrap(), 1);
 }

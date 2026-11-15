@@ -30,14 +30,14 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 56 | 2 | 18 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 57 | 2 | 17 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 66 | 16 | 31 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 68 | 14 | 31 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -212,7 +212,7 @@ Coverage classes:
 | 90 | Should throw error when read reporting config is called for non-existing endpoint | `asserted` | reporting_configure_and_read_error_paths |
 | 91 | Should allow to create a backup | `adapter` | backup/archive touches the coordinator |
 | 92 | Should return an error when the backup archive cannot be created | `adapter` | backup/archive touches the coordinator |
-| 93 | Should allow to restart | `code` | request handler ported, no dedicated assertion |
+| 93 | Should allow to restart | `asserted` | restart_request_triggers_the_restart_callback |
 | 94 | Change options and apply - homeassistant | `asserted` | options_apply_homeassistant_and_log_levels |
 | 95 | Change options and apply - log_level | `code` | request handler ported, no dedicated assertion |
 | 96 | Change options and apply - log_debug_namespace_ignore | `asserted` | options_apply_homeassistant_and_log_levels |
@@ -459,8 +459,8 @@ Coverage classes:
 | 85 | Should discover devices with availability | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 86 | Should clear discovery when device is removed | `asserted` | clears_discovery_on_entity_removed |
 | 87 | Should clear discovery when group is removed | `slice` | group removal resolves by ID |
-| 88 | Should refresh discovery when device is renamed | `slice` | rename clears and rediscovers (homeassistant_rename) |
-| 89 | Should refresh discovery when group is renamed | `slice` | rename path shared by groups |
+| 88 | Should refresh discovery when device is renamed | `asserted` | homeassistant_rename_clears_and_republishes_discovery |
+| 89 | Should refresh discovery when group is renamed | `asserted` | group_rename_clears_and_republishes_discovery |
 | 90 | Shouldnt refresh discovery when device is renamed and homeassistant_rename is false | `asserted` | keeps_discovery_topics_when_rename_is_not_a_homeassistant_rename |
 | 91 | Should discover update when device supports it | `asserted` | discovers_ota_update_entity_when_definition_has_ota |
 | 92 | Should discover trigger when action is published | `asserted` | action_publishes_device_trigger_and_republication |

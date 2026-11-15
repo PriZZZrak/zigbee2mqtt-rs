@@ -2514,37 +2514,45 @@ impl Extension for HomeAssistant {
                 Arc::new(move |data| {
                     let this = this.clone();
                     tokio::spawn(async move {
-                        if let Some(ieee) = data
-                            .get("entity")
+                        let entity_value = data.get("entity");
+                        let resolved = entity_value
                             .and_then(|entity| entity.get("ieeeAddr"))
                             .and_then(Value::as_str)
-                        {
-                            if let Some(device) = this.context.zigbee.resolve_device(ieee) {
-                                let device = device as Arc<dyn Entity>;
-                                let rename = data
-                                    .get("homeAssisantRename")
-                                    .and_then(Value::as_bool)
-                                    .unwrap_or(false);
-                                if rename {
-                                    this.clear_entity(&device).await;
-                                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                                }
-                                this.discover(device.clone(), true).await;
-                                let triggers: Vec<String> = this
-                                    .get_discovered(&device.entity_id().key())
-                                    .lock()
-                                    .unwrap()
-                                    .triggers
-                                    .iter()
-                                    .cloned()
-                                    .collect();
-                                for trigger in triggers {
-                                    if let Some((key, value)) = trigger.split_once('_') {
-                                        this.publish_device_trigger_discover(
-                                            &device, key, value, true,
-                                        )
+                            .and_then(|ieee| this.context.zigbee.resolve_device(ieee))
+                            .map(|device| device as Arc<dyn Entity>)
+                            .or_else(|| {
+                                entity_value
+                                    .and_then(|entity| entity.get("ID"))
+                                    .map(|id| {
+                                        id.as_str()
+                                            .map(str::to_string)
+                                            .unwrap_or_else(|| id.to_string())
+                                    })
+                                    .and_then(|id| this.context.zigbee.resolve_entity(&id))
+                            });
+                        let Some(entity) = resolved else { return };
+                        let rename = data
+                            .get("homeAssisantRename")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false);
+                        if rename {
+                            this.clear_entity(&entity).await;
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        }
+                        this.discover(entity.clone(), true).await;
+                        if entity.is_device() {
+                            let triggers: Vec<String> = this
+                                .get_discovered(&entity.entity_id().key())
+                                .lock()
+                                .unwrap()
+                                .triggers
+                                .iter()
+                                .cloned()
+                                .collect();
+                            for trigger in triggers {
+                                if let Some((key, value)) = trigger.split_once('_') {
+                                    this.publish_device_trigger_discover(&entity, key, value, true)
                                         .await;
-                                    }
                                 }
                             }
                         }
