@@ -890,3 +890,77 @@ async fn device_joined_publishes_event_and_enables_rename_last() {
         .get_device("lamp2")
         .is_some());
 }
+
+#[tokio::test]
+async fn zigbee_events_publish_bridge_events_and_devices() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    let cases: Vec<(&str, Value, Value)> = vec![
+        (
+            "announce",
+            json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}}),
+            json!({"type": "device_announce", "data": {"ieee_address": IEEE}}),
+        ),
+        (
+            "interview",
+            json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}, "status": "started"}),
+            json!({"type": "device_interview", "data": {"ieee_address": IEEE, "status": "started"}}),
+        ),
+        (
+            "interview",
+            json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}, "status": "failed"}),
+            json!({"type": "device_interview", "data": {"ieee_address": IEEE, "status": "failed"}}),
+        ),
+        (
+            "interview",
+            json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}, "status": "successful"}),
+            json!({"type": "device_interview", "data": {"ieee_address": IEEE, "status": "successful"}}),
+        ),
+        (
+            "leave",
+            json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}}),
+            json!({"type": "device_leave", "data": {"ieee_address": IEEE}}),
+        ),
+    ];
+
+    for (event, data, expected) in cases {
+        harness.mqtt.lock().await.attempted.clear();
+        let mut bus = harness.event_bus.lock().unwrap();
+        match event {
+            "announce" => bus.emit_device_announce(data),
+            "interview" => bus.emit_device_interview(data),
+            _ => bus.emit_device_leave(data),
+        }
+        drop(bus);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let mqtt = harness.mqtt.lock().await;
+        let published = mqtt
+            .attempted
+            .iter()
+            .find(|(topic, _, _)| topic == "zigbee2mqtt/bridge/event")
+            .unwrap_or_else(|| panic!("missing bridge/event for {event}"));
+        let payload: Value = serde_json::from_str(&published.1).unwrap();
+        assert_eq!(payload["type"], expected["type"]);
+        assert_eq!(payload["data"]["ieee_address"], expected["data"]["ieee_address"]);
+        if let Some(status) = expected["data"]["status"].as_str() {
+            assert_eq!(payload["data"]["status"], status);
+            if status == "successful" {
+                // The harness device has no registered definition, so the event
+                // reports it as unsupported with a null definition.
+                assert_eq!(payload["data"]["supported"], false);
+                assert!(payload["data"]["definition"].is_null());
+            }
+        }
+        assert!(
+            mqtt
+                .attempted
+                .iter()
+                .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/devices"),
+            "devices not republished for {event}"
+        );
+    }
+}

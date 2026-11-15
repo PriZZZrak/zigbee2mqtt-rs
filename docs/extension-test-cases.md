@@ -30,7 +30,7 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 46 | 2 | 28 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 51 | 2 | 23 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
@@ -129,11 +129,11 @@ Coverage classes:
 | 7 | Should publish groups on startup | `asserted` | start_publishes_bridge_topics |
 | 8 | Should publish event when device joined | `asserted` | device_joined_publishes_event_and_enables_rename_last |
 | 9 | Should publish devices when device joined | `asserted` | device_joined_publishes_event_and_enables_rename_last |
-| 10 | Should publish event when device announces | `code` | request handler ported, no dedicated assertion |
-| 11 | Should publish event when device interview started | `code` | request handler ported, no dedicated assertion |
-| 12 | Should publish event and devices when device interview failed | `code` | request handler ported, no dedicated assertion |
-| 13 | Should publish event and devices when device interview successful | `code` | request handler ported, no dedicated assertion |
-| 14 | Should publish event and devices when device leaves | `code` | request handler ported, no dedicated assertion |
+| 10 | Should publish event when device announces | `asserted` | zigbee_events_publish_bridge_events_and_devices |
+| 11 | Should publish event when device interview started | `asserted` | zigbee_events_publish_bridge_events_and_devices |
+| 12 | Should publish event and devices when device interview failed | `asserted` | zigbee_events_publish_bridge_events_and_devices |
+| 13 | Should publish event and devices when device interview successful | `asserted` | zigbee_events_publish_bridge_events_and_devices |
+| 14 | Should publish event and devices when device leaves | `asserted` | zigbee_events_publish_bridge_events_and_devices |
 | 15 | Should allow permit join on all | `adapter` | permit join talks to the coordinator |
 | 16 | Should disallow permit join on all | `adapter` | permit join talks to the coordinator |
 | 17 | Should allow permit join with number string (automatically on all) | `adapter` | permit join talks to the coordinator |
