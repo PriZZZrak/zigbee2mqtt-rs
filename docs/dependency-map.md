@@ -71,7 +71,7 @@ Notes:
 | `winston`, `winston-transport`, `winston-syslog` | logging, file/console/syslog | custom | `z2m_rs::util::logger`, `zigbee_apiarist::utils::logger` | PARTIAL (file/console done; syslog transport and timestamp formatting missing) |
 | `ajv` | JSON-schema settings validation | custom schema subset on `regex` (no `jsonschema` crate) | `z2m_rs::util::settings_schema` (`validate`, `validate_non_required`, `restart_required`), used by `z2m_rs::util::settings` | PORTED for the pinned schema: type/enum/required/properties/pattern(Properties)/propertyNames/items/oneOf/$ref/minimum/maximum; `requiresRestart` computed for overrides; Ajv message text reproduced |
 | `semver` | Node version gate in `index.js` (`satisfies(process.version, …)`) | not applicable | — | N/A: there is no Node runtime; no library version comparison is needed |
-| `fflate` | ZIP for `bridge/request/backup`, onboarding unzip | `zip` 9.5.1 (deflate) + `base64` for the response payload | `z2m_rs::extension::bridge` (backup handler) | PARTIAL: backup ZIP ported; `lib/util/onboarding.ts` unzip is not ported |
+| `fflate` | ZIP for `bridge/request/backup`, onboarding unzip | `zip` 9.5.1 (deflate) + `base64` for the payloads | `z2m_rs::extension::bridge` (backup), `z2m_rs::util::onboarding` (`/submit-zip`) | PORTED (backup + onboarding unzip with traversal guards) |
 | `humanize-duration` | relative `last_seen` strings | custom `utils::humanize_duration` (`largest: 2, round: true`) | `z2m_rs::util::utils` | PORTED (no extra crate); unit-tested against the upstream call shape |
 | `throttleit` | request throttling | `tokio::time` | `controller::helpers::request_queue`, `extension::receive` throttle | PORTED |
 | `srvx` | HTTP server for static assets/API | custom HTTP server, no `axum`/`hyper` | `z2m_rs::util::static_file_server`, `extension::frontend` | PORTED for API/serving logic; Windfront assets deferred to OpenWrt packaging |
@@ -180,8 +180,10 @@ Remaining gaps (tracked, do not hide):
   `rustls-rustcrypto` is a pre-release provider.
 - gzip: pre-compressed `.gz` assets are served; on-the-fly compression is
   deferred together with the Windfront assets.
-- onboarding unzip (`lib/util/onboarding.ts`) is not ported; only the backup
-  ZIP path uses the `zip` crate today.
+- onboarding: `lib/util/onboarding.ts` is ported (`util::onboarding`: data-dir
+  preparation, `/data`, `/submit`, `/submit-zip`, failure page, ZIP extraction
+  with traversal guards, `onboard()`, server loops); only the Windfront
+  onboarding asset bundle is deferred to OpenWrt packaging.
 - HIL on the Routerich AX3000 + Dongle-P has not been executed.
 - `bridge/info.os.node_version` reports the Rust toolchain version
   (`rustc X.Y.Z`) because there is no Node runtime; upstream reports
