@@ -1452,3 +1452,69 @@ async fn status_offline_or_other_topics_do_not_republish() {
         .iter()
         .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/state"));
 }
+
+#[tokio::test]
+async fn discovery_types_are_unique_and_templates_guarded() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let mqtt = harness.mqtt.lock().await;
+    let mut seen = std::collections::HashSet::new();
+    for (topic, payload, _) in &mqtt.attempted {
+        let Some(rest) = topic.strip_prefix("homeassistant/") else {
+            continue;
+        };
+        let parts: Vec<&str> = rest.split('/').collect();
+        if parts.len() != 4 || parts[3] != "config" || parts[1] == "0x00124b0024c16b95" {
+            continue;
+        }
+        let key = (parts[0].to_string(), parts[2].to_string());
+        assert!(seen.insert(key.clone()), "duplicate discovery entry {key:?}");
+
+        let payload: Value = serde_json::from_str(payload).unwrap();
+        if let Some(template) = payload["value_template"].as_str() {
+            if template.contains("value_json") {
+                assert!(
+                    template.starts_with("{% if \""),
+                    "unguarded template {template}"
+                );
+            }
+        }
+    }
+    assert!(!seen.is_empty());
+}
+
+#[tokio::test]
+async fn configuration_switches_are_config_entities() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        if let zigbee_converters::Exposes::Static(exposes) = &mut definition.exposes {
+            exposes.push(Expose {
+                r#type: "switch".to_string(),
+                name: Some("switch".to_string()),
+                endpoint: Some("1".to_string()),
+                access: access::ALL,
+                features: vec![Expose {
+                    property: Some("window_detection".to_string()),
+                    ..Expose::binary("state", access::ALL)
+                }],
+                label: Some("Window detection".to_string()),
+                ..Default::default()
+            });
+        }
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let payload = config(
+        &harness,
+        &format!("homeassistant/switch/{IEEE}/window_detection/config"),
+    )
+    .await
+    .expect("configuration switch");
+    assert_eq!(payload["entity_category"], "config");
+    assert_eq!(payload["icon"], "mdi:window-open-variant");
+    assert_eq!(payload["name"], "Window detection");
+}

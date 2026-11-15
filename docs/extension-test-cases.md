@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 62 | 16 | 35 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 66 | 16 | 31 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -372,12 +372,12 @@ Coverage classes:
 
 | # | Upstream case | Class | Evidence / reason |
 |---:|---|---|---|
-| 1 | Should not have duplicate type/object_ids in a mapping | `code` | object_id derivation keeps type/object_id unique |
-| 2 | Should guard every generated state template against a missing property | `code` | state_value_template guards every property access |
+| 1 | Should not have duplicate type/object_ids in a mapping | `asserted` | discovery_types_are_unique_and_templates_guarded |
+| 2 | Should guard every generated state template against a missing property | `asserted` | discovery_types_are_unique_and_templates_guarded |
 | 3 | Should guard the number entity built from a numeric expose with SET access | `slice` | number entity SET guard |
 | 4 | Should not guard with a form that drops a legitimate 0, false or null | `slice` | presence check (not truthiness) in state_value_template |
-| 5 | Should mark thermostat configuration toggles as config entities | `code` | entity_category cascade for config entities |
-| 6 | Should mark device settings as config entities | `code` | entity_category cascade for config entities |
+| 5 | Should mark thermostat configuration toggles as config entities | `asserted` | configuration_switches_are_config_entities |
+| 6 | Should mark device settings as config entities | `asserted` | configuration_switches_are_config_entities |
 | 7 | Should apply expose-level Home Assistant discovery metadata | `asserted` | applies_expose_metadata_and_null_name |
 | 8 | Should set discovery name to null when expose specifies homeassistant name null | `asserted` | applies_expose_metadata_and_null_name |
 | 9 | Should discover devices and groups | `slice` | discovers_numeric_binary_enum_and_switch_entities |
