@@ -1112,3 +1112,30 @@ async fn backup_without_adapter_returns_an_error() {
     assert!(!payload["error"].as_str().unwrap_or_default().is_empty());
     assert!(payload["data"]["zip"].is_null());
 }
+
+#[tokio::test]
+async fn remove_device_can_clear_the_entity_cache() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Upstream `Should allow to clear cache when removing device`.
+    send(
+        &harness,
+        "device/remove",
+        json!({"id": "lamp", "force": true, "clear_cache": true}),
+    )
+    .await;
+    let payload = response(&harness, "device/remove").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["force"], true);
+    assert!(harness.context.zigbee.resolve_device(IEEE).is_none());
+    assert!(harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_device("lamp")
+        .is_none());
+}

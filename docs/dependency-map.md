@@ -69,7 +69,7 @@ Notes:
 |---|---|---|---|---|
 | `mqtt` | MQTT client | `rumqttc-v4-next` (aliased `rumqttc`) | `z2m_rs::mqtt::Mqtt` | PORTED (connect/subscribe/retained/QoS1-2, bridge topics, `bridge/request/*`, live `queued`; `mqtts://` with `reject_unauthorized`/ca/cert/key over the pure-Rust rustls provider) |
 | `js-yaml` | YAML read/write | `serde_yaml_ng` | `z2m_rs::util::yaml` | PORTED |
-| `winston`, `winston-transport`, `winston-syslog` | logging, file/console/syslog | custom | `z2m_rs::util::logger`, `zigbee_apiarist::utils::logger` | PORTED (console/file/syslog RFC 5424 over udp/tcp/unix; timestamp formatting remains PARTIAL) |
+| `winston`, `winston-transport`, `winston-syslog` | logging, file/console/syslog | custom | `z2m_rs::util::logger`, `zigbee_apiarist::utils::logger` | PORTED (console/file/syslog RFC 5424 over udp/tcp/unix, winston/fecha `timestamp_format` tokens) |
 | `ajv` | JSON-schema settings validation | custom schema subset on `regex` (no `jsonschema` crate) | `z2m_rs::util::settings_schema` (`validate`, `validate_non_required`, `restart_required`), used by `z2m_rs::util::settings` | PORTED for the pinned schema: type/enum/required/properties/pattern(Properties)/propertyNames/items/oneOf/$ref/minimum/maximum; `requiresRestart` computed for overrides; Ajv message text reproduced |
 | `semver` | Node version gate in `index.js` (`satisfies(process.version, …)`) | not applicable | — | N/A: there is no Node runtime; no library version comparison is needed |
 | `fflate` | ZIP for `bridge/request/backup`, onboarding unzip | `zip` 9.5.1 (deflate) + `base64` for the payloads | `z2m_rs::extension::bridge` (backup), `z2m_rs::util::onboarding` (`/submit-zip`) | PORTED (backup + onboarding unzip with traversal guards) |
@@ -169,8 +169,6 @@ Completed in this pass:
 
 Remaining gaps (tracked, do not hide):
 
-- `z2m-rs/util/logger.rs` lacks upstream `timestamp_format` handling; it uses
-  ISO-8601 instead of the malformed epoch string. Format parity is `PARTIAL`.
 - mDNS discovery is still injected rather than live (`mdns-sd` not added yet).
 - `mqtts://` has been validated against a local aedes TLS broker
   (`docs/mqtt-broker-differential.md`); a public MQTT endpoint and browser

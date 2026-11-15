@@ -14,7 +14,7 @@ counterpart.
 | `model/device.ts` | `crates/z2m-rs/src/model/device.rs` | PORTED | `tests/model.rs`, converter/publish tests |
 | `model/group.ts` | `crates/z2m-rs/src/model/group.rs` | PORTED | `tests/model.rs`, `tests/groups.rs` |
 | `util/data.ts` | `crates/z2m-rs/src/util/data.rs` | PORTED | `tests/data.rs` |
-| `util/logger.ts` | `crates/z2m-rs/src/util/logger.rs` | PORTED | `tests/logger.rs` (console/file transports, namespaced levels, syslog RFC 5424 over udp/tcp/unix); `timestamp_format` PARTIAL |
+| `util/logger.ts` | `crates/z2m-rs/src/util/logger.rs` | PORTED | `tests/logger.rs`, `tests/logger_timestamp.rs` (console/file transports, winston/fecha `timestamp_format` tokens, timed file lines, namespaced levels, syslog RFC 5424 over udp/tcp/unix) |
 | `util/objectAssignDeep.ts` | `crates/z2m-rs/src/util/object_assign_deep.rs` | PORTED | `tests/object_assign_deep.rs` |
 | `util/onboarding.ts` | `crates/z2m-rs/src/util/onboarding.rs` | PORTED | unit tests in `util/onboarding.rs` (`/data`, `/submit`, `/submit-zip`, ZIP traversal guards, failure payload); Windfront onboarding assets deferred |
 | `util/sd-notify.ts` | `crates/z2m-rs/src/util/sd_notify.rs` | PORTED | `tests/sd_notify.rs` |

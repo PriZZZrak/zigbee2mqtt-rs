@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde_json::{json, Value};
-use zigbee_apiarist::utils::datetime::{now_file_timestamp, now_iso8601};
+use zigbee_apiarist::utils::datetime::{
+    civil_from_days, local_offset_seconds, now_file_timestamp, now_iso8601, now_ms,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct Transport {
@@ -94,6 +96,8 @@ pub struct Logger {
     pub log_listener: Option<Arc<dyn Fn(&str, &str, &str) + Send + Sync>>,
     /// Upstream `winston-syslog` transport (`log_output: ["syslog"]`).
     pub syslog: Option<SyslogTransport>,
+    /// Append handle for the file transport (`log_output: ["file"]`).
+    pub file_log: Option<std::fs::File>,
 }
 
 impl Logger {
@@ -144,6 +148,9 @@ impl Logger {
 
         if outputs.iter().any(|output| output == "file") {
             let directory = self.init_file_directory();
+            if let Some(directory) = &directory {
+                let _ = std::fs::create_dir_all(directory);
+            }
             self.cleanup_log_directories();
             let rotation = self.advanced_bool("log_rotation").unwrap_or(true);
             let transport = Transport {
@@ -155,6 +162,7 @@ impl Logger {
                 maxsize: rotation.then_some(10 * 1024 * 1024),
             };
             self.transports.push(transport);
+            self.file_log = self.open_log_file(&directory);
 
             if self.advanced_bool("log_symlink_current").unwrap_or(false) {
                 if let (Some(directory), Some(parent)) =
@@ -289,6 +297,28 @@ impl Logger {
         })
     }
 
+    fn open_log_file(&self, directory: &Option<String>) -> Option<std::fs::File> {
+        let directory = directory.as_ref()?;
+        std::fs::create_dir_all(directory).ok()?;
+        let filename = self.advanced_str("log_file").unwrap_or("log.log");
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(Path::new(directory).join(filename))
+            .ok()
+    }
+
+    /// Upstream `advanced.timestamp_format` (winston/fecha tokens).
+    fn timestamp_pattern(&self) -> String {
+        self.advanced_str("timestamp_format")
+            .unwrap_or("YYYY-MM-DD HH:mm:ss")
+            .to_string()
+    }
+
+    fn format_timestamp(&self) -> String {
+        format_timestamp(now_ms() as i64, &self.timestamp_pattern())
+    }
+
     fn log_directory_pattern(&self) -> String {
         self.advanced_str("log_directory")
             .unwrap_or("data/log/%TIMESTAMP%")
@@ -319,18 +349,29 @@ impl Logger {
         let Ok(entries) = std::fs::read_dir(parent) else {
             return;
         };
+        // The directory created by this run is never a removal candidate; the
+        // upstream cleanup keeps `log_directories_to_keep` newest directories
+        // including the active one.
+        let active = {
+            let pattern = self.log_directory_pattern();
+            pattern
+                .contains("%TIMESTAMP%")
+                .then(|| PathBuf::from(pattern.replace("%TIMESTAMP%", &now_file_timestamp())))
+        };
         let mut directories: Vec<PathBuf> = entries
             .filter_map(Result::ok)
             .map(|entry| entry.path())
             .filter(|path| path.is_dir())
+            .filter(|path| Some(path) != active.as_ref())
             .collect();
 
         let keep = self.advanced_u64("log_directories_to_keep").unwrap_or(10) as usize;
-        if directories.len() <= keep {
+        let keep_others = keep.saturating_sub(1);
+        if directories.len() <= keep_others {
             return;
         }
         directories.sort();
-        let remove_count = directories.len() - keep;
+        let remove_count = directories.len() - keep_others;
         for directory in directories.into_iter().take(remove_count) {
             if let Some(error) = self.remove_error.clone() {
                 self.winston_logs.push((
@@ -504,10 +545,15 @@ impl Logger {
         if let Some(syslog) = &self.syslog {
             syslog.send(level, &message);
         }
+        let timestamp = self.format_timestamp();
+        if let Some(file) = self.file_log.as_mut() {
+            use std::io::Write as _;
+            let _ = writeln!(file, "[{timestamp}] {level}: \t{message}");
+        }
 
         if self.log_console_json {
             self.console_writes.push(
-                json!({"level": level, "message": message, "timestamp": timestamp()}).to_string(),
+                json!({"level": level, "message": message, "timestamp": timestamp}).to_string(),
             );
         } else {
             let color = match level {
@@ -516,17 +562,14 @@ impl Logger {
                 "debug" => 34,
                 _ => 32,
             };
-            self.console_writes
-                .push(format!("\u{1b}[{color}m{level}\u{1b}[39m: \t{message}"));
+            self.console_writes.push(format!(
+                "[{timestamp}] \u{1b}[{color}m{level}\u{1b}[39m: \t{message}"
+            ));
         }
     }
 
     /// Upstream: `logger.end()`.
     pub fn end(&mut self) {}
-}
-
-fn timestamp() -> String {
-    now_iso8601()
 }
 
 fn split_alternatives(pattern: &str) -> Vec<String> {
@@ -551,4 +594,73 @@ fn split_alternatives(pattern: &str) -> Vec<String> {
     }
     result.push(current);
     result
+}
+
+/// Winston/fecha-compatible timestamp formatting with local time
+/// (`advanced.timestamp_format`, logger.ts:38-41).
+pub fn format_timestamp(now_ms: i64, pattern: &str) -> String {
+    const MONTHS: [&str; 12] = [
+        "January", "February", "March", "April", "May", "June", "July", "August", "September",
+        "October", "November", "December",
+    ];
+    const MONTHS_SHORT: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    const WEEKDAYS: [&str; 7] = [
+        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+    ];
+
+    let local_ms = now_ms + local_offset_seconds(now_ms) * 1000;
+    let days = local_ms.div_euclid(86_400_000);
+    let rem = local_ms.rem_euclid(86_400_000);
+    let (year, month, day) = civil_from_days(days);
+    let seconds = rem / 1000;
+    let (hour, minute, second) = (seconds / 3600, (seconds % 3600) / 60, seconds % 60);
+    let millis = rem % 1000;
+    let weekday = (days + 4).rem_euclid(7);
+    let hour12 = if hour % 12 == 0 { 12 } else { hour % 12 };
+    let offset = local_offset_seconds(now_ms);
+
+    let tokens: [(&str, String); 25] = [
+        ("YYYY", format!("{year:04}")),
+        ("YY", format!("{:02}", year.rem_euclid(100))),
+        ("MMMM", MONTHS[(month - 1) as usize].to_string()),
+        ("MMM", MONTHS_SHORT[(month - 1) as usize].to_string()),
+        ("MM", format!("{month:02}")),
+        ("M", format!("{month}")),
+        ("dddd", WEEKDAYS[weekday as usize].to_string()),
+        ("ddd", WEEKDAYS[weekday as usize][..3].to_string()),
+        ("DD", format!("{day:02}")),
+        ("D", format!("{day}")),
+        ("HH", format!("{hour:02}")),
+        ("H", format!("{hour}")),
+        ("hh", format!("{hour12:02}")),
+        ("h", format!("{hour12}")),
+        ("mm", format!("{minute:02}")),
+        ("m", format!("{minute}")),
+        ("ss", format!("{second:02}")),
+        ("s", format!("{second}")),
+        ("SSS", format!("{millis:03}")),
+        ("A", if hour < 12 { "AM".into() } else { "PM".into() }),
+        ("a", if hour < 12 { "am".into() } else { "pm".into() }),
+        ("ZZ", format!("{}{:02}{:02}", if offset < 0 { "-" } else { "+" }, offset.abs() / 3600, (offset.abs() % 3600) / 60)),
+        ("Z", format!("{}{:02}:{:02}", if offset < 0 { "-" } else { "+" }, offset.abs() / 3600, (offset.abs() % 3600) / 60)),
+        ("X", format!("{}", local_ms / 1000)),
+        ("x", format!("{local_ms}")),
+    ];
+
+    let mut output = String::new();
+    let mut index = 0;
+    while index < pattern.len() {
+        let rest = &pattern[index..];
+        if let Some((token, value)) = tokens.iter().find(|(token, _)| rest.starts_with(token)) {
+            output.push_str(value);
+            index += token.len();
+        } else {
+            let character = rest.chars().next().unwrap();
+            output.push(character);
+            index += character.len_utf8();
+        }
+    }
+    output
 }
