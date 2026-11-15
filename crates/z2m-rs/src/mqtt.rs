@@ -105,7 +105,7 @@ impl Mqtt {
         let server = mqtt_settings["server"]
             .as_str()
             .unwrap_or("mqtt://localhost:1883");
-        let (host, port) = parse_server(server)?;
+        let (host, port, use_tls) = parse_server(server)?;
         self.base_topic = mqtt_settings["base_topic"]
             .as_str()
             .unwrap_or("zigbee2mqtt")
@@ -116,24 +116,30 @@ impl Mqtt {
             .as_str()
             .map(str::to_string)
             .unwrap_or_else(|| format!("zigbee2mqtt-{}", std::process::id()));
-        let mut options = MqttOptions::new(client_id, host, port);
+        let mut options = MqttOptions::new(client_id, (host.as_str(), port));
+        if use_tls {
+            let config = build_tls_config(mqtt_settings)?;
+            options.set_transport(rumqttc::Transport::Tls(
+                rumqttc::TlsConfiguration::Rustls(config),
+            ));
+        }
         if let Some(keepalive) = mqtt_settings["keepalive"].as_u64() {
-            options.set_keep_alive(std::time::Duration::from_secs(keepalive));
+            options.set_keep_alive(keepalive.min(u16::MAX as u64) as u16);
         }
         if let (Some(user), Some(password)) = (
             mqtt_settings["user"].as_str(),
             mqtt_settings["password"].as_str(),
         ) {
-            options.set_credentials(user, password);
+            options.set_credentials(user, password.to_string());
         } else if let Some(user) = mqtt_settings["user"].as_str() {
-            options.set_credentials(user, "");
+            options.set_credentials(user, String::new());
         }
         if let Some(id) = mqtt_settings["client_id"].as_str() {
             options.set_clean_session(false);
             let _ = id;
         }
 
-        let (client, mut eventloop) = AsyncClient::new(options, 64);
+        let (client, mut eventloop) = AsyncClient::builder(options).capacity(64).build();
         let base_topic = self.base_topic.clone();
         let event_bus = self.event_bus.clone();
         let published_topics = self.published_topics.clone();
@@ -143,14 +149,15 @@ impl Mqtt {
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Packet::Publish(publish))) => {
-                        if published_topics.lock().unwrap().remove(&publish.topic) {
+                        let topic = String::from_utf8_lossy(&publish.topic).to_string();
+                        if published_topics.lock().unwrap().remove(&topic) {
                             continue;
                         }
                         // Upstream uses `payload.toString()`; lossy UTF-8 keeps
                         // the same contract instead of dropping the message.
                         let payload = String::from_utf8_lossy(&publish.payload).to_string();
                         event_bus.lock().unwrap().emit_mqtt_message(json!({
-                            "topic": publish.topic,
+                            "topic": topic,
                             "message": payload,
                         }));
                     }
@@ -167,9 +174,8 @@ impl Mqtt {
                         let _ = connect_client
                             .publish(
                                 format!("{base_topic}/bridge/state"),
-                                QoS::AtLeastOnce,
-                                true,
                                 serde_json::to_vec(&json!({"state": "online"})).unwrap_or_default(),
+                                rumqttc::PublishOptions::new(QoS::AtLeastOnce).retain(true),
                             )
                             .await;
                         let _ = connect_client
@@ -198,9 +204,8 @@ impl Mqtt {
             let _ = client
                 .publish(
                     format!("{}/bridge/state", self.base_topic),
-                    QoS::AtLeastOnce,
-                    true,
                     serde_json::to_vec(&json!({"state": "offline"})).unwrap_or_default(),
+                    rumqttc::PublishOptions::new(QoS::AtLeastOnce).retain(true),
                 )
                 .await;
             let _ = client.disconnect().await;
@@ -247,7 +252,7 @@ impl Mqtt {
             return false;
         };
         if client
-            .publish(&topic, qos, options.retain, payload.clone())
+            .publish(&topic, payload.clone(), rumqttc::PublishOptions::new(qos).retain(options.retain))
             .await
             .is_err()
         {
@@ -327,18 +332,160 @@ impl Mqtt {
     }
 }
 
-fn parse_server(server: &str) -> Result<(String, u16), String> {
-    let rest = server
+fn parse_server(server: &str) -> Result<(String, u16, bool), String> {
+    let (rest, tls) = if let Some(rest) = server
+        .strip_prefix("mqtts://")
+        .or_else(|| server.strip_prefix("ssl://"))
+    {
+        (rest, true)
+    } else if let Some(rest) = server
         .strip_prefix("mqtt://")
         .or_else(|| server.strip_prefix("tcp://"))
-        .ok_or_else(|| format!("Unsupported MQTT server '{server}'"))?;
+    {
+        (rest, false)
+    } else {
+        return Err(format!("Unsupported MQTT server '{server}'"));
+    };
     let (host, port) = rest
         .rsplit_once(':')
         .ok_or_else(|| format!("Invalid MQTT server '{server}', expected mqtt://host:port"))?;
     let port = port
         .parse::<u16>()
         .map_err(|_| format!("Invalid MQTT port in '{server}'"))?;
-    Ok((host.to_string(), port))
+    Ok((host.to_string(), port, tls))
+}
+
+/// Upstream mqtt.js TLS options: `reject_unauthorized`, `ca`, `cert`, `key`.
+fn build_tls_config(mqtt_settings: &Value) -> Result<Arc<tokio_rustls::rustls::ClientConfig>, String> {
+    use std::sync::Arc as StdArc;
+    use tokio_rustls::rustls;
+
+    let _ = rustls::crypto::CryptoProvider::install_default(rustls_rustcrypto::provider());
+    let provider = StdArc::new(rustls_rustcrypto::provider());
+    let reject_unauthorized = mqtt_settings["reject_unauthorized"]
+        .as_bool()
+        .unwrap_or(true);
+    let client_auth = match (
+        mqtt_settings["cert"].as_str(),
+        mqtt_settings["key"].as_str(),
+    ) {
+        (Some(cert), Some(key)) => {
+            let certs = rustls_pemfile::certs(&mut std::io::BufReader::new(
+                std::fs::File::open(cert).map_err(|error| error.to_string())?,
+            ))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| error.to_string())?;
+            let key = rustls_pemfile::private_key(&mut std::io::BufReader::new(
+                std::fs::File::open(key).map_err(|error| error.to_string())?,
+            ))
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "No private key found in mqtt.key".to_string())?;
+            Some((certs, key))
+        }
+        _ => None,
+    };
+
+    let builder = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|error| error.to_string())?;
+    let config = if reject_unauthorized {
+        let roots = root_store(mqtt_settings)?;
+        let builder = builder.with_root_certificates(roots);
+        match client_auth {
+            Some((certs, key)) => builder
+                .with_client_auth_cert(certs, key)
+                .map_err(|error| error.to_string())?,
+            None => builder.with_no_client_auth(),
+        }
+    } else {
+        let builder = builder
+            .dangerous()
+            .with_custom_certificate_verifier(StdArc::new(NoVerification::new()));
+        match client_auth {
+            Some((certs, key)) => builder
+                .with_client_auth_cert(certs, key)
+                .map_err(|error| error.to_string())?,
+            None => builder.with_no_client_auth(),
+        }
+    };
+    Ok(Arc::new(config))
+}
+
+fn root_store(mqtt_settings: &Value) -> Result<tokio_rustls::rustls::RootCertStore, String> {
+    let mut roots = tokio_rustls::rustls::RootCertStore::empty();
+    let native = rustls_native_certs::load_native_certs();
+    for cert in native.certs {
+        let _ = roots.add(cert);
+    }
+    if let Some(path) = mqtt_settings["ca"].as_str() {
+        let certs = rustls_pemfile::certs(&mut std::io::BufReader::new(
+            std::fs::File::open(path).map_err(|error| error.to_string())?,
+        ))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+        for cert in certs {
+            roots.add(cert).map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(roots)
+}
+
+/// Upstream mqtt.js `rejectUnauthorized: false`.
+#[derive(Debug)]
+struct NoVerification {
+    provider: std::sync::Arc<tokio_rustls::rustls::crypto::CryptoProvider>,
+}
+
+impl NoVerification {
+    fn new() -> Self {
+        Self {
+            provider: std::sync::Arc::new(rustls_rustcrypto::provider()),
+        }
+    }
+}
+
+impl tokio_rustls::rustls::client::danger::ServerCertVerifier for NoVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[tokio_rustls::rustls::pki_types::CertificateDer<'_>],
+        _server_name: &tokio_rustls::rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: tokio_rustls::rustls::pki_types::UnixTime,
+    ) -> Result<tokio_rustls::rustls::client::danger::ServerCertVerified, tokio_rustls::rustls::Error>
+    {
+        Ok(tokio_rustls::rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+        _dss: &tokio_rustls::rustls::DigitallySignedStruct,
+    ) -> Result<
+        tokio_rustls::rustls::client::danger::HandshakeSignatureValid,
+        tokio_rustls::rustls::Error,
+    > {
+        Ok(tokio_rustls::rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+        _dss: &tokio_rustls::rustls::DigitallySignedStruct,
+    ) -> Result<
+        tokio_rustls::rustls::client::danger::HandshakeSignatureValid,
+        tokio_rustls::rustls::Error,
+    > {
+        Ok(tokio_rustls::rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<tokio_rustls::rustls::SignatureScheme> {
+        self.provider
+            .signature_verification_algorithms
+            .supported_schemes()
+    }
 }
 
 struct PendingPublish(Arc<AtomicUsize>);
@@ -346,5 +493,39 @@ struct PendingPublish(Arc<AtomicUsize>);
 impl Drop for PendingPublish {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_tls_config, parse_server};
+    use serde_json::json;
+
+    #[test]
+    fn parses_plain_and_tls_servers() {
+        assert_eq!(
+            parse_server("mqtt://localhost:1883").unwrap(),
+            ("localhost".to_string(), 1883, false)
+        );
+        assert_eq!(
+            parse_server("tcp://broker:1884").unwrap(),
+            ("broker".to_string(), 1884, false)
+        );
+        assert_eq!(
+            parse_server("mqtts://secure:8883").unwrap(),
+            ("secure".to_string(), 8883, true)
+        );
+        assert_eq!(
+            parse_server("ssl://legacy:8883").unwrap(),
+            ("legacy".to_string(), 8883, true)
+        );
+        assert!(parse_server("ws://localhost:8080").is_err());
+    }
+
+    #[test]
+    fn builds_a_pure_rust_tls_config() {
+        let config = build_tls_config(&json!({"reject_unauthorized": false}))
+            .expect("TLS config builds with the rustcrypto provider");
+        assert!(config.alpn_protocols.is_empty());
     }
 }

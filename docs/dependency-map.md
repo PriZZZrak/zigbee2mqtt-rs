@@ -13,7 +13,7 @@ Last verified against crates.io / `Cargo.lock`: **2026-11-14**.
 | `serde_json` | `1` | 1.0.154 | 1.0.154 | current |
 | `serde_yaml_ng` | `0.10` | 0.10.0 | 0.10.0 | current; replaced deprecated `serde_yaml` |
 | `tokio` | `1` | 1.54.1 | 1.54.1 | current; `test-util` is a dev-only feature |
-| `rumqttc` | `0.25` | 0.25.1 | 0.25.1 | current; `default-features = false` (no native TLS) |
+| `rumqttc-v4-next` (aliased `rumqttc`) | `0.34` | 0.34.0 | 0.34.0 | MQTT 3.1.1 client; `default-features = false, features = ["use-rustls-no-provider"]` — no ring/aws-lc, the pure-Rust `rustls-rustcrypto` provider is installed in `mqtt.rs` |
 | `regex` | `1` | 1.13.1 | 1.13.1 | current; imported only by `z2m_rs::util::settings_schema` (Ajv wrapper) and `z2m_rs::util::utils` (`filterProperties`) |
 | `zip` | `9.5.1` | 9.5.1 | 9.5.1 | current; `default-features = false, features = ["deflate"]` → `flate2` → pure-Rust `zlib-rs` |
 | `base64` | `0.23.1` | 0.23.1 | 0.23.1 | current; replaces Node `Buffer` base64 in backup/icon paths |
@@ -22,7 +22,8 @@ Last verified against crates.io / `Cargo.lock`: **2026-11-14**.
 | `futures-util` | `0.3.34` | 0.3.34 | 0.3.34 | `default-features = false, features = ["sink"]`; sink/stream helpers in `frontend` |
 | `rustls` / `tokio-rustls` | `0.23` / `0.26` | 0.23.46 / 0.26.6 | 0.23.46 / 0.26.6 | frontend TLS; default features off (no aws-lc/ring) |
 | `rustls-rustcrypto` | `0.1.0-pre.0` | 0.1.0-pre.0 | 0.1.0-pre.0 (pre-release) | pure-Rust RustCrypto `CryptoProvider` used by frontend TLS |
-| `rustls-pemfile` | `2` | 2.2.0 | 2.2.0 | certificate/key parsing for frontend TLS |
+| `rustls-pemfile` | `2` | 2.2.0 | 2.2.0 | certificate/key parsing for frontend and MQTT TLS |
+| `rustls-native-certs` | `0.8` | 0.8.5 | 0.8.5 | native trust anchors for `mqtts://` |
 | `socket2` | `0.6` | 0.6.5 | 0.6.5 | current |
 | `libc` | `0.2` (unix only) | 0.2.191 | 0.2.191 | current; OS bindings for serial modem lines and `localtime_r` (no C crypto/codec) |
 | `serial2-tokio` | `0.1` | 0.1.26 | 0.1.26 | current; `unix`/`windows` features are cfg-gated in the manifest |
@@ -66,7 +67,7 @@ Notes:
 
 | Upstream | Upstream use | Rust replacement | Wrapper / API | Status |
 |---|---|---|---|---|
-| `mqtt` | MQTT client | `rumqttc` | `z2m_rs::mqtt::Mqtt` | PORTED (connect/subscribe/retained/QoS, bridge topics, `bridge/request/*`, `stats()` with live `queued`); `mqtts://` not enabled yet |
+| `mqtt` | MQTT client | `rumqttc-v4-next` (aliased `rumqttc`) | `z2m_rs::mqtt::Mqtt` | PORTED (connect/subscribe/retained/QoS1-2, bridge topics, `bridge/request/*`, live `queued`; `mqtts://` with `reject_unauthorized`/ca/cert/key over the pure-Rust rustls provider) |
 | `js-yaml` | YAML read/write | `serde_yaml_ng` | `z2m_rs::util::yaml` | PORTED |
 | `winston`, `winston-transport`, `winston-syslog` | logging, file/console/syslog | custom | `z2m_rs::util::logger`, `zigbee_apiarist::utils::logger` | PORTED (console/file/syslog RFC 5424 over udp/tcp/unix; timestamp formatting remains PARTIAL) |
 | `ajv` | JSON-schema settings validation | custom schema subset on `regex` (no `jsonschema` crate) | `z2m_rs::util::settings_schema` (`validate`, `validate_non_required`, `restart_required`), used by `z2m_rs::util::settings` | PORTED for the pinned schema: type/enum/required/properties/pattern(Properties)/propertyNames/items/oneOf/$ref/minimum/maximum; `requiresRestart` computed for overrides; Ajv message text reproduced |
@@ -107,7 +108,7 @@ module:
 | `zip` | `crates/z2m-rs/src/extension/bridge.rs` (backup archive) |
 | `base64` | `crates/z2m-rs/src/util/utils.rs` (icon data URLs), `crates/z2m-rs/src/extension/bridge.rs` (backup payload) |
 | `md-5` | `crates/z2m-rs/src/util/utils.rs` (`md5_hex`; migration reuses it) |
-| `rustls`, `tokio-rustls`, `rustls-rustcrypto`, `rustls-pemfile` | `crates/z2m-rs/src/extension/frontend.rs` (TLS section; `build_tls_acceptor`) |
+| `rustls`, `tokio-rustls`, `rustls-rustcrypto`, `rustls-pemfile`, `rustls-native-certs` | `crates/z2m-rs/src/extension/frontend.rs` (server TLS) and `crates/z2m-rs/src/mqtt.rs` (`mqtts://` client TLS) |
 | `tokio-tungstenite`, `futures-util` | `crates/z2m-rs/src/extension/frontend.rs` (WebSocket) |
 | `tokio::net` (TCP client) | `crates/zigbee-apiarist/src/adapter/transport.rs`; `crates/z2m-rs/src/extension/frontend.rs` (server) |
 | `SystemTime::now`, `Date.now()` equivalent | `crates/zigbee-apiarist/src/utils/datetime.rs` |
@@ -171,12 +172,9 @@ Remaining gaps (tracked, do not hide):
 - `z2m-rs/util/logger.rs` lacks upstream `timestamp_format` handling; it uses
   ISO-8601 instead of the malformed epoch string. Format parity is `PARTIAL`.
 - mDNS discovery is still injected rather than live (`mdns-sd` not added yet).
-- `mqtts://` (TLS to the broker) is **OMITTED** (user decision 2026-11-15,
-  AGENTS §5 Q5): `rumqttc`'s `use-rustls-no-provider` pulls
-  `rustls-webpki 0.102` → `ring` (C/asm crypto), which violates the pure-Rust
-  rule (§6). Only `mqtt://`/`tcp://` are supported.
-- TLS interoperability with Chrome/Safari/Firefox has not been validated yet;
-  `rustls-rustcrypto` is a pre-release provider.
+- TLS interoperability with Chrome/Safari/Firefox (`wss://`) and with real
+  MQTT brokers over `mqtts://` has not been validated against a public endpoint
+  yet; `rustls-rustcrypto` is a pre-release provider.
 - gzip: pre-compressed `.gz` assets are served; on-the-fly compression is
   deferred together with the Windfront assets.
 - onboarding: `lib/util/onboarding.ts` is ported (`util::onboarding`: data-dir

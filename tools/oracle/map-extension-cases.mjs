@@ -373,7 +373,7 @@ const CASES = {
             42: [A, "set_and_get_dispatch_to_converters"],
             43: [S, "multi-endpoint get dispatch"],
             44: [S, "multi-endpoint cover get"],
-            45: [C, "unknown endpoint error"],
+            45: [A, "missing_endpoint_and_converter_are_logged"],
             46: [A, "unsupported_device_is_rejected (no definition)"],
             47: [C, "unknown property endpoint error"],
             ...Object.fromEntries(
@@ -384,6 +384,7 @@ const CASES = {
             ),
             61: [S, "invalid payload is rejected"],
             100: [A, "unsupported_device_is_rejected"],
+            104: [A, "missing_endpoint_and_converter_are_logged"],
             110: [S, "unsupported_device_is_rejected (entity not found path)"],
         },
     },

@@ -31,9 +31,9 @@ async fn real_broker_connect_publish_and_queue_stats() {
         let (host, port) = rest.split_once(':').unwrap();
         (host.to_string(), port.parse::<u16>().unwrap())
     };
-    let mut options = rumqttc::MqttOptions::new("z2m-rs-broker-observer", host, port);
-    options.set_keep_alive(Duration::from_secs(5));
-    let (observer, mut eventloop) = rumqttc::AsyncClient::new(options, 10);
+    let mut options = rumqttc::MqttOptions::new("z2m-rs-broker-observer", (host.as_str(), port));
+    options.set_keep_alive(5);
+    let (observer, mut eventloop) = rumqttc::AsyncClient::builder(options).capacity(10).build();
     observer
         .subscribe("z2m-rs-broker-test/state", rumqttc::QoS::AtLeastOnce)
         .await

@@ -335,3 +335,72 @@ async fn set_and_get_dispatch_to_converters() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(harness.recorded.lock().unwrap().len(), 1);
 }
+
+#[tokio::test]
+async fn missing_endpoint_and_converter_are_logged() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_converter(&harness.zigbee, calls);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+    assert!(
+        harness.zigbee.resolve_device(IEEE).unwrap().definition().is_some(),
+        "definition not resolved"
+    );
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": format!("zigbee2mqtt/{IEEE}/center/get"),
+        "message": r#"{"state":""}"#,
+    }));
+    for _ in 0..50 {
+        if harness
+            .logger
+            .lock()
+            .unwrap()
+            .winston_logs
+            .iter()
+            .any(|(_, line)| line.contains("has no endpoint 'center'"))
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(harness
+        .logger
+        .lock()
+        .unwrap()
+        .winston_logs
+        .iter()
+        .any(|(_, line)| line.contains("has no endpoint 'center'")),
+        "logs={:?}", harness.logger.lock().unwrap().winston_logs);
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": format!("zigbee2mqtt/{IEEE}/set"),
+        "message": r#"{"unknown_property": 5}"#,
+    }));
+    for _ in 0..50 {
+        if harness
+            .logger
+            .lock()
+            .unwrap()
+            .winston_logs
+            .iter()
+            .any(|(_, line)| line.contains("No converter available for 'set' 'unknown_property'"))
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(harness
+        .logger
+        .lock()
+        .unwrap()
+        .winston_logs
+        .iter()
+        .any(|(_, line)| line.contains("No converter available for 'unknown_property' on")));
+
+}

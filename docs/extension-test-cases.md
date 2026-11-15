@@ -41,7 +41,7 @@ Coverage classes:
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
-| publish.test.ts | 110 | 3 | 27 | 2 | 78 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
+| publish.test.ts | 110 | 5 | 27 | 1 | 77 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
 | receive.test.ts | 34 | 14 | 17 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
@@ -611,7 +611,7 @@ Coverage classes:
 | 42 | Should handle get | `asserted` | set_and_get_dispatch_to_converters |
 | 43 | Should handle get with multiple endpoints | `slice` | multi-endpoint get dispatch |
 | 44 | Should handle get with multiple cover endpoints | `slice` | multi-endpoint cover get |
-| 45 | Should log error when device has no such endpoint (via topic) | `code` | unknown endpoint error |
+| 45 | Should log error when device has no such endpoint (via topic) | `asserted` | missing_endpoint_and_converter_are_logged |
 | 46 | Should log error when device has no definition | `asserted` | unsupported_device_is_rejected (no definition) |
 | 47 | Should log error when device has no such endpoint (via property) | `code` | unknown property endpoint error |
 | 48 | Should parse topic with when base topic has multiple slashes | `slice` | parse_topic_resolves_entity_and_endpoint |
@@ -670,7 +670,7 @@ Coverage classes:
 | 101 | Should publish state to roller shutter | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 102 | Should publish to MKS-CM-W5 | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 103 | Should publish separate genOnOff to GL-S-007ZS when setting state and brightness as bulb doesnt turn on with moveToLevelWithOnOff | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
-| 104 | Should log as error when setting property with no defined converter | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
+| 104 | Should log as error when setting property with no defined converter | `asserted` | missing_endpoint_and_converter_are_logged |
 | 105 | Should restore brightness when its turned on with transition, Z2M is restarted and turned on again | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 106 | Should restore brightness when its turned off without transition and is turned on with | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 107 | Shouldnt use moveToLevelWithOnOff on turn on when no transition has been used as some devices do not turn on in that case | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |

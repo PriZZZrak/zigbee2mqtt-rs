@@ -43,7 +43,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | OMITTED | R1 excludes OTA flashing (user decision); no HTTP/TLS or SHA-512 dependency |
 | Green Power | `controller/greenPower.ts` | PORTED | see row above |
 | GPD frame codec (`GPD_FRAME` read/write) | `zspec/zcl/buffaloZcl.ts` | PORTED | commissioning/channel/custom writes, commissioning/channel/attribute-report/read-rsp parses with `payloadSize` positioning |
-| MQTT transport | `lib/mqtt.ts` | PARTIAL | `mqtt://`/`tcp://` with retained/QoS1, self-publish skip, unsubscribe, live `queued`; `mqtts://` **OMITTED** (user decision 2026-11-15: rumqttc TLS pulls `ring`, AGENTS §5 Q5/§6) |
+| MQTT transport | `lib/mqtt.ts` | PORTED | `rumqttc-v4-next` (aliased `rumqttc`, no ring/aws-lc) with `mqtt://` and `mqtts://` (rustls + rustls-rustcrypto, `reject_unauthorized`/ca/cert/key), retained/QoS1-2, self-publish skip, unsubscribe, live `queued` |
 | MQTT bridge + `bridge/request/*` | `zigbee2mqtt/lib/mqtt.ts`, `extension/*` | PORTED | bridge extension: state/info/devices/groups/definitions/logging, request dispatch, events; see the per-extension rows below |
 | Home Assistant discovery | `extension/homeassistant.ts` | PORTED | see the Home Assistant row below |
 | Frontend / Windfront protocol | `extension/frontend.ts` | PORTED | WebSocket protocol/API; static assets deferred to OpenWrt packaging |

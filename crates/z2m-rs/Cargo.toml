@@ -8,7 +8,7 @@ regex = "1"
 serde_json = "1"
 serde_yaml_ng = "0.10"
 tokio = { version = "1", features = ["rt", "sync", "time", "net", "macros", "signal"] }
-rumqttc = { version = "0.25", default-features = false }
+rumqttc = { package = "rumqttc-v4-next", version = "0.34", default-features = false, features = ["use-rustls-no-provider"] }
 zigbee-apiarist = { path = "../zigbee-apiarist" }
 zigbee-converters = { path = "../zigbee-converters" }
 zip = { version = "9.5.1", default-features = false, features = ["deflate"] }
@@ -20,6 +20,7 @@ rustls = { version = "0.23", default-features = false, features = ["std", "tls12
 tokio-rustls = { version = "0.26", default-features = false, features = ["tls12", "logging"] }
 rustls-rustcrypto = "0.1.0-pre.0"
 rustls-pemfile = "2"
+rustls-native-certs = "0.8"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "test-util"] }
