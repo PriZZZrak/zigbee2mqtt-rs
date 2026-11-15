@@ -34,6 +34,28 @@ MQTT_TEST_SERVER=mqtt://127.0.0.1:18830 \
    constant.
 4. `Mqtt::disconnect` publishes the retained `{"state":"offline"}` payload.
 
+## TLS (`mqtts://`) run (2026-11-15)
+
+The same test against an aedes broker behind Node `tls.createServer`
+(certificate `crates/z2m-rs/tests/fixtures/mqtt-tls.crt`, SAN `DNS:localhost`):
+
+```bash
+cd /tmp/opencode/broker && node tls-broker.js        # aedes TLS on 18831
+MQTT_TEST_SERVER=mqtts://localhost:18831 \
+MQTT_TEST_CA=crates/z2m-rs/tests/fixtures/mqtt-tls.crt \
+  cargo test -p z2m-rs --test mqtt_broker -- --ignored --nocapture
+```
+
+```
+mqtt.stats = {"connected":true,"queued":0}
+test real_broker_connect_publish_and_queue_stats ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+```
+
+The handshake runs over `tokio-rustls` with the `rustls-rustcrypto` provider
+(native roots plus `mqtt.ca`); the TLS branch asserts CONNACK (connected) and
+that a QoS1 publish is accepted by the broker.
+
 ## Transcript (2026-11-14)
 
 ```

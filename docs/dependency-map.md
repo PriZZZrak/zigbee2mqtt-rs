@@ -172,9 +172,10 @@ Remaining gaps (tracked, do not hide):
 - `z2m-rs/util/logger.rs` lacks upstream `timestamp_format` handling; it uses
   ISO-8601 instead of the malformed epoch string. Format parity is `PARTIAL`.
 - mDNS discovery is still injected rather than live (`mdns-sd` not added yet).
-- TLS interoperability with Chrome/Safari/Firefox (`wss://`) and with real
-  MQTT brokers over `mqtts://` has not been validated against a public endpoint
-  yet; `rustls-rustcrypto` is a pre-release provider.
+- `mqtts://` has been validated against a local aedes TLS broker
+  (`docs/mqtt-broker-differential.md`); a public MQTT endpoint and browser
+  `wss://` interoperability with Chrome/Safari/Firefox are still unverified.
+  `rustls-rustcrypto` remains a pre-release provider.
 - gzip: pre-compressed `.gz` assets are served; on-the-fly compression is
   deferred together with the Windfront assets.
 - onboarding: `lib/util/onboarding.ts` is ported (`util::onboarding`: data-dir
