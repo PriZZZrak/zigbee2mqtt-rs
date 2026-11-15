@@ -30,7 +30,7 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 51 | 2 | 23 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 56 | 2 | 18 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
@@ -156,7 +156,7 @@ Coverage classes:
 | 34 | Should allow to clear cache when removing device | `code` | request handler ported, no dedicated assertion |
 | 35 | Should allow to remove group | `asserted` | force_remove_group_removes_settings |
 | 36 | Should allow to force remove group | `asserted` | force_remove_group_removes_settings |
-| 37 | Should allow to add and remove from blocklist | `code` | request handler ported, no dedicated assertion |
+| 37 | Should allow to add and remove from blocklist | `asserted` | options_blocklist_and_device_option_variants |
 | 38 | Should throw error on removing non-existing device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
 | 39 | Should throw error when remove device fails | `code` | request handler ported, no dedicated assertion |
 | 40 | Should allow rename device | `asserted` | group_add_and_rename_device |
@@ -179,10 +179,10 @@ Coverage classes:
 | 57 | Should error when generate_external_definition requested for unknown device | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 58 | Should allow to generate device definition | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 59 | Should allow change device options | `asserted` | device_and_group_options_apply_and_warn |
-| 60 | Should save as image as file when changing device icon | `code` | request handler ported, no dedicated assertion |
-| 61 | Should save as image as file when changing device icon | `code` | request handler ported, no dedicated assertion |
-| 62 | Should allow to remove device option | `code` | request handler ported, no dedicated assertion |
-| 63 | Should allow change device options with restart required | `code` | request handler ported, no dedicated assertion |
+| 60 | Should save as image as file when changing device icon | `asserted` | options_blocklist_and_device_option_variants (base64 icon) |
+| 61 | Should save as image as file when changing device icon | `asserted` | options_blocklist_and_device_option_variants (base64 icon) |
+| 62 | Should allow to remove device option | `asserted` | options_blocklist_and_device_option_variants (qos: null) |
+| 63 | Should allow change device options with restart required | `asserted` | options_blocklist_and_device_option_variants (disabled) |
 | 64 | Should allow change group options | `code` | request handler ported, no dedicated assertion |
 | 65 | Should allow change group options with restart required | `code` | request handler ported, no dedicated assertion |
 | 66 | Should throw error on invalid device change options payload | `asserted` | device_and_group_options_apply_and_warn |

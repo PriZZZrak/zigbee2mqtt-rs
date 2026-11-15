@@ -964,3 +964,105 @@ async fn zigbee_events_publish_bridge_events_and_devices() {
         );
     }
 }
+
+#[tokio::test]
+async fn options_blocklist_and_device_option_variants() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Upstream `Should allow to add and remove from blocklist`.
+    send(
+        &harness,
+        "options",
+        json!({"options": {"blocklist": ["0x123", "0x1234"]}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["blocklist"],
+        json!(["0x123", "0x1234"])
+    );
+    send(
+        &harness,
+        "options",
+        json!({"options": {"blocklist": ["0x123"]}}),
+    )
+    .await;
+    let _ = response(&harness, "options").await;
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["blocklist"],
+        json!(["0x123"])
+    );
+
+    // Upstream `Should allow to remove device option`.
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["devices", IEEE, "qos"], json!(1));
+    send(
+        &harness,
+        "device/options",
+        json!({"id": "lamp", "options": {"qos": null}}),
+    )
+    .await;
+    let payload = response(&harness, "device/options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["to"].get("qos"), None);
+    assert_eq!(
+        harness
+            .context
+            .settings
+            .lock()
+            .unwrap()
+            .get_device("lamp")
+            .unwrap()
+            .get("qos"),
+        None
+    );
+
+    // Upstream `Should allow change device options with restart required`.
+    send(
+        &harness,
+        "device/options",
+        json!({"id": "lamp", "options": {"disabled": true}}),
+    )
+    .await;
+    let payload = response(&harness, "device/options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["restart_required"], true);
+    assert_eq!(
+        harness
+            .context
+            .settings
+            .lock()
+            .unwrap()
+            .get_device("lamp")
+            .unwrap()["disabled"],
+        true
+    );
+
+    // Upstream `Should save as image as file when changing device icon`.
+    let icon = "data:image/png;base64,aGVsbG8=";
+    send(
+        &harness,
+        "device/options",
+        json!({"id": "lamp", "options": {"icon": icon}}),
+    )
+    .await;
+    let payload = response(&harness, "device/options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    let file = payload["data"]["to"]["icon"]
+        .as_str()
+        .expect("icon path")
+        .to_string();
+    assert!(file.starts_with("device_icons/"), "{file}");
+    let path = z2m_rs::util::data::join_path(&file);
+    assert!(path.exists(), "{}", path.display());
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_dir(path.parent().unwrap());
+}

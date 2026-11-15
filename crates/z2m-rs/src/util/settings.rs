@@ -470,6 +470,14 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
                 .and_then(|value| value.get_mut(&key))
             {
                 merge_entity_options(entry, &options);
+                let mut value = Value::Object(std::mem::take(entry));
+                crate::util::utils::remove_null_properties_from_object(
+                    &mut value,
+                    &["homeassistant"],
+                );
+                if let Value::Object(map) = value {
+                    *entry = map;
+                }
             }
         } else if let Some(Value::Object(entry)) = self
             .configuration
@@ -477,6 +485,11 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
             .and_then(|value| value.get_mut(&key))
         {
             merge_entity_options(entry, &options);
+            let mut value = Value::Object(std::mem::take(entry));
+            crate::util::utils::remove_null_properties_from_object(&mut value, &["homeassistant"]);
+            if let Value::Object(map) = value {
+                *entry = map;
+            }
         }
         Ok(())
     }
