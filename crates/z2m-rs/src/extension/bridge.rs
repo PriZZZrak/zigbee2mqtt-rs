@@ -218,6 +218,19 @@ impl Bridge {
         ))
     }
 
+    /// Upstream endpoint lookup by number or name
+    /// (`device.endpoint(message.endpoint)`).
+    fn endpoint_for(
+        entity: &Arc<dyn Entity>,
+        endpoint: &Value,
+    ) -> Option<Arc<zigbee_apiarist::controller::model::endpoint::Endpoint>> {
+        match endpoint {
+            Value::String(name) => entity.endpoint(Some(name)),
+            Value::Number(number) => entity.endpoint(Some(&number.to_string())),
+            _ => entity.endpoint(None),
+        }
+    }
+
     /// Upstream `changeEntityOptions` (`bridge.ts:450-507`).
     async fn change_entity_options(
         &self,
@@ -362,8 +375,7 @@ impl Bridge {
             .map(str::to_string)
             .unwrap_or_else(|| message["id"].to_string());
         let device = self.get_entity("device", &id)?;
-        let endpoint_name = message["endpoint"].as_str();
-        let endpoint = device.endpoint(endpoint_name).ok_or_else(|| {
+        let endpoint = Self::endpoint_for(&device, &message["endpoint"]).ok_or_else(|| {
             format!(
                 "Device '{id}' does not have endpoint '{}'",
                 message["endpoint"]
@@ -433,14 +445,12 @@ impl Bridge {
             .map(str::to_string)
             .unwrap_or_else(|| message["id"].to_string());
         let device = self.get_entity("device", &id)?;
-        let endpoint = device
-            .endpoint(message["endpoint"].as_str())
-            .ok_or_else(|| {
-                format!(
-                    "Device '{id}' does not have endpoint '{}'",
-                    message["endpoint"]
-                )
-            })?;
+        let endpoint = Self::endpoint_for(&device, &message["endpoint"]).ok_or_else(|| {
+            format!(
+                "Device '{id}' does not have endpoint '{}'",
+                message["endpoint"]
+            )
+        })?;
         let configs = message["configs"]
             .as_array()
             .map(|items| {

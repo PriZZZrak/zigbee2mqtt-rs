@@ -61,7 +61,7 @@ fn harness() -> Harness {
         None,
     )
     .unwrap();
-    ZhDevice::create(
+    let device = ZhDevice::create(
         DeviceType::Router,
         IEEE,
         1234,
@@ -73,6 +73,7 @@ fn harness() -> Harness {
         None,
     )
     .unwrap();
+    device.create_endpoint(1).unwrap();
 
     let controller = Arc::new(
         Controller::new(ControllerOptions {
@@ -571,4 +572,145 @@ async fn options_apply_homeassistant_and_log_levels() {
         Some("warning")
     );
     assert_eq!(logger.get_debug_namespace_ignore(), "^zh:.*");
+}
+
+#[tokio::test]
+async fn interview_request_validates_payload_and_entity() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    for (message, error) in [
+        (json!({"options": {}}), "Invalid payload".to_string()),
+        (json!({"id": "missing"}), "Device 'missing' does not exist".to_string()),
+        (
+            json!({"id": format!("{IEEE}/1")}),
+            format!("Device '{IEEE}/1' does not exist"),
+        ),
+        (json!({"id": "group_1"}), "Device 'group_1' does not exist".to_string()),
+    ] {
+        send(&harness, "device/interview", message).await;
+        let payload = response(&harness, "device/interview").await;
+        assert_eq!(payload["status"], "error", "{payload}");
+        assert_eq!(payload["error"], error);
+    }
+}
+
+#[tokio::test]
+async fn device_and_group_options_apply_and_warn() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Upstream `Should allow change device options`.
+    send(
+        &harness,
+        "device/options",
+        json!({"id": "lamp", "options": {"retain": false, "transition": 1}}),
+    )
+    .await;
+    let payload = response(&harness, "device/options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["restart_required"], false);
+    assert_eq!(payload["data"]["id"], "lamp");
+    let settings = harness.context.settings.lock().unwrap();
+    let device = settings.get_device("lamp").expect("device settings");
+    assert_eq!(device["retain"], false);
+    assert_eq!(device["transition"], 1);
+    drop(settings);
+
+    // Upstream `Should warn on unsupported device option`.
+    send(
+        &harness,
+        "device/options",
+        json!({"id": "lamp", "options": {"unsupported": true}}),
+    )
+    .await;
+    let payload = response(&harness, "device/options").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert!(harness
+        .context
+        .logger
+        .lock()
+        .unwrap()
+        .winston_logs
+        .iter()
+        .any(|(_, line)| line.contains("does not support option 'unsupported'")));
+
+    // Invalid payloads and entity mismatches.
+    send(&harness, "device/options", json!({"id": "lamp"})).await;
+    let payload = response(&harness, "device/options").await;
+    assert_eq!(payload["error"], "Invalid payload");
+
+    send(
+        &harness,
+        "group/options",
+        json!({"id": "1", "options": {"retain": true}}),
+    )
+    .await;
+    let payload = response(&harness, "group/options").await;
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Group '1' does not exist");
+}
+
+#[tokio::test]
+async fn reporting_configure_and_read_error_paths() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Upstream `Should throw error when configure reporting is called with
+    // malformed payload / for non-existing device / endpoint`.
+    for (message, error) in [
+        (json!({"id": "lamp"}), "Invalid payload".to_string()),
+        (
+            json!({
+                "id": "missing",
+                "endpoint": 1,
+                "cluster": "genOnOff",
+                "attribute": "onOff",
+                "minimum_report_interval": 0,
+                "maximum_report_interval": 100,
+            }),
+            "Device 'missing' does not exist".to_string(),
+        ),
+        (
+            json!({
+                "id": "lamp",
+                "endpoint": 9,
+                "cluster": "genOnOff",
+                "attribute": "onOff",
+                "minimum_report_interval": 0,
+                "maximum_report_interval": 100,
+            }),
+            "Device 'lamp' does not have endpoint '9'".to_string(),
+        ),
+    ] {
+        send(&harness, "device/reporting/configure", message).await;
+        let payload = response(&harness, "device/reporting/configure").await;
+        assert_eq!(payload["status"], "error", "{payload}");
+        assert_eq!(payload["error"], error);
+    }
+
+    // Upstream `Should throw error when read reporting config is called with
+    // malformed payload / for non-existing device / endpoint`.
+    for (message, error) in [
+        (json!({"id": "lamp"}), "Invalid payload".to_string()),
+        (
+            json!({"id": "missing", "endpoint": 1, "cluster": "genOnOff", "configs": []}),
+            "Device 'missing' does not exist".to_string(),
+        ),
+        (
+            json!({"id": "lamp", "endpoint": 9, "cluster": "genOnOff", "configs": []}),
+            "Device 'lamp' does not have endpoint '9'".to_string(),
+        ),
+    ] {
+        send(&harness, "device/reporting/read", message).await;
+        let payload = response(&harness, "device/reporting/read").await;
+        assert_eq!(payload["status"], "error", "{payload}");
+        assert_eq!(payload["error"], error);
+    }
 }

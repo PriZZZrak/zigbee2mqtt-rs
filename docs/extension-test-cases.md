@@ -30,7 +30,7 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 19 | 3 | 44 | 0 | 31 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 32 | 3 | 41 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
@@ -170,23 +170,23 @@ Coverage classes:
 | 48 | Should throw error when renaming last joined device but none has joined | `code` | request handler ported, no dedicated assertion |
 | 49 | Should allow interviewing a device by friendly name | `adapter` | interview/install code talks to the coordinator |
 | 50 | Should allow interviewing a device by ieeeAddr | `adapter` | interview/install code talks to the coordinator |
-| 51 | Should throw error on invalid device interview payload | `adapter` | interview/install code talks to the coordinator |
-| 52 | Should throw error on non-existing device interview | `adapter` | interview/install code talks to the coordinator |
-| 53 | Should throw error on id is device endpoint | `adapter` | interview/install code talks to the coordinator |
-| 54 | Should throw error on id is a group | `adapter` | interview/install code talks to the coordinator |
+| 51 | Should throw error on invalid device interview payload | `asserted` | interview_request_validates_payload_and_entity |
+| 52 | Should throw error on non-existing device interview | `asserted` | interview_request_validates_payload_and_entity |
+| 53 | Should throw error on id is device endpoint | `asserted` | interview_request_validates_payload_and_entity |
+| 54 | Should throw error on id is a group | `asserted` | interview_request_validates_payload_and_entity |
 | 55 | Should throw error on when interview fails | `adapter` | interview/install code talks to the coordinator |
 | 56 | Should error when generate_external_definition is invalid | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 57 | Should error when generate_external_definition requested for unknown device | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 58 | Should allow to generate device definition | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
-| 59 | Should allow change device options | `code` | request handler ported, no dedicated assertion |
+| 59 | Should allow change device options | `asserted` | device_and_group_options_apply_and_warn |
 | 60 | Should save as image as file when changing device icon | `code` | request handler ported, no dedicated assertion |
 | 61 | Should save as image as file when changing device icon | `code` | request handler ported, no dedicated assertion |
 | 62 | Should allow to remove device option | `code` | request handler ported, no dedicated assertion |
 | 63 | Should allow change device options with restart required | `code` | request handler ported, no dedicated assertion |
 | 64 | Should allow change group options | `code` | request handler ported, no dedicated assertion |
 | 65 | Should allow change group options with restart required | `code` | request handler ported, no dedicated assertion |
-| 66 | Should throw error on invalid device change options payload | `code` | request handler ported, no dedicated assertion |
-| 67 | Should warn on unsupported device option | `code` | request handler ported, no dedicated assertion |
+| 66 | Should throw error on invalid device change options payload | `asserted` | device_and_group_options_apply_and_warn |
+| 67 | Should warn on unsupported device option | `asserted` | device_and_group_options_apply_and_warn |
 | 68 | Should allow to add group by string | `asserted` | group_add_and_rename_device |
 | 69 | Should allow to add group with ID | `code` | request handler ported, no dedicated assertion |
 | 70 | Shouldnt allow to add group with empty name | `code` | request handler ported, no dedicated assertion |
@@ -201,15 +201,15 @@ Coverage classes:
 | 79 | Should allow to touchlink scan | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 80 | Should allow to configure reporting with endpoint as number | `adapter` | reporting configuration goes through the adapter |
 | 81 | Should allow to configure reporting with endpoint as string | `adapter` | reporting configuration goes through the adapter |
-| 82 | Should throw error when configure reporting is called with malformed payload | `adapter` | reporting configuration goes through the adapter |
-| 83 | Should throw error when configure reporting is called for non-existing device | `adapter` | reporting configuration goes through the adapter |
-| 84 | Should throw error when configure reporting is called for non-existing endpoint | `adapter` | reporting configuration goes through the adapter |
+| 82 | Should throw error when configure reporting is called with malformed payload | `asserted` | reporting_configure_and_read_error_paths |
+| 83 | Should throw error when configure reporting is called for non-existing device | `asserted` | reporting_configure_and_read_error_paths |
+| 84 | Should throw error when configure reporting is called for non-existing endpoint | `asserted` | reporting_configure_and_read_error_paths |
 | 85 | Should allow to read reporting config with endpoint as number | `adapter` | reporting configuration goes through the adapter |
 | 86 | Should allow to read reporting config with endpoint as string | `adapter` | reporting configuration goes through the adapter |
 | 87 | Should allow to read reporting config with manufacturer code | `adapter` | reporting configuration goes through the adapter |
-| 88 | Should throw error when read reporting config is called with malformed payload | `adapter` | reporting configuration goes through the adapter |
-| 89 | Should throw error when read reporting config is called for non-existing device | `adapter` | reporting configuration goes through the adapter |
-| 90 | Should throw error when read reporting config is called for non-existing endpoint | `adapter` | reporting configuration goes through the adapter |
+| 88 | Should throw error when read reporting config is called with malformed payload | `asserted` | reporting_configure_and_read_error_paths |
+| 89 | Should throw error when read reporting config is called for non-existing device | `asserted` | reporting_configure_and_read_error_paths |
+| 90 | Should throw error when read reporting config is called for non-existing endpoint | `asserted` | reporting_configure_and_read_error_paths |
 | 91 | Should allow to create a backup | `adapter` | backup/archive touches the coordinator |
 | 92 | Should return an error when the backup archive cannot be created | `adapter` | backup/archive touches the coordinator |
 | 93 | Should allow to restart | `code` | request handler ported, no dedicated assertion |

@@ -120,6 +120,19 @@ const CASES = {
             27: [A, "health_check_and_invalid_options"],
             28: [AD, "coordinator check needs a live adapter"],
             31: [A, "force_remove_device_without_adapter"],
+            51: [A, "interview_request_validates_payload_and_entity"],
+            52: [A, "interview_request_validates_payload_and_entity"],
+            53: [A, "interview_request_validates_payload_and_entity"],
+            54: [A, "interview_request_validates_payload_and_entity"],
+            59: [A, "device_and_group_options_apply_and_warn"],
+            66: [A, "device_and_group_options_apply_and_warn"],
+            67: [A, "device_and_group_options_apply_and_warn"],
+            82: [A, "reporting_configure_and_read_error_paths"],
+            83: [A, "reporting_configure_and_read_error_paths"],
+            84: [A, "reporting_configure_and_read_error_paths"],
+            88: [A, "reporting_configure_and_read_error_paths"],
+            89: [A, "reporting_configure_and_read_error_paths"],
+            90: [A, "reporting_configure_and_read_error_paths"],
             40: [A, "group_add_and_rename_device"],
             43: [A, "group_add_and_rename_device"],
             68: [A, "group_add_and_rename_device"],
@@ -139,7 +152,7 @@ const CASES = {
                 entries([91, 92], [AD, "backup/archive touches the coordinator"]),
             ),
             ...Object.fromEntries(
-                entries([49, 50, 51, 52, 53, 54, 55, 74, 75], [
+                entries([49, 50, 55, 74, 75], [
                     AD,
                     "interview/install code talks to the coordinator",
                 ]),
@@ -148,7 +161,7 @@ const CASES = {
                 entries(range(15, 22), [AD, "permit join talks to the coordinator"]),
             ),
             ...Object.fromEntries(
-                entries(range(80, 90), [AD, "reporting configuration goes through the adapter"]),
+                entries([80, 81, 85, 86, 87], [AD, "reporting configuration goes through the adapter"]),
             ),
         },
     },
