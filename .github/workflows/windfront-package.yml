@@ -33,6 +33,13 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Building zigbee2mqtt-windfront $version"
 
+      - name: Install usign
+        run: |
+          if command -v usign >/dev/null 2>&1; then exit 0; fi
+          git clone --depth 1 https://github.com/openwrt/usign.git /tmp/usign
+          cmake -S /tmp/usign -B /tmp/usign/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/usign/build -j"$(nproc)"
+          sudo cmake --install /tmp/usign/build
       - name: Download the release tarball
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -70,27 +77,28 @@ jobs:
       - name: Update the opkg feed
         env:
           USIGN_PRIVATE_KEY: ${{ secrets.USIGN_PRIVATE_KEY }}
+          USIGN_PUBLIC_KEY: ${{ secrets.USIGN_PUBLIC_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           feed="$RUNNER_TEMP/feed"
-          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
-            git worktree add "$feed" gh-pages
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$remote" gh-pages >/dev/null 2>&1; then
+            git clone --depth 1 --branch gh-pages "$remote" "$feed"
           else
-            git worktree add --detach "$feed" HEAD
-            (cd "$feed" && git checkout --orphan gh-pages && git rm -rf . >/dev/null 2>&1 || true)
+            git init "$feed"
+            (cd "$feed" && git checkout -b gh-pages && git remote add origin "$remote")
           fi
           cp "$RUNNER_TEMP"/out/*.ipk "$feed"/
           key=""
-          if [ -n "${USIGN_PRIVATE_KEY:-}" ]; then
+          if [ -n "${USIGN_PRIVATE_KEY:-}" ] && command -v usign >/dev/null 2>&1; then
             key="$RUNNER_TEMP/usign.key"
             printf '%s\n' "$USIGN_PRIVATE_KEY" > "$key"
-            if command -v usign >/dev/null 2>&1; then
-              usign -F -p "$feed/public.key" -s "$key" || true
+            if [ -n "${USIGN_PUBLIC_KEY:-}" ]; then
+              printf '%s\n' "$USIGN_PUBLIC_KEY" > "$feed/public.key"
             fi
-          fi
-          if command -v usign >/dev/null 2>&1; then
             ./packaging/openwrt/update-feed.sh "$feed" "$key"
           else
             ./packaging/openwrt/update-feed.sh "$feed"
