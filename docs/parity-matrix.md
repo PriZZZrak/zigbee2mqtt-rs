@@ -4,6 +4,8 @@ Status is evidence-based. `PORTED` requires a ported upstream test **and** a
 differential fixture or transcript. This file is a starting point, not a parity
 claim.
 
+Full upstream `lib/` coverage table: `docs/lib-port-map.md`.
+
 Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 
 | Surface | Upstream | Status | Evidence / gap |
