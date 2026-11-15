@@ -18,30 +18,64 @@ use z2m_rs::util::settings::Settings;
 #[ignore = "requires a real MQTT broker (MQTT_TEST_SERVER)"]
 async fn real_broker_connect_publish_and_queue_stats() {
     let server = std::env::var("MQTT_TEST_SERVER").expect("MQTT_TEST_SERVER");
-    let settings = json!({
-        "mqtt": {"server": server, "base_topic": "z2m-rs-broker-test"},
+    let mut mqtt_settings = json!({
+        "server": server,
+        "base_topic": "z2m-rs-broker-test",
     });
+    if let Ok(ca) = std::env::var("MQTT_TEST_CA") {
+        mqtt_settings["ca"] = json!(ca);
+    }
+    if let Ok(reject) = std::env::var("MQTT_TEST_REJECT_UNAUTHORIZED") {
+        mqtt_settings["reject_unauthorized"] = json!(reject == "true");
+    }
+    let settings = json!({"mqtt": mqtt_settings});
     let event_bus = Arc::new(Mutex::new(EventBus::new()));
     let mut mqtt = Mqtt::new(event_bus.clone());
     mqtt.connect(&settings).await.expect("connect");
 
-    // Subscribe with a second raw client to prove broker delivery.
-    let (host, port) = {
-        let rest = settings["mqtt"]["server"].as_str().unwrap().strip_prefix("mqtt://").unwrap();
-        let (host, port) = rest.split_once(':').unwrap();
-        (host.to_string(), port.parse::<u16>().unwrap())
-    };
-    let mut options = rumqttc::MqttOptions::new("z2m-rs-broker-observer", (host.as_str(), port));
-    options.set_keep_alive(5);
-    let (observer, mut eventloop) = rumqttc::AsyncClient::builder(options).capacity(10).build();
-    observer
-        .subscribe("z2m-rs-broker-test/state", rumqttc::QoS::AtLeastOnce)
-        .await
-        .unwrap();
-
+    let tls = server.starts_with("mqtts://") || server.starts_with("ssl://");
     let mut delivered = None;
-    for _ in 0..50 {
-        let publish = mqtt
+    if !tls {
+        // Subscribe with a second raw client to prove broker delivery.
+        let (host, port) = {
+            let rest = server.strip_prefix("mqtt://").unwrap();
+            let (host, port) = rest.split_once(':').unwrap();
+            (host.to_string(), port.parse::<u16>().unwrap())
+        };
+        let mut options = rumqttc::MqttOptions::new("z2m-rs-broker-observer", (host.as_str(), port));
+        options.set_keep_alive(5);
+        let (observer, mut eventloop) = rumqttc::AsyncClient::builder(options).capacity(10).build();
+        observer
+            .subscribe("z2m-rs-broker-test/state", rumqttc::QoS::AtLeastOnce)
+            .await
+            .unwrap();
+
+        for _ in 0..50 {
+            let publish = mqtt
+                .publish(
+                    "state",
+                    r#"{"state":"ON"}"#,
+                    MqttPublishOptions {
+                        qos: 1,
+                        ..Default::default()
+                    },
+                )
+                .await;
+            assert!(publish);
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            match tokio::time::timeout(Duration::from_millis(100), eventloop.poll()).await {
+                Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(publish)))) => {
+                    delivered = Some(String::from_utf8_lossy(&publish.payload).to_string());
+                    break;
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(delivered.as_deref(), Some(r#"{"state":"ON"}"#));
+    } else {
+        // TLS: prove the handshake + CONNACK and that publishes are accepted.
+        assert!(mqtt.is_connected());
+        assert!(mqtt
             .publish(
                 "state",
                 r#"{"state":"ON"}"#,
@@ -50,18 +84,9 @@ async fn real_broker_connect_publish_and_queue_stats() {
                     ..Default::default()
                 },
             )
-            .await;
-        assert!(publish);
+            .await);
         tokio::time::sleep(Duration::from_millis(100)).await;
-        match tokio::time::timeout(Duration::from_millis(100), eventloop.poll()).await {
-            Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(publish)))) => {
-                delivered = Some(String::from_utf8_lossy(&publish.payload).to_string());
-                break;
-            }
-            _ => {}
-        }
     }
-    assert_eq!(delivered.as_deref(), Some(r#"{"state":"ON"}"#));
 
     let stats = mqtt.stats();
     assert_eq!(stats["connected"], true);
