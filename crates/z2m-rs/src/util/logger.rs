@@ -18,6 +18,60 @@ pub struct Transport {
     pub maxsize: Option<u64>,
 }
 
+/// Upstream `winston-syslog` transport sockets (`logger.ts:111-129`).
+pub enum SyslogSocket {
+    Udp(std::net::UdpSocket),
+    Tcp(std::sync::Mutex<std::net::TcpStream>),
+    #[cfg(unix)]
+    Unix(std::os::unix::net::UnixDatagram),
+}
+
+pub struct SyslogTransport {
+    pub socket: SyslogSocket,
+    pub app_name: String,
+    pub facility: u8,
+    pub hostname: String,
+}
+
+impl SyslogTransport {
+    /// RFC 5424 message as produced by `winston-syslog`.
+    fn format(&self, level: &str, message: &str) -> String {
+        let severity = match level {
+            "error" => 3,
+            "warning" => 4,
+            "info" => 6,
+            _ => 7,
+        };
+        let priority = u16::from(self.facility) * 8 + severity;
+        format!(
+            "<{priority}>1 {} {} {} - - {}",
+            now_iso8601(),
+            self.hostname,
+            self.app_name,
+            message
+        )
+    }
+
+    fn send(&self, level: &str, message: &str) {
+        let payload = self.format(level, message);
+        match &self.socket {
+            SyslogSocket::Udp(socket) => {
+                let _ = socket.send(payload.as_bytes());
+            }
+            SyslogSocket::Tcp(stream) => {
+                use std::io::Write as _;
+                if let Ok(mut stream) = stream.lock() {
+                    let _ = stream.write_all(format!("{payload}\n").as_bytes());
+                }
+            }
+            #[cfg(unix)]
+            SyslogSocket::Unix(socket) => {
+                let _ = socket.send(payload.as_bytes());
+            }
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Logger {
     pub level: String,
@@ -38,6 +92,8 @@ pub struct Logger {
     pub log_console_json: bool,
     /// Upstream winston transport hook (`bridge.ts` EventTransport).
     pub log_listener: Option<Arc<dyn Fn(&str, &str, &str) + Send + Sync>>,
+    /// Upstream `winston-syslog` transport (`log_output: ["syslog"]`).
+    pub syslog: Option<SyslogTransport>,
 }
 
 impl Logger {
@@ -126,12 +182,111 @@ impl Logger {
             .unwrap_or_default();
         self.cached_namespaced_levels = self.namespaced_levels.clone();
 
+        if outputs.iter().any(|output| output == "syslog") {
+            self.syslog = self.init_syslog();
+        } else {
+            self.syslog = None;
+        }
+
         if let Some(ignore) = self
             .advanced_str("log_debug_namespace_ignore")
             .map(str::to_string)
         {
             self.set_debug_namespace_ignore(&ignore);
         }
+    }
+
+    /// Upstream `winston-syslog` options (`logger.ts:111-129`).
+    fn init_syslog(&self) -> Option<SyslogTransport> {
+        let options = self
+            .advanced
+            .get("advanced")
+            .and_then(|advanced| advanced.get("log_syslog"))
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        let app_name = options
+            .get("app_name")
+            .or_else(|| options.get("appName"))
+            .and_then(Value::as_str)
+            .unwrap_or("Zigbee2MQTT")
+            .to_string();
+        let hostname = options
+            .get("localhost")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .or_else(|| std::env::var("HOSTNAME").ok())
+            .unwrap_or_else(|| "localhost".to_string());
+        let facility_name = options
+            .get("facility")
+            .and_then(Value::as_str)
+            .unwrap_or("local0");
+        let facility = match facility_name {
+            "kern" => 0,
+            "user" => 1,
+            "mail" => 2,
+            "daemon" => 3,
+            "auth" => 4,
+            "syslog" => 5,
+            "lpr" => 6,
+            "news" => 7,
+            "uucp" => 8,
+            "cron" => 9,
+            "authpriv" => 10,
+            "ftp" => 11,
+            "local1" => 17,
+            "local2" => 18,
+            "local3" => 19,
+            "local4" => 20,
+            "local5" => 21,
+            "local6" => 22,
+            "local7" => 23,
+            _ => 16,
+        };
+        let kind = options
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("udp");
+        let host = options
+            .get("host")
+            .and_then(Value::as_str)
+            .unwrap_or("localhost");
+        let port = options
+            .get("port")
+            .and_then(Value::as_u64)
+            .or_else(|| {
+                options
+                    .get("port")
+                    .and_then(Value::as_str)
+                    .and_then(|port| port.parse().ok())
+            })
+            .unwrap_or(514);
+
+        let socket = match kind {
+            "tcp" => {
+                let stream = std::net::TcpStream::connect((host, port as u16)).ok()?;
+                SyslogSocket::Tcp(std::sync::Mutex::new(stream))
+            }
+            #[cfg(unix)]
+            "unix" => {
+                let path = options.get("path").and_then(Value::as_str)?;
+                let socket = std::os::unix::net::UnixDatagram::unbound().ok()?;
+                socket.connect(path).ok()?;
+                SyslogSocket::Unix(socket)
+            }
+            _ => {
+                let bind = if host.contains(':') { "[::]:0" } else { "0.0.0.0:0" };
+                let socket = std::net::UdpSocket::bind(bind).ok()?;
+                socket.connect((host, port as u16)).ok()?;
+                SyslogSocket::Udp(socket)
+            }
+        };
+
+        Some(SyslogTransport {
+            socket,
+            app_name,
+            facility,
+            hostname,
+        })
     }
 
     fn log_directory_pattern(&self) -> String {
@@ -346,6 +501,9 @@ impl Logger {
 
         let message = format!("{namespace}: {message}");
         self.winston_logs.push((level.to_string(), message.clone()));
+        if let Some(syslog) = &self.syslog {
+            syslog.send(level, &message);
+        }
 
         if self.log_console_json {
             self.console_writes.push(

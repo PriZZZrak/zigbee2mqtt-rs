@@ -700,3 +700,34 @@ fn logs_to_console_in_json_when_configured() {
         .trim_end()
         .ends_with("\u{1b}[32minfo\u{1b}[39m: \tz2m: Test JSON message"));
 }
+
+#[test]
+fn syslog_transport_sends_rfc5424_messages() {
+    let receiver = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    receiver
+        .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+        .unwrap();
+    let port = receiver.local_addr().unwrap().port();
+
+    let (dir, mut logger) = setup();
+    logger.advanced = settings(json!({
+        "log_output": ["syslog"],
+        "log_syslog": {"type": "udp", "host": "127.0.0.1", "port": port, "app_name": "Z2M-Test"},
+    }));
+    logger.init();
+    logger.info("hello", "z2m");
+
+    let mut buffer = [0u8; 2048];
+    let size = receiver.recv(&mut buffer).unwrap();
+    let message = String::from_utf8_lossy(&buffer[..size]).to_string();
+    // facility local0 (16) * 8 + severity info (6) = 134
+    assert!(message.starts_with("<134>1 "), "{message}");
+    assert!(message.contains(" Z2M-Test - - z2m: hello"), "{message}");
+
+    logger.error("boom", "z2m");
+    let size = receiver.recv(&mut buffer).unwrap();
+    let message = String::from_utf8_lossy(&buffer[..size]).to_string();
+    // severity error (3) => 131
+    assert!(message.starts_with("<131>1 "), "{message}");
+    let _ = std::fs::remove_dir_all(dir);
+}

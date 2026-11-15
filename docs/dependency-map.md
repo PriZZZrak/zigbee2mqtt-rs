@@ -68,7 +68,7 @@ Notes:
 |---|---|---|---|---|
 | `mqtt` | MQTT client | `rumqttc` | `z2m_rs::mqtt::Mqtt` | PORTED (connect/subscribe/retained/QoS, bridge topics, `bridge/request/*`, `stats()` with live `queued`); `mqtts://` not enabled yet |
 | `js-yaml` | YAML read/write | `serde_yaml_ng` | `z2m_rs::util::yaml` | PORTED |
-| `winston`, `winston-transport`, `winston-syslog` | logging, file/console/syslog | custom | `z2m_rs::util::logger`, `zigbee_apiarist::utils::logger` | PARTIAL (file/console done; syslog transport and timestamp formatting missing) |
+| `winston`, `winston-transport`, `winston-syslog` | logging, file/console/syslog | custom | `z2m_rs::util::logger`, `zigbee_apiarist::utils::logger` | PORTED (console/file/syslog RFC 5424 over udp/tcp/unix; timestamp formatting remains PARTIAL) |
 | `ajv` | JSON-schema settings validation | custom schema subset on `regex` (no `jsonschema` crate) | `z2m_rs::util::settings_schema` (`validate`, `validate_non_required`, `restart_required`), used by `z2m_rs::util::settings` | PORTED for the pinned schema: type/enum/required/properties/pattern(Properties)/propertyNames/items/oneOf/$ref/minimum/maximum; `requiresRestart` computed for overrides; Ajv message text reproduced |
 | `semver` | Node version gate in `index.js` (`satisfies(process.version, …)`) | not applicable | — | N/A: there is no Node runtime; no library version comparison is needed |
 | `fflate` | ZIP for `bridge/request/backup`, onboarding unzip | `zip` 9.5.1 (deflate) + `base64` for the payloads | `z2m_rs::extension::bridge` (backup), `z2m_rs::util::onboarding` (`/submit-zip`) | PORTED (backup + onboarding unzip with traversal guards) |
@@ -76,7 +76,7 @@ Notes:
 | `throttleit` | request throttling | `tokio::time` | `controller::helpers::request_queue`, `extension::receive` throttle | PORTED |
 | `srvx` | HTTP server for static assets/API | custom HTTP server, no `axum`/`hyper` | `z2m_rs::util::static_file_server`, `extension::frontend` | PORTED for API/serving logic; Windfront assets deferred to OpenWrt packaging |
 | `ws` | WebSocket | `tokio-tungstenite` 0.30.0 | `z2m_rs::extension::frontend` | PORTED (protocol; `handshake`-only feature set) |
-| `unix-dgram` | syslog socket | `std::os::unix::net::UnixDatagram` | `z2m_rs::util::logger` syslog transport | BLOCKED; must be `#[cfg(unix)]` with a no-op fallback on Windows |
+| `unix-dgram` | syslog socket | `std::os::unix::net::UnixDatagram` | `z2m_rs::util::logger` syslog transport | PORTED (`#[cfg(unix)]`; udp/tcp remain available on non-unix) |
 | `bind-decorator` | `this` binding | language feature | — | omitted |
 | `zigbee-herdsman` | Zigbee stack | `zigbee-apiarist` | workspace crate | PARTIAL |
 | `zigbee-herdsman-converters` | device converters | `crates/zigbee-converters` (separate crate) | `zigbee_converters::{Definition, DefinitionRegistry, Expose, ...}` | PORTED minimal surface required by the bridge; converter database and authoring tooling excluded (AGENTS §5 Q4) |
@@ -170,8 +170,6 @@ Remaining gaps (tracked, do not hide):
 
 - `z2m-rs/util/logger.rs` lacks upstream `timestamp_format` handling; it uses
   ISO-8601 instead of the malformed epoch string. Format parity is `PARTIAL`.
-- syslog transport is not implemented; it needs `#[cfg(unix)]` plus a no-op
-  fallback on non-unix targets.
 - mDNS discovery is still injected rather than live (`mdns-sd` not added yet).
 - `mqtts://` (TLS to the broker) is not enabled: `rumqttc` would need
   `use-rustls-no-provider` and the same `rustls-rustcrypto` provider as the
