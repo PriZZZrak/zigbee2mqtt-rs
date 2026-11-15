@@ -1098,3 +1098,17 @@ async fn restart_request_triggers_the_restart_callback() {
     tokio::time::sleep(Duration::from_millis(650)).await;
     assert_eq!(*harness.restarts.lock().unwrap(), 1);
 }
+
+#[tokio::test]
+async fn backup_without_adapter_returns_an_error() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "backup", json!("")).await;
+    let payload = response(&harness, "backup").await;
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert!(!payload["error"].as_str().unwrap_or_default().is_empty());
+    assert!(payload["data"]["zip"].is_null());
+}

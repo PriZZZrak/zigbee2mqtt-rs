@@ -109,6 +109,7 @@ const CASES = {
             19: [AD, "permit-join info republish after a coordinator call"],
             20: [AD, "permit-join info republish while stopping"],
             4: [A, "logging_publishes_to_mqtt_with_dedupe_and_connection_guard"],
+            92: [A, "backup_without_adapter_returns_an_error"],
             93: [A, "restart_request_triggers_the_restart_callback"],
             94: [A, "options_apply_homeassistant_and_log_levels"],
             96: [A, "options_apply_homeassistant_and_log_levels"],
@@ -174,7 +175,7 @@ const CASES = {
                 ]),
             ),
             ...Object.fromEntries(
-                entries([91, 92], [AD, "backup/archive touches the coordinator"]),
+                entries([91], [AD, "backup archive touches the coordinator"]),
             ),
             ...Object.fromEntries(
                 entries([49, 50, 55, 74, 75], [
@@ -279,6 +280,7 @@ const CASES = {
                 ]),
             ),
             36: [S, "discovery dedupe by topic+payload"],
+            37: [A, "precision_options_do_not_change_discovery_payloads"],
             38: [A, "applies_device_option_overrides_and_null_filtering"],
             39: [A, "applies_device_option_overrides_and_null_filtering"],
             40: [A, "applies_device_option_overrides_and_null_filtering"],
@@ -405,7 +407,7 @@ const CASES = {
             8: [S, "no-payload messages do not bypass the debounce"],
             12: [S, "debounce/retain via device options"],
             13: [A, "payload_conflict_uses_debounce_ignore"],
-            14: [S, "state cache not republished during debounce"],
+            14: [A, "debounce_merges_payloads_and_updates_the_state_cache"],
             17: [A, "tests/calibration.rs applies_calibration_offset_and_precision"],
             18: [S, "0 precision truncates"],
             19: [S, "precision via device options"],

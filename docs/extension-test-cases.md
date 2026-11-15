@@ -30,19 +30,19 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 57 | 2 | 17 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 58 | 2 | 17 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 68 | 14 | 31 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 69 | 14 | 30 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 5 | 27 | 1 | 77 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
-| receive.test.ts | 34 | 14 | 17 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
+| receive.test.ts | 34 | 15 | 16 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
 
@@ -210,8 +210,8 @@ Coverage classes:
 | 88 | Should throw error when read reporting config is called with malformed payload | `asserted` | reporting_configure_and_read_error_paths |
 | 89 | Should throw error when read reporting config is called for non-existing device | `asserted` | reporting_configure_and_read_error_paths |
 | 90 | Should throw error when read reporting config is called for non-existing endpoint | `asserted` | reporting_configure_and_read_error_paths |
-| 91 | Should allow to create a backup | `adapter` | backup/archive touches the coordinator |
-| 92 | Should return an error when the backup archive cannot be created | `adapter` | backup/archive touches the coordinator |
+| 91 | Should allow to create a backup | `adapter` | backup archive touches the coordinator |
+| 92 | Should return an error when the backup archive cannot be created | `asserted` | backup_without_adapter_returns_an_error |
 | 93 | Should allow to restart | `asserted` | restart_request_triggers_the_restart_callback |
 | 94 | Change options and apply - homeassistant | `asserted` | options_apply_homeassistant_and_log_levels |
 | 95 | Change options and apply - log_level | `code` | request handler ported, no dedicated assertion |
@@ -408,7 +408,7 @@ Coverage classes:
 | 34 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
 | 35 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
 | 36 | Should not discovery devices which are already discovered | `slice` | discovery dedupe by topic+payload |
-| 37 | Should discover devices with precision | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 37 | Should discover devices with precision | `asserted` | precision_options_do_not_change_discovery_payloads |
 | 38 | Should discover devices with overridden user configuration | `asserted` | applies_device_option_overrides_and_null_filtering |
 | 39 | Should discover devices with overridden name | `asserted` | applies_device_option_overrides_and_null_filtering |
 | 40 | Should discover devices with overridden user configuration affecting type and object_id | `asserted` | applies_device_option_overrides_and_null_filtering |
@@ -695,7 +695,7 @@ Coverage classes:
 | 11 | Should publish last seen updates from frames that are not emitted as a message right away without debounce or throttle | `asserted` | last_seen_from_non_emitted_frame_publishes_immediately |
 | 12 | Should debounce and retain messages when set via device_options | `slice` | debounce/retain via device options |
 | 13 | Should debounce messages only with the same payload values for provided debounce_ignore keys | `asserted` | payload_conflict_uses_debounce_ignore |
-| 14 | Should NOT publish old messages from State cache during debouncing | `slice` | state cache not republished during debounce |
+| 14 | Should NOT publish old messages from State cache during debouncing | `asserted` | debounce_merges_payloads_and_updates_the_state_cache |
 | 15 | Should throttle multiple messages from spamming devices | `slice` | receive pipeline covered by the behavioural tests |
 | 16 | Shouldnt republish old state | `slice` | receive pipeline covered by the behavioural tests |
 | 17 | Should handle a zigbee message with 1 precision | `asserted` | tests/calibration.rs applies_calibration_offset_and_precision |

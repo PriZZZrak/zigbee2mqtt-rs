@@ -492,3 +492,38 @@ async fn elapsed_is_added_from_the_second_message_onwards() {
         .expect("elapsed on the second message");
     assert!(elapsed >= 40, "elapsed {elapsed} too small");
 }
+
+#[tokio::test]
+async fn debounce_merges_payloads_and_updates_the_state_cache() {
+    use z2m_rs::model::entity::Entity;
+
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "advanced": {"last_seen": "ISO_8601"},
+        "devices": {IEEE: {"friendly_name": "lamp", "debounce": 1}},
+    }));
+    let device = harness.zigbee.resolve_device(IEEE).unwrap();
+
+    harness
+        .receive
+        .publish_debounce(device.clone(), json!({"a": 1}), 1, None)
+        .await;
+    harness
+        .receive
+        .publish_debounce(device.clone(), json!({"b": 2}), 1, None)
+        .await;
+
+    // State cache is updated right away so a cached republish cannot send the
+    // old value (upstream receive.ts:88-90).
+    assert_eq!(
+        harness.state.lock().unwrap().get(&device.entity_id()),
+        json!({"a": 1, "b": 2})
+    );
+
+    tokio::time::sleep(Duration::from_millis(1300)).await;
+    let recorded = harness.recorded.lock().unwrap();
+    assert_eq!(recorded.len(), 1, "{recorded:?}");
+    assert_eq!(recorded[0].0, json!({"a": 1, "b": 2}));
+    assert_eq!(recorded[0].1.as_deref(), Some("publishDebounce"));
+}

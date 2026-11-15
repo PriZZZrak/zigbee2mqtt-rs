@@ -1640,3 +1640,30 @@ async fn group_rename_clears_and_republishes_discovery() {
         .any(|payload| payload["device"]["name"] == "kitchen2");
     assert!(rediscovered, "group was not rediscovered with the new name");
 }
+
+#[tokio::test]
+async fn precision_options_do_not_change_discovery_payloads() {
+    let _guard = serial();
+    let harness = harness();
+    {
+        let mut settings = harness.context.settings.lock().unwrap();
+        settings.set(&["devices", IEEE, "temperature_precision"], json!(1));
+        settings.set(&["devices", IEEE, "humidity_precision"], json!(0));
+        settings.set(&["devices", IEEE, "pressure_precision"], json!(2));
+    }
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let payload = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("temperature config");
+    assert_eq!(
+        payload["value_template"],
+        "{% if \"temperature\" in value_json %}{{ value_json[\"temperature\"] }}{% endif %}"
+    );
+    let template = payload["value_template"].as_str().unwrap();
+    assert!(!template.contains("round"));
+}
