@@ -350,3 +350,104 @@ async fn tls_frontend_serves_websocket() {
         .unwrap();
     frontend.stop().await.unwrap();
 }
+
+async fn http_get(addr: std::net::SocketAddr, path: &str, accept: &str) -> (u16, String) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let mut stream = TcpStream::connect(addr).await.unwrap();
+    stream
+        .write_all(
+            format!(
+                "GET {path} HTTP/1.1\r\nHost: localhost\r\nAccept: {accept}\r\nConnection: close\r\n\r\n"
+            )
+            .as_bytes(),
+        )
+        .await
+        .unwrap();
+    let mut response = Vec::new();
+    let _ = stream.read_to_end(&mut response).await;
+    let response = String::from_utf8_lossy(&response).to_string();
+    let status = response
+        .split_whitespace()
+        .nth(1)
+        .and_then(|code| code.parse().ok())
+        .unwrap_or(0);
+    (status, response)
+}
+
+fn assets_dir() -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "z2m-windfront-assets-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(dir.join("assets")).unwrap();
+    std::fs::write(dir.join("index.html"), "<html>windfront</html>").unwrap();
+    std::fs::write(dir.join("assets/app.js"), "console.log(1)").unwrap();
+    std::fs::write(dir.join("package.json"), r#"{"version":"2.15.1"}"#).unwrap();
+    dir
+}
+
+#[tokio::test]
+async fn serves_windfront_assets_with_cache_and_spa_fallback() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
+    let dir = assets_dir();
+    std::env::set_var("ZIGBEE2MQTT_FRONTEND_ASSETS", &dir);
+    let harness = harness(None);
+    let frontend = Frontend::new(harness.context.clone());
+    frontend.clone().start().await.unwrap();
+    let addr = frontend.bound_addr().unwrap();
+
+    let (status, index) = http_get(addr, "/", "text/html").await;
+    assert_eq!(status, 200, "{index}");
+    assert!(index.contains("<html>windfront</html>"));
+    assert!(index.contains("no-store"));
+
+    let (status, asset) = http_get(addr, "/assets/app.js", "*/*").await;
+    assert_eq!(status, 200, "{asset}");
+    assert!(asset.contains("public, max-age=31536000, immutable"), "{asset}");
+
+    // SPA fallback for client-side routes.
+    let (status, fallback) = http_get(addr, "/devices/0x0017880104e45519", "text/html").await;
+    assert_eq!(status, 200, "{fallback}");
+    assert!(fallback.contains("<html>windfront</html>"));
+
+    // The WebSocket endpoint is not served as a static file.
+    let (status, _) = http_get(addr, "/api", "*/*").await;
+    assert_eq!(status, 404);
+
+    frontend.stop().await.unwrap();
+    std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn serves_assets_under_a_custom_base_url() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
+    let dir = assets_dir();
+    std::env::set_var("ZIGBEE2MQTT_FRONTEND_ASSETS", &dir);
+    let harness = harness(None);
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["frontend", "base_url"], json!("/z2m"));
+    let frontend = Frontend::new(harness.context.clone());
+    frontend.clone().start().await.unwrap();
+    let addr = frontend.bound_addr().unwrap();
+
+    let (status, index) = http_get(addr, "/z2m/", "text/html").await;
+    assert_eq!(status, 200, "{index}");
+    assert!(index.contains("<html>windfront</html>"));
+
+    let (status, _) = http_get(addr, "/", "text/html").await;
+    assert_eq!(status, 404);
+
+    frontend.stop().await.unwrap();
+    std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
+    let _ = std::fs::remove_dir_all(dir);
+}

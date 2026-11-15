@@ -9,6 +9,7 @@ use z2m_rs::controller::Controller;
 use z2m_rs::event_bus::EventBus;
 use z2m_rs::mqtt::Mqtt;
 use z2m_rs::state::State;
+use z2m_rs::extension::frontend::windfront_assets_dir;
 use z2m_rs::util::logger::Logger;
 use z2m_rs::util::onboarding;
 use z2m_rs::util::settings::Settings;
@@ -51,7 +52,10 @@ async fn main() {
         settings.lock().unwrap().set_onboarding(true);
         // Windfront onboarding assets are deferred to OpenWrt packaging; the
         // handlers serve `/data`, `/submit` and `/submit-zip` and 404 the rest.
-        let static_dir = data_path.join("onboarding");
+        let static_dir = windfront_assets_dir()
+            .map(|dir| dir.join("onboarding"))
+            .filter(|dir| dir.is_dir())
+            .unwrap_or_else(|| data_path.join("onboarding"));
         if let Err(error) = onboarding::run_server(
             settings.clone(),
             data_path.clone(),
@@ -71,7 +75,11 @@ async fn main() {
         for error in &errors {
             eprintln!("- {error}");
         }
-        let _ = onboarding::run_failure_server(errors, data_path.join("onboarding")).await;
+        let static_dir = windfront_assets_dir()
+            .map(|dir| dir.join("onboarding"))
+            .filter(|dir| dir.is_dir())
+            .unwrap_or_else(|| data_path.join("onboarding"));
+        let _ = onboarding::run_failure_server(errors, static_dir).await;
         return;
     }
 

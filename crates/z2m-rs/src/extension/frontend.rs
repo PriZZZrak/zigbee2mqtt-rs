@@ -1,13 +1,12 @@
 // Original: .upstream/zigbee2mqtt/lib/extension/frontend.ts
 // Upstream revision: zigbee2mqtt 2.14.3 (3c841fdf).
 //
-// Protocol/API scope (AGENTS §5 Q5): WebSocket protocol + auth + retained/state
-// replay. Static assets and TLS are deferred: the Windfront package is not
-// shipped (OpenWrt packaging), and TLS would require a C crypto provider,
-// which AGENTS §6 forbids. Non-API HTTP requests receive 404 from the
-// WebSocket handshake.
+// WebSocket protocol + auth + retained/state replay, static Windfront serving
+// (env/package assets path, base_url, SPA fallback, pre-compressed assets) and
+// TLS via the pure-Rust rustls-rustcrypto provider.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -20,6 +19,7 @@ use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_rustls::TlsAcceptor;
 use tokio_tungstenite::{accept_hdr_async, WebSocketStream};
+use crate::util::static_file_server::{send_not_found, HttpRequest, StaticFileServer};
 
 use crate::extension::extension::{Extension, ExtensionContext, ExtensionFuture};
 use crate::model::entity::Entity;
@@ -211,21 +211,33 @@ impl Frontend {
 
     async fn serve<S>(
         this: Arc<Self>,
-        stream: S,
+        mut stream: S,
         clients: Clients,
         api_path: String,
         auth_token: Option<String>,
+        server: Option<Arc<StaticFileServer>>,
     ) -> Result<(), String>
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
     {
-        let callback =
-            move |request: &Request, response: Response| -> Result<Response, ErrorResponse> {
-                if request.uri().path() != api_path {
-                    let mut error = ErrorResponse::new(Some("Not Found".to_string()));
-                    *error.status_mut() = StatusCode::NOT_FOUND;
-                    return Err(error);
-                }
+        let (head, request) = read_head(&mut stream)
+            .await
+            .map_err(|error| error.to_string())?;
+        let path = request
+            .target
+            .split(['?', '#'])
+            .next()
+            .unwrap_or("/")
+            .to_string();
+        let is_websocket = request
+            .headers
+            .get("upgrade")
+            .is_some_and(|upgrade| upgrade.eq_ignore_ascii_case("websocket"));
+
+        if is_websocket && path == api_path {
+            let callback = move |request: &Request,
+                                 response: Response|
+                  -> Result<Response, ErrorResponse> {
                 if let Some(expected) = &auth_token {
                     let provided = request.uri().query().and_then(|query| {
                         query.split('&').find_map(|pair| {
@@ -241,17 +253,205 @@ impl Frontend {
                 }
                 Ok(response)
             };
+            let socket = accept_hdr_async(Rewind::new(head, stream), callback)
+                .await
+                .map_err(|error| error.to_string())?;
+            let id = this.next_id.fetch_add(1, Ordering::SeqCst);
+            let (sender, receiver) = mpsc::unbounded_channel::<Message>();
+            clients.lock().unwrap().insert(id, sender.clone());
+            this.replay(&sender).await;
+            Self::handle_socket(&this, socket, id, receiver).await;
+            return Ok(());
+        }
 
-        let socket = accept_hdr_async(stream, callback)
+        let response = match server {
+            Some(server) => server.handle(&request),
+            None => send_not_found(&request),
+        };
+        write_response(&mut stream, &response)
             .await
             .map_err(|error| error.to_string())?;
-        let id = this.next_id.fetch_add(1, Ordering::SeqCst);
-        let (sender, receiver) = mpsc::unbounded_channel::<Message>();
-        clients.lock().unwrap().insert(id, sender.clone());
-        this.replay(&sender).await;
-        Self::handle_socket(&this, socket, id, receiver).await;
         Ok(())
     }
+}
+
+/// Resolves the Windfront assets directory: env override, OpenWrt package
+/// path, then the Node package fallback used in development.
+pub fn windfront_assets_dir() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(path) = std::env::var("ZIGBEE2MQTT_FRONTEND_ASSETS") {
+        candidates.push(PathBuf::from(path));
+    }
+    candidates.push(PathBuf::from("/usr/share/zigbee2mqtt/windfront"));
+    candidates.push(PathBuf::from(
+        "node_modules/zigbee2mqtt-windfront/dist",
+    ));
+    candidates
+        .into_iter()
+        .find(|path| path.join("index.html").exists())
+}
+
+fn resolve_frontend_assets(settings: &Value) -> Option<PathBuf> {
+    if settings["frontend"]["disable_ui_serving"]
+        .as_bool()
+        .unwrap_or(false)
+    {
+        return None;
+    }
+    windfront_assets_dir()
+}
+
+/// The package version this binary was built and tested against.
+const EXPECTED_WINDFRONT_VERSION_RAW: &str =
+    include_str!("../../../../packaging/windfront.version");
+
+fn expected_windfront_version() -> &'static str {
+    EXPECTED_WINDFRONT_VERSION_RAW.trim()
+}
+
+fn check_windfront_version(dir: &Path, logger: &Arc<Mutex<crate::util::logger::Logger>>) -> Result<(), String> {
+    let manifest = std::fs::read_to_string(dir.join("package.json"))
+        .map_err(|error| format!("Windfront assets at '{}' are incomplete: {error}", dir.display()))?;
+    let parsed: Value = serde_json::from_str(&manifest)
+        .map_err(|error| format!("Invalid Windfront package.json: {error}"))?;
+    let version = parsed["version"].as_str().unwrap_or_default();
+    if version == expected_windfront_version()
+        || std::env::var("ZIGBEE2MQTT_ALLOW_WINDFRONT_MISMATCH").is_ok()
+    {
+        return Ok(());
+    }
+    let message = format!(
+        "Windfront assets version '{version}' does not match the tested version '{}' (set ZIGBEE2MQTT_ALLOW_WINDFRONT_MISMATCH=1 to override)",
+        expected_windfront_version()
+    );
+    logger.lock().unwrap().warning(&message, "z2m");
+    Err(message)
+}
+
+/// Replays the bytes already read while detecting the HTTP request head so the
+/// WebSocket handshake sees the original stream.
+struct Rewind<S> {
+    prefix: Vec<u8>,
+    position: usize,
+    inner: S,
+}
+
+impl<S> Rewind<S> {
+    fn new(prefix: Vec<u8>, inner: S) -> Self {
+        Self {
+            prefix,
+            position: 0,
+            inner,
+        }
+    }
+}
+
+impl<S: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for Rewind<S> {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+        buffer: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        if self.position < self.prefix.len() {
+            let remaining = &self.prefix[self.position..];
+            let take = remaining.len().min(buffer.remaining());
+            buffer.put_slice(&remaining[..take]);
+            self.position += take;
+            return std::task::Poll::Ready(Ok(()));
+        }
+        std::pin::Pin::new(&mut self.inner).poll_read(context, buffer)
+    }
+}
+
+impl<S: tokio::io::AsyncWrite + Unpin> tokio::io::AsyncWrite for Rewind<S> {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+        buffer: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        std::pin::Pin::new(&mut self.inner).poll_write(context, buffer)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.inner).poll_flush(context)
+    }
+
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.inner).poll_shutdown(context)
+    }
+}
+
+/// Reads the HTTP request head (up to CRLFCRLF) and parses method/target/headers.
+async fn read_head<S: tokio::io::AsyncRead + Unpin>(
+    stream: &mut S,
+) -> std::io::Result<(Vec<u8>, HttpRequest)> {
+    use tokio::io::AsyncReadExt as _;
+
+    let mut head = Vec::new();
+    let mut chunk = [0u8; 2048];
+    let end = loop {
+        let read = stream.read(&mut chunk).await?;
+        if read == 0 {
+            return Ok((head, HttpRequest::default()));
+        }
+        head.extend_from_slice(&chunk[..read]);
+        if let Some(position) = head.windows(4).position(|window| window == b"\r\n\r\n") {
+            break position;
+        }
+        if head.len() > 64 * 1024 {
+            return Ok((head, HttpRequest::default()));
+        }
+    };
+    let text = String::from_utf8_lossy(&head[..end]).to_string();
+    let mut lines = text.split("\r\n");
+    let mut request = HttpRequest::default();
+    if let Some(first) = lines.next() {
+        let mut parts = first.split_whitespace();
+        request.method = parts.next().unwrap_or("").to_string();
+        request.target = parts.next().unwrap_or("/").to_string();
+    }
+    for line in lines {
+        if let Some((name, value)) = line.split_once(':') {
+            request
+                .headers
+                .insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
+        }
+    }
+    Ok((head, request))
+}
+
+async fn write_response<S: tokio::io::AsyncWrite + Unpin>(
+    stream: &mut S,
+    response: &crate::util::static_file_server::HttpResponse,
+) -> std::io::Result<()> {
+    use tokio::io::AsyncWriteExt as _;
+
+    let reason = match response.status {
+        200 => "OK",
+        304 => "Not Modified",
+        401 => "Unauthorized",
+        404 => "Not Found",
+        _ => "Internal Server Error",
+    };
+    let mut text = format!(
+        "HTTP/1.1 {} {}\r\nContent-Length: {}\r\nConnection: close\r\n",
+        response.status,
+        reason,
+        response.body.len()
+    );
+    for (name, value) in &response.headers {
+        text.push_str(&format!("{name}: {value}\r\n"));
+    }
+    text.push_str("\r\n");
+    stream.write_all(text.as_bytes()).await?;
+    stream.write_all(&response.body).await?;
+    stream.flush().await
 }
 
 impl Extension for Frontend {
@@ -287,6 +487,36 @@ impl Extension for Frontend {
                 );
             }
 
+            let assets = resolve_frontend_assets(&settings);
+            let server = match &assets {
+                Some(dir) => {
+                    check_windfront_version(dir, &self.context.logger)?;
+                    self.context.logger.lock().unwrap().info(
+                        &format!("Serving Windfront from '{}'", dir.display()),
+                        "z2m",
+                    );
+                    let mut static_server = crate::util::static_file_server::create_static_file_server(
+                        dir.clone(),
+                        Arc::new(|message: &str| {
+                            zigbee_apiarist::utils::logger::logger().error(message, "z2m");
+                        }),
+                    );
+                    static_server.base_url = self.base_url.clone();
+                    Some(Arc::new(static_server))
+                }
+                None => {
+                    if !settings["frontend"]["disable_ui_serving"]
+                        .as_bool()
+                        .unwrap_or(false)
+                    {
+                        self.context.logger.lock().unwrap().warning(
+                            "Windfront assets were not found, the UI will not be served (set ZIGBEE2MQTT_FRONTEND_ASSETS or install zigbee2mqtt-windfront)",
+                            "z2m",
+                        );
+                    }
+                    None
+                }
+            };
             let host = settings["frontend"]["host"]
                 .as_str()
                 .unwrap_or("")
@@ -322,12 +552,13 @@ impl Extension for Frontend {
                                     let api_path = api_path.clone();
                                     let auth_token = auth_token.clone();
                                     let tls = tls_acceptor.clone();
+                                    let server = server.clone();
                                     let logger = this.context.logger.clone();
                                     tokio::spawn(async move {
                                         match tls {
                                             Some(acceptor) => match acceptor.accept(stream).await {
                                                 Ok(tls_stream) => {
-                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token).await;
+                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token, server).await;
                                                 }
                                                 Err(error) => logger.lock().unwrap().error(
                                                     &format!("TLS handshake failed: {error}"),
@@ -335,7 +566,7 @@ impl Extension for Frontend {
                                                 ),
                                             },
                                             None => {
-                                                let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                                let _ = Self::serve(this, stream, clients, api_path, auth_token, server).await;
                                             }
                                         }
                                     });
@@ -373,13 +604,14 @@ impl Extension for Frontend {
                                     let this = this.clone();
                                     let api_path = api_path.clone();
                                     let auth_token = auth_token.clone();
+                                    let server = server.clone();
                                     let tls = tls_acceptor.clone();
                                     let logger = this.context.logger.clone();
                                     tokio::spawn(async move {
                                         match tls {
                                             Some(acceptor) => match acceptor.accept(stream).await {
                                                 Ok(tls_stream) => {
-                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token).await;
+                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token, server).await;
                                                 }
                                                 Err(error) => logger.lock().unwrap().error(
                                                     &format!("TLS handshake failed: {error}"),
@@ -387,7 +619,7 @@ impl Extension for Frontend {
                                                 ),
                                             },
                                             None => {
-                                                let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                                let _ = Self::serve(this, stream, clients, api_path, auth_token, server).await;
                                             }
                                         }
                                     });
@@ -427,13 +659,14 @@ impl Extension for Frontend {
                                     let this = this.clone();
                                     let api_path = api_path.clone();
                                     let auth_token = auth_token.clone();
+                                    let server = server.clone();
                                     let tls = tls_acceptor.clone();
                                     let logger = this.context.logger.clone();
                                     tokio::spawn(async move {
                                         match tls {
                                             Some(acceptor) => match acceptor.accept(stream).await {
                                                 Ok(tls_stream) => {
-                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token).await;
+                                                    let _ = Self::serve(this, tls_stream, clients, api_path, auth_token, server).await;
                                                 }
                                                 Err(error) => logger.lock().unwrap().error(
                                                     &format!("TLS handshake failed: {error}"),
@@ -441,7 +674,7 @@ impl Extension for Frontend {
                                                 ),
                                             },
                                             None => {
-                                                let _ = Self::serve(this, stream, clients, api_path, auth_token).await;
+                                                let _ = Self::serve(this, stream, clients, api_path, auth_token, server).await;
                                             }
                                         }
                                     });

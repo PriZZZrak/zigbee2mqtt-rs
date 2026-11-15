@@ -1,0 +1,101 @@
+name: zigbee2mqtt-rs package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: opkg-feed
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build the static aarch64 binary
+        run: |
+          set -euo pipefail
+          cargo zigbuild --release -p z2m-rs --target aarch64-unknown-linux-musl
+          bin="target/aarch64-unknown-linux-musl/release/z2m-rs"
+          test -x "$bin"
+          "$bin" --help >/dev/null 2>&1 || true
+          file "$bin"
+
+      - name: Package version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ -z "$version" ] || [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            version="0.0.0-g$(git rev-parse --short HEAD)"
+          fi
+          windfront=$(tr -d '[:space:]' < packaging/windfront.version)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "windfront=$windfront" >> "$GITHUB_OUTPUT"
+
+      - name: Build ipk
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          WINDFRONT: ${{ steps.version.outputs.windfront }}
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/payload"
+          mkdir -p "$payload/usr/bin" "$payload/etc/init.d"
+          cp target/aarch64-unknown-linux-musl/release/z2m-rs "$payload/usr/bin/zigbee2mqtt-rs"
+          cp packaging/openwrt/files/zigbee2mqtt-rs.init "$payload/etc/init.d/zigbee2mqtt-rs"
+          chmod 0755 "$payload/usr/bin/zigbee2mqtt-rs" "$payload/etc/init.d/zigbee2mqtt-rs"
+          mkdir -p "$RUNNER_TEMP/out"
+          ./packaging/openwrt/build-ipk.sh \
+            zigbee2mqtt-rs "$VERSION" aarch64_cortex-a53 \
+            "zigbee2mqtt-windfront (= $WINDFRONT)" \
+            "$payload" "$RUNNER_TEMP/out" \
+            "Zigbee to MQTT bridge (pure Rust port)" \
+            "/etc/zigbee2mqtt/configuration.yaml" \
+            packaging/openwrt/files-rs
+
+      - name: Update the opkg feed
+        env:
+          USIGN_PRIVATE_KEY: ${{ secrets.USIGN_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          feed="$RUNNER_TEMP/feed"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git worktree add "$feed" gh-pages
+          else
+            git worktree add --detach "$feed" HEAD
+            (cd "$feed" && git checkout --orphan gh-pages && git rm -rf . >/dev/null 2>&1 || true)
+          fi
+          cp "$RUNNER_TEMP"/out/*.ipk "$feed"/
+          key=""
+          if [ -n "${USIGN_PRIVATE_KEY:-}" ]; then
+            key="$RUNNER_TEMP/usign.key"
+            printf '%s\n' "$USIGN_PRIVATE_KEY" > "$key"
+            if command -v usign >/dev/null 2>&1; then
+              usign -F -p "$feed/public.key" -s "$key" || true
+            fi
+          fi
+          if command -v usign >/dev/null 2>&1; then
+            ./packaging/openwrt/update-feed.sh "$feed" "$key"
+          else
+            ./packaging/openwrt/update-feed.sh "$feed"
+          fi
+          (cd "$feed" && git add -A && git commit -m "zigbee2mqtt-rs ${VERSION}" && git push origin gh-pages)

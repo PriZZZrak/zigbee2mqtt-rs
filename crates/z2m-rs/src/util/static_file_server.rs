@@ -20,6 +20,8 @@ pub struct HttpResponse {
 
 pub struct StaticFileServer {
     pub dir: PathBuf,
+    /// Mount prefix (`frontend.base_url`), e.g. `/` or `/z2m`.
+    pub base_url: String,
     pub log_error: Arc<dyn Fn(&str) + Send + Sync>,
     /// Models upstream's `response.setHeader` throwing inside the failure test.
     pub fail_on_content_security_policy: bool,
@@ -39,7 +41,11 @@ impl StaticFileServer {
             };
         }
 
-        let Some(relative) = decode_path(&request.target) else {
+        let target = match self.relative_target(&request.target) {
+            Some(target) => target,
+            None => return send_not_found(request),
+        };
+        let Some(relative) = decode_path(&target) else {
             return send_not_found(request);
         };
         if relative
@@ -55,14 +61,26 @@ impl StaticFileServer {
             self.dir.join(&relative)
         };
 
-        let Ok(resolved) = requested.canonicalize() else {
-            return send_not_found(request);
+        let resolved = match requested.canonicalize() {
+            Ok(resolved) => resolved,
+            Err(_) => {
+                // SPA fallback: unknown routes serve index.html (staticFileServer.ts).
+                if request.method == "GET" && accepts_html(request) {
+                    let index = self.dir.join("index.html");
+                    match index.canonicalize() {
+                        Ok(index) => index,
+                        Err(_) => return send_not_found(request),
+                    }
+                } else {
+                    return send_not_found(request);
+                }
+            }
         };
         if !resolved.starts_with(self.dir.canonicalize().unwrap_or_else(|_| self.dir.clone())) {
             return send_not_found(request);
         }
 
-        let is_root = request.target == "/" || request.target.is_empty();
+        let is_root = target == "/" || target.is_empty();
         let plain_content_type = content_type(&resolved).to_string();
         let (path, encoding) = choose_encoding(&resolved, request);
         let Ok(body) = std::fs::read(&path) else {
@@ -100,6 +118,11 @@ impl StaticFileServer {
         headers.insert("etag".to_string(), etag);
         if is_root {
             headers.insert("cache-control".to_string(), "no-store".to_string());
+        } else if self.is_hashed_asset(&relative) {
+            headers.insert(
+                "cache-control".to_string(),
+                "public, max-age=31536000, immutable".to_string(),
+            );
         }
         if let Some(encoding) = encoding {
             headers.insert("content-encoding".to_string(), encoding.to_string());
@@ -114,6 +137,40 @@ impl StaticFileServer {
             body,
         }
     }
+
+    /// Strips `frontend.base_url` from the request target; `None` when the
+    /// request is outside the mount point.
+    fn relative_target(&self, target: &str) -> Option<String> {
+        let path = target.split(['?', '#']).next().unwrap_or(target);
+        let base = self.base_url.trim_end_matches('/');
+        if base.is_empty() {
+            return Some(if path.is_empty() { "/".to_string() } else { path.to_string() });
+        }
+        let stripped = path.strip_prefix(base)?;
+        if stripped.is_empty() || stripped.starts_with('/') {
+            Some(if stripped.is_empty() {
+                "/".to_string()
+            } else {
+                stripped.to_string()
+            })
+        } else {
+            None
+        }
+    }
+
+    fn is_hashed_asset(&self, relative: &Path) -> bool {
+        relative
+            .components()
+            .next()
+            .is_some_and(|component| component.as_os_str() == "assets")
+    }
+}
+
+fn accepts_html(request: &HttpRequest) -> bool {
+    request
+        .headers
+        .get("accept")
+        .is_some_and(|accept| accept.contains("text/html"))
 }
 
 pub fn create_static_file_server(
@@ -122,6 +179,7 @@ pub fn create_static_file_server(
 ) -> StaticFileServer {
     StaticFileServer {
         dir,
+        base_url: "/".to_string(),
         log_error,
         fail_on_content_security_policy: false,
     }
@@ -134,6 +192,7 @@ pub fn create_failing_static_file_server(
 ) -> StaticFileServer {
     StaticFileServer {
         dir,
+        base_url: "/".to_string(),
         log_error,
         fail_on_content_security_policy: true,
     }

@@ -1,0 +1,106 @@
+name: windfront package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Windfront version (defaults to packaging/windfront.version)"
+        required: false
+  push:
+    tags:
+      - "windfront-v*"
+
+concurrency:
+  group: opkg-feed
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          version="${{ github.event.inputs.version }}"
+          if [ -z "$version" ]; then
+            version=$(tr -d '[:space:]' < packaging/windfront.version)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building zigbee2mqtt-windfront $version"
+
+      - name: Download the release tarball
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/windfront"
+          url="https://registry.npmjs.org/zigbee2mqtt-windfront/-/zigbee2mqtt-windfront-${VERSION}.tgz"
+          curl -fsSL "$url" -o "$RUNNER_TEMP/windfront.tgz"
+          tar -C "$RUNNER_TEMP/windfront" -xzf "$RUNNER_TEMP/windfront.tgz"
+          node -e '
+            const pkg = require(process.argv[1]);
+            if (pkg.name !== "zigbee2mqtt-windfront" || pkg.version !== process.env.VERSION) {
+              throw new Error(`unexpected package ${pkg.name}@${pkg.version}`);
+            }
+          ' "$RUNNER_TEMP/windfront/package/package.json"
+          sha256sum "$RUNNER_TEMP/windfront.tgz" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA256: $(sha256sum "$RUNNER_TEMP/windfront.tgz" | awk '{print $1}')"
+
+      - name: Build ipk
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/payload"
+          mkdir -p "$payload/usr/share/zigbee2mqtt/windfront"
+          cp -a "$RUNNER_TEMP/windfront/package/dist/." "$payload/usr/share/zigbee2mqtt/windfront/"
+          cp "$RUNNER_TEMP/windfront/package/package.json" "$payload/usr/share/zigbee2mqtt/windfront/package.json"
+          cp "$RUNNER_TEMP/windfront/package/LICENSE" "$payload/usr/share/zigbee2mqtt/windfront/LICENSE"
+          mkdir -p "$RUNNER_TEMP/out"
+          ./packaging/openwrt/build-ipk.sh \
+            zigbee2mqtt-windfront "$VERSION" all "" \
+            "$payload" "$RUNNER_TEMP/out" \
+            "Windfront static UI for Zigbee2MQTT"
+
+      - name: Update the opkg feed
+        env:
+          USIGN_PRIVATE_KEY: ${{ secrets.USIGN_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          feed="$RUNNER_TEMP/feed"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git worktree add "$feed" gh-pages
+          else
+            git worktree add --detach "$feed" HEAD
+            (cd "$feed" && git checkout --orphan gh-pages && git rm -rf . >/dev/null 2>&1 || true)
+          fi
+          cp "$RUNNER_TEMP"/out/*.ipk "$feed"/
+          key=""
+          if [ -n "${USIGN_PRIVATE_KEY:-}" ]; then
+            key="$RUNNER_TEMP/usign.key"
+            printf '%s\n' "$USIGN_PRIVATE_KEY" > "$key"
+            if command -v usign >/dev/null 2>&1; then
+              usign -F -p "$feed/public.key" -s "$key" || true
+            fi
+          fi
+          if command -v usign >/dev/null 2>&1; then
+            ./packaging/openwrt/update-feed.sh "$feed" "$key"
+          else
+            ./packaging/openwrt/update-feed.sh "$feed"
+          fi
+          (cd "$feed" && git add -A && git commit -m "windfront ${VERSION}" && git push origin gh-pages)
+
+      - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/windfront-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/out/*.ipk
+          name: "zigbee2mqtt-windfront ${{ steps.version.outputs.version }}"
+          tag_name: ${{ github.ref_name }}

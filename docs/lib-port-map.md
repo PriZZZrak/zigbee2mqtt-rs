@@ -29,7 +29,7 @@ counterpart.
 | `extension/bind.ts` | `crates/z2m-rs/src/extension/bind.rs` | PORTED | `tests/bind.rs`; adapter-backed paths HARDWARE_PENDING |
 | `extension/bridge.ts` | `crates/z2m-rs/src/extension/bridge.rs` | PORTED | `tests/bridge.rs` (17 tests); approved OMITTED handlers listed in `docs/parity-matrix.md` |
 | `extension/configure.ts` | `crates/z2m-rs/src/extension/configure.rs` | PORTED | `tests/configure.rs` |
-| `extension/frontend.ts` | `crates/z2m-rs/src/extension/frontend.rs` | PORTED | `tests/frontend.rs` (WS, auth, replay, TLS, unix socket); static assets deferred |
+| `extension/frontend.ts` | `crates/z2m-rs/src/extension/frontend.rs` | PORTED | `tests/frontend.rs` (WS, auth, replay, TLS, unix socket, static Windfront serving with base_url/SPA fallback/cache headers, assets version check); OpenWrt packaging in `docs/openwrt-packaging.md` |
 | `extension/groups.ts` | `crates/z2m-rs/src/extension/groups.rs` | PORTED | `tests/groups.rs` |
 | `extension/health.ts` | `crates/z2m-rs/src/extension/health.rs` | PORTED | `tests/health.rs` |
 | `extension/homeassistant.ts` | `crates/z2m-rs/src/extension/homeassistant.rs` | PORTED | `tests/homeassistant.rs` (29 tests); per-case map in `docs/extension-test-cases.md` |
