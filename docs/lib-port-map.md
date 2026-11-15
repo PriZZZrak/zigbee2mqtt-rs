@@ -6,7 +6,7 @@ counterpart.
 
 | Upstream file | Rust destination | Status | Evidence |
 |---|---|---|---|
-| `controller.ts` | `crates/z2m-rs/src/controller.rs` | PORTED | `tests/controller.rs`, `tests/controller_lifecycle.rs`, `tests/last_seen.rs` (publishEntityState, extension wiring, cached state, last_seen formats) |
+| `controller.ts` | `crates/z2m-rs/src/controller.rs` | PORTED | `tests/controller.rs`, `tests/controller_lifecycle.rs`, `tests/last_seen.rs`, `tests/router_artifacts.rs` (publishEntityState, extension wiring, cached state, last_seen formats, real router database load/round-trip) |
 | `eventBus.ts` | `crates/z2m-rs/src/event_bus.rs` | PORTED | `tests/on_event.rs`, `tests/groups.rs`, `tests/homeassistant.rs` (event dispatch, stats) |
 | `mqtt.ts` | `crates/z2m-rs/src/mqtt.rs` | PORTED | `tests/mqtt_broker.rs` (real aedes broker: retained online state, QoS1 delivery, live `queued`), unit tests for server parsing and the pure-Rust TLS config |
 | `state.ts` | `crates/z2m-rs/src/state.rs` | PORTED | `tests/state.rs` |
@@ -18,7 +18,7 @@ counterpart.
 | `util/objectAssignDeep.ts` | `crates/z2m-rs/src/util/object_assign_deep.rs` | PORTED | `tests/object_assign_deep.rs` |
 | `util/onboarding.ts` | `crates/z2m-rs/src/util/onboarding.rs` | PORTED | unit tests in `util/onboarding.rs` (`/data`, `/submit`, `/submit-zip`, ZIP traversal guards, failure payload); Windfront onboarding assets deferred |
 | `util/sd-notify.ts` | `crates/z2m-rs/src/util/sd_notify.rs` | PORTED | `tests/sd_notify.rs` |
-| `util/settings.ts` | `crates/z2m-rs/src/util/settings.rs` | PORTED | `tests/settings.rs`, `tests/settings_schema.rs` |
+| `util/settings.ts` | `crates/z2m-rs/src/util/settings.rs` | PORTED | `tests/settings.rs`, `tests/settings_schema.rs`, `tests/router_artifacts.rs` (real router configuration.yaml loads and validates cleanly) |
 | `util/settingsMigration.ts` | `crates/z2m-rs/src/util/settings_migration.rs` | PORTED | `tests/settings_migration.rs` (versions 1→5, notes, icon migration) |
 | `util/staticFileServer.ts` | `crates/z2m-rs/src/util/static_file_server.rs` | PORTED | `tests/static_file_server.rs` |
 | `util/stringify.ts` | `crates/z2m-rs/src/util/stringify.rs` | PORTED | `tests/utils.rs` (`stable_stringify`) |
