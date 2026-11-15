@@ -171,11 +171,10 @@ Remaining gaps (tracked, do not hide):
 - `z2m-rs/util/logger.rs` lacks upstream `timestamp_format` handling; it uses
   ISO-8601 instead of the malformed epoch string. Format parity is `PARTIAL`.
 - mDNS discovery is still injected rather than live (`mdns-sd` not added yet).
-- `mqtts://` (TLS to the broker) is blocked by the pure-Rust policy:
-  `rumqttc`'s `use-rustls-no-provider` pulls `rustls-webpki 0.102`, which
-  links `ring` (C/asm crypto). Enabling it needs an explicit decision: accept
-  `ring` for MQTT only, replace the MQTT client, or keep `mqtts` unsupported.
-  (`cargo tree -i ring` shows the dependency chain.)
+- `mqtts://` (TLS to the broker) is **OMITTED** (user decision 2026-11-15,
+  AGENTS §5 Q5): `rumqttc`'s `use-rustls-no-provider` pulls
+  `rustls-webpki 0.102` → `ring` (C/asm crypto), which violates the pure-Rust
+  rule (§6). Only `mqtt://`/`tcp://` are supported.
 - TLS interoperability with Chrome/Safari/Firefox has not been validated yet;
   `rustls-rustcrypto` is a pre-release provider.
 - gzip: pre-compressed `.gz` assets are served; on-the-fly compression is

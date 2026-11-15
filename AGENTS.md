@@ -196,6 +196,9 @@ Resolved on 2026-11-06:
   R1 per §4; documented `OMITTED`). `frontend.ts` is ported for the WebSocket
   protocol and HTTP API only; Windfront static assets are deferred to OpenWrt
   packaging. `publish.ts` and `receive.ts` are completed as part of this goal.
+- **Q6 — MQTT broker TLS (2026-11-15, user decision):** `mqtts://` is
+  **OMITTED**. `rumqttc`'s TLS feature pulls `rustls-webpki 0.102` → `ring`
+  (C/asm crypto), which violates §6; only `mqtt://`/`tcp://` are supported.
 
 ## 6. Technical constraints
 
