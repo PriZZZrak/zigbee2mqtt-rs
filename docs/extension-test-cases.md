@@ -30,14 +30,14 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 43 | 2 | 31 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 46 | 2 | 28 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 56 | 15 | 42 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 59 | 15 | 39 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -127,8 +127,8 @@ Coverage classes:
 | 5 | Should log to MQTT including debug when enabled | `code` | request handler ported, no dedicated assertion |
 | 6 | Shouldnt log to MQTT when not connected | `asserted` | logging_publishes_to_mqtt_with_dedupe_and_connection_guard (connection guard) |
 | 7 | Should publish groups on startup | `asserted` | start_publishes_bridge_topics |
-| 8 | Should publish event when device joined | `code` | request handler ported, no dedicated assertion |
-| 9 | Should publish devices when device joined | `code` | request handler ported, no dedicated assertion |
+| 8 | Should publish event when device joined | `asserted` | device_joined_publishes_event_and_enables_rename_last |
+| 9 | Should publish devices when device joined | `asserted` | device_joined_publishes_event_and_enables_rename_last |
 | 10 | Should publish event when device announces | `code` | request handler ported, no dedicated assertion |
 | 11 | Should publish event when device interview started | `code` | request handler ported, no dedicated assertion |
 | 12 | Should publish event and devices when device interview failed | `code` | request handler ported, no dedicated assertion |
@@ -165,7 +165,7 @@ Coverage classes:
 | 43 | Should allow rename group | `asserted` | group_add_and_rename_device |
 | 44 | Should throw error on invalid device rename payload | `asserted` | rename_trims_validates_and_reports_errors |
 | 45 | Should throw error on non-existing device rename | `asserted` | rename_trims_validates_and_reports_errors |
-| 46 | Should allow to rename last joined device | `code` | request handler ported, no dedicated assertion |
+| 46 | Should allow to rename last joined device | `asserted` | device_joined_publishes_event_and_enables_rename_last |
 | 47 | Should throw error when renaming device through not allowed friendlyName | `code` | request handler ported, no dedicated assertion |
 | 48 | Should throw error when renaming last joined device but none has joined | `asserted` | rename_trims_validates_and_reports_errors |
 | 49 | Should allow interviewing a device by friendly name | `adapter` | interview/install code talks to the coordinator |
@@ -440,9 +440,9 @@ Coverage classes:
 | 66 | Should discover an infrared emitter entity | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 67 | Should discover an infrared receiver entity | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 68 | Should discover devices with custom homeassistant.discovery_topic | `code` | homeassistant.discovery_topic is honoured by discovery_topic_for |
-| 69 | Should throw error when starting with attributes output | `code` | attributes output rejected in start() |
-| 70 | Should throw error when homeassistant.discovery_topic equals the mqtt.base_topic | `code` | discovery_topic == base_topic rejected in start() |
-| 71 | Should warn when starting with cache_state false | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 69 | Should throw error when starting with attributes output | `asserted` | start_rejects_attribute_output_and_conflicting_discovery_topic |
+| 70 | Should throw error when homeassistant.discovery_topic equals the mqtt.base_topic | `asserted` | start_rejects_attribute_output_and_conflicting_discovery_topic |
+| 71 | Should warn when starting with cache_state false | `asserted` | starting_without_cache_state_warns |
 | 72 | Should not add missing values to the payload | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 73 | Should copy hue/saturtion to h/s if present | `asserted` | adjust_message_copies_hue_and_saturation |
 | 74 | Should not copy hue/saturtion if properties are missing | `slice` | adjust_message copies only when all properties exist |

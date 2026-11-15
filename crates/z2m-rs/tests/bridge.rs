@@ -847,3 +847,46 @@ async fn force_remove_group_removes_settings() {
         .get(&group_id.to_string())
         .is_none());
 }
+
+#[tokio::test]
+async fn device_joined_publishes_event_and_enables_rename_last() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness.event_bus.lock().unwrap().emit_device_joined(json!({
+        "device": {"ieeeAddr": IEEE, "name": "lamp"},
+    }));
+    tokio::time::sleep(Duration::from_millis(250)).await;
+
+    {
+        let mqtt = harness.mqtt.lock().await;
+        let event = mqtt
+            .attempted
+            .iter()
+            .find(|(topic, _, _)| topic == "zigbee2mqtt/bridge/event")
+            .expect("device_joined event");
+        let payload: Value = serde_json::from_str(&event.1).unwrap();
+        assert_eq!(payload["type"], "device_joined");
+        assert_eq!(payload["data"]["ieee_address"], IEEE);
+        assert!(mqtt
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/devices"));
+    }
+
+    // Upstream `Should allow to rename last joined device`.
+    send(&harness, "device/rename", json!({"last": true, "to": "lamp2"})).await;
+    let payload = response(&harness, "device/rename").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["to"], "lamp2");
+    assert!(harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_device("lamp2")
+        .is_some());
+}

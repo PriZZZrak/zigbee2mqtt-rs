@@ -2429,6 +2429,12 @@ impl Extension for HomeAssistant {
                     "Home Assistant extension created with setting 'enabled: false'".to_string(),
                 );
             }
+            if !settings["advanced"]["cache_state"].as_bool().unwrap_or(true) {
+                self.context.logger.lock().unwrap().warning(
+                    "In order for Home Assistant integration to work properly, set `cache_state: true` under `advanced`",
+                    "z2m",
+                );
+            }
             if settings["advanced"]["output"].as_str() == Some("attribute") {
                 return Err(
                     "Home Assistant integration requires 'output: json' under 'advanced'"

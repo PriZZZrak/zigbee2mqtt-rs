@@ -1309,3 +1309,63 @@ async fn configuration_url_points_at_the_frontend() {
         format!("http://example.com/#/device/0/{IEEE}/info")
     );
 }
+
+#[tokio::test]
+async fn start_rejects_attribute_output_and_conflicting_discovery_topic() {
+    let _guard = serial();
+    let attribute = harness();
+    attribute
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["advanced", "output"], json!("attribute"));
+    let error = HomeAssistant::new(attribute.context.clone())
+        .start()
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error,
+        "Home Assistant integration requires 'output: json' under 'advanced'"
+    );
+
+    let conflicting = harness();
+    conflicting
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["homeassistant", "discovery_topic"], json!("zigbee2mqtt"));
+    let error = HomeAssistant::new(conflicting.context.clone())
+        .start()
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error,
+        "'homeassistant.discovery_topic' cannot not be equal to the 'mqtt.base_topic' (got 'zigbee2mqtt')"
+    );
+}
+
+#[tokio::test]
+async fn starting_without_cache_state_warns() {
+    let _guard = serial();
+    let harness = harness();
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["advanced", "cache_state"], json!(false));
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    assert!(harness
+        .context
+        .logger
+        .lock()
+        .unwrap()
+        .winston_logs
+        .iter()
+        .any(|(_, line)| line
+            .contains("In order for Home Assistant integration to work properly, set `cache_state: true` under `advanced`")));
+}
