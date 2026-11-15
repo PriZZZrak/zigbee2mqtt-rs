@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 59 | 15 | 39 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 62 | 16 | 35 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -451,11 +451,11 @@ Coverage classes:
 | 77 | Should discover when not discovered yet | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 78 | Shouldnt discover when device leaves | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 79 | Should discover when options change | `asserted` | entity_options_changed_republishes_discovery |
-| 80 | Should send all status when home assistant comes online (default topic) | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 81 | Should send all status when home assistant comes online | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 80 | Should send all status when home assistant comes online (default topic) | `asserted` | status_online_republishes_bridge_state_and_cached_states |
+| 81 | Should send all status when home assistant comes online | `slice` | status republish uses the configured status_topic |
 | 82 | Should keep the versions of an update payload that already has them | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 83 | Shouldnt send all status when home assistant comes offline | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 84 | Shouldnt send all status when home assistant comes online with different topic | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 83 | Shouldnt send all status when home assistant comes offline | `asserted` | status_offline_or_other_topics_do_not_republish |
+| 84 | Shouldnt send all status when home assistant comes online with different topic | `asserted` | status_offline_or_other_topics_do_not_republish |
 | 85 | Should discover devices with availability | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 86 | Should clear discovery when device is removed | `asserted` | clears_discovery_on_entity_removed |
 | 87 | Should clear discovery when group is removed | `slice` | group removal resolves by ID |

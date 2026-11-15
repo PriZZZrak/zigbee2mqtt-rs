@@ -1369,3 +1369,86 @@ async fn starting_without_cache_state_warns() {
         .any(|(_, line)| line
             .contains("In order for Home Assistant integration to work properly, set `cache_state: true` under `advanced`")));
 }
+
+#[tokio::test(start_paused = true)]
+async fn status_online_republishes_bridge_state_and_cached_states() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    {
+        let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+        harness
+            .context
+            .state
+            .lock()
+            .unwrap()
+            .set(device.as_ref(), json!({"state": "ON"}), None);
+    }
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_mqtt_message(json!({
+            "topic": "homeassistant/status",
+            "message": "online",
+        }));
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    tokio::time::advance(Duration::from_secs(31)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+
+    let mqtt = harness.mqtt.lock().await;
+    let state = mqtt
+        .attempted
+        .iter()
+        .find(|(topic, _, _)| topic == "zigbee2mqtt/bridge/state")
+        .expect("bridge state republished");
+    assert_eq!(state.1, r#"{"state":"online"}"#);
+    assert!(state.2.retain);
+    assert_eq!(state.2.qos, 1);
+    drop(mqtt);
+    assert!(harness
+        .published
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|payload| payload == &json!({"state": "ON"})));
+}
+
+#[tokio::test(start_paused = true)]
+async fn status_offline_or_other_topics_do_not_republish() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    for message in [
+        json!({"topic": "homeassistant/status", "message": "offline"}),
+        json!({"topic": "homeassistant/other", "message": "online"}),
+    ] {
+        harness
+            .event_bus
+            .lock()
+            .unwrap()
+            .emit_mqtt_message(message);
+    }
+    tokio::time::advance(Duration::from_secs(31)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+
+    assert!(!harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/state"));
+}
