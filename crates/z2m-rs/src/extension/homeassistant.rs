@@ -1733,16 +1733,32 @@ impl HomeAssistant {
             if payload.get("availability").is_none()
                 || payload.get("availability").and_then(Value::as_bool) != Some(false)
             {
-                let mut availability = vec![
-                    json!({"topic": format!("{}/bridge/state", settings["mqtt"]["base_topic"].as_str().unwrap_or("zigbee2mqtt")), "value_template": "{{ value_json.state }}"}),
-                ];
-                if availability_enabled && !entity.is_device()
-                    || availability_enabled && entity.is_device()
-                {
-                    availability.push(json!({"topic": format!("{base_topic}/availability"), "value_template": "{{ value_json.state }}"}));
+                // Disabled devices are permanently offline (homeassistant.ts:1888-1905).
+                let disabled_device = entity.is_device()
+                    && entity
+                        .options()
+                        .get("disabled")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                let template = if disabled_device {
+                    "{{ \"offline\" }}"
+                } else {
+                    "{{ value_json.state }}"
+                };
+                let mut availability = vec![json!({
+                    "topic": format!("{}/bridge/state", settings["mqtt"]["base_topic"].as_str().unwrap_or("zigbee2mqtt")),
+                    "value_template": template,
+                })];
+                if availability_enabled {
+                    availability.push(json!({
+                        "topic": format!("{base_topic}/availability"),
+                        "value_template": template,
+                    }));
+                    payload.insert("availability_mode".into(), json!("all"));
+                } else if !entity.is_device() && !entity.is_group() {
+                    payload.insert("availability_mode".into(), json!("all"));
                 }
                 payload.insert("availability".into(), Value::Array(availability));
-                payload.insert("availability_mode".into(), json!("all"));
             }
 
             let command_prefix = payload

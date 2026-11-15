@@ -30,14 +30,14 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 32 | 3 | 41 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 43 | 2 | 31 | 0 | 21 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 54 | 15 | 44 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 56 | 15 | 42 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -149,25 +149,25 @@ Coverage classes:
 | 27 | Should allow a healthcheck | `asserted` | health_check_and_invalid_options |
 | 28 | Should allow a coordinator check | `adapter` | coordinator check needs a live adapter |
 | 29 | Should allow to remove device by string | `slice` | device removal by string id |
-| 30 | Should allow to remove device by object ID | `slice` | device removal by object id |
+| 30 | Should allow to remove device by object ID | `asserted` | force_remove_device_blocks_and_keeps_configuration |
 | 31 | Should allow to force remove device | `asserted` | force_remove_device_without_adapter |
-| 32 | Should allow to block device | `code` | request handler ported, no dedicated assertion |
-| 33 | Should allow to keep configuration when removing device | `code` | request handler ported, no dedicated assertion |
+| 32 | Should allow to block device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
+| 33 | Should allow to keep configuration when removing device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
 | 34 | Should allow to clear cache when removing device | `code` | request handler ported, no dedicated assertion |
-| 35 | Should allow to remove group | `code` | request handler ported, no dedicated assertion |
-| 36 | Should allow to force remove group | `code` | request handler ported, no dedicated assertion |
+| 35 | Should allow to remove group | `asserted` | force_remove_group_removes_settings |
+| 36 | Should allow to force remove group | `asserted` | force_remove_group_removes_settings |
 | 37 | Should allow to add and remove from blocklist | `code` | request handler ported, no dedicated assertion |
-| 38 | Should throw error on removing non-existing device | `code` | request handler ported, no dedicated assertion |
+| 38 | Should throw error on removing non-existing device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
 | 39 | Should throw error when remove device fails | `code` | request handler ported, no dedicated assertion |
 | 40 | Should allow rename device | `asserted` | group_add_and_rename_device |
-| 41 | Should trim input when renaming device | `code` | request handler ported, no dedicated assertion |
-| 42 | Shouldnt allow rename device with to not allowed name containing a wildcard | `code` | request handler ported, no dedicated assertion |
+| 41 | Should trim input when renaming device | `asserted` | rename_trims_validates_and_reports_errors |
+| 42 | Shouldnt allow rename device with to not allowed name containing a wildcard | `asserted` | rename_trims_validates_and_reports_errors |
 | 43 | Should allow rename group | `asserted` | group_add_and_rename_device |
-| 44 | Should throw error on invalid device rename payload | `code` | request handler ported, no dedicated assertion |
-| 45 | Should throw error on non-existing device rename | `code` | request handler ported, no dedicated assertion |
+| 44 | Should throw error on invalid device rename payload | `asserted` | rename_trims_validates_and_reports_errors |
+| 45 | Should throw error on non-existing device rename | `asserted` | rename_trims_validates_and_reports_errors |
 | 46 | Should allow to rename last joined device | `code` | request handler ported, no dedicated assertion |
 | 47 | Should throw error when renaming device through not allowed friendlyName | `code` | request handler ported, no dedicated assertion |
-| 48 | Should throw error when renaming last joined device but none has joined | `code` | request handler ported, no dedicated assertion |
+| 48 | Should throw error when renaming last joined device but none has joined | `asserted` | rename_trims_validates_and_reports_errors |
 | 49 | Should allow interviewing a device by friendly name | `adapter` | interview/install code talks to the coordinator |
 | 50 | Should allow interviewing a device by ieeeAddr | `adapter` | interview/install code talks to the coordinator |
 | 51 | Should throw error on invalid device interview payload | `asserted` | interview_request_validates_payload_and_entity |
@@ -477,8 +477,8 @@ Coverage classes:
 | 103 | Should discover with json availability payload value_template | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 104 | Should discover with availability offline when device is disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 105 | Should discover last_seen when enabled | `asserted` | discovers_last_seen_when_continuous_format_is_enabled |
-| 106 | Should discover devices with configuration url (zigbee2mqtt-windfront) | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 107 | Should discover devices with configuration url (zigbee2mqtt-frontend) | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 106 | Should discover devices with configuration url (zigbee2mqtt-windfront) | `asserted` | configuration_url_points_at_the_frontend |
+| 107 | Should discover devices with configuration url (zigbee2mqtt-frontend) | `asserted` | configuration_url_points_at_the_frontend |
 | 108 | Should rediscover scenes when a scene is changed | `asserted` | scenes_are_discovered_and_rediscovered_on_change |
 | 109 | Should not clear bridge entities unnecessarily | `code` | bridge entities are published once (dedupe) |
 | 110 | Should discover bridge entities | `asserted` | bridge discovery assertions in discovers_numeric_binary_enum_and_switch_entities |

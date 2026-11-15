@@ -1250,3 +1250,62 @@ async fn group_state_publish_does_not_republish_endpoint_states() {
         mqtt.attempted
     );
 }
+
+#[tokio::test]
+async fn disabled_device_is_discovered_as_offline() {
+    let _guard = serial();
+    let harness = harness();
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["devices", IEEE, "disabled"], json!(true));
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let payload = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("temperature config");
+    let availability = payload["availability"].as_array().expect("availability");
+    // A disabled device disables availability for the entity, so only the
+    // bridge state topic remains - with the offline template.
+    assert_eq!(availability.len(), 1, "{availability:?}");
+    for entry in availability {
+        assert_eq!(entry["value_template"], "{{ \"offline\" }}");
+    }
+    // Availability is disabled for disabled devices, so no availability_mode.
+    assert!(payload["availability_mode"].is_null());
+}
+
+#[tokio::test]
+async fn configuration_url_points_at_the_frontend() {
+    let _guard = serial();
+    let harness = harness();
+    harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .set(&["frontend", "url"], json!("http://example.com"));
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["frontend"]["url"],
+        "http://example.com"
+    );
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let payload = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("temperature config");
+    assert_eq!(
+        payload["device"]["configuration_url"],
+        format!("http://example.com/#/device/0/{IEEE}/info")
+    );
+}

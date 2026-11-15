@@ -714,3 +714,136 @@ async fn reporting_configure_and_read_error_paths() {
         assert_eq!(payload["error"], error);
     }
 }
+
+#[tokio::test]
+async fn rename_trims_validates_and_reports_errors() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    // Upstream `Should trim input when renaming device`.
+    send(
+        &harness,
+        "device/rename",
+        json!({"from": "lamp", "to": "  lamp2  "}),
+    )
+    .await;
+    let payload = response(&harness, "device/rename").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["to"], "lamp2");
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get_device("lamp2").map(|device| device["friendly_name"].clone()),
+        Some(json!("lamp2"))
+    );
+
+    // Upstream `Shouldnt allow rename device with to not allowed name containing
+    // a wildcard`.
+    send(
+        &harness,
+        "device/rename",
+        json!({"from": "lamp2", "to": "living_room/blinds#"}),
+    )
+    .await;
+    let payload = response(&harness, "device/rename").await;
+    assert_eq!(payload["status"], "error");
+    assert_eq!(
+        payload["error"],
+        "MQTT wildcard (+ and #) not allowed in friendly_name ('living_room/blinds#')"
+    );
+
+    // Invalid payload, unknown entity and `last` without a joined device.
+    send(&harness, "device/rename", json!({"from": "lamp2"})).await;
+    let payload = response(&harness, "device/rename").await;
+    assert_eq!(payload["error"], "Invalid payload");
+
+    send(
+        &harness,
+        "device/rename",
+        json!({"from": "missing", "to": "x"}),
+    )
+    .await;
+    let payload = response(&harness, "device/rename").await;
+    assert_eq!(payload["error"], "Device 'missing' does not exist");
+
+    send(&harness, "device/rename", json!({"last": true, "to": "x"})).await;
+    let payload = response(&harness, "device/rename").await;
+    assert_eq!(payload["error"], "No device has joined since start");
+}
+
+#[tokio::test]
+async fn force_remove_device_blocks_and_keeps_configuration() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "device/remove",
+        json!({"id": "lamp", "force": true, "block": true, "keep_config": true}),
+    )
+    .await;
+    let payload = response(&harness, "device/remove").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["force"], true);
+
+    let settings = harness.context.settings.lock().unwrap();
+    assert!(settings
+        .get()
+        .get("blocklist")
+        .and_then(Value::as_array)
+        .is_some_and(|list| list.contains(&json!(IEEE))));
+    assert!(
+        settings.get_device("lamp").is_some(),
+        "keep_config removed the device settings"
+    );
+    drop(settings);
+    assert!(harness.context.zigbee.resolve_device(IEEE).is_none());
+
+    // Unknown device is rejected.
+    send(
+        &harness,
+        "device/remove",
+        json!({"id": "missing", "force": true}),
+    )
+    .await;
+    let payload = response(&harness, "device/remove").await;
+    assert_eq!(payload["error"], "Device 'missing' does not exist");
+}
+
+#[tokio::test]
+async fn force_remove_group_removes_settings() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "group/add",
+        json!({"friendly_name": "kitchen"}),
+    )
+    .await;
+    let payload = response(&harness, "group/add").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    let group_id = payload["data"]["id"].as_u64().expect("group id");
+
+    send(
+        &harness,
+        "group/remove",
+        json!({"id": group_id, "force": true}),
+    )
+    .await;
+    let payload = response(&harness, "group/remove").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert!(harness.context.zigbee.group_by_id(group_id).is_none());
+    assert!(harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get()["groups"]
+        .get(&group_id.to_string())
+        .is_none());
+}

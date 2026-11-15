@@ -402,7 +402,40 @@ impl Settings {
         Ok(())
     }
 
+/// Upstream `utils.validateFriendlyName(name)` (`utils.ts:223-239`).
+pub fn validate_friendly_name(name: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    if name.is_empty() {
+        errors.push("friendly_name must be at least 1 char long".to_string());
+    }
+    if name.starts_with('/') || name.ends_with('/') {
+        errors.push("friendly_name is not allowed to end or start with /".to_string());
+    }
+    if name.chars().any(|character| character.is_control()) {
+        errors.push("friendly_name is not allowed to contain control char".to_string());
+    }
+    if let Some(position) = name.rfind('/') {
+        if name[position + 1..]
+            .chars()
+            .all(|character| character.is_ascii_digit())
+        {
+            errors.push(format!(
+                "Friendly name cannot end with a \"/DIGIT\" ('{name}')"
+            ));
+        }
+    }
+    if name.contains('#') || name.contains('+') {
+        errors.push(format!(
+            "MQTT wildcard (+ and #) not allowed in friendly_name ('{name}')"
+        ));
+    }
+    errors
+}
+
     pub fn change_friendly_name(&mut self, from: &str, to: &str) -> Result<(), String> {
+        if let Some(error) = Self::validate_friendly_name(to).into_iter().next() {
+            return Err(error);
+        }
         let Some((entity_type, key)) = self.find_entity(from) else {
             return Err(format!("Device or group '{from}' does not exist"));
         };
