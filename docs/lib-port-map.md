@@ -45,7 +45,7 @@ counterpart.
 | `types/dom.shim.d.ts` | — | types only | no runtime behaviour |
 | `types/types.d.ts` | — | types only | no runtime behaviour |
 | `types/unix-dgram.d.ts` | — | types only | replaced by `std::os::unix::net::UnixDatagram` |
-| `types/zigbee2mqtt-frontend.d.ts` | — | types only | no runtime behaviour |
+| `types/zigbee2mqtt-frontend.d.ts` | — | types only | deprecated upstream frontend package; no runtime behaviour and no support planned |
 
 ## Verification commands
 

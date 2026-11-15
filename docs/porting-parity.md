@@ -21,7 +21,6 @@ Current pins (must match `.upstream/*/package.json`):
 | `zigbee2mqtt` | 2.14.3 | MQTT, HA, frontend, config, storage |
 | `zigbee-herdsman-converters` | 26.125.0 | reference only; never executed in R1 |
 | `zigbee2mqtt-windfront` | 2.15.1 | frontend protocol |
-| `zigbee2mqtt-frontend` | 0.9.21 | historical frontend reference |
 
 Rules:
 

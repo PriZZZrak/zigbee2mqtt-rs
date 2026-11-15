@@ -81,7 +81,7 @@ Notes:
 | `bind-decorator` | `this` binding | language feature | — | omitted |
 | `zigbee-herdsman` | Zigbee stack | `zigbee-apiarist` | workspace crate | PARTIAL |
 | `zigbee-herdsman-converters` | device converters | `crates/zigbee-converters` (separate crate) | `zigbee_converters::{Definition, DefinitionRegistry, Expose, ...}` | PORTED minimal surface required by the bridge; converter database and authoring tooling excluded (AGENTS §5 Q4) |
-| `zigbee2mqtt-frontend`, `zigbee2mqtt-windfront` | static frontend | served assets | `util::static_file_server` | assets only |
+| `zigbee2mqtt-windfront` | static frontend | served assets | `util::static_file_server` | assets only; the deprecated `zigbee2mqtt-frontend` package is not supported (its enum value remains in the pinned settings schema for parity) |
 
 ### Development tooling
 
