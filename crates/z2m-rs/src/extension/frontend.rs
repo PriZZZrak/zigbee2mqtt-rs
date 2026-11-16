@@ -119,7 +119,8 @@ impl Frontend {
     async fn replay(&self, sender: &mpsc::UnboundedSender<Message>) {
         let retained: Vec<(String, String)> = {
             let mqtt = self.context.mqtt.lock().await;
-            mqtt.retained_messages
+            let retained_messages = mqtt.retained_messages.lock().unwrap();
+            retained_messages
                 .values()
                 .map(|message| (message.topic.clone(), message.payload.clone()))
                 .collect()

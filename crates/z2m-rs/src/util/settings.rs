@@ -1,6 +1,7 @@
 // Original: .upstream/zigbee2mqtt/lib/util/settings.ts
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Map, Value};
 
@@ -19,6 +20,8 @@ pub struct Settings {
     pub configuration: Value,
     pub files: BTreeMap<String, Value>,
     pub env: BTreeMap<String, String>,
+    /// Data directory backing `files`; `None` keeps the settings in memory (tests).
+    pub path: Option<PathBuf>,
 }
 
 impl Settings {
@@ -27,6 +30,7 @@ impl Settings {
             configuration,
             files: BTreeMap::new(),
             env: BTreeMap::new(),
+            path: None,
         }
     }
 
@@ -47,7 +51,57 @@ impl Settings {
             configuration,
             files,
             env: BTreeMap::new(),
+            path: None,
         }
+    }
+
+    /// Upstream `read()` (`settings.ts:186`): load `configuration.yaml`, the
+    /// separate devices/groups files it points at, `secret.yaml`, and capture
+    /// `ZIGBEE2MQTT_CONFIG_*` overrides. Mutations are written back by `write()`.
+    pub fn read_data_dir(dir: impl AsRef<Path>) -> Result<Self, String> {
+        let dir = dir.as_ref().to_path_buf();
+        let mut files = BTreeMap::new();
+        let configuration_path = dir.join(CONFIGURATION_FILE);
+        if configuration_path.exists() {
+            let value = crate::util::yaml::read(&configuration_path)
+                .map_err(|error| error.to_string())?;
+            files.insert(CONFIGURATION_FILE.to_string(), value);
+        }
+        let configuration = files
+            .get(CONFIGURATION_FILE)
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        for key in ["devices", "groups"] {
+            let names: Vec<String> = match configuration.get(key) {
+                Some(Value::String(name)) => vec![name.clone()],
+                Some(Value::Array(names)) => names
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect(),
+                _ => Vec::new(),
+            };
+            for name in names {
+                let path = dir.join(&name);
+                if !path.exists() {
+                    continue;
+                }
+                let value = crate::util::yaml::read(&path).map_err(|error| error.to_string())?;
+                files.insert(name, value);
+            }
+        }
+        if let Ok(value) = crate::util::yaml::read(dir.join(SECRET_FILE)) {
+            files.insert(SECRET_FILE.to_string(), value);
+        }
+        let env = std::env::vars()
+            .filter(|(name, _)| name.starts_with("ZIGBEE2MQTT_CONFIG_"))
+            .collect();
+        Ok(Self {
+            configuration,
+            files,
+            env,
+            path: Some(dir),
+        })
     }
 
     /// Upstream `reRead()` (`settings.ts:705-711`): drop the cached settings and
@@ -312,6 +366,7 @@ impl Settings {
         }
         let devices = self.entities_mut("devices");
         devices.insert(id.to_string(), json!({"friendly_name": id}));
+        self.write();
     }
 
     pub fn remove_device(&mut self, id: &str) -> Result<(), String> {
@@ -335,6 +390,7 @@ impl Settings {
         } else if let Some(Value::Object(entries)) = self.configuration.get_mut("devices") {
             entries.remove(&key);
         }
+        self.write();
         Ok(())
     }
 
@@ -352,6 +408,7 @@ impl Settings {
                 items.push(value);
             }
         }
+        self.write();
     }
 
     pub fn add_group(&mut self, name: &str, id: Option<&str>) -> u64 {
@@ -375,6 +432,7 @@ impl Settings {
         }
         self.entities_mut("groups")
             .insert(id.clone(), json!({"friendly_name": name}));
+        self.write();
         id.parse().unwrap_or(0)
     }
 
@@ -399,6 +457,7 @@ impl Settings {
         } else if let Some(Value::Object(entries)) = self.configuration.get_mut("groups") {
             entries.remove(&key);
         }
+        self.write();
         Ok(())
     }
 
@@ -443,6 +502,8 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
             return Err(format!("friendly_name '{to}' is already in use"));
         }
         self.set_entity_friendly_name(&entity_type, &key, to);
+        // Upstream `changeFriendlyName` persists the rename (settings.ts:702).
+        self.write();
         Ok(())
     }
 
@@ -491,6 +552,7 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
                 *entry = map;
             }
         }
+        self.write();
         Ok(())
     }
 
@@ -550,6 +612,24 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
 
         let changed = !self.env.is_empty() || applied != before;
         self.configuration = applied;
+
+        // Upstream `write()` (`settings.ts:206-269`): persist the settings and
+        // the split devices/groups files. Those files are written from `files`,
+        // so renames/removals that touched a split file land there while
+        // `configuration.yaml` keeps the reference (`devices: devices.yaml`).
+        if let Some(dir) = self.path.clone() {
+            for (name, value) in &self.files {
+                if name == CONFIGURATION_FILE || name == SECRET_FILE {
+                    continue;
+                }
+                let _ = crate::util::yaml::write_if_changed(dir.join(name), value);
+            }
+            let _ = crate::util::yaml::write_if_changed(
+                dir.join(CONFIGURATION_FILE),
+                &self.configuration,
+            );
+        }
+
         self.files
             .insert(CONFIGURATION_FILE.to_string(), self.configuration.clone());
         changed

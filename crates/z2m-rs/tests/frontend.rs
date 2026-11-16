@@ -123,7 +123,14 @@ async fn auth_token_is_enforced() {
 #[tokio::test]
 async fn replay_retained_and_receive_messages() {
     let harness = harness(None);
-    harness.mqtt.lock().await.retained_messages.insert(
+    harness
+        .mqtt
+        .lock()
+        .await
+        .retained_messages
+        .lock()
+        .unwrap()
+        .insert(
         "zigbee2mqtt/bridge/info".to_string(),
         RetainedMessage {
             topic: "zigbee2mqtt/bridge/info".to_string(),

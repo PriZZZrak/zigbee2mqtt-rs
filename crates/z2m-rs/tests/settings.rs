@@ -1351,3 +1351,104 @@ fn get_device_and_group_accept_friendly_names() {
     assert_eq!(settings.get_device("missing"), None);
     assert_eq!(settings.get_group("missing"), None);
 }
+
+/// Upstream `changeFriendlyName` writes the configuration file (settings.ts:702).
+#[test]
+fn change_friendly_name_persists_the_configuration() {
+    let mut settings = Settings::with_files(BTreeMap::from([(
+        CONFIGURATION_FILE.to_string(),
+        json!({"devices": {"0x0017880104e45519": {"friendly_name": "myname"}}}),
+    )]));
+
+    settings
+        .change_friendly_name("myname", "renamed")
+        .expect("rename succeeds");
+
+    assert_eq!(
+        settings.read_file(CONFIGURATION_FILE),
+        json!({"devices": {"0x0017880104e45519": {"friendly_name": "renamed"}}})
+    );
+}
+
+fn temp_data_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "z2m-settings-{tag}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// Upstream `read()`/`write()` (`settings.ts:186-269`): renames, blocklist and
+/// options are persisted to the data directory.
+#[test]
+fn settings_persist_mutations_to_disk() {
+    let dir = temp_data_dir("disk");
+    std::fs::write(
+        dir.join(CONFIGURATION_FILE),
+        "version: 5\nmqtt:\n  base_topic: zigbee2mqtt\n  server: mqtt://localhost\ndevices:\n  '0x0017880104e45519':\n    friendly_name: myname\n",
+    )
+    .unwrap();
+
+    let mut settings = Settings::read_data_dir(&dir).expect("reads configuration.yaml");
+    settings
+        .change_friendly_name("myname", "renamed")
+        .expect("rename");
+    settings.block_device("0x0017880104e45519");
+    settings
+        .apply(serde_json::json!({"advanced": {"log_level": "debug"}}))
+        .expect("options apply");
+
+    let on_disk = z2m_rs::util::yaml::read(dir.join(CONFIGURATION_FILE)).unwrap();
+    assert_eq!(
+        on_disk["devices"]["0x0017880104e45519"]["friendly_name"],
+        "renamed"
+    );
+    assert_eq!(on_disk["blocklist"], serde_json::json!(["0x0017880104e45519"]));
+    assert_eq!(on_disk["advanced"]["log_level"], "debug");
+
+    // A fresh read sees the persisted state.
+    let reread = Settings::read_data_dir(&dir).unwrap();
+    assert_eq!(
+        reread.get_device("renamed").map(|d| d["friendly_name"].clone()),
+        Some(serde_json::json!("renamed"))
+    );
+
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A split `devices.yaml` is written from the settings store while
+/// `configuration.yaml` keeps the file reference (upstream `write()`).
+#[test]
+fn settings_write_updates_split_devices_file() {
+    let dir = temp_data_dir("split");
+    std::fs::write(
+        dir.join(CONFIGURATION_FILE),
+        "version: 5\ndevices: devices.yaml\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join(DEVICES_FILE),
+        "0x0017880104e45519:\n  friendly_name: myname\n",
+    )
+    .unwrap();
+
+    let mut settings = Settings::read_data_dir(&dir).expect("reads split files");
+    settings
+        .change_friendly_name("myname", "renamed")
+        .expect("rename");
+
+    let devices = z2m_rs::util::yaml::read(dir.join(DEVICES_FILE)).unwrap();
+    assert_eq!(
+        devices["0x0017880104e45519"]["friendly_name"],
+        "renamed"
+    );
+    let configuration = z2m_rs::util::yaml::read(dir.join(CONFIGURATION_FILE)).unwrap();
+    assert_eq!(configuration["devices"], "devices.yaml");
+
+    let _ = std::fs::remove_dir_all(dir);
+}

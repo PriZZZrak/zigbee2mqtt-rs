@@ -117,3 +117,38 @@ the router, so the feed is known to contain working artifacts:
   drops it. Only the first request after such a kill was affected.
 - `/dev/ttyUSB0` is locked while the Node service runs; stop it and wait for
   `index.js` to disappear before starting the Rust binary.
+
+## R1 acceptance matrix (bridge requests, persistence, HA, WebSocket)
+
+Run against the live coordinator with a copied data dir (`base_topic: z2m-rs-test`,
+frontend `:8090`, HA discovery enabled).
+
+| Check | Result |
+|---|---|
+| `bridge/request/health_check` | ok `{healthy: true}` |
+| `bridge/request/options` (`{options:{advanced:{log_level}}}`) | ok, persisted |
+| `bridge/request/device/interview` (router) | ok + `bridge/event device_interview {status: successful}` |
+| `bridge/request/networkmap` (`type: raw`) | ok, 5 nodes |
+| `bridge/request/device/rename` | ok; `configuration.yaml` updated on disk |
+| `bridge/request/device/remove` (`force+block`, fabricated IEEE) | ok; DB entry removed, `blocklist` persisted |
+| `bridge/request/restart` | ok; process exits, supervisor restart completes |
+| Windfront WebSocket | replay (`bridge/state|info|devices|groups` + cached device states), inbound request + `bridge/response/permit_join` |
+| Home Assistant discovery | 90 `homeassistant/#` topics |
+| `state.json` | rewritten (3 keys), `database.db` parseable, fake device gone |
+| HTTP on the frontend port | `curl` 200 from the shell; the Node probe reported unreachable — under investigation |
+
+Bugs found and fixed in this run:
+
+- **Settings were never persisted**: `Settings` had no data-directory backing, so
+  `bridge/request/options`, `device/rename`, `device/remove` (blocklist) and
+  `group/*` only changed memory. Added `Settings::read_data_dir` (upstream
+  `read()`), real `write()` to `configuration.yaml` + split devices/groups
+  files, `write()` calls in the mutators (upstream `settings.ts:206-269`), and
+  `main` now fails hard on an unreadable configuration instead of silently
+  continuing. Tests: `settings_persist_mutations_to_disk`,
+  `settings_write_updates_split_devices_file`.
+- **`bridge/state` was missing from the Windfront replay**: the CONNACK handler
+  published it through the raw rumqttc client, bypassing the retained-message
+  bookkeeping. `retained_messages` is shared with the event loop and the state
+  (and the offline state on disconnect) is recorded like upstream
+  `Mqtt.publish`.

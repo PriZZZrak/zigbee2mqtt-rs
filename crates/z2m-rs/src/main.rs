@@ -16,13 +16,10 @@ use z2m_rs::util::settings::Settings;
 use z2m_rs::util::{data, yaml};
 use z2m_rs::zigbee::Zigbee;
 
-fn read_configuration() -> Value {
-    let config_path = data::join_path("configuration.yaml");
-    if !config_path.exists() {
-        return json!({});
-    }
-    match yaml::read(&config_path) {
-        Ok(configuration) => configuration,
+/// Upstream `settings.read()`: an unreadable/invalid configuration is fatal.
+fn read_settings(data_path: &std::path::Path) -> Settings {
+    match Settings::read_data_dir(data_path) {
+        Ok(settings) => settings,
         Err(error) => {
             eprintln!("Failed to read configuration.yaml: {error}");
             std::process::exit(1);
@@ -33,7 +30,7 @@ fn read_configuration() -> Value {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let data_path = data::get_path();
-    let settings = Arc::new(Mutex::new(Settings::from_config(read_configuration())));
+    let settings = Arc::new(Mutex::new(read_settings(&data_path)));
 
     // Upstream `onboard()`: brand-new installs and `Z2M_ONBOARD_FORCE_RUN` start
     // the onboarding server before the bridge comes up.
@@ -66,7 +63,7 @@ async fn main() {
             eprintln!("Failed to start onboarding server: {error}");
             std::process::exit(1);
         }
-        *settings.lock().unwrap() = Settings::from_config(read_configuration());
+        *settings.lock().unwrap() = read_settings(&data_path);
     }
 
     let errors = settings.lock().unwrap().validate();

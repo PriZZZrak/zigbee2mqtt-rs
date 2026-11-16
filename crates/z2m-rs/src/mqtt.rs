@@ -65,7 +65,9 @@ pub struct Mqtt {
     queued: Arc<AtomicUsize>,
     /// QoS1/2 publishes awaiting broker acknowledgement.
     unacked: Arc<Mutex<std::collections::HashSet<u16>>>,
-    pub retained_messages: BTreeMap<String, RetainedMessage>,
+    /// Upstream `retainedMessages`; shared with the event loop so the
+    /// CONNACK `bridge/state` publish is recorded like any other retained one.
+    pub retained_messages: Arc<Mutex<BTreeMap<String, RetainedMessage>>>,
     /// Upstream tests spy on `mqtt.publish`; this keeps the same observable
     /// call log when no broker is connected.
     pub attempted: Vec<(String, String, MqttPublishOptions)>,
@@ -83,7 +85,7 @@ impl Mqtt {
             published_topics: Arc::new(Mutex::new(std::collections::HashSet::new())),
             queued: Arc::new(AtomicUsize::new(0)),
             unacked: Arc::new(Mutex::new(std::collections::HashSet::new())),
-            retained_messages: BTreeMap::new(),
+            retained_messages: Arc::new(Mutex::new(BTreeMap::new())),
             attempted: Vec::new(),
             client: None,
             task: None,
@@ -156,6 +158,7 @@ impl Mqtt {
         let base_topic = self.base_topic.clone();
         let event_bus = self.event_bus.clone();
         let published_topics = self.published_topics.clone();
+        let retained_messages = self.retained_messages.clone();
         let unacked = self.unacked.clone();
         let connect_client = client.clone();
         let task = tokio::spawn(async move {
@@ -184,13 +187,38 @@ impl Mqtt {
                         unacked.lock().unwrap().remove(&ack.pkid);
                     }
                     Ok(Event::Incoming(Packet::ConnAck(_))) => {
+                        // Upstream publishes the state through its own
+                        // `publish()`, so the retained map and the publish event
+                        // see it too (znp state is replayed by the frontend).
+                        let state_topic = format!("{base_topic}/bridge/state");
+                        let state_payload =
+                            serde_json::to_vec(&json!({"state": "online"})).unwrap_or_default();
                         let _ = connect_client
                             .publish(
-                                format!("{base_topic}/bridge/state"),
-                                serde_json::to_vec(&json!({"state": "online"})).unwrap_or_default(),
+                                state_topic.clone(),
+                                state_payload.clone(),
                                 rumqttc::PublishOptions::new(QoS::AtLeastOnce).retain(true),
                             )
                             .await;
+                        let text = String::from_utf8_lossy(&state_payload).to_string();
+                        retained_messages.lock().unwrap().insert(
+                            state_topic.clone(),
+                            RetainedMessage {
+                                topic: state_topic.clone(),
+                                payload: text.clone(),
+                                options: MqttPublishOptions {
+                                    retain: true,
+                                    qos: 1,
+                                    ..Default::default()
+                                },
+                            },
+                        );
+                        published_topics.lock().unwrap().insert(state_topic.clone());
+                        event_bus.lock().unwrap().emit_mqtt_message_published(json!({
+                            "topic": state_topic,
+                            "payload": text,
+                            "options": {"meta": {"isEntityState": false}},
+                        }));
                         let _ = connect_client
                             .subscribe(format!("{base_topic}/#"), QoS::AtLeastOnce)
                             .await;
@@ -214,13 +242,28 @@ impl Mqtt {
     /// Upstream `Mqtt.disconnect()`.
     pub async fn disconnect(&mut self) {
         if let Some(client) = self.client.as_mut() {
+            let offline_topic = format!("{}/bridge/state", self.base_topic);
+            let offline_payload =
+                serde_json::to_vec(&json!({"state": "offline"})).unwrap_or_default();
             let _ = client
                 .publish(
-                    format!("{}/bridge/state", self.base_topic),
-                    serde_json::to_vec(&json!({"state": "offline"})).unwrap_or_default(),
+                    offline_topic.clone(),
+                    offline_payload.clone(),
                     rumqttc::PublishOptions::new(QoS::AtLeastOnce).retain(true),
                 )
                 .await;
+            self.retained_messages.lock().unwrap().insert(
+                offline_topic.clone(),
+                RetainedMessage {
+                    topic: offline_topic,
+                    payload: String::from_utf8_lossy(&offline_payload).to_string(),
+                    options: MqttPublishOptions {
+                        retain: true,
+                        qos: 1,
+                        ..Default::default()
+                    },
+                },
+            );
             let _ = client.disconnect().await;
         }
         self.connected = false;
@@ -275,7 +318,7 @@ impl Mqtt {
             self.published_topics.lock().unwrap().insert(topic.clone());
         }
         if options.retain {
-            self.retained_messages.insert(
+            self.retained_messages.lock().unwrap().insert(
                 topic.clone(),
                 RetainedMessage {
                     topic: topic.clone(),
