@@ -18,6 +18,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Adapter manager | `adapter/z-stack/adapter/manager.ts` | PORTED | startup HIL `Resumed`; PTY tests cover `startup`/`restoreBackup`/`startCommissioning` strategy selection; destructive HIL validated once (2026-11-10) — **re-run forbidden** (AGENTS §3.11) |
 | Adapter NV memory | `adapter-nv-memory.ts` | PORTED | wire transcript + HIL `init` |
 | Adapter backup | `adapter-backup.ts` | PORTED | `createBackup` matched router backup; `restoreBackup` validated once (2026-11-10) — **re-run forbidden** (AGENTS §3.11) |
+| Adapter discovery (`findAllDevices`, mDNS, TCP paths) | `test/adapter/adapter.test.ts` | PORTED | `tests/adapter_base_suite.rs` (10 tests): adapter detection table (deconz/zstack/zboss/zigate/ember/ZBT-2/SkyConnect/ZWA-2), Windows CP210x, pnpId names, sorting, serial/mDNS errors, mDNS `tcp://` services, TCP IPv4/IPv6/hostname/invalid; `docs/adapter-test-parity.md` maps all 52 cases (the `Adapter.create` factory branches are listed as not ported) |
 | Z-Stack structs | `adapter/z-stack/structs/*` | PORTED | buffer-backed Struct/Table + `differential_structs` fixtures |
 | Z-Stack constants | `adapter/z-stack/constants/*` | PORTED | generated from upstream + `differential_constants`/`generated_constants` |
 | ZNP MT command catalog | `znp/definition.ts` | PORTED | generated 241 commands + `differential_definition` |
