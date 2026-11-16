@@ -89,6 +89,22 @@ and follow upstream's not-found fallback.
    development layout keeps `package.json` one level above `dist/`, so the
    frontend refused to start. The check now also looks in the package root.
 
+## Feed artifact verification (same session)
+
+The published packages were downloaded back from `gh-pages` and exercised on
+the router, so the feed is known to contain working artifacts:
+
+- `feed/Packages` SHA256 matches `zigbee2mqtt-rs_0.0.1-dev.1_aarch64_cortex-a53.ipk`
+  (`33f5ea7a…`), `ar t` = `debian-binary control.tar.gz data.tar.gz`,
+  `Installed-Size: 12008`, `Depends: zigbee2mqtt-windfront (= 2.15.1)`.
+- Extracted `data.tar.gz`: ELF64 AArch64 binary (12.2 MB) plus the procd init
+  script (`sh -n` clean).
+- The CI binary ran with the packaged Windfront assets
+  (`/tmp/wfpkg/usr/share/zigbee2mqtt/windfront`): coordinator resumed,
+  `Zigbee2MQTT started!`, HTTP 200 on the frontend port, and the MQTT probe
+  reported `bridge/state`, `bridge/info`, `bridge/devices`, `bridge/groups`
+  and `permit_join` → `{"status":"ok"}`.
+
 ## Notes for the next run
 
 - Startup (coordinator resume + full coordinator backup) takes ~10 s on this

@@ -89,6 +89,15 @@ opkg install zigbee2mqtt-windfront zigbee2mqtt-rs
 `Depends: zigbee2mqtt-windfront (= <packaging/windfront.version>)`; an unsigned
 feed works too, but opkg then only warns about missing signatures.
 
+**OpenWrt enables `option check_signature` in `/etc/opkg.conf`**, so the feed
+must be signed for a stock installation: without `USIGN_PRIVATE_KEY` /
+`USIGN_PUBLIC_KEY` `opkg update` fails signature verification. Either add the
+secrets or disable the check for a throwaway feed.
+
+Space: `zigbee2mqtt-windfront` installs ~6.8 MB and `zigbee2mqtt-rs` ~12 MB
+into the overlay. A router that still carries the Node.js installation in
+`/opt/zigbee2mqtt` (53.6 MB) has no room; remove that first.
+
 The service waits for the serial port from `configuration.yaml`, exports
 `ZIGBEE2MQTT_DATA=/etc/zigbee2mqtt` and
 `ZIGBEE2MQTT_FRONTEND_ASSETS=/usr/share/zigbee2mqtt/windfront`, and respawns
