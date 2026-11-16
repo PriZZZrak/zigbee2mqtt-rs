@@ -39,7 +39,7 @@ First publication: `windfront-v2.15.1` (2026-11-16) produced
 
 A failing run writes `feed/ci-error.txt` (run URL + captured output) to the
 same branch: the Actions log itself is only readable with repository admin
-rights.
+rights. The next successful run deletes that file.
 
 ## Feed layout
 
