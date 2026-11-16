@@ -158,6 +158,13 @@ impl Znp {
 
         match catch_unwind(AssertUnwindSafe(|| ZpiObject::from_unpi_frame(&frame))) {
             Ok(object) => {
+                logger().debug(
+                    &format!(
+                        "<-- {}",
+                        object.to_string_with_frame(object.subsystem != Subsystem::ZDO)
+                    ),
+                    NS,
+                );
                 waitress.resolve(&object).await;
                 let _ = event_tx.send(object.clone());
                 received.lock().await.push(object);
@@ -392,6 +399,10 @@ impl Znp {
                 )
                 .await;
 
+            logger().debug(
+                &format!("--> {}", object.to_string_with_frame(true)),
+                NS,
+            );
             self.transport
                 .write(&object.to_unpi_frame().to_buffer())
                 .await?;

@@ -263,4 +263,22 @@ impl ZpiObject {
             self.payload
         )
     }
+
+    /// Upstream `toString(includeFrame)` — ZpiObject.ts:___
+    ///
+    /// `includeFrame` appends the UNPI frame as lowercase hex, matching the
+    /// `-->`/`<--` debug lines of `znp.ts`.
+    pub fn to_string_with_frame(&self, include_frame: bool) -> String {
+        let base = self.to_string();
+        if !include_frame {
+            return base;
+        }
+        let frame = self.to_unpi_frame();
+        let hex: String = frame
+            .to_buffer()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        format!("{base} {hex}")
+    }
 }

@@ -1,5 +1,6 @@
 #!/bin/sh
-# Builds an OpenWrt .ipk from a prepared payload directory.
+# Builds an OpenWrt .ipk from a prepared payload directory and writes the opkg
+# feed stanza (`<ipk>.meta`) next to it.
 #
 # Usage:
 #   build-ipk.sh <package> <version> <architecture> <depends> <payload-dir> <out-dir> [description] [conffiles] [control-extra-dir]
@@ -58,4 +59,16 @@ mkdir -p "$out"
 ipk="$out/${package}_${version}_${architecture}.ipk"
 rm -f "$ipk"
 (cd "$work" && ar rc "$ipk" debian-binary control.tar.gz data.tar.gz)
+
+# Feed stanza: `update-feed.sh` concatenates these files, so the index never
+# has to unpack the .ipk (no `ar`/`tar` dependency on the publishing step) and
+# the fields stay identical to the package control file.
+{
+    cat "$work/control/control"
+    printf 'Filename: %s\n' "$(basename "$ipk")"
+    printf 'Size: %s\n' "$(wc -c < "$ipk" | tr -d ' ')"
+    printf 'SHA256sum: %s\n' "$(sha256sum "$ipk" | awk '{print $1}')"
+    printf '\n'
+} > "$ipk.meta"
+
 printf '%s\n' "$ipk"

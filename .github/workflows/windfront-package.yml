@@ -40,6 +40,7 @@ jobs:
           cmake -S /tmp/usign -B /tmp/usign/build -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/usign/build -j"$(nproc)"
           sudo cmake --install /tmp/usign/build
+
       - name: Download the release tarball
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -75,38 +76,43 @@ jobs:
             zigbee2mqtt-windfront "$VERSION" all "" \
             "$payload" "$RUNNER_TEMP/out" \
             "Windfront static UI for Zigbee2MQTT"
+          ls -l "$RUNNER_TEMP/out"
+          cat "$RUNNER_TEMP/out"/*.meta >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout the opkg feed branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: feed
 
       - name: Update the opkg feed
         env:
           USIGN_PRIVATE_KEY: ${{ secrets.USIGN_PRIVATE_KEY }}
           USIGN_PUBLIC_KEY: ${{ secrets.USIGN_PUBLIC_KEY }}
-          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          feed="$RUNNER_TEMP/feed"
-          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          if git ls-remote --exit-code --heads "$remote" gh-pages >/dev/null 2>&1; then
-            git clone --depth 1 --branch gh-pages "$remote" "$feed"
-          else
-            git init "$feed"
-            (cd "$feed" && git checkout -b gh-pages && git remote add origin "$remote")
-          fi
-          mkdir -p "$feed/feed"
-          cp "$RUNNER_TEMP"/out/*.ipk "$feed/feed"/
-          key=""
-          if [ -n "${USIGN_PRIVATE_KEY:-}" ] && command -v usign >/dev/null 2>&1; then
+          root="$GITHUB_WORKSPACE/feed"
+          dir="$root/feed"
+          mkdir -p "$dir"
+          cp "$RUNNER_TEMP"/out/*.ipk "$RUNNER_TEMP"/out/*.meta "$dir"/
+          if [ -n "${USIGN_PRIVATE_KEY:-}" ]; then
             key="$RUNNER_TEMP/usign.key"
             printf '%s\n' "$USIGN_PRIVATE_KEY" > "$key"
             if [ -n "${USIGN_PUBLIC_KEY:-}" ]; then
-              printf '%s\n' "$USIGN_PUBLIC_KEY" > "$feed/feed/public.key"
+              printf '%s\n' "$USIGN_PUBLIC_KEY" > "$dir/public.key"
             fi
-            ./packaging/opkg/update-feed.sh "$feed/feed" "$key"
+            ./packaging/opkg/update-feed.sh "$dir" "$key"
           else
-            ./packaging/opkg/update-feed.sh "$feed/feed"
+            ./packaging/opkg/update-feed.sh "$dir"
           fi
-          (cd "$feed" && git add -A && git commit -m "windfront ${VERSION}" && git push origin gh-pages)
+          cat "$dir/Packages" >> "$GITHUB_STEP_SUMMARY"
+          cd "$root"
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -m "windfront ${VERSION}"
+          git push origin gh-pages
 
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/windfront-v')

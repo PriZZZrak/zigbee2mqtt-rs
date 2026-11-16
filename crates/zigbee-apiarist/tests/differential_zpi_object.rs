@@ -2,7 +2,7 @@
 // tools/oracle/generate.mjs -> fixtures/zpi_object.json.
 
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use zigbee_apiarist::adapter::z_stack::unpi::constants::{Subsystem, Type};
 use zigbee_apiarist::adapter::z_stack::unpi::frame::Frame;
 use zigbee_apiarist::adapter::z_stack::znp::zpi_object::ZpiObject;
@@ -96,4 +96,23 @@ fn zpi_object_matches_upstream_fixtures() {
             other => panic!("{}: unknown op '{other}'", case.id),
         }
     }
+}
+
+/// Upstream `ZpiObject.toString(includeFrame)`: the frame hex is appended only
+/// when `includeFrame` is true (used by the `-->`/`<--` debug lines of znp.ts).
+#[test]
+fn zpi_object_to_string_with_frame_appends_unpi_hex() {
+    let object = ZpiObject::create_request(Subsystem::SYS, "ping", json!({"capabilities": 1}));
+    let frame_hex = hex(&object.to_unpi_frame().to_buffer());
+
+    let with_frame = object.to_string_with_frame(true);
+    assert!(
+        with_frame.starts_with("SREQ: SYS - ping - "),
+        "{with_frame}"
+    );
+    assert!(with_frame.ends_with(&frame_hex), "{with_frame}");
+
+    let without_frame = object.to_string_with_frame(false);
+    assert_eq!(without_frame, object.to_string());
+    assert!(!without_frame.contains(&frame_hex), "{without_frame}");
 }

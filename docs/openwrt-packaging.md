@@ -98,11 +98,11 @@ without a crash-count limit (`respawn 3600 10 0`).
 ## Local builds
 
 ```sh
-# Windfront ipk
+# Windfront ipk (+ <ipk>.meta feed stanza)
 ./packaging/opkg/build-ipk.sh zigbee2mqtt-windfront 2.15.1 all "" \
   /path/to/payload /tmp/out "Windfront static UI for Zigbee2MQTT"
 
-# feed index (+ optional usign key; signs Packages -> Packages.sig)
+# feed index from the *.meta stanzas (+ optional usign key -> Packages.sig)
 ./packaging/opkg/update-feed.sh /tmp/feed /path/to/usign.sec
 ```
 
