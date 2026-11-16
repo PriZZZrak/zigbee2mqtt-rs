@@ -41,9 +41,9 @@ publish `Packages.sig` and `public.key` next to the index. Without the secret
 ## Router setup
 
 ```sh
-# copy the public key (from https://<org>.github.io/<repo>/public.key)
+# copy the public key (from https://<org>.github.io/<repo>/feed/public.key)
 opkg-key add public.key
-echo 'src/gz z2m_rs https://<org>.github.io/<repo>' >> /etc/opkg/customfeeds.conf
+echo 'src/gz z2m_rs https://<org>.github.io/<repo>/feed' >> /etc/opkg/customfeeds.conf
 opkg update
 opkg install zigbee2mqtt-rs zigbee2mqtt-windfront
 ```

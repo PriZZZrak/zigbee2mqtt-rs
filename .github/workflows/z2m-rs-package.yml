@@ -94,7 +94,8 @@ jobs:
             git init "$feed"
             (cd "$feed" && git checkout -b gh-pages && git remote add origin "$remote")
           fi
-          cp "$RUNNER_TEMP"/out/*.ipk "$feed"/
+          mkdir -p "$feed/feed"
+          cp "$RUNNER_TEMP"/out/*.ipk "$feed/feed"/
           key=""
           if [ -n "${USIGN_PRIVATE_KEY:-}" ] && command -v usign >/dev/null 2>&1; then
             key="$RUNNER_TEMP/usign.key"
@@ -102,8 +103,8 @@ jobs:
             if [ -n "${USIGN_PUBLIC_KEY:-}" ]; then
               printf '%s\n' "$USIGN_PUBLIC_KEY" > "$feed/public.key"
             fi
-            ./packaging/openwrt/update-feed.sh "$feed" "$key"
+            ./packaging/openwrt/update-feed.sh "$feed/feed" "$key"
           else
-            ./packaging/openwrt/update-feed.sh "$feed"
+            ./packaging/openwrt/update-feed.sh "$feed/feed"
           fi
           (cd "$feed" && git add -A && git commit -m "zigbee2mqtt-rs ${VERSION}" && git push origin gh-pages)
