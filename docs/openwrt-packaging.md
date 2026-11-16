@@ -71,7 +71,15 @@ Generate a keypair once (on any machine with `usign`, e.g. the router itself):
 ```sh
 usign -G -p z2m-rs.pub -s z2m-rs.sec -c "zigbee2mqtt-rs feed"
 usign -F -p z2m-rs.pub          # fingerprint, used as /etc/opkg/keys/<fp>
+usign -F -s z2m-rs.sec          # must print the same fingerprint
 ```
+
+Store the **whole file content** of each key as a secret, including the
+`untrusted comment: …` line: `usign` decodes the key from the second line but
+rejects a file that starts with the base64 payload ("Failed to decode secret
+key"). A trailing blank line is harmless. `.sec` (~200 chars) is
+`USIGN_PRIVATE_KEY`, `.pub` (~60 chars) is `USIGN_PUBLIC_KEY`; both start with
+`RWR`.
 
 ## Router setup
 
