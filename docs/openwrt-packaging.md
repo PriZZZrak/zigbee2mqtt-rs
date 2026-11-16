@@ -128,6 +128,17 @@ without a crash-count limit (`respawn 3600 10 0`).
 - firmware images are not built by these workflows; the feed is meant for an
   already-running Routerich AX3000 / OpenWrt 24.10 installation.
 
+## Status (2026-11-16)
+
+Both packages are published to the signed feed and were exercised on the
+Routerich AX3000 (see `docs/hil/2026-11-16-rust-port-startup.md`). Installing
+them on the live router is **deferred**: the overlay only has ~1 MB free and
+frees enough space only when `node-zigbee2mqtt` (53.6 MB in
+`/opt/zigbee2mqtt`, re-installable from the same custom feed) is removed.
+R1 has no converter layer yet, so the Rust bridge reports every device as
+"Not supported" and would not publish device state; keeping the Node service is
+the only way to keep the live devices working until the device layer lands.
+
 ## Local builds
 
 ```sh
