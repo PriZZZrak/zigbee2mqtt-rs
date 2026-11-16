@@ -369,7 +369,12 @@ pub fn read_http_request(
     while body.len() < content_length {
         let read = stream.read(&mut chunk)?;
         if read == 0 {
-            break;
+            // Upstream express emits a request stream error for a truncated
+            // body; the handler must not accept a partial upload.
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "request body shorter than Content-Length",
+            ));
         }
         body.extend_from_slice(&chunk[..read]);
     }

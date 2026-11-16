@@ -55,6 +55,26 @@ impl Settings {
         }
     }
 
+    /// Upstream `writeMinimalDefaults()` (`settings.ts:157-183`): a brand-new
+    /// installation starts from a minimal, schema-valid configuration.
+    pub fn minimal_configuration() -> Value {
+        json!({
+            "version": CURRENT_VERSION,
+            "mqtt": {"base_topic": "zigbee2mqtt", "server": "mqtt://localhost:1883"},
+            "serial": {},
+            "advanced": {
+                "log_level": "info",
+                "channel": 11,
+                "network_key": "GENERATE",
+                "pan_id": "GENERATE",
+                "ext_pan_id": "GENERATE",
+                "enable_external_js": false,
+            },
+            "frontend": {"enabled": false, "port": 8080},
+            "homeassistant": {"enabled": false},
+        })
+    }
+
     /// Upstream `read()` (`settings.ts:186`): load `configuration.yaml`, the
     /// separate devices/groups files it points at, `secret.yaml`, and capture
     /// `ZIGBEE2MQTT_CONFIG_*` overrides. Mutations are written back by `write()`.
@@ -67,10 +87,26 @@ impl Settings {
                 .map_err(|error| error.to_string())?;
             files.insert(CONFIGURATION_FILE.to_string(), value);
         }
-        let configuration = files
+        let mut configuration = files
             .get(CONFIGURATION_FILE)
             .cloned()
-            .unwrap_or_else(|| json!({}));
+            .unwrap_or_else(Self::minimal_configuration);
+        files
+            .entry(CONFIGURATION_FILE.to_string())
+            .or_insert_with(|| configuration.clone());
+        // Upstream `read()` runs `migrateIfNecessary()` before using the file.
+        if configuration.is_object() {
+            let mut next_version = CURRENT_VERSION;
+            if let Err(error) = crate::util::settings_migration::migrate_if_necessary(
+                &mut configuration,
+                next_version,
+                None,
+            ) {
+                return Err(error);
+            }
+            let _ = &mut next_version;
+            files.insert(CONFIGURATION_FILE.to_string(), configuration.clone());
+        }
         for key in ["devices", "groups"] {
             let names: Vec<String> = match configuration.get(key) {
                 Some(Value::String(name)) => vec![name.clone()],
