@@ -18,6 +18,15 @@ use z2m_rs::util::onboarding;
 use z2m_rs::util::settings::Settings;
 use z2m_rs::util::static_file_server::{create_static_file_server, HttpRequest};
 
+/// The handlers read process environment variables (onboarding URL/redirect
+/// overrides), so the suite serializes like upstream's mocked env.
+fn env_guard() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "z2m-onboarding-{tag}-{}-{}",
@@ -87,6 +96,7 @@ fn base64(bytes: &[u8]) -> Vec<u8> {
 
 #[tokio::test]
 async fn extracts_uploaded_zip_files_into_the_data_path() {
+    let _guard = env_guard();
     let dir = temp_dir("zip");
     let body = base64(&zip_with(&[
         ("configuration.yaml", b"version: 5\nmqtt:\n  base_url: x\n"),
@@ -109,6 +119,7 @@ async fn extracts_uploaded_zip_files_into_the_data_path() {
 
 #[tokio::test]
 async fn rejects_non_zip_upload_payloads() {
+    let _guard = env_guard();
     let dir = temp_dir("notzip");
     let (status, payload) = onboarding::submit_zip(&dir, &base64(b"this is not a zip"));
     assert_eq!(status, 406, "{payload}");
@@ -118,6 +129,7 @@ async fn rejects_non_zip_upload_payloads() {
 
 #[tokio::test]
 async fn rejects_zip_upload_payloads_with_invalid_entry_paths() {
+    let _guard = env_guard();
     let dir = temp_dir("abszip");
     let (status, payload) = onboarding::submit_zip(&dir, &base64(&zip_with(&[("/etc/passwd", b"x")])));
     assert_eq!(status, 406, "{payload}");
@@ -128,6 +140,7 @@ async fn rejects_zip_upload_payloads_with_invalid_entry_paths() {
 
 #[tokio::test]
 async fn rejects_zip_upload_payloads_with_unsafe_relative_entry_paths() {
+    let _guard = env_guard();
     let dir = temp_dir("travzip");
     let (status, payload) = onboarding::submit_zip(&dir, &base64(&zip_with(&[("../evil.txt", b"x")])));
     assert_eq!(status, 406, "{payload}");
@@ -137,6 +150,7 @@ async fn rejects_zip_upload_payloads_with_unsafe_relative_entry_paths() {
 
 #[tokio::test]
 async fn handles_empty_zip_upload_payloads() {
+    let _guard = env_guard();
     let dir = temp_dir("emptyzip");
     let (status, payload) = onboarding::submit_zip(&dir, b"");
     assert_eq!(status, 406, "{payload}");
@@ -151,6 +165,7 @@ async fn handles_empty_zip_upload_payloads() {
 
 #[tokio::test]
 async fn handles_request_stream_errors_for_submit_endpoints() {
+    let _guard = env_guard();
     // A truncated request (headers announce a body that never arrives).
     let mut stream = std::io::Cursor::new(b"POST /submit HTTP/1.1\r\nContent-Length: 10\r\n\r\nabc".to_vec());
     assert!(onboarding::read_http_request(&mut stream).is_err());
@@ -163,6 +178,7 @@ async fn handles_request_stream_errors_for_submit_endpoints() {
 
 #[tokio::test]
 async fn passes_unknown_onboarding_and_failure_routes_to_the_static_file_server() {
+    let _guard = env_guard();
     let dir = temp_dir("routes");
     let settings = settings_in(&dir);
     let (assets, server) = static_assets();
@@ -191,6 +207,7 @@ async fn passes_unknown_onboarding_and_failure_routes_to_the_static_file_server(
 
 #[tokio::test]
 async fn returns_an_error_when_the_onboarding_server_cannot_listen() {
+    let _guard = env_guard();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let (assets, _) = static_assets();
@@ -216,6 +233,7 @@ async fn returns_an_error_when_the_onboarding_server_cannot_listen() {
 
 #[tokio::test]
 async fn handles_empty_config_submit() {
+    let _guard = env_guard();
     let dir = temp_dir("emptysubmit");
     let settings = settings_in(&dir);
 
@@ -227,6 +245,7 @@ async fn handles_empty_config_submit() {
 
 #[tokio::test]
 async fn creates_config_file_and_sets_given_settings() {
+    let _guard = env_guard();
     let dir = temp_dir("submit");
     let settings = settings_in(&dir);
     let body = serde_json::to_vec(&json!({
@@ -251,6 +270,7 @@ async fn creates_config_file_and_sets_given_settings() {
 
 #[tokio::test]
 async fn creates_config_file_and_sets_unusual_settings() {
+    let _guard = env_guard();
     let dir = temp_dir("unusual");
     let settings = settings_in(&dir);
     // Nested/unknown-but-valid shapes must be persisted verbatim.
@@ -276,6 +296,7 @@ async fn creates_config_file_and_sets_unusual_settings() {
 
 #[tokio::test]
 async fn reruns_onboard_via_env_and_on_failed_start() {
+    let _guard = env_guard();
     let dir = temp_dir("rerun");
     std::fs::write(
         dir.join("configuration.yaml"),
@@ -306,6 +327,7 @@ async fn reruns_onboard_via_env_and_on_failed_start() {
 
 #[tokio::test]
 async fn sets_given_settings_without_and_with_frontend_redirect() {
+    let _guard = env_guard();
     let dir = temp_dir("redirect");
     let settings = settings_in(&dir);
 
@@ -350,6 +372,7 @@ async fn sets_given_settings_without_and_with_frontend_redirect() {
 
 #[tokio::test]
 async fn handles_configuring_and_disabling_onboarding_via_env() {
+    let _guard = env_guard();
     std::env::set_var("Z2M_ONBOARD_URL", "https://0.0.0.0:8099");
     assert_eq!(onboarding::server_url(), ("0.0.0.0".to_string(), 8099));
     std::env::set_var("Z2M_ONBOARD_URL", "http://127.0.0.1");
@@ -384,6 +407,7 @@ async fn handles_configuring_and_disabling_onboarding_via_env() {
 
 #[tokio::test]
 async fn runs_migrations() {
+    let _guard = env_guard();
     let dir = temp_dir("migrate");
     // Version 4 configuration with a pre-2.x `advanced` layout.
     std::fs::write(
@@ -407,6 +431,7 @@ async fn runs_migrations() {
 
 #[tokio::test]
 async fn handles_validation_failure() {
+    let _guard = env_guard();
     let dir = temp_dir("invalid");
     let settings = settings_in(&dir);
 
@@ -420,6 +445,7 @@ async fn handles_validation_failure() {
 
 #[tokio::test]
 async fn handles_non_required_validation_failure_before_applying_envs() {
+    let _guard = env_guard();
     let dir = temp_dir("nonrequired");
     // A partially valid configuration (no mqtt) still boots R1 (non-required
     // validation only).
@@ -437,6 +463,7 @@ async fn handles_non_required_validation_failure_before_applying_envs() {
 
 #[tokio::test]
 async fn handles_invalid_yaml_file_and_load_errors() {
+    let _guard = env_guard();
     let dir = temp_dir("badyaml");
     std::fs::write(dir.join("configuration.yaml"), "mqtt: [unclosed\n").unwrap();
     assert!(Settings::read_data_dir(&dir).is_err(), "invalid yaml is fatal");
@@ -451,6 +478,7 @@ async fn handles_invalid_yaml_file_and_load_errors() {
 
 #[tokio::test]
 async fn handles_creating_data_path() {
+    let _guard = env_guard();
     let base = temp_dir("datapath");
     let dir = base.join("nested/data");
 
