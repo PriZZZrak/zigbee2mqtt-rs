@@ -151,24 +151,57 @@ zigbee2mqtt **2.14.3 / `3c841fdf`**, Windfront **2.15.1**.
 
 ### CP-01 — Достоверность карт и статусов · P0
 
-- [ ] Разделить понятия «реализация портирована», «upstream-тест сопоставлен»,
+- [x] Разделить понятия «реализация портирована», «upstream-тест сопоставлен»,
   «Rust-тест пройден», «differential подтверждён», «HIL выполнен».
-- [ ] Устранить конфликт `PORTED` модельного слоя с признанным отсутствием
+  → `parity-matrix.md` → «Status vocabulary» (`PORTED` / `DIFFERENTIAL_PENDING` /
+  `PARTIAL` / `HIL_ONLY` / `HARDWARE_PENDING` / `OMITTED`).
+- [x] Устранить конфликт `PORTED` модельного слоя с признанным отсутствием
   Node differential в разделе Known gaps `parity-matrix.md`.
-- [ ] Согласовать число ожидающих adapter-сценариев: **63** в матрице против
+  → строка модельного слоя переведена в `DIFFERENTIAL_PENDING` с ссылкой на CP-08.
+- [x] Согласовать число ожидающих adapter-сценариев: **63** в матрице против
   **52** в построчной карте расширений.
-- [ ] Исправить ссылку на 130-row Z-Stack checklist: сейчас она ведёт на
+  → 52 подтверждено проверкой сумм (`extension-test-cases.md`, 598 случаев,
+  15 файлов); заголовок и текст матрицы исправлены на 52.
+- [x] Исправить ссылку на 130-row Z-Stack checklist: сейчас она ведёт на
   52-case документ обнаружения адаптеров. Предоставить отдельное полное
   сопоставление Z-Stack upstream cases.
-- [ ] Исправить утверждение в конце `z2m-controller-test-parity.md`, что HIL
+  → `docs/zstack-adapter-test-parity.md`: 124 upstream `it` → 130 Rust-тестов,
+  все имена проверены скриптом.
+- [x] Исправить утверждение в конце `z2m-controller-test-parity.md`, что HIL
   закрывает всю startup/abort/retained-republish матрицу.
-- [ ] Согласовать устаревшие сведения о несуществующем HIL, pending lifecycle,
+  → формулировка заменена: HIL покрывает только start/resume, bridge API,
+  persistence и обычный restart; abort/reconnect/retained → CP-02/CP-05.
+- [x] Согласовать устаревшие сведения о несуществующем HIL, pending lifecycle,
   отложенных assets и количестве Rust-тестов с более новыми документами.
-- [ ] Проверять суммы и существование ссылок/имен тестов при регенерации карт.
+  → `parity-matrix.md` (HIL-строка и adapter-class), `dependency-map.md`,
+  `lib-port-map.md` и 5 `static`-строк frontend переведены на фактические
+  доказательства (`crates/z2m-rs/tests/frontend.rs`).
+- [x] Проверять суммы и существование ссылок/имён тестов при регенерации карт.
+  → `tools/docs/check-parity-maps.mjs`: upstream `it`-counts, Rust-символы и
+  stem-модули, пути `docs|tests|crates`, per-file суммы классов (598/15) и
+  ссылки из `parity-matrix.md`.
 
 **Закрытие:** каждая строка имеет непротиворечивый статус и проверяемое
 доказательство; обычный startup smoke не используется как доказательство
 abort/reconnect; несовпадения устранены без механического повышения статусов.
+
+```text
+Статус: CLOSED
+Сценарии: zigbee-herdsman 11.2.0/c1a54e3d, zigbee2mqtt 2.14.3/3c841fdf;
+  controller.test.ts 325 it (311 + 14 добавленных строк), adapter.test.ts 124 it
+  / 130 Rust, extension-test-cases.md 598 случаев в 15 файлах
+Проверки: parity-matrix status vocabulary; zstack-adapter-test-parity.md
+  (124 строки, все Rust-имена существуют); z2m-controller-test-parity.md
+  (325 строк, 320 PORTED / 5 PENDING с причиной)
+Доказательства: tools/docs/check-parity-maps.mjs -> "OK: 11 maps checked,
+  0 errors, 2 warnings"; extension-test-cases.md -> 15 files, 598 cases
+Прогон: node tools/docs/check-parity-maps.mjs (commit после этого блока),
+  окружение: Node 24.22.2 (локальный toolchain)
+Карты: parity-matrix (vocabulary + 3 строки), adapter-test-parity,
+  zstack-adapter-test-parity (новая), z2m-controller-test-parity,
+  extension-test-cases (frontend static -> asserted: asserted 192/426)
+Остаток: нет; новые несовпадения ловит скрипт (exit != 0).
+```
 
 ### CP-02 — MQTT reconnect, retained и ошибки доставки · P0
 

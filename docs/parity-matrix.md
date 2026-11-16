@@ -6,7 +6,20 @@ claim.
 
 Full upstream `lib/` coverage table: `docs/lib-port-map.md`.
 
-Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
+## Status vocabulary
+
+| Status | Meaning |
+|---|---|
+| `PORTED` | implementation ported **and** the upstream cases assert it in Rust |
+| `DIFFERENTIAL_PENDING` | implementation + Rust tests exist, Node differential/transcript missing |
+| `PARTIAL` | implementation ported, documented gaps remain |
+| `HIL_ONLY` | only a hardware run proves the surface |
+| `HARDWARE_PENDING` | needs a hardware run |
+| `OMITTED` | approved scope exclusion (AGENTS) |
+
+Counts are documentation, not a coverage metric: see
+`docs/test-coverage-audit.md` and `tools/docs/check-parity-maps.mjs` (verifies
+upstream case counts, test-symbol references, map sums and doc links).
 
 | Surface | Upstream | Status | Evidence / gap |
 |---|---|---|---|
@@ -31,7 +44,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Controller helpers (request/queue/install codes/zclFrameConverter/zclTSN) | `controller/helpers/*` | PORTED | upstream request-queue semantics, full install-code vectors, converter tests |
 | `controller/touchlink.ts` | `controller/touchlink.ts` | PORTED | scan/identify/factory-reset frames + lock/restore tests |
 | Controller Entity / ZigbeeEntity + ControllerAdapter boundary | `controller/model/entity.ts`, `zigbeeEntity.ts` | PORTED | injection roundtrip + trait-object test |
-| Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | PORTED | CRUD/registries, ZCL read/write/command/report/config-reporting, interview, `onZclData`, binds, groups, DB round-trip; `test/device.test.ts` ported 19/19 in `tests/device_suite.rs` (`docs/device-test-parity.md`), which found and fixed two default-response bugs (caller direction was overwritten; non-SUCCESS status dropped when `disableDefaultResponse` was set). OTA omitted per decision, per-device HA discovery out of the initial R1 surface |
+| Controller models (Device/Endpoint/Group) | `controller/model/{device,endpoint,group}.ts` | DIFFERENTIAL_PENDING | CRUD/registries, ZCL read/write/command/report/config-reporting, interview, `onZclData`, binds, groups, DB round-trip; `test/device.test.ts` ported 19/19 in `tests/device_suite.rs` (`docs/device-test-parity.md`), which found and fixed two default-response bugs; Node state/event transcript still missing (CP-08) (caller direction was overwritten; non-SUCCESS status dropped when `disableDefaultResponse` was set). OTA omitted per decision, per-device HA discovery out of the initial R1 surface |
 | Device OTA methods (`checkOta`/`updateOta`/`abortOta`/`scheduleOta`/`unscheduleOta`/`findMatchingOtaImage`/`#waitForOtaCommand`/`#notifyOta`) | `controller/model/device.ts:1495-1899` | OMITTED | R1 excludes OTA (user decision); `controller/helpers/ota.ts` needs HTTPS + SHA-512 and no HTTP/TLS/hash dependency may be added. Fields `#scheduledOta`/`#otaInProgress`/`#otaAbortController` and the `scheduledOta` DB field are omitted consistently |
 | ZCL cluster catalog | `zspec/zcl/definition/cluster.ts` | PORTED | generated `definition/clusters.json` from upstream v11.2.0: all 129 clusters with attributes, commands, responses, defaults, limits and conditions; `differential_zcl::zcl_catalog_covers_all_upstream_clusters` checks every entry by name and ID |
 | `controller.test.ts` | `test/controller.test.ts` | PORTED | 311 / 311 upstream `it` cases are mapped 1:1 in `docs/controller-test-parity.md` (suite `tests/controller_suite.rs`, 220 tests, plus controller/green-power unit tests). Request-queue cases use the public queue/test-support accessors; the rxOnCap case assembles the spec-valid commissioning frame bytes because upstream mocks `Frame.fromBuffer` (no GPD 0xe0 writer). |
@@ -40,7 +53,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | `controller/index.ts` | `controller/index.ts` | PORTED | re-exports `Controller` |
 | Z-Stack controller runtime wrapper | `adapter/z-stack/adapter/zStackAdapter.ts` (controller surface) | PORTED | `ZStackRuntimeAdapter` implements `ControllerRuntimeAdapter` (model/green power/touchlink/runtime) and forwards broadcast adapter events; event-mapping test. Scripted PTY coordinator runs `ZStackAdapter.start` + `Controller.start/stop` with captured UNPI frames |
 | Wire differential (no hardware) | `adapter/z-stack/*` + `controller/model/endpoint.ts` path | PORTED | `tests/wire_capture.rs`: scripted TCP coordinator records bytes to file; `ZStackAdapter` broadcast/group/permitJoin/interPAN/retry/ZDO and `Endpoint` command paths match upstream `ZpiObject.createRequest` goldens. `Controller.start/stop` transcript is byte-for-byte identical to the upstream Node run; ZCL incoming responses match by TSN (`tools/oracle/wire_controller.mjs`, 38 frames, `tests/fixtures/controller_start_wire.hex`); see `docs/wire-differential.md` |
-| `adapter/z-stack/adapter.test.ts` | `test/adapter/z-stack/adapter.test.ts` | PORTED | `tests/adapter_zstack_suite.rs`: serial-wire ZNP mock mirroring `ZnpRequestMockBuilder`, upstream NV fixtures (1.2/3.0.x/3.x.0, aligned/unaligned/extended), upstream backup JSON; 130 tests cover commissioning, restore/create/legacy backup failures, diagnostics, LED/power, permit join, ZCL send/retry/route-discovery/timeout, groups/broadcast/inter-PAN, incoming messages + chunked `dataRetrieve`, device events, `waitFor` and all ZDO payload cases. See `docs/wire-differential.md`; per-case mapping in `docs/adapter-test-parity.md` |
+| `adapter/z-stack/adapter.test.ts` | `test/adapter/z-stack/adapter.test.ts` | PORTED | `tests/adapter_zstack_suite.rs`: serial-wire ZNP mock mirroring `ZnpRequestMockBuilder`, upstream NV fixtures (1.2/3.0.x/3.x.0, aligned/unaligned/extended), upstream backup JSON; 130 tests cover commissioning, restore/create/legacy backup failures, diagnostics, LED/power, permit join, ZCL send/retry/route-discovery/timeout, groups/broadcast/inter-PAN, incoming messages + chunked `dataRetrieve`, device events, `waitFor` and all ZDO payload cases. See `docs/wire-differential.md`; per-case mapping (124 upstream cases / 130 Rust tests) in `docs/zstack-adapter-test-parity.md` |
 | ZCL frame/codec tests | `test/zcl.test.ts`, `test/zspec/zcl/utils.test.ts` | PORTED | `tests/zcl_test.rs`: 147 real tests with exact upstream vectors, covering all 230 upstream cases (191 single `it` + 39 `it.each` rows; per-case mapping in `docs/zcl-test-parity.md`); no tautological/placeholder assertions. `tests/zspec/zcl/utils_test.rs` (54 tests: processAttributeWrite/PreRead/PostRead, parameter write/read, defaults/restrictions for both attribute and parameter variants), `tests/zcl_cluster_roundtrip.rs` (every catalog cluster serializes/parses a command and read frame) |
 | `controller/greenPower.ts` | `controller/greenPower.ts` | PORTED | pairing/commissioning option codecs, security-key encryption, notification decryption/re-parse, commissioning/decommissioning/channel-request handling, `permitJoin`, `deviceJoined`/`deviceLeave`; upstream unit cases ported (option vectors, GPP/MIC omission, FULLENCR decrypt, MOES commissioning vector) |
 | `controller/helpers/ota.ts` | `controller/helpers/ota.ts` | OMITTED | R1 excludes OTA flashing (user decision); no HTTP/TLS or SHA-512 dependency |
@@ -134,9 +147,9 @@ Known deviations:
   without a default response, matching upstream (only `ZclStatusError` sets
   `defaultResponse`).
 
-### Extension adapter-class cases (63) — pending user-coordinated HIL
+### Extension adapter-class cases (52) — deterministic/hardware split (CP-07)
 
-The `adapter` class in `docs/extension-test-cases.md` (63 of 598 upstream
+The `adapter` class in `docs/extension-test-cases.md` (52 of 598 upstream
 extension cases: permit join, interview, install code, reporting, backup,
 adapter-backed bind and ping timers) cannot be executed without a real
 coordinator. Those rows are **HARDWARE_PENDING**: no run is claimed. Running
@@ -144,7 +157,7 @@ them needs an explicit redeploy of the Routerich AX3000 + Dongle-P test unit
 coordinated with the user (AGENTS §1, §9); destructive commissioning stays
 forbidden (§3.11).
 
-Coordinator-only HIL smoke with `ZStackRuntimeAdapter` is **not yet recorded**.
+Coordinator-only HIL smoke is recorded in `docs/hil/2026-11-16-rust-port-startup.md`; the remaining adapter rows are tracked in CP-07 of `docs/test-coverage-audit.md`.
 Per AGENTS §1/§6 the test router currently runs the Node.js Zigbee2MQTT, so a
 hardware run needs an explicit redeploy and user coordination; no destructive
 operation or recommissioning was attempted.

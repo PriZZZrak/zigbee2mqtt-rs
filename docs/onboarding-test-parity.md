@@ -35,7 +35,7 @@ they exercise the same handler branch; the table records which.
 | 21 | handles disabling onboarding server via ENV | `handles_configuring_and_disabling_onboarding_via_env` |
 | 22 | handles configuring onboarding with config ENV overrides | `handles_configuring_and_disabling_onboarding_via_env` |
 | 23 | runs migrations | `runs_migrations` |
-| 24 | runs 1.x.x conflict migrations | `runs_migrations` (the shared `settings_migration` behavior; the 1.x conflict vectors are covered by `tests/settings_migration.rs`, 15 tests ported from the upstream migration cases) |
+| 24 | runs 1.x.x conflict migrations | `runs_migrations` (the shared `settings_migration` behavior; the 1.x conflict vectors are covered by `crates/z2m-rs/tests/settings_migration.rs`, 15 tests ported from the upstream migration cases) |
 | 25 | handles validation failure | `handles_validation_failure` |
 | 26 | handles non-required validation failure before applying envs | `handles_non_required_validation_failure_before_applying_envs` |
 | 27 | handles invalid yaml file | `handles_invalid_yaml_file_and_load_errors` |

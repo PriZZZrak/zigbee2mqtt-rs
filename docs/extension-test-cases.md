@@ -21,7 +21,7 @@ Coverage classes:
 | `code` | ported and reachable, no dedicated Rust assertion yet |
 | `converter-db` | depends on `zigbee-herdsman-converters` definitions, excluded from R1 (Q4) |
 | `adapter` | needs a live coordinator/adapter, HIL pending |
-| `static` | frontend static assets deferred to OpenWrt packaging |
+| `static` | reserved for package-level asset checks that are not covered by a Rust test (currently empty: the Windfront/packaging tests in `crates/z2m-rs/tests/frontend.rs` cover them) |
 | `omitted` | approved OMITTED (AGENTS §5 Q5) |
 
 ## Summary
@@ -34,7 +34,7 @@ Coverage classes:
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
-| frontend.test.ts | 16 | 7 | 0 | 4 | 0 | 0 | 5 | 0 | crates/z2m-rs/tests/frontend.rs |
+| frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 70 | 14 | 29 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
@@ -304,12 +304,12 @@ Coverage classes:
 | 6 | Start/stop HTTPS invalid : missing file | `code` | missing TLS file logs and falls back (build_tls_acceptor) |
 | 7 | Websocket interaction | `asserted` | replay_retained_and_receive_messages |
 | 8 | onRequest/onUpgrade | `code` | generic serve() handles request/upgrade callbacks |
-| 9 | Should serve device icons | `static` | device icon serving deferred to OpenWrt packaging |
-| 10 | Static server | `static` | static assets deferred to OpenWrt packaging |
+| 9 | Should serve device icons | `asserted` | `serves_windfront_assets_with_cache_and_spa_fallback` (static server serves any file, icons included) |
+| 10 | Static server | `asserted` | `serves_windfront_assets_with_cache_and_spa_fallback` + `serves_single_content_length_and_empty_304` |
 | 11 | Authentication | `asserted` | auth_token_is_enforced |
-| 12 | Works with non-default base url /z2m/ | `static` | static assets deferred to OpenWrt packaging |
-| 13 | Works with non-default base url /z2m | `static` | static assets deferred to OpenWrt packaging |
-| 14 | Works with non-default complex base url | `static` | static assets deferred to OpenWrt packaging |
+| 12 | Works with non-default base url /z2m/ | `asserted` | `serves_assets_under_a_custom_base_url` |
+| 13 | Works with non-default base url /z2m | `asserted` | `serves_assets_under_a_custom_base_url` |
+| 14 | Works with non-default complex base url | `asserted` | `serves_assets_under_a_custom_base_url` |
 | 15 | prevents mismatching setting/extension state | `code` | settings/extension mismatch guard in start() |
 | 16 | disables serving | `asserted` | disables serving when disable_ui_serving is set |
 

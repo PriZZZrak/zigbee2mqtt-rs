@@ -1,7 +1,9 @@
 # `controller.test.ts` parity checklist
 
-Source: `.upstream/zigbee-herdsman/test/controller.test.ts` (v11.2.0), 311 `it` cases.
-Status is `PORTED` when a Rust test (`tests/controller_suite.rs` or a unit
+Source: `.upstream/zigbee-herdsman/test/controller.test.ts` (v11.2.0), **325 `it` cases**;
+rows 1-311 are the original checklist, rows 312-325 were added when the count was
+re-verified (`tools/docs/check-parity-maps.mjs`).
+Status is `PORTED` when a Rust test (`crates/zigbee-apiarist/tests/controller_suite.rs` or a unit
 test under `src/controller/`) asserts the upstream behaviour; remaining rows
 are explicitly `PENDING`.
 
@@ -319,4 +321,26 @@ are explicitly `PENDING`.
 | 310 | 11060 | ignores invalid attributes when processing ZCL attribute | `ignores_invalid_attributes_when_processing_zcl_attribute` | PORTED |
 | 311 | 11097 | ensures manufacturer code is always unique in a single call | `ensures_manufacturer_code_unique_in_single_call` | PORTED |
 
-Ported: **311 / 311**.
+| 312 | 4345 | Send default response when requested | `send_default_response_when_requested` | PORTED |
+| 313 | 4380 | Send default response with parsing error status when requested | `send_default_response_with_parsing_error_status_when_requested` | PORTED |
+| 314 | 4412 | Ignore failure to send default response | `default_response_failure_does_not_trigger_route_discovery` | PORTED |
+| 315 | 4433 | Send default response with parsing error status when default response is disabled | `send_default_response_with_parsing_error_status_when_requested` | PORTED |
+| 316 | 4457 | Send default response once to frame received twice | `de_duplicates_replying_with_default_response` (device suite) | PORTED |
+| 317 | 4525 | Should resolve manufacturer specific cluster attribute names on specific ZCL frames: generic target device | — | PENDING (CP-08) |
+| 318 | 4562 | Should resolve manufacturer specific cluster attribute names on specific ZCL frames: specific target device | — | PENDING (CP-08) |
+| 319 | 4601 | Should resolve generic cluster attribute names on generic ZCL frames: generic target device | — | PENDING (CP-08) |
+| 320 | 4634 | Should resolve manufacturer specific cluster attribute names on generic ZCL frames: Legrand target device | — | PENDING (CP-08) |
+| 321 | 4683 | Should drop non-success records from readRsp payloads | `sends_read_response_for_unsupported_attribute` | PORTED |
+| 322 | 4740 | (duplicate of 317, nested describe) | — | PENDING (CP-08) |
+| 323 | 4777 | (duplicate of 318, nested describe) | — | PENDING (CP-08) |
+| 324 | 4816 | (duplicate of 319, nested describe) | — | PENDING (CP-08) |
+| 325 | 4849 | (duplicate of 320, nested describe) | — | PENDING (CP-08) |
+
+## Summary
+**320 / 325**. Rows 312-316 (default response) map to
+`send_default_response_when_requested`,
+`send_default_response_with_parsing_error_status_when_requested`,
+`default_response_failure_does_not_trigger_route_discovery` and the device
+suite's dedupe case; rows 317-325 (manufacturer/generic attribute-name
+resolution for a target device) are **PENDING** — no Rust test asserts them yet
+(CP-08).

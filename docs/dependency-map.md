@@ -75,7 +75,7 @@ Notes:
 | `fflate` | ZIP for `bridge/request/backup`, onboarding unzip | `zip` 9.5.1 (deflate) + `base64` for the payloads | `z2m_rs::extension::bridge` (backup), `z2m_rs::util::onboarding` (`/submit-zip`) | PORTED (backup + onboarding unzip with traversal guards) |
 | `humanize-duration` | relative `last_seen` strings | custom `utils::humanize_duration` (`largest: 2, round: true`) | `z2m_rs::util::utils` | PORTED (no extra crate); unit-tested against the upstream call shape |
 | `throttleit` | request throttling | `tokio::time` | `controller::helpers::request_queue`, `extension::receive` throttle | PORTED |
-| `srvx` | HTTP server for static assets/API | custom HTTP server, no `axum`/`hyper` | `z2m_rs::util::static_file_server`, `extension::frontend` | PORTED for API/serving logic; Windfront assets deferred to OpenWrt packaging |
+| `srvx` | HTTP server for static assets/API | custom HTTP server, no `axum`/`hyper` | `z2m_rs::util::static_file_server`, `extension::frontend` | PORTED for API/serving logic; Windfront assets are served from the `zigbee2mqtt-windfront` opkg package (`docs/openwrt-packaging.md`) |
 | `ws` | WebSocket | `tokio-tungstenite` 0.30.0 | `z2m_rs::extension::frontend` | PORTED (protocol; `handshake`-only feature set) |
 | `unix-dgram` | syslog socket | `std::os::unix::net::UnixDatagram` | `z2m_rs::util::logger` syslog transport | PORTED (`#[cfg(unix)]`; udp/tcp remain available on non-unix) |
 | `bind-decorator` | `this` binding | language feature | — | omitted |
@@ -179,7 +179,7 @@ Remaining gaps (tracked, do not hide):
 - onboarding: `lib/util/onboarding.ts` is ported (`util::onboarding`: data-dir
   preparation, `/data`, `/submit`, `/submit-zip`, failure page, ZIP extraction
   with traversal guards, `onboard()`, server loops); only the Windfront
-  onboarding asset bundle is deferred to OpenWrt packaging.
+  onboarding assets come from the packaged Windfront dist (`ZIGBEE2MQTT_FRONTEND_ASSETS`) and fall back to the data dir.
 - HIL on the Routerich AX3000 + Dongle-P has not been executed.
 - `bridge/info.os.node_version` reports the Rust toolchain version
   (`rustc X.Y.Z`) because there is no Node runtime; upstream reports

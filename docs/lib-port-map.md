@@ -58,4 +58,4 @@ cargo tree --workspace -e features | grep -E -- '(-sys v|cc v|bindgen|cmake)'
 
 Known non-porting gaps live in `docs/parity-matrix.md`: HIL/adapter rows are
 `HARDWARE_PENDING`, the converter database is excluded by AGENTS §5 Q4, and the
-Windfront static assets are deferred to OpenWrt packaging.
+Windfront static assets are served from the packaged `zigbee2mqtt-windfront` dist (`docs/openwrt-packaging.md`).
