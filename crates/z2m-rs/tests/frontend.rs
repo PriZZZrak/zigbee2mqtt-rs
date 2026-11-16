@@ -358,6 +358,16 @@ async fn tls_frontend_serves_websocket() {
     frontend.stop().await.unwrap();
 }
 
+async fn raw_request(addr: std::net::SocketAddr, request: &str) -> String {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let mut stream = TcpStream::connect(addr).await.unwrap();
+    stream.write_all(request.as_bytes()).await.unwrap();
+    let mut response = Vec::new();
+    let _ = stream.read_to_end(&mut response).await;
+    String::from_utf8_lossy(&response).to_string()
+}
+
 async fn http_get(addr: std::net::SocketAddr, path: &str, accept: &str) -> (u16, String) {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -489,4 +499,48 @@ async fn accepts_windfront_package_json_from_the_package_root() {
     frontend.stop().await.unwrap();
     std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
     let _ = std::fs::remove_dir_all(root);
+}
+
+/// The frontend must emit a single `Content-Length` (the static server already
+/// sets one) and no body/`Content-Length` for 304 — Node's llhttp rejects
+/// duplicate framing headers, which made a Node HTTP client see a socket error
+/// while curl tolerated the response.
+#[tokio::test]
+async fn serves_single_content_length_and_empty_304() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
+    let dir = assets_dir();
+    std::env::set_var("ZIGBEE2MQTT_FRONTEND_ASSETS", &dir);
+    let harness = harness(None);
+    let frontend = Frontend::new(harness.context.clone());
+    frontend.clone().start().await.unwrap();
+    let addr = frontend.bound_addr().unwrap();
+
+    let (status, response) = http_get(addr, "/assets/app.js", "*/*").await;
+    assert_eq!(status, 200, "{response}");
+    let content_lengths = response
+        .lines()
+        .filter(|line| line.to_ascii_lowercase().starts_with("content-length:"))
+        .count();
+    assert_eq!(content_lengths, 1, "{response}");
+
+    // Conditional request: ETag matches -> 304 without content-length/body.
+    let etag = response
+        .lines()
+        .find_map(|line| line.strip_prefix("etag: ").map(str::to_string))
+        .expect("etag header");
+    let conditional = raw_request(addr, &format!(
+        "GET /assets/app.js HTTP/1.1\r\nHost: localhost\r\nIf-None-Match: {etag}\r\nConnection: close\r\n\r\n"
+    ))
+    .await;
+    assert!(conditional.starts_with("HTTP/1.1 304"), "{conditional}");
+    assert!(
+        !conditional
+            .to_ascii_lowercase()
+            .contains("content-length"),
+        "{conditional}"
+    );
+
+    frontend.stop().await.unwrap();
+    std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
+    let _ = std::fs::remove_dir_all(dir);
 }

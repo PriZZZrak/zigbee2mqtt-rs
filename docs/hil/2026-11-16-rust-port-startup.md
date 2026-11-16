@@ -135,7 +135,7 @@ frontend `:8090`, HA discovery enabled).
 | Windfront WebSocket | replay (`bridge/state|info|devices|groups` + cached device states), inbound request + `bridge/response/permit_join` |
 | Home Assistant discovery | 90 `homeassistant/#` topics |
 | `state.json` | rewritten (3 keys), `database.db` parseable, fake device gone |
-| HTTP on the frontend port | `curl` 200 from the shell; the Node probe reported unreachable — under investigation |
+| HTTP on the frontend port | 200 via curl and via a Node `http.get` client (root 886 B, `assets/index-*.js` 1.4 MB), 203 ms while a networkmap scan was running |
 
 Bugs found and fixed in this run:
 
@@ -147,6 +147,12 @@ Bugs found and fixed in this run:
   `main` now fails hard on an unreadable configuration instead of silently
   continuing. Tests: `settings_persist_mutations_to_disk`,
   `settings_write_updates_split_devices_file`.
+- **Duplicate `Content-Length` broke Node HTTP clients**: the static file server
+  already set `content-length`, and `write_response` added a second one (304
+  responses also carried a body-length header). Node's llhttp rejects duplicate
+  framing headers, so a Node client saw a socket error while curl tolerated it.
+  `write_response` now emits a single `Content-Length` and no body/header for
+  304; regression test `serves_single_content_length_and_empty_304`.
 - **`bridge/state` was missing from the Windfront replay**: the CONNACK handler
   published it through the raw rumqttc client, bypassing the retained-message
   bookkeeping. `retained_messages` is shared with the event loop and the state

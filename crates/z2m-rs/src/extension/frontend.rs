@@ -452,18 +452,27 @@ async fn write_response<S: tokio::io::AsyncWrite + Unpin>(
         404 => "Not Found",
         _ => "Internal Server Error",
     };
-    let mut text = format!(
-        "HTTP/1.1 {} {}\r\nContent-Length: {}\r\nConnection: close\r\n",
-        response.status,
-        reason,
-        response.body.len()
-    );
+    // Upstream's `http` server writes the headers once: a `Content-Length`
+    // supplied by the static file server must not be duplicated here (Node's
+    // llhttp rejects duplicate framing headers, curl only tolerates them), and
+    // 304 responses carry no body and therefore no `Content-Length`.
+    let has_content_length = response
+        .headers
+        .keys()
+        .any(|name| name.eq_ignore_ascii_case("content-length"));
+    let mut text = format!("HTTP/1.1 {} {}\r\n", response.status, reason);
+    if !has_content_length && response.status != 304 {
+        text.push_str(&format!("Content-Length: {}\r\n", response.body.len()));
+    }
+    text.push_str("Connection: close\r\n");
     for (name, value) in &response.headers {
         text.push_str(&format!("{name}: {value}\r\n"));
     }
     text.push_str("\r\n");
     stream.write_all(text.as_bytes()).await?;
-    stream.write_all(&response.body).await?;
+    if response.status != 304 && !response.body.is_empty() {
+        stream.write_all(&response.body).await?;
+    }
     stream.flush().await
 }
 
