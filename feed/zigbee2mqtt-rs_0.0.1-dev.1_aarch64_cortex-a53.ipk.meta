@@ -9,6 +9,6 @@ Source: https://github.com/PriZZZrak/zigbee2mqtt-rs
 Depends: zigbee2mqtt-windfront (= 2.15.1)
 Description: Zigbee to MQTT bridge (pure Rust port)
 Filename: zigbee2mqtt-rs_0.0.1-dev.1_aarch64_cortex-a53.ipk
-Size: 5044458
-SHA256sum: 33f5ea7aeb1cc570fb83e467ef6e23c8031f49e9abdbf2c1a1ddfc71a576a4bf
+Size: 5044460
+SHA256sum: 02861662c07f6e7ddcf3c60e23db1f9d9925d6cd2b22c5e374e2b04a945c7159
 
