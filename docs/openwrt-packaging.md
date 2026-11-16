@@ -29,7 +29,13 @@ Two packages, published to an opkg feed on the `gh-pages` branch:
   the exact windfront dependency, and updates the same feed.
 
 Both workflows share `concurrency: opkg-feed` so the `Packages` index is not
-rewritten concurrently.
+rewritten concurrently. The feed is updated on a second `actions/checkout` of
+the `gh-pages` branch (`path: feed`) and pushed with the workflow token.
+
+First publication: `windfront-v2.15.1` (2026-11-16) produced
+`feed/Packages`, `feed/Packages.gz` and
+`feed/zigbee2mqtt-windfront_2.15.1_all.ipk` on `gh-pages` (commit `19fa4ec`);
+`Packages.sig`/`public.key` appear once the usign secrets are configured.
 
 ## Feed layout
 
