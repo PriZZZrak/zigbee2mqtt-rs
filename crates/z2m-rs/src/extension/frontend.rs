@@ -310,7 +310,19 @@ fn expected_windfront_version() -> &'static str {
 }
 
 fn check_windfront_version(dir: &Path, logger: &Arc<Mutex<crate::util::logger::Logger>>) -> Result<(), String> {
-    let manifest = std::fs::read_to_string(dir.join("package.json"))
+    // The opkg package puts `package.json` next to the assets; a development
+    // checkout (`node_modules/zigbee2mqtt-windfront/dist`) keeps it one level
+    // up in the package root.
+    let manifest_path = [dir.join("package.json"), dir.join("../package.json")]
+        .into_iter()
+        .find(|path| path.exists())
+        .ok_or_else(|| {
+            format!(
+                "Windfront assets at '{}' are incomplete: no package.json",
+                dir.display()
+            )
+        })?;
+    let manifest = std::fs::read_to_string(&manifest_path)
         .map_err(|error| format!("Windfront assets at '{}' are incomplete: {error}", dir.display()))?;
     let parsed: Value = serde_json::from_str(&manifest)
         .map_err(|error| format!("Invalid Windfront package.json: {error}"))?;

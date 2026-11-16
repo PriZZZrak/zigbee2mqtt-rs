@@ -451,3 +451,35 @@ async fn serves_assets_under_a_custom_base_url() {
     std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[tokio::test]
+async fn accepts_windfront_package_json_from_the_package_root() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
+    let root = std::env::temp_dir().join(format!(
+        "z2m-windfront-pkg-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let dist = root.join("dist");
+    std::fs::create_dir_all(&dist).unwrap();
+    std::fs::write(dist.join("index.html"), "<html>pkg</html>").unwrap();
+    // Development layout: package.json lives in the package root, assets in dist/.
+    std::fs::write(root.join("package.json"), r#"{"version":"2.15.1"}"#).unwrap();
+
+    std::env::set_var("ZIGBEE2MQTT_FRONTEND_ASSETS", &dist);
+    let harness = harness(None);
+    let frontend = Frontend::new(harness.context.clone());
+    frontend.clone().start().await.unwrap();
+    let addr = frontend.bound_addr().unwrap();
+
+    let (status, body) = http_get(addr, "/", "text/html").await;
+    assert_eq!(status, 200, "{body}");
+    assert!(body.contains("<html>pkg</html>"));
+
+    frontend.stop().await.unwrap();
+    std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
+    let _ = std::fs::remove_dir_all(root);
+}

@@ -37,6 +37,10 @@ First publication: `windfront-v2.15.1` (2026-11-16) produced
 `feed/zigbee2mqtt-windfront_2.15.1_all.ipk` on `gh-pages` (commit `19fa4ec`);
 `Packages.sig`/`public.key` appear once the usign secrets are configured.
 
+A failing run writes `feed/ci-error.txt` (run URL + captured output) to the
+same branch: the Actions log itself is only readable with repository admin
+rights.
+
 ## Feed layout
 
 The repository's `gh-pages` branch already hosts unrelated content, so the

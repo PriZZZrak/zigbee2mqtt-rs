@@ -199,6 +199,11 @@ impl AdapterTransport {
             return Err("Cannot write while transport is closed".to_string());
         }
 
+        if std::env::var("ZIGBEE2MQTT_TRACE_SERIAL").is_ok() {
+            let hex: String = data.iter().map(|byte| format!("{byte:02x}")).collect();
+            logger().debug(&format!("TX chunk {hex}"), NS);
+        }
+
         match self.writer.as_mut() {
             Some(TransportWriter::Serial(port)) => {
                 port.write_all(data)
@@ -295,6 +300,7 @@ impl AdapterTransport {
     fn start_serial_reader(&mut self, mut reader: serial2_tokio::SerialPort) {
         let (tx, rx) = mpsc::channel(32);
         let is_open = self.is_open.clone();
+        let trace = std::env::var("ZIGBEE2MQTT_TRACE_SERIAL").is_ok();
         let task = tokio::spawn(async move {
             let mut buffer = [0u8; 1024];
             loop {
@@ -305,6 +311,13 @@ impl AdapterTransport {
                         return;
                     }
                     Ok(read) => {
+                        if trace {
+                            let hex: String = buffer[..read]
+                                .iter()
+                                .map(|byte| format!("{byte:02x}"))
+                                .collect();
+                            logger().debug(&format!("RX chunk {hex}"), NS);
+                        }
                         if tx
                             .send(TransportEvent::Data(buffer[..read].to_vec()))
                             .await

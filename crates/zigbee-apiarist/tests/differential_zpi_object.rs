@@ -98,21 +98,15 @@ fn zpi_object_matches_upstream_fixtures() {
     }
 }
 
-/// Upstream `ZpiObject.toString(includeFrame)`: the frame hex is appended only
-/// when `includeFrame` is true (used by the `-->`/`<--` debug lines of znp.ts).
+/// Upstream `ZpiObject.toString(includePayload)` — zpiObject.ts:115.
+///
+/// The `-->` line prints the payload, the `<--` line omits it for ZDO frames.
 #[test]
-fn zpi_object_to_string_with_frame_appends_unpi_hex() {
+fn zpi_object_to_string_matches_upstream_format() {
     let object = ZpiObject::create_request(Subsystem::SYS, "ping", json!({"capabilities": 1}));
-    let frame_hex = hex(&object.to_unpi_frame().to_buffer());
-
-    let with_frame = object.to_string_with_frame(true);
-    assert!(
-        with_frame.starts_with("SREQ: SYS - ping - "),
-        "{with_frame}"
+    assert_eq!(
+        object.to_string(),
+        "SREQ: SYS - ping - {\"capabilities\":1}"
     );
-    assert!(with_frame.ends_with(&frame_hex), "{with_frame}");
-
-    let without_frame = object.to_string_with_frame(false);
-    assert_eq!(without_frame, object.to_string());
-    assert!(!without_frame.contains(&frame_hex), "{without_frame}");
+    assert_eq!(object.to_string_without_payload(), "SREQ: SYS - ping");
 }

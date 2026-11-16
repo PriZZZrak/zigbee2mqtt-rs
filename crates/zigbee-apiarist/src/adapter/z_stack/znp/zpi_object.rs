@@ -253,7 +253,9 @@ impl ZpiObject {
             || (self.command.name == "systemReset" && self.subsystem == Subsystem::SAPI)
     }
 
-    /// Upstream: `obj.toString()`.
+    /// Upstream `toString(includePayload = true)` — zpiObject.ts:115.
+    ///
+    /// Used by the `-->`/reset/default debug lines (`${object}`).
     pub fn to_string(&self) -> String {
         format!(
             "{}: {} - {} - {}",
@@ -264,21 +266,16 @@ impl ZpiObject {
         )
     }
 
-    /// Upstream `toString(includeFrame)` — ZpiObject.ts:___
+    /// Upstream `toString(false)` — zpiObject.ts:115.
     ///
-    /// `includeFrame` appends the UNPI frame as lowercase hex, matching the
-    /// `-->`/`<--` debug lines of `znp.ts`.
-    pub fn to_string_with_frame(&self, include_frame: bool) -> String {
-        let base = self.to_string();
-        if !include_frame {
-            return base;
-        }
-        let frame = self.to_unpi_frame();
-        let hex: String = frame
-            .to_buffer()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        format!("{base} {hex}")
+    /// The `<--` debug line omits the payload for ZDO frames
+    /// (`znp.ts:103`).
+    pub fn to_string_without_payload(&self) -> String {
+        format!(
+            "{}: {} - {}",
+            self.r#type.name(),
+            self.subsystem.name(),
+            self.command.name
+        )
     }
 }

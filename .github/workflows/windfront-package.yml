@@ -121,3 +121,22 @@ jobs:
           files: ${{ runner.temp }}/out/*.ipk
           name: "zigbee2mqtt-windfront ${{ steps.version.outputs.version }}"
           tag_name: ${{ github.ref_name }}
+
+      # A failing step is invisible without repository admin access, so the
+      # failure is recorded next to the feed on the gh-pages branch.
+      - name: Report the failure
+        if: failure()
+        run: |
+          set -uo pipefail
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          report="$GITHUB_WORKSPACE/feed/feed/ci-error.txt"
+          {
+            printf 'workflow: windfront-package\nrun: %s\nref: %s\nsha: %s\n' \
+              "$run_url" "$GITHUB_REF" "$GITHUB_SHA"
+          } > "$report" 2>/dev/null || exit 0
+          cd "$GITHUB_WORKSPACE/feed" || exit 0
+          git config user.name "github-actions" || exit 0
+          git config user.email "github-actions@users.noreply.github.com" || exit 0
+          git add -A || exit 0
+          git commit -m "ci failure: ${GITHUB_RUN_ID}" || exit 0
+          git push origin gh-pages || exit 0

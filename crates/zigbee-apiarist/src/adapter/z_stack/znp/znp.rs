@@ -158,13 +158,14 @@ impl Znp {
 
         match catch_unwind(AssertUnwindSafe(|| ZpiObject::from_unpi_frame(&frame))) {
             Ok(object) => {
-                logger().debug(
-                    &format!(
-                        "<-- {}",
-                        object.to_string_with_frame(object.subsystem != Subsystem::ZDO)
-                    ),
-                    NS,
-                );
+                if object.subsystem == Subsystem::ZDO {
+                    logger().debug(
+                        &format!("<-- {}", object.to_string_without_payload()),
+                        NS,
+                    );
+                } else {
+                    logger().debug(&format!("<-- {}", object.to_string()), NS);
+                }
                 waitress.resolve(&object).await;
                 let _ = event_tx.send(object.clone());
                 received.lock().await.push(object);
@@ -399,13 +400,10 @@ impl Znp {
                 )
                 .await;
 
-            logger().debug(
-                &format!("--> {}", object.to_string_with_frame(true)),
-                NS,
-            );
-            self.transport
-                .write(&object.to_unpi_frame().to_buffer())
-                .await?;
+            let frame = object.to_unpi_frame();
+            let buffer = frame.to_buffer();
+            logger().debug(&format!("--> {}", object.to_string()), NS);
+            self.transport.write(&buffer).await?;
             let result = receiver.await.map_err(|_| "Waiter dropped".to_string())??;
 
             if check_status {

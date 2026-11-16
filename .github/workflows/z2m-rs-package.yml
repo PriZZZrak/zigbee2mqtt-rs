@@ -13,11 +13,29 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  # Everything the job prints is captured here so the failure reporter can
+  # publish it to the gh-pages feed (the Actions log needs admin rights).
+  CI_LOG: ${{ github.workspace }}/ci.log
+
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout the opkg feed branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: feed
+
+      - name: Prepare the CI log
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@users.noreply.github.com"
+          : > "$CI_LOG"
+          echo "run=$GITHUB_RUN_ID ref=$GITHUB_REF" >> "$CI_LOG"
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -40,10 +58,15 @@ jobs:
       - name: Build the static aarch64 binary
         run: |
           set -euo pipefail
-          cargo zigbuild --release -p z2m-rs --target aarch64-unknown-linux-musl
+          {
+            rustc --version
+            cargo --version
+            zig version
+            cargo zigbuild --release -p z2m-rs --target aarch64-unknown-linux-musl
+          } 2>&1 | tee -a "$CI_LOG"
           bin="target/aarch64-unknown-linux-musl/release/z2m-rs"
           test -x "$bin"
-          file "$bin"
+          file "$bin" | tee -a "$CI_LOG"
           sha256sum "$bin" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Package version
@@ -75,15 +98,9 @@ jobs:
             "$payload" "$RUNNER_TEMP/out" \
             "Zigbee to MQTT bridge (pure Rust port)" \
             "" \
-            packaging/opkg/files-rs
+            packaging/opkg/files-rs | tee -a "$CI_LOG"
           ls -l "$RUNNER_TEMP/out"
           cat "$RUNNER_TEMP/out"/*.meta >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Checkout the opkg feed branch
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: feed
 
       - name: Update the opkg feed
         env:
@@ -108,8 +125,23 @@ jobs:
           fi
           cat "$dir/Packages" >> "$GITHUB_STEP_SUMMARY"
           cd "$root"
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
           git add -A
           git commit -m "zigbee2mqtt-rs ${VERSION}"
           git push origin gh-pages
+
+      # A failing step is invisible without repository admin access, so the
+      # captured output is published next to the feed on the gh-pages branch.
+      - name: Report the failure
+        if: failure()
+        run: |
+          set -uo pipefail
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          report="$GITHUB_WORKSPACE/feed/feed/ci-error.txt"
+          {
+            printf 'run: %s\nref: %s\nsha: %s\n\n' "$run_url" "$GITHUB_REF" "$GITHUB_SHA"
+            tail -n 300 "$CI_LOG" 2>/dev/null || echo "(no captured output)"
+          } > "$report" 2>/dev/null || exit 0
+          cd "$GITHUB_WORKSPACE/feed" || exit 0
+          git add -A || exit 0
+          git commit -m "ci failure: ${GITHUB_RUN_ID}" || exit 0
+          git push origin gh-pages || exit 0

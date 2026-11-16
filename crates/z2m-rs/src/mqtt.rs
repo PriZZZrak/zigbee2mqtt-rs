@@ -13,6 +13,10 @@ use serde_json::{json, Value};
 use crate::event_bus::EventBus;
 use zigbee_apiarist::utils::logger::logger;
 
+/// MQTT remaining-length protocol maximum (256 MiB - 1). Used for the outgoing
+/// direction because upstream has no client-side outgoing limit.
+const MAX_OUTGOING_PACKET_SIZE: usize = 268_435_455;
+
 /// Upstream `MqttPublishOptions`.
 #[derive(Debug, Clone)]
 pub struct MqttPublishOptions {
@@ -126,6 +130,15 @@ impl Mqtt {
         if let Some(keepalive) = mqtt_settings["keepalive"].as_u64() {
             options.set_keep_alive(keepalive.min(u16::MAX as u64) as u16);
         }
+        // Upstream (mqtt.js) does not limit outgoing packets; the broker does.
+        // `mqtt.maximum_packet_size` describes what the server may send to us
+        // (MQTT 5 CONNECT property), so keep the outgoing direction at the
+        // protocol maximum instead of rumqttc's 10 KiB default.
+        let maximum_packet_size = mqtt_settings["maximum_packet_size"]
+            .as_u64()
+            .unwrap_or(1_048_576)
+            .clamp(20, MAX_OUTGOING_PACKET_SIZE as u64) as usize;
+        options.set_max_packet_size(maximum_packet_size, MAX_OUTGOING_PACKET_SIZE);
         if let (Some(user), Some(password)) = (
             mqtt_settings["user"].as_str(),
             mqtt_settings["password"].as_str(),
@@ -333,25 +346,57 @@ impl Mqtt {
 }
 
 fn parse_server(server: &str) -> Result<(String, u16, bool), String> {
-    let (rest, tls) = if let Some(rest) = server
+    // Upstream (mqtt.js) accepts a server without an explicit port and falls
+    // back to the scheme default; zigbee2mqtt's own default config uses
+    // `mqtt://localhost`.
+    let (rest, default_port, tls) = if let Some(rest) = server
         .strip_prefix("mqtts://")
         .or_else(|| server.strip_prefix("ssl://"))
     {
-        (rest, true)
+        (rest, 8883, true)
     } else if let Some(rest) = server
         .strip_prefix("mqtt://")
         .or_else(|| server.strip_prefix("tcp://"))
     {
-        (rest, false)
+        (rest, 1883, false)
     } else {
         return Err(format!("Unsupported MQTT server '{server}'"));
     };
-    let (host, port) = rest
-        .rsplit_once(':')
-        .ok_or_else(|| format!("Invalid MQTT server '{server}', expected mqtt://host:port"))?;
-    let port = port
-        .parse::<u16>()
-        .map_err(|_| format!("Invalid MQTT port in '{server}'"))?;
+
+    // Bracketed IPv6 literal, optionally followed by `:port`.
+    if let Some(tail) = rest.strip_prefix('[') {
+        let (host, rest) = tail
+            .split_once(']')
+            .ok_or_else(|| format!("Invalid MQTT server '{server}'"))?;
+        let port = match rest.strip_prefix(':') {
+            Some(port) => port
+                .parse::<u16>()
+                .map_err(|_| format!("Invalid MQTT port in '{server}'"))?,
+            None if rest.is_empty() => default_port,
+            None => return Err(format!("Invalid MQTT server '{server}'")),
+        };
+        if host.is_empty() {
+            return Err(format!("Invalid MQTT server '{server}'"));
+        }
+        return Ok((host.to_string(), port, tls));
+    }
+
+    // A bare IPv6 address (multiple colons, no brackets) has no port.
+    let (host, port) = if rest.matches(':').count() > 1 {
+        (rest, default_port)
+    } else {
+        match rest.rsplit_once(':') {
+            Some((host, port)) => (
+                host,
+                port.parse::<u16>()
+                    .map_err(|_| format!("Invalid MQTT port in '{server}'"))?,
+            ),
+            None => (rest, default_port),
+        }
+    };
+    if host.is_empty() {
+        return Err(format!("Invalid MQTT server '{server}'"));
+    }
     Ok((host.to_string(), port, tls))
 }
 
@@ -507,6 +552,24 @@ mod tests {
             parse_server("mqtt://localhost:1883").unwrap(),
             ("localhost".to_string(), 1883, false)
         );
+        // mqtt.js defaults the port from the scheme (z2m's default config is
+        // `server: mqtt://localhost`).
+        assert_eq!(
+            parse_server("mqtt://localhost").unwrap(),
+            ("localhost".to_string(), 1883, false)
+        );
+        assert_eq!(
+            parse_server("mqtts://broker.example").unwrap(),
+            ("broker.example".to_string(), 8883, true)
+        );
+        assert_eq!(
+            parse_server("mqtt://[::1]").unwrap(),
+            ("::1".to_string(), 1883, false)
+        );
+        assert_eq!(
+            parse_server("mqtt://[::1]:1885").unwrap(),
+            ("::1".to_string(), 1885, false)
+        );
         assert_eq!(
             parse_server("tcp://broker:1884").unwrap(),
             ("broker".to_string(), 1884, false)
@@ -520,6 +583,7 @@ mod tests {
             ("legacy".to_string(), 8883, true)
         );
         assert!(parse_server("ws://localhost:8080").is_err());
+        assert!(parse_server("mqtt://").is_err());
     }
 
     #[test]

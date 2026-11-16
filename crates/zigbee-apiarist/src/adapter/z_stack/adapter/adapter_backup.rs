@@ -266,10 +266,6 @@ impl AdapterBackup {
         };
 
         let stored = self.get_stored_backup();
-        eprintln!(
-            "MERGE stored={:?}",
-            stored.as_ref().map(|o| o.as_ref().map(|b| b.devices.len()))
-        );
         if let Ok(Some(old_backup)) = stored {
             let missing = old_backup
                 .devices
@@ -285,11 +281,6 @@ impl AdapterBackup {
                 })
                 .cloned()
                 .collect::<Vec<_>>();
-            eprintln!(
-                "MERGE missing={} db={:?}",
-                missing.len(),
-                ieee_addresses_in_database
-            );
             backup.devices.extend(missing);
         }
 
