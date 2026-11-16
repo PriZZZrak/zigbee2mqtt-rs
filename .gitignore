@@ -1,5 +1,5 @@
 openwrt-sdk/
-openwrt/
+/openwrt/
 ref/
 .upstream
 .opencode/

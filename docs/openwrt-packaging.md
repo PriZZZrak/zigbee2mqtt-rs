@@ -31,22 +31,53 @@ Two packages, published to an opkg feed on the `gh-pages` branch:
 Both workflows share `concurrency: opkg-feed` so the `Packages` index is not
 rewritten concurrently.
 
+## Feed layout
+
+The repository's `gh-pages` branch already hosts unrelated content, so the
+packages live in a subdirectory:
+
+```
+gh-pages/
+  feed/
+    Packages
+    Packages.gz
+    Packages.sig      (only when USIGN_PRIVATE_KEY is set)
+    public.key        (only when USIGN_PUBLIC_KEY is set)
+    zigbee2mqtt-windfront_2.15.1_all.ipk
+    zigbee2mqtt-rs_<version>_aarch64_cortex-a53.ipk
+```
+
+URL: `https://<org>.github.io/<repo>/feed`.
+
 ## Feed signing (needs the private key)
 
-Store the OpenWrt `usign` private key as the repository secret
-`USIGN_PRIVATE_KEY`. When the runner has `usign` available, the workflows
-publish `Packages.sig` and `public.key` next to the index. Without the secret
-(or without `usign` on the runner) the feed is published unsigned.
+Store the OpenWrt `usign` keypair as the repository secrets
+`USIGN_PRIVATE_KEY` and `USIGN_PUBLIC_KEY` (contents of the two files, not the
+paths). When both exist, the workflows publish `Packages.sig` and
+`feed/public.key`; without them the feed is published unsigned.
+
+Generate a keypair once (on any machine with `usign`, e.g. the router itself):
+
+```sh
+usign -G -p z2m-rs.pub -s z2m-rs.sec -c "zigbee2mqtt-rs feed"
+usign -F -p z2m-rs.pub          # fingerprint, used as /etc/opkg/keys/<fp>
+```
 
 ## Router setup
 
 ```sh
-# copy the public key (from https://<org>.github.io/<repo>/feed/public.key)
-opkg-key add public.key
+# signed feed: install the public key (fingerprint = `usign -F -p public.key`)
+wget -O /tmp/public.key https://<org>.github.io/<repo>/feed/public.key
+opkg-key add /tmp/public.key
+
 echo 'src/gz z2m_rs https://<org>.github.io/<repo>/feed' >> /etc/opkg/customfeeds.conf
 opkg update
-opkg install zigbee2mqtt-rs zigbee2mqtt-windfront
+opkg install zigbee2mqtt-windfront zigbee2mqtt-rs
 ```
+
+`opkg install zigbee2mqtt-rs` pulls the exact Windfront version because of
+`Depends: zigbee2mqtt-windfront (= <packaging/windfront.version>)`; an unsigned
+feed works too, but opkg then only warns about missing signatures.
 
 The service waits for the serial port from `configuration.yaml`, exports
 `ZIGBEE2MQTT_DATA=/etc/zigbee2mqtt` and
@@ -68,9 +99,18 @@ without a crash-count limit (`respawn 3600 10 0`).
 
 ```sh
 # Windfront ipk
-./packaging/openwrt/build-ipk.sh zigbee2mqtt-windfront 2.15.1 all "" \
+./packaging/opkg/build-ipk.sh zigbee2mqtt-windfront 2.15.1 all "" \
   /path/to/payload /tmp/out "Windfront static UI for Zigbee2MQTT"
 
-# feed index (+ optional usign key)
-./packaging/openwrt/update-feed.sh /tmp/feed /path/to/usign.key
+# feed index (+ optional usign key; signs Packages -> Packages.sig)
+./packaging/opkg/update-feed.sh /tmp/feed /path/to/usign.sec
 ```
+
+Both workflows build `usign` from `https://github.com/openwrt/usign` when the
+runner does not ship it; `update-feed.sh` fails with an explicit error if a key
+is given but `usign` is unavailable.
+
+Verified locally against the real `zigbee2mqtt-windfront-2.15.1.tgz`
+(2026-11-16): ipk 2.7 MB / `Installed-Size: 6792`, `ar t` =
+`debian-binary control.tar.gz data.tar.gz`, `Packages` + `Packages.gz` +
+`Packages.sig` written and `usign -V` reports `OK`.

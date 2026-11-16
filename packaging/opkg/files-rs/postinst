@@ -1,0 +1,4 @@
+#!/bin/sh
+[ -n "${IPKG_INSTROOT:-}" ] && exit 0
+grep -qxF '/etc/zigbee2mqtt' /etc/sysupgrade.conf 2>/dev/null || echo '/etc/zigbee2mqtt' >> /etc/sysupgrade.conf
+exit 0

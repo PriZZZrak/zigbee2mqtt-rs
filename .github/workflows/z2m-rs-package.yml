@@ -65,16 +65,16 @@ jobs:
           payload="$RUNNER_TEMP/payload"
           mkdir -p "$payload/usr/bin" "$payload/etc/init.d"
           cp target/aarch64-unknown-linux-musl/release/z2m-rs "$payload/usr/bin/zigbee2mqtt-rs"
-          cp packaging/openwrt/files/zigbee2mqtt-rs.init "$payload/etc/init.d/zigbee2mqtt-rs"
+          cp packaging/opkg/files/zigbee2mqtt-rs.init "$payload/etc/init.d/zigbee2mqtt-rs"
           chmod 0755 "$payload/usr/bin/zigbee2mqtt-rs" "$payload/etc/init.d/zigbee2mqtt-rs"
           mkdir -p "$RUNNER_TEMP/out"
-          ./packaging/openwrt/build-ipk.sh \
+          ./packaging/opkg/build-ipk.sh \
             zigbee2mqtt-rs "$VERSION" aarch64_cortex-a53 \
             "zigbee2mqtt-windfront (= $WINDFRONT)" \
             "$payload" "$RUNNER_TEMP/out" \
             "Zigbee to MQTT bridge (pure Rust port)" \
-            "/etc/zigbee2mqtt/configuration.yaml" \
-            packaging/openwrt/files-rs
+            "" \
+            packaging/opkg/files-rs
 
       - name: Update the opkg feed
         env:
@@ -101,10 +101,10 @@ jobs:
             key="$RUNNER_TEMP/usign.key"
             printf '%s\n' "$USIGN_PRIVATE_KEY" > "$key"
             if [ -n "${USIGN_PUBLIC_KEY:-}" ]; then
-              printf '%s\n' "$USIGN_PUBLIC_KEY" > "$feed/public.key"
+              printf '%s\n' "$USIGN_PUBLIC_KEY" > "$feed/feed/public.key"
             fi
-            ./packaging/openwrt/update-feed.sh "$feed/feed" "$key"
+            ./packaging/opkg/update-feed.sh "$feed/feed" "$key"
           else
-            ./packaging/openwrt/update-feed.sh "$feed/feed"
+            ./packaging/opkg/update-feed.sh "$feed/feed"
           fi
           (cd "$feed" && git add -A && git commit -m "zigbee2mqtt-rs ${VERSION}" && git push origin gh-pages)

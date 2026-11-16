@@ -67,9 +67,11 @@ jobs:
           mkdir -p "$payload/usr/share/zigbee2mqtt/windfront"
           cp -a "$RUNNER_TEMP/windfront/package/dist/." "$payload/usr/share/zigbee2mqtt/windfront/"
           cp "$RUNNER_TEMP/windfront/package/package.json" "$payload/usr/share/zigbee2mqtt/windfront/package.json"
-          cp "$RUNNER_TEMP/windfront/package/LICENSE" "$payload/usr/share/zigbee2mqtt/windfront/LICENSE"
+          if [ -f "$RUNNER_TEMP/windfront/package/LICENSE" ]; then
+            cp "$RUNNER_TEMP/windfront/package/LICENSE" "$payload/usr/share/zigbee2mqtt/windfront/LICENSE"
+          fi
           mkdir -p "$RUNNER_TEMP/out"
-          ./packaging/openwrt/build-ipk.sh \
+          ./packaging/opkg/build-ipk.sh \
             zigbee2mqtt-windfront "$VERSION" all "" \
             "$payload" "$RUNNER_TEMP/out" \
             "Windfront static UI for Zigbee2MQTT"
@@ -98,11 +100,11 @@ jobs:
             key="$RUNNER_TEMP/usign.key"
             printf '%s\n' "$USIGN_PRIVATE_KEY" > "$key"
             if [ -n "${USIGN_PUBLIC_KEY:-}" ]; then
-              printf '%s\n' "$USIGN_PUBLIC_KEY" > "$feed/public.key"
+              printf '%s\n' "$USIGN_PUBLIC_KEY" > "$feed/feed/public.key"
             fi
-            ./packaging/openwrt/update-feed.sh "$feed/feed" "$key"
+            ./packaging/opkg/update-feed.sh "$feed/feed" "$key"
           else
-            ./packaging/openwrt/update-feed.sh "$feed/feed"
+            ./packaging/opkg/update-feed.sh "$feed/feed"
           fi
           (cd "$feed" && git add -A && git commit -m "windfront ${VERSION}" && git push origin gh-pages)
 
