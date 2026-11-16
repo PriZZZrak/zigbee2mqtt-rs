@@ -64,8 +64,17 @@ impl Controller {
         }
     }
 
-    pub fn add_extension(&self, extension: Arc<dyn Extension>) {
-        self.extensions.lock().unwrap().push(extension);
+    /// Upstream `addExtension` (`controller.ts`): a duplicate name is an error.
+    pub fn add_extension(&self, extension: Arc<dyn Extension>) -> Result<(), String> {
+        let mut extensions = self.extensions.lock().unwrap();
+        if extensions
+            .iter()
+            .any(|existing| existing.name() == extension.name())
+        {
+            return Err(format!("Extension '{}' already exists", extension.name()));
+        }
+        extensions.push(extension);
+        Ok(())
     }
 
     /// Upstream `publishEntityState` (`controller.ts:382-460`).
