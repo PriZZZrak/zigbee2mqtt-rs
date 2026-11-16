@@ -189,7 +189,12 @@ impl State {
         );
 
         let json = stringify_pretty_4(&Value::Object(self.state.clone()));
-        if let Err(error) = std::fs::write(&self.file, json) {
+        // Rollback-safe: temp file + rename (the state file is rewritten while
+        // the bridge may be killed at any moment).
+        let temporary = self.file.with_extension("json.tmp");
+        let result = std::fs::write(&temporary, json)
+            .and_then(|_| std::fs::rename(&temporary, &self.file));
+        if let Err(error) = result {
             self.logger.lock().unwrap().error(
                 &format!(
                     "Failed to write state to '{}' ({error})",

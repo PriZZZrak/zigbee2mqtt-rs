@@ -67,7 +67,12 @@ pub fn write_if_changed(file: impl AsRef<Path>, content: &Value) -> Result<(), Y
     if &before != content {
         let serialized = serde_yaml_ng::to_string(content)
             .map_err(|error| YAMLFileException::new(error.to_string(), file))?;
-        std::fs::write(file, serialized)
+        // Rollback-safe: write a sibling temp file and rename it over the
+        // target, so a crash mid-write cannot truncate the configuration.
+        let temporary = file.with_extension("yaml.tmp");
+        std::fs::write(&temporary, serialized)
+            .map_err(|error| YAMLFileException::new(error.to_string(), file))?;
+        std::fs::rename(&temporary, file)
             .map_err(|error| YAMLFileException::new(error.to_string(), file))?;
     }
     Ok(())
