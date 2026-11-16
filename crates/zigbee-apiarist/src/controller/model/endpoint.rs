@@ -1125,7 +1125,11 @@ impl Endpoint {
             }
         }
         let mut options = options.unwrap_or_default();
-        options.direction = Some(Direction::SERVER_TO_CLIENT as u8);
+        // Upstream: `{direction: SERVER_TO_CLIENT, ...options, transactionSequenceNumber}`
+        // — a caller-provided direction wins (device.ts sends the inverted one).
+        if options.direction.is_none() {
+            options.direction = Some(Direction::SERVER_TO_CLIENT as u8);
+        }
         options.transaction_sequence_number = Some(transaction_sequence_number);
         self.zcl_command(
             Value::from(cluster.name.clone()),
@@ -1451,7 +1455,11 @@ impl Endpoint {
             return Err("Use parameter".to_string());
         }
         let mut options = options.unwrap_or_default();
-        options.direction = Some(Direction::SERVER_TO_CLIENT as u8);
+        // Upstream: `{direction: SERVER_TO_CLIENT, ...options, transactionSequenceNumber}`
+        // — a caller-provided direction wins (device.ts passes the inverted one).
+        if options.direction.is_none() {
+            options.direction = Some(Direction::SERVER_TO_CLIENT as u8);
+        }
         options.transaction_sequence_number = Some(transaction_sequence_number);
         self.zcl_command(
             Value::from(cluster_id),

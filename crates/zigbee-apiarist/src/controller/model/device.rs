@@ -629,9 +629,10 @@ impl Device {
         let header = frame.header;
         let command = &frame.command;
         let cluster = &frame.cluster;
-        let mut send_default_response = !data_payload.was_broadcast
-            && !header.frame_control.disable_default_response
-            && command.response.is_none();
+        // Upstream only checks broadcast/response here; `disableDefaultResponse`
+        // is applied later, where a non-SUCCESS status still gets a response
+        // (device.ts:394, :588-597).
+        let mut send_default_response = !data_payload.was_broadcast && command.response.is_none();
         let mut default_response_status = default_response.unwrap_or(Status::SUCCESS as u8);
 
         if header.is_global() {
