@@ -373,8 +373,12 @@ impl Controller {
         });
         Entity::inject_database(database);
 
-        // Adapter (inject before starting so timers can use it)
+        // Adapter: inject before starting so timers and any incoming frame
+        // processed during `start` (network resume) can reach it. Upstream
+        // injects after `adapter.start`, but its adapter only emits after the
+        // event handlers are registered; ours dispatches frames immediately.
         let _ = self.adapter.set(adapter.clone());
+        Entity::inject_adapter(adapter.clone());
 
         logger().debug(
             &format!("Starting with options '{}'", self.options_log_json()),
@@ -427,7 +431,6 @@ impl Controller {
             }
         }
 
-        Entity::inject_adapter(adapter.clone());
 
         logger().debug(
             &format!(

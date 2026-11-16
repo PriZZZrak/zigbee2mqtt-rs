@@ -76,7 +76,7 @@ Legend: `PORTED` / `PARTIAL` / `OMITTED` / `BLOCKED` / `HARDWARE_PENDING`.
 | Backup metadata (`toUnifiedBackup`/`fromUnifiedBackup`/`fromLegacyBackup`) | `utils/backup.ts` | PORTED | unified round-trip against the real router backup; legacy parser unit test |
 | HIL (coordinator in container) | — | PORTED | Dongle Plus `10c4:ea60`, SYS version + NV init, see `docs/hil/2026-11-09-dongle-plus.md` |
 | Upstream z2m oracle (container) | `zigbee2mqtt.14.3` | PORTED | resumed network, 3 devices, MQTT transcripts, see `docs/hil/2026-11-09-z2m-run.md` |
-| HIL (router + Dongle-P) | — | HARDWARE_PENDING | no Routerich/OpenWrt run recorded |
+| HIL (router + Dongle-P) | — | HARDWARE_PENDING | first AArch64-musl run 2026-11-16: coordinator resumed from the real network; startup currently blocked by ZNP version-detection/parse desync, see `docs/hil/2026-11-16-rust-port-startup.md` |
 
 ## Controller model layer — status and remaining gaps
 

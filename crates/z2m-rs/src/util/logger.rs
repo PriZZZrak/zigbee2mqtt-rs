@@ -551,10 +551,20 @@ impl Logger {
             let _ = writeln!(file, "[{timestamp}] {level}: \t{message}");
         }
 
+        let console_silent = self
+            .transports
+            .iter()
+            .find(|transport| transport.kind == "Console")
+            .map(|transport| transport.silent)
+            .unwrap_or(false);
+
         if self.log_console_json {
-            self.console_writes.push(
-                json!({"level": level, "message": message, "timestamp": timestamp}).to_string(),
-            );
+            let line =
+                json!({"level": level, "message": message, "timestamp": timestamp}).to_string();
+            if !console_silent {
+                println!("{line}");
+            }
+            self.console_writes.push(line);
         } else {
             let color = match level {
                 "error" => 31,
@@ -562,6 +572,9 @@ impl Logger {
                 "debug" => 34,
                 _ => 32,
             };
+            if !console_silent {
+                println!("[{timestamp}] {level}: \t{message}");
+            }
             self.console_writes.push(format!(
                 "[{timestamp}] \u{1b}[{color}m{level}\u{1b}[39m: \t{message}"
             ));
