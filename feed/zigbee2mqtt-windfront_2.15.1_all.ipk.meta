@@ -1,0 +1,13 @@
+Package: zigbee2mqtt-windfront
+Version: 2.15.1
+Architecture: all
+Installed-Size: 6832
+Section: net
+Priority: optional
+Maintainer: zigbee2mqtt-rs <noreply@github.com>
+Source: https://github.com/PriZZZrak/zigbee2mqtt-rs
+Description: Windfront static UI for Zigbee2MQTT
+Filename: zigbee2mqtt-windfront_2.15.1_all.ipk
+Size: 2849116
+SHA256sum: d2c68e4a276e32cd0f9418daeb588c84e2d8eaa07a252fed64ba647f021eb578
+
