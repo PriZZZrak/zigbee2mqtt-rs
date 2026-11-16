@@ -88,10 +88,16 @@ key"). A trailing blank line is harmless. `.sec` (~200 chars) is
 wget -O /tmp/public.key https://<org>.github.io/<repo>/feed/public.key
 opkg-key add /tmp/public.key
 
-echo 'src/gz z2m_rs https://<org>.github.io/<repo>/feed' >> /etc/opkg/customfeeds.conf
+# customfeeds.conf usually has no trailing newline: prefix the new line
+printf '\nsrc/gz z2m_rs https://<org>.github.io/<repo>/feed\n' >> /etc/opkg/customfeeds.conf
 opkg update
 opkg install zigbee2mqtt-windfront zigbee2mqtt-rs
 ```
+
+Verified on Routerich AX3000 (2026-11-16) with the signed feed: key
+fingerprint `70a94d533b5a96a5`, `opkg update` prints
+`Signature check passed.` for `/feed/Packages.sig`, and `opkg list` shows
+`zigbee2mqtt-rs - 0.0.1-dev.1` and `zigbee2mqtt-windfront - 2.15.1`.
 
 `opkg install zigbee2mqtt-rs` pulls the exact Windfront version because of
 `Depends: zigbee2mqtt-windfront (= <packaging/windfront.version>)`; an unsigned
