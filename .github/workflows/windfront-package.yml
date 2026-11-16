@@ -95,6 +95,7 @@ jobs:
           root="$GITHUB_WORKSPACE/feed"
           dir="$root/feed"
           mkdir -p "$dir"
+          rm -f "$dir/ci-error.txt"
           cp "$RUNNER_TEMP"/out/*.ipk "$RUNNER_TEMP"/out/*.meta "$dir"/
           if [ -n "${USIGN_PRIVATE_KEY:-}" ]; then
             key="$RUNNER_TEMP/usign.key"
