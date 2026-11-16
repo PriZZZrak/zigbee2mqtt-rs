@@ -91,10 +91,10 @@ without a test.
 | 75 | Should start when state is corrupted | `starts_when_state_file_is_corrupted` |
 | 76 | Start controller with force_disable_retain | covered by — `crates/z2m-rs/tests/publish.rs` |
 | 77 | Should republish retained messages on MQTT initial connect | not ported — needs a broker; `crates/z2m-rs/tests/mqtt_broker.rs` covers connect only |
-| 78 | Should not republish retained messages on MQTT initial connect when retained message are sent | not ported — needs a broker |
-| 79 | Should republish retained messages on MQTT reconnect | not ported — needs a broker |
-| 80 | Should not republish retained messages on MQTT reconnect when retained message are sent | not ported — needs a broker |
-| 81 | Should not republish retained messages on MQTT reconnect when retained message arrives while publishing bridge state | not ported — needs a broker |
+| 78 | Should not republish retained messages on MQTT initial connect when retained message are sent | `cancels_the_republish_when_a_retained_bridge_info_arrives` |
+| 79 | Should republish retained messages on MQTT reconnect | `reconnects_and_republishes_state_after_the_broker_drops_the_connection` |
+| 80 | Should not republish retained messages on MQTT reconnect when retained message are sent | `cancels_the_republish_when_a_retained_bridge_info_arrives` |
+| 81 | Should not republish retained messages on MQTT reconnect when retained message arrives while publishing bridge state | `cancels_the_republish_when_a_retained_bridge_info_arrives` (timer armed before the state publish) |
 | 82 | Should prevent any message being published with retain flag when force_disable_retain is set | covered by — `crates/z2m-rs/tests/publish.rs` |
 | 83 | Should publish last seen changes | covered by — `crates/z2m-rs/tests/last_seen.rs` |
 | 84 | Should not publish last seen changes when reason is messageEmitted | covered by — `crates/z2m-rs/tests/last_seen.rs` |

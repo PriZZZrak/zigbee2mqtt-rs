@@ -4,7 +4,7 @@
 // keeps the upstream publish/retain/subscribe contract used by the bridge.
 
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
@@ -59,7 +59,7 @@ pub struct Mqtt {
     pub event_bus: Arc<Mutex<EventBus>>,
     pub base_topic: String,
     pub server: String,
-    pub connected: bool,
+    pub connected: Arc<AtomicBool>,
     pub published_topics: Arc<Mutex<std::collections::HashSet<String>>>,
     /// Publishes currently enqueued in `rumqttc` (upstream `client.queue.length`).
     queued: Arc<AtomicUsize>,
@@ -68,6 +68,8 @@ pub struct Mqtt {
     /// Upstream `retainedMessages`; shared with the event loop so the
     /// CONNACK `bridge/state` publish is recorded like any other retained one.
     pub retained_messages: Arc<Mutex<BTreeMap<String, RetainedMessage>>>,
+    /// Upstream `mqtt.force_disable_retain`: retain off on the wire, no tracking.
+    pub force_disable_retain: bool,
     /// Upstream tests spy on `mqtt.publish`; this keeps the same observable
     /// call log when no broker is connected.
     pub attempted: Vec<(String, String, MqttPublishOptions)>,
@@ -81,11 +83,12 @@ impl Mqtt {
             event_bus,
             base_topic: "zigbee2mqtt".to_string(),
             server: "mqtt://localhost:1883".to_string(),
-            connected: false,
+            connected: Arc::new(AtomicBool::new(false)),
             published_topics: Arc::new(Mutex::new(std::collections::HashSet::new())),
             queued: Arc::new(AtomicUsize::new(0)),
             unacked: Arc::new(Mutex::new(std::collections::HashSet::new())),
             retained_messages: Arc::new(Mutex::new(BTreeMap::new())),
+            force_disable_retain: false,
             attempted: Vec::new(),
             client: None,
             task: None,
@@ -154,18 +157,34 @@ impl Mqtt {
             let _ = id;
         }
 
+        self.force_disable_retain = mqtt_settings["force_disable_retain"]
+            .as_bool()
+            .unwrap_or(false);
         let (client, mut eventloop) = AsyncClient::builder(options).capacity(64).build();
         let base_topic = self.base_topic.clone();
         let event_bus = self.event_bus.clone();
         let published_topics = self.published_topics.clone();
         let retained_messages = self.retained_messages.clone();
         let unacked = self.unacked.clone();
+        let connected = self.connected.clone();
+        let force_disable_retain = mqtt_settings["force_disable_retain"]
+            .as_bool()
+            .unwrap_or(false);
+        let republish: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+        let republish_in_loop = republish.clone();
         let connect_client = client.clone();
         let task = tokio::spawn(async move {
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Packet::Publish(publish))) => {
                         let topic = String::from_utf8_lossy(&publish.topic).to_string();
+                        // Retained `bridge/info` means the broker kept our messages:
+                        // cancel the pending republish (mqtt.ts:201-206).
+                        if topic == format!("{base_topic}/bridge/info") {
+                            if let Some(timer) = republish_in_loop.lock().unwrap().take() {
+                                timer.abort();
+                            }
+                        }
                         if published_topics.lock().unwrap().remove(&topic) {
                             continue;
                         }
@@ -222,9 +241,36 @@ impl Mqtt {
                         let _ = connect_client
                             .subscribe(format!("{base_topic}/#"), QoS::AtLeastOnce)
                             .await;
+
+                        // Upstream republishes tracked retained messages 2 s after
+                        // connect unless `bridge/info` arrives first (mqtt.ts:177-189).
+                        if let Some(previous) = republish_in_loop.lock().unwrap().take() {
+                            previous.abort();
+                        }
+                        let client = connect_client.clone();
+                        let retained = retained_messages.clone();
+                        let timer = tokio::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                            let messages: Vec<RetainedMessage> =
+                                retained.lock().unwrap().values().cloned().collect();
+                            for message in messages {
+                                let options = rumqttc::PublishOptions::new(QoS::AtLeastOnce)
+                                    .retain(message.options.retain && !force_disable_retain);
+                                let _ = client
+                                    .publish(
+                                        message.topic.clone(),
+                                        message.payload.clone().into_bytes(),
+                                        options,
+                                    )
+                                    .await;
+                            }
+                        });
+                        *republish_in_loop.lock().unwrap() = Some(timer);
+                        connected.store(true, Ordering::SeqCst);
                     }
                     Ok(_) => {}
                     Err(error) => {
+                        connected.store(false, Ordering::SeqCst);
                         logger().error(&format!("MQTT error: {error}"), "z2m:mqtt");
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     }
@@ -235,7 +281,6 @@ impl Mqtt {
 
         self.client = Some(client);
         self.task = Some(task);
-        self.connected = true;
         Ok(())
     }
 
@@ -266,7 +311,7 @@ impl Mqtt {
             );
             let _ = client.disconnect().await;
         }
-        self.connected = false;
+        self.connected.store(false, Ordering::SeqCst);
         if let Some(task) = self.task.take() {
             task.abort();
         }
@@ -307,8 +352,11 @@ impl Mqtt {
         let Some(client) = self.client.as_mut() else {
             return false;
         };
+        // Upstream forces retain off on the wire when `force_disable_retain`
+        // is set and then does not track the message as retained (mqtt.ts:246, :225).
+        let retain = options.retain && !self.force_disable_retain;
         if client
-            .publish(&topic, payload.clone(), rumqttc::PublishOptions::new(qos).retain(options.retain))
+            .publish(&topic, payload.clone(), rumqttc::PublishOptions::new(qos).retain(retain))
             .await
             .is_err()
         {
@@ -317,7 +365,7 @@ impl Mqtt {
         if options.skip_receive {
             self.published_topics.lock().unwrap().insert(topic.clone());
         }
-        if options.retain {
+        if retain {
             self.retained_messages.lock().unwrap().insert(
                 topic.clone(),
                 RetainedMessage {
@@ -326,6 +374,8 @@ impl Mqtt {
                     options: options.clone(),
                 },
             );
+        } else {
+            self.retained_messages.lock().unwrap().remove(&topic);
         }
         self.event_bus
             .lock()
@@ -360,7 +410,7 @@ impl Mqtt {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.connected
+        self.connected.load(Ordering::SeqCst)
     }
 
     pub fn info(&self) -> Value {

@@ -470,7 +470,12 @@ async fn logging_publishes_to_mqtt_with_dedupe_and_connection_guard() {
         .iter()
         .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/logging"));
 
-    harness.mqtt.lock().await.connected = true;
+    harness
+        .mqtt
+        .lock()
+        .await
+        .connected
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     {
         let mut logger = harness.context.logger.lock().unwrap();

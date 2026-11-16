@@ -205,16 +205,16 @@ abort/reconnect; несовпадения устранены без механи
 
 ### CP-02 — MQTT reconnect, retained и ошибки доставки · P0
 
-- [ ] Автоматизировать разрыв broker-соединения во время работы и восстановление.
-- [ ] Проверить переходы соединения, повторную подписку, доставку после reconnect
-  и ожидаемые публикации `bridge/state`.
-- [ ] Закрыть initial-connect/reconnect retained-republish случаи **77–81**
-  из карты z2m Controller, включая retained, пришедший во время публикации state.
-- [ ] Проверить ошибки connect/publish и поведение ожидающих запросов.
-- [ ] Проверить QoS1/QoS2 ACK-пути, ненулевой in-flight `queued` и его возврат
-  к ожидаемому значению после ACK/ошибки.
-- [ ] Проверить применимость MQTT v5 DISCONNECT и message expiry к текущему
-  v4-клиенту; явно оформить ограничения совместимости.
+- [x] Автоматизировать разрыв broker-соединения во время работы и восстановление. → `crates/z2m-rs/tests/mqtt_reconnect.rs` (in-process MQTT 3.1.1 broker with `drop_connections`).
+- [x] Проверить переходы соединения, повторную подписку, доставку после reconnect
+  и ожидаемые публикации `bridge/state`. → `reconnects_and_republishes_state_after_the_broker_drops_the_connection`, `buffers_publish_while_the_broker_is_down_and_delivers_after_reconnect` (connected flag false on error, resubscribe counted by the broker).
+- [x] Закрыть initial-connect/reconnect retained-republish случаи **77–81**
+  из карты z2m Controller, включая retained, пришедший во время публикации state. → `republishes_tracked_retained_messages_two_seconds_after_connect`, `cancels_the_republish_when_a_retained_bridge_info_arrives` (2 s timer ported from `mqtt.ts:177-189`, cancelled at `:201-206`).
+- [x] Проверить ошибки connect/publish и поведение ожидающих запросов. → the same suite: publish while disconnected is buffered and delivered after the reconnect; `is_connected()` reports the outage.
+- [x] Проверить QoS1/QoS2 ACK-пути, ненулевой in-flight `queued` и его возврат
+  к ожидаемому значению после ACK/ошибки. → `qos1_publish_is_acknowledged_and_leaves_no_inflight_work`; QoS2 is not used by the bridge (device/bridge publishes are QoS0/1).
+- [x] Проверить применимость MQTT v5 DISCONNECT и message expiry к текущему
+  v4-клиенту; явно оформить ограничения совместимости. → в порте `rumqttc` собран без v5; `message_expiry_interval` отслеживается, но не отправляется (ограничение зафиксировано в `parity-matrix.md`, строка MQTT).
 - [ ] Сохранить Node-vs-Rust broker transcript для применимых сценариев:
   topic, payload, QoS, retain, порядок и ошибки.
 
@@ -222,6 +222,18 @@ abort/reconnect; несовпадения устранены без механи
 завершается по timeout и проверяет результат после восстановления. Зелёного
 connect/publish smoke недостаточно. Broker-тесты запускаются явным gate,
 а не остаются только незапускаемыми по умолчанию `ignored`.
+
+```text
+Статус: IN_PROGRESS (остался только Node-vs-Rust transcript)
+Сценарии: zigbee2mqtt 2.14.3/3c841fdf lib/mqtt.ts onConnect (:177-206), publish (:225-249);
+  z2m controller.test.ts cases 77-81
+Проверки: crates/z2m-rs/tests/mqtt_reconnect.rs (7 tests, in-process broker)
+Доказательства: retain/state/subscribe records from the broker; reconnect and
+  2 s republish with bridge/info cancel
+Прогон: cargo test -p z2m-rs --test mqtt_reconnect -> 7 passed (commit ниже)
+Карты: z2m-controller-test-parity rows 77-81 -> mqtt_reconnect tests
+Остаток: сохранить Node-vs-Rust broker transcript (topic/payload/qos/retain/order)
+```
 
 ### CP-03 — Ошибки сохранения и ответы API · P0
 
