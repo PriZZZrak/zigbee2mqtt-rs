@@ -299,7 +299,11 @@ pub async fn onboard(
     let needs_server = std::env::var("Z2M_ONBOARD_NO_SERVER").is_err()
         && (std::env::var("Z2M_ONBOARD_FORCE_RUN").is_ok() || !conf_exists || force_server);
     if needs_server {
-        settings.lock().unwrap().set_onboarding(true);
+        settings
+            .lock()
+            .unwrap()
+            .set_onboarding(true)
+            .map_err(|error| error.to_string())?;
         // The HTTP loop is started by `main`; the data-directory state is ready.
     }
 

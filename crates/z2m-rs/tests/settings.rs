@@ -515,7 +515,7 @@ fn should_apply_home_assistant_environment_variables() {
         ]);
 
     for _ in 0..3 {
-        assert!(settings.write());
+        assert!(settings.write().unwrap());
         assert_eq!(settings.validate(), Vec::<String>::new());
 
         assert_eq!(settings.get()["frontend"]["enabled"], json!(true));
@@ -598,7 +598,7 @@ fn should_apply_environment_variables_as_overrides() {
 
     // Write trice to ensure there are no side effects.
     for _ in 0..3 {
-        assert!(settings.write());
+        assert!(settings.write().unwrap());
         assert_eq!(settings.validate(), Vec::<String>::new());
 
         assert_eq!(settings.get()["serial"]["disable_led"], json!(true));
@@ -1077,7 +1077,7 @@ fn should_write_environment_variables_as_overrides_to_configuration_yaml_not_in_
     )]);
 
     for _ in 0..3 {
-        assert!(settings.write());
+        assert!(settings.write().unwrap());
         assert_eq!(settings.validate(), Vec::<String>::new());
 
         assert_eq!(
@@ -1114,7 +1114,7 @@ fn shouldnt_write_to_configuration_yaml_when_there_are_no_changes_in_it() {
 
     settings.add_device("0x1234");
 
-    assert!(!settings.write());
+    assert!(!settings.write().unwrap());
 }
 
 #[test]
@@ -1269,7 +1269,7 @@ fn testing_write_applies_environment_overrides() {
         "testtopic".to_string(),
     )]);
 
-    assert!(settings.testing_write());
+    assert!(settings.testing_write().unwrap());
     assert_eq!(settings.get()["mqtt"]["base_topic"], json!("testtopic"));
 }
 

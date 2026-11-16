@@ -46,7 +46,7 @@ async fn main() {
                 .and_then(Value::as_bool)
                 .unwrap_or(false));
     if needs_server {
-        settings.lock().unwrap().set_onboarding(true);
+        let _ = settings.lock().unwrap().set_onboarding(true);
         // Windfront onboarding assets are deferred to OpenWrt packaging; the
         // handlers serve `/data`, `/submit` and `/submit-zip` and 404 the rest.
         let static_dir = windfront_assets_dir()

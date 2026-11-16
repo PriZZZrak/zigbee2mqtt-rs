@@ -237,19 +237,33 @@ connect/publish smoke недостаточно. Broker-тесты запуска
 
 ### CP-03 — Ошибки сохранения и ответы API · P0
 
-- [ ] Проверить актуальность отклонения onboarding case **19**:
-  `Settings::write` игнорирует I/O errors.
-- [ ] Воспроизвести ошибку записи детерминированно, в том числе в окружении
-  с root, где один `chmod` может не запретить запись.
-- [ ] Проверить `/submit`, options, rename, remove/blocklist и group mutations
-  при ошибке сохранения; сопоставить ответы и изменения памяти с upstream.
-- [ ] Проверить обычную и split devices/groups конфигурацию.
-- [ ] Проверить сохранность предыдущих файлов и последующее чтение после отказа.
+- [x] Проверить актуальность отклонения onboarding case **19**:
+  `Settings::write` игнорирует I/O errors. → дефект подтверждён и исправлен: `write()` возвращает `Result`, мутаторы пробрасывают ошибку.
+- [x] Воспроизвести ошибку записи детерминированно, в том числе в окружении
+  с root, где один `chmod` может не запретить запись. → целевой файл заменяется каталогом (`EISDIR`), работает под root: `crates/z2m-rs/tests/persistence_errors.rs`.
+- [x] Проверить `/submit`, options, rename, remove/blocklist и group mutations
+  при ошибке сохранения; сопоставить ответы и изменения памяти с upstream. → 6 тестов: `/submit` 406 `{success:false}`; `apply`/rename/remove/blocklist/group возвращают ошибку с путём файла; память изменена до записи (как upstream).
+- [x] Проверить обычную и split devices/groups конфигурацию. → `split_devices_write_failure_leaves_the_configuration_file_intact` (ошибка в `devices.yaml`, `configuration.yaml` байт-в-байт прежний).
+- [x] Проверить сохранность предыдущих файлов и последующее чтение после отказа. → `a_failed_write_does_not_replace_the_previous_file` (файл-каталог не удаляется, исходное содержимое восстанавливается и читается).
 
 **Закрытие:** ошибка не превращается в ложный успешный результат там, где
 upstream возвращает ошибку; состояние и ответы проверены differential/fixtures.
 При конфликте upstream-семантики с требованиями rollback-safe persistence
 решение принимается до изменения поведения.
+
+```text
+Статус: CLOSED
+Сценарии: zigbee2mqtt 2.14.3/3c841fdf util/settings.ts:206-269 (write throws),
+  onboarding.test.ts case 19, z2m-controller-test-parity rows 11/36/72-74
+Проверки: persistence_errors.rs (6 tests): submit 406, apply, rename, remove,
+  blocklist, add/remove group, split devices file, previous-file preservation
+Доказательства: ошибки содержат путь файла; /submit -> {success:false,error};
+  split-конфиг сохраняет configuration.yaml нетронутым
+Прогон: cargo test -p z2m-rs --test persistence_errors -> 6 passed;
+  settings 67 / onboarding 19 / bridge 21 без регрессий (commit ниже)
+Карты: onboarding-test-parity case 19 -> ported; parity-matrix storage row
+Остаток: нет
+```
 
 ### CP-04 — Crash, respawn и reboot recovery · P0
 

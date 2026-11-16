@@ -30,7 +30,7 @@ they exercise the same handler branch; the table records which.
 | 16 | sets given settings - no frontend redirect | `sets_given_settings_without_and_with_frontend_redirect` |
 | 17 | sets given settings - no frontend redirect via ENV | `sets_given_settings_without_and_with_frontend_redirect` |
 | 18 | sets given settings - frontend SSL redirect | `sets_given_settings_without_and_with_frontend_redirect` |
-| 19 | handles saving errors | **not ported**: `Settings::write` ignores I/O errors, so a read-only data dir reports success instead of `500`. Documented deviation, see below |
+| 19 | handles saving errors | `submit_reports_a_write_failure_instead_of_success` (`crates/z2m-rs/tests/persistence_errors.rs`): `Settings::write` returns `Result`, `/submit` answers 406 `{success:false, error}` like upstream |
 | 20 | handles configuring onboarding via ENV | `handles_configuring_and_disabling_onboarding_via_env` |
 | 21 | handles disabling onboarding server via ENV | `handles_configuring_and_disabling_onboarding_via_env` |
 | 22 | handles configuring onboarding with config ENV overrides | `handles_configuring_and_disabling_onboarding_via_env` |
@@ -54,11 +54,11 @@ they exercise the same handler branch; the table records which.
   `UnexpectedEof` when the stream ends before `Content-Length`, matching the
   express request-stream error upstream asserts.
 
-## Known deviation (case 19)
+## Case 19 (saving errors) — fixed
 
-`Settings::write` (`settings.ts:206-269` equivalent) discards `yaml`
-I/O errors, so `POST /submit` reports `success: true` when the data directory
-is not writable. Upstream throws and the handler answers `500`. Fixing this
-requires `write()` to return a `Result` and every mutator to propagate it
-(`device/rename`, `device/remove`, `options`, …). Tracked as a follow-up; the
-behavior is identical for writable data directories.
+`Settings::write` now returns `Result<bool, String>` and the mutators
+(`apply`, `changeFriendlyName`, `changeEntityOptions`, `addDevice`,
+`removeDevice`, `blockDevice`, `addGroup`, `removeGroup`, `setOnboarding`)
+propagate the I/O error like the upstream throw. `POST /submit` therefore
+answers `406 {success:false, error}` (upstream's status) and the bridge
+handlers turn the same error into `{status:"error"}`

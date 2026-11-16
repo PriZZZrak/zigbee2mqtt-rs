@@ -652,7 +652,7 @@ impl Controller {
 
         utils::sleep(0).await;
         logger_info(&self.logger, "Zigbee2MQTT started!");
-        self.settings.lock().unwrap().set_onboarding(false);
+        let _ = self.settings.lock().unwrap().set_onboarding(false);
         *self.abort.lock().unwrap() = None;
         Ok(())
     }

@@ -64,7 +64,7 @@ impl Group {
         if self.id() != DEFAULT_BIND_GROUP_ID as u64
             && settings.get_group(&self.id().to_string()).is_none()
         {
-            settings.add_group(&self.name(), Some(&self.id().to_string()));
+            let _ = settings.add_group(&self.name(), Some(&self.id().to_string()));
         }
     }
 

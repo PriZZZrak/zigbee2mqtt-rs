@@ -534,7 +534,7 @@ impl Bridge {
         };
         let group_id = {
             let mut settings = self.context.settings.lock().unwrap();
-            settings.add_group(&friendly_name, id.as_deref())
+            settings.add_group(&friendly_name, id.as_deref())?
         };
         self.context.zigbee.create_group(group_id);
         self.publish_groups().await;

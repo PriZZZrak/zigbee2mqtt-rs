@@ -340,19 +340,20 @@ impl Settings {
     }
 
     /// Upstream `setOnboarding(value)` (`settings.ts`).
-    pub fn set_onboarding(&mut self, value: bool) {
+    pub fn set_onboarding(&mut self, value: bool) -> Result<(), String> {
         let current = self.configuration.get("onboarding").and_then(Value::as_bool);
         if value {
             if current != Some(true) {
                 self.configuration["onboarding"] = Value::Bool(true);
-                self.write();
+                self.write()?;
             }
         } else if self.configuration.get("onboarding").is_some() {
             if let Value::Object(map) = &mut self.configuration {
                 map.remove("onboarding");
             }
-            self.write();
+            self.write()?;
         }
+        Ok(())
     }
 
     pub fn set(&mut self, path: &[&str], value: Value) {
@@ -396,13 +397,14 @@ impl Settings {
         }
     }
 
-    pub fn add_device(&mut self, id: &str) {
+    pub fn add_device(&mut self, id: &str) -> Result<(), String> {
         if self.get_device(id).is_some() || self.entities("devices").contains_key(id) {
             panic!("Device '{id}' already exists");
         }
         let devices = self.entities_mut("devices");
         devices.insert(id.to_string(), json!({"friendly_name": id}));
-        self.write();
+        self.write()?;
+        Ok(())
     }
 
     pub fn remove_device(&mut self, id: &str) -> Result<(), String> {
@@ -426,11 +428,11 @@ impl Settings {
         } else if let Some(Value::Object(entries)) = self.configuration.get_mut("devices") {
             entries.remove(&key);
         }
-        self.write();
+        self.write()?;
         Ok(())
     }
 
-    pub fn block_device(&mut self, id: &str) {
+    pub fn block_device(&mut self, id: &str) -> Result<(), String> {
         if !self
             .configuration
             .get("blocklist")
@@ -444,10 +446,11 @@ impl Settings {
                 items.push(value);
             }
         }
-        self.write();
+        self.write()?;
+        Ok(())
     }
 
-    pub fn add_group(&mut self, name: &str, id: Option<&str>) -> u64 {
+    pub fn add_group(&mut self, name: &str, id: Option<&str>) -> Result<u64, String> {
         let groups = self.entities("groups");
         let id = if let Some(id) = id.filter(|id| !id.is_empty()) {
             id.to_string()
@@ -468,8 +471,8 @@ impl Settings {
         }
         self.entities_mut("groups")
             .insert(id.clone(), json!({"friendly_name": name}));
-        self.write();
-        id.parse().unwrap_or(0)
+        self.write()?;
+        Ok(id.parse().unwrap_or(0))
     }
 
     pub fn remove_group(&mut self, id: &str) -> Result<(), String> {
@@ -493,7 +496,7 @@ impl Settings {
         } else if let Some(Value::Object(entries)) = self.configuration.get_mut("groups") {
             entries.remove(&key);
         }
-        self.write();
+        self.write()?;
         Ok(())
     }
 
@@ -539,7 +542,7 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
         }
         self.set_entity_friendly_name(&entity_type, &key, to);
         // Upstream `changeFriendlyName` persists the rename (settings.ts:702).
-        self.write();
+        self.write()?;
         Ok(())
     }
 
@@ -588,7 +591,7 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
                 *entry = map;
             }
         }
-        self.write();
+        self.write()?;
         Ok(())
     }
 
@@ -620,7 +623,7 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
         }
 
         self.configuration = new_settings;
-        self.write();
+        self.write()?;
 
         // Upstream compiles `ajvRestartRequired` against the *override*
         // document (`settings.ts:505-507`), not against the merged settings.
@@ -628,11 +631,11 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
     }
 
     /// Upstream `testing.write` (`settings.ts:713`).
-    pub fn testing_write(&mut self) -> bool {
+    pub fn testing_write(&mut self) -> Result<bool, String> {
         self.write()
     }
 
-    pub fn write(&mut self) -> bool {
+    pub fn write(&mut self) -> Result<bool, String> {
         let before = self.configuration.clone();
         let mut applied = self.configuration.clone();
 
@@ -658,17 +661,16 @@ pub fn validate_friendly_name(name: &str) -> Vec<String> {
                 if name == CONFIGURATION_FILE || name == SECRET_FILE {
                     continue;
                 }
-                let _ = crate::util::yaml::write_if_changed(dir.join(name), value);
+                crate::util::yaml::write_if_changed(dir.join(name), value)
+                    .map_err(|error| error.to_string())?;
             }
-            let _ = crate::util::yaml::write_if_changed(
-                dir.join(CONFIGURATION_FILE),
-                &self.configuration,
-            );
+            crate::util::yaml::write_if_changed(dir.join(CONFIGURATION_FILE), &self.configuration)
+                .map_err(|error| error.to_string())?;
         }
 
         self.files
             .insert(CONFIGURATION_FILE.to_string(), self.configuration.clone());
-        changed
+        Ok(changed)
     }
 
     fn find_entity(&self, id: &str) -> Option<(String, String)> {

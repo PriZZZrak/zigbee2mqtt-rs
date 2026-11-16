@@ -186,7 +186,7 @@ impl Device {
         if self.zh.r#type() != DeviceType::Coordinator
             && settings.get_device(&self.ieee_addr()).is_none()
         {
-            settings.add_device(&self.ieee_addr());
+            let _ = settings.add_device(&self.ieee_addr());
         }
     }
 
