@@ -73,6 +73,12 @@ pub struct Zigbee {
     device_lookup: Mutex<std::collections::HashMap<String, Arc<Device>>>,
     coordinator_ieee_addr: Mutex<Option<String>>,
     converters: Arc<Mutex<DefinitionRegistry>>,
+    /// Test hook: replaces the coordinator startup (audit CP-05 abort matrix).
+    #[doc(hidden)]
+    pub test_start: Mutex<Option<(Result<bool, String>, u64)>>,
+    /// Test hook: number of times `stop()` ran.
+    #[doc(hidden)]
+    pub test_stop_count: std::sync::atomic::AtomicUsize,
 }
 
 impl Zigbee {
@@ -133,6 +139,8 @@ impl Zigbee {
             device_lookup: Mutex::new(std::collections::HashMap::new()),
             coordinator_ieee_addr,
             converters,
+            test_start: Mutex::new(None),
+            test_stop_count: std::sync::atomic::AtomicUsize::new(0),
         });
         let _ = zigbee.self_ref.set(Arc::downgrade(&zigbee));
         zigbee
@@ -172,6 +180,12 @@ impl Zigbee {
 
     /// Upstream `start(abortSignal)` (`zigbee.ts:31`).
     pub async fn start(self: &Arc<Self>, abort: &AbortSignal) -> Result<bool, String> {
+        if let Some((result, delay_ms)) = self.test_start.lock().unwrap().clone() {
+            if delay_ms > 0 {
+                crate::util::utils::sleep(delay_ms).await;
+            }
+            return result;
+        }
         self.logger.lock().unwrap().info(
             &format!("Starting zigbee-herdsman ({})", zigbee_apiarist::VERSION),
             "z2m",
@@ -767,6 +781,8 @@ impl Zigbee {
 
     /// Upstream `stop()` (`zigbee.ts:256`).
     pub async fn stop(&self) -> Result<(), String> {
+        self.test_stop_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.logger
             .lock()
             .unwrap()

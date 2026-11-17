@@ -65,6 +65,12 @@ impl Controller {
     }
 
     /// Upstream `addExtension` (`controller.ts`): a duplicate name is an error.
+    /// Test/diagnostics hook: number of registered (started) extensions.
+    #[doc(hidden)]
+    pub fn extensions_len(&self) -> usize {
+        self.extensions.lock().unwrap().len()
+    }
+
     pub fn add_extension(&self, extension: Arc<dyn Extension>) -> Result<(), String> {
         let mut extensions = self.extensions.lock().unwrap();
         if extensions

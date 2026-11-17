@@ -99,7 +99,24 @@ impl EventBus {
     fn emit(&mut self, event: Event, data: Value) {
         if let Some(listeners) = self.listeners.get(&event) {
             for registration in listeners {
-                (registration.callback)(data.clone());
+                // Upstream wraps every handler in try/catch (sync) or .catch
+                // (async) and logs the failure; one listener must not abort the
+                // others or the caller. Rust handlers are sync closures, so a
+                // panic is caught here instead of unwinding into the emitter.
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    (registration.callback)(data.clone())
+                }));
+                if let Err(payload) = result {
+                    let message = payload
+                        .downcast_ref::<&str>()
+                        .map(|value| value.to_string())
+                        .or_else(|| payload.downcast_ref::<String>().cloned())
+                        .unwrap_or_else(|| "unknown panic".to_string());
+                    zigbee_apiarist::utils::logger::logger().error(
+                        &format!("EventBus handler for {event:?} failed: {message}"),
+                        "z2m:eventBus",
+                    );
+                }
             }
         }
     }

@@ -281,6 +281,21 @@ impl Mqtt {
 
         self.client = Some(client);
         self.task = Some(task);
+
+        // Upstream `mqtt.connect()` rejects when the first connection cannot be
+        // established; rumqttc retries in the background, so wait for the
+        // CONNACK with a bounded timeout instead of reporting success early.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !self.is_connected() && std::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        if !self.is_connected() {
+            if let Some(task) = self.task.take() {
+                task.abort();
+            }
+            self.client = None;
+            return Err(format!("Connection to '{server}' timed out after 5000ms"));
+        }
         Ok(())
     }
 
