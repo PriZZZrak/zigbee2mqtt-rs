@@ -1038,3 +1038,23 @@ async fn backoff_can_be_disabled() {
     );
     availability.stop().await.unwrap();
 }
+
+/// Case 6: the passive default timeout is 25 hours.
+#[tokio::test(start_paused = true)]
+async fn default_passive_timeout_is_25_hours() {
+    let _guard = serial();
+    let harness = harness(true, json!(null));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+
+    assert_eq!(
+        availability.test_ping_delay(IEEE),
+        Some(25 * 60 * 60 * 1_000 + 1_000),
+        "default passive timeout (1500 minutes) plus 1 s"
+    );
+    availability.stop().await.unwrap();
+}

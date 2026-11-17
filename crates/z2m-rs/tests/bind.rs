@@ -253,3 +253,54 @@ async fn binds_clear_validates_payload_and_target() {
     let payload = response(&harness, "binds/clear").await;
     assert_eq!(payload["error"], "Invalid target");
 }
+
+/// Cases 21-24: bind rejects missing source/target entities and endpoints.
+#[tokio::test]
+async fn bind_reports_missing_source_and_target() {
+    let _guard = serial();
+    let harness = harness();
+    let bind = Bind::new(harness.context.clone());
+    bind.clone().start().await.unwrap();
+
+    send(&harness, "bind", json!({"from": "missing", "to": "lamp"})).await;
+    let payload = response(&harness, "bind").await;
+    assert_eq!(
+        payload["error"], "Source device 'missing' does not exist",
+        "{payload}"
+    );
+
+    harness.mqtt.lock().await.attempted.clear();
+    send(
+        &harness,
+        "bind",
+        json!({"from": "lamp", "from_endpoint": "9", "to": "lamp"}),
+    )
+    .await;
+    let payload = response(&harness, "bind").await;
+    assert_eq!(
+        payload["error"], "Source device 'lamp' does not have endpoint '9'",
+        "{payload}"
+    );
+
+    harness.mqtt.lock().await.attempted.clear();
+    send(&harness, "bind", json!({"from": "lamp", "to": "missing"})).await;
+    let payload = response(&harness, "bind").await;
+    assert_eq!(
+        payload["error"], "Target device or group 'missing' does not exist",
+        "{payload}"
+    );
+
+    harness.mqtt.lock().await.attempted.clear();
+    send(
+        &harness,
+        "bind",
+        json!({"from": "lamp", "to": "lamp", "to_endpoint": "9"}),
+    )
+    .await;
+    let payload = response(&harness, "bind").await;
+    assert_eq!(
+        payload["error"], "Target device 'lamp' does not have endpoint '9'",
+        "{payload}"
+    );
+    bind.stop().await.unwrap();
+}

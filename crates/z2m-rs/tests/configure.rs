@@ -454,11 +454,7 @@ async fn does_not_configure_disabled_devices() {
 const END_DEVICE: &str = "0x0017880104e45511";
 
 /// Definition whose `configure` records the device IEEE and can fail.
-fn recording_registration(
-    calls: Arc<Mutex<Vec<String>>>,
-    version: &str,
-    fail: bool,
-) -> Definition {
+fn recording_registration(calls: Arc<Mutex<Vec<String>>>, version: &str, fail: bool) -> Definition {
     let mut definition = Definition::new("TEST", "Acme", "Test").with_zigbee_model("TEST");
     definition.version = version.to_string();
     definition.configure = Some(Arc::new(move |device, _coordinator, _definition| {
@@ -517,7 +513,11 @@ async fn configures_routers_but_not_end_devices_on_startup() {
         .lock()
         .unwrap()
         .register(recording_registration(calls.clone(), "1.2.3", false));
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     harness
         .zigbee
         .resolve_device(END_DEVICE)
@@ -533,8 +533,14 @@ async fn configures_routers_but_not_end_devices_on_startup() {
     }
 
     let calls = calls.lock().unwrap().clone();
-    assert!(calls.contains(&IEEE.to_string()), "router was not configured: {calls:?}");
-    assert!(!calls.contains(&END_DEVICE.to_string()), "end device was configured: {calls:?}");
+    assert!(
+        calls.contains(&IEEE.to_string()),
+        "router was not configured: {calls:?}"
+    );
+    assert!(
+        !calls.contains(&END_DEVICE.to_string()),
+        "end device was configured: {calls:?}"
+    );
     configure.stop().await.unwrap();
 }
 
@@ -550,7 +556,11 @@ async fn reconfigures_when_the_device_rejoins() {
         .lock()
         .unwrap()
         .register(recording_registration(calls.clone(), "1.2.3", false));
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     let configure = Configure::new(harness.context.clone());
     configure.clone().start().await.unwrap();
 
@@ -580,7 +590,11 @@ async fn reconfigures_on_reconfigure_event() {
         .lock()
         .unwrap()
         .register(recording_registration(calls.clone(), "1.2.3", false));
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     let configure = Configure::new(harness.context.clone());
     configure.clone().start().await.unwrap();
 
@@ -593,7 +607,11 @@ async fn reconfigures_on_reconfigure_event() {
         .unwrap()
         .emit_reconfigure(json!({"device": {"ieeeAddr": IEEE}}));
     tokio::time::sleep(Duration::from_millis(120)).await;
-    assert_eq!(calls.lock().unwrap().len(), 2, "reconfigure event must re-run");
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        2,
+        "reconfigure event must re-run"
+    );
     configure.stop().await.unwrap();
 }
 
@@ -609,7 +627,11 @@ async fn does_not_configure_twice_when_already_configured() {
         .lock()
         .unwrap()
         .register(recording_registration(calls.clone(), "1.2.3", false));
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     let configure = Configure::new(harness.context.clone());
     configure.clone().start().await.unwrap();
 
@@ -618,7 +640,11 @@ async fn does_not_configure_twice_when_already_configured() {
     emit_interview(&harness);
     tokio::time::sleep(Duration::from_millis(120)).await;
 
-    assert_eq!(calls.lock().unwrap().len(), 1, "second configure must be skipped");
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        1,
+        "second configure must be skipped"
+    );
     configure.stop().await.unwrap();
 }
 
@@ -634,17 +660,29 @@ async fn configures_on_zigbee_message_when_not_configured_yet() {
         .lock()
         .unwrap()
         .register(recording_registration(calls.clone(), "1.2.3", false));
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     let configure = Configure::new(harness.context.clone());
     configure.clone().start().await.unwrap();
 
     emit_last_seen(&harness, IEEE);
     tokio::time::sleep(Duration::from_millis(80)).await;
-    assert_eq!(calls.lock().unwrap().len(), 1, "message must configure once");
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        1,
+        "message must configure once"
+    );
 
     emit_last_seen(&harness, IEEE);
     tokio::time::sleep(Duration::from_millis(120)).await;
-    assert_eq!(calls.lock().unwrap().len(), 1, "configured device stays configured");
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        1,
+        "configured device stays configured"
+    );
     configure.stop().await.unwrap();
 }
 
@@ -660,7 +698,11 @@ async fn reconfigures_when_the_definition_version_changes() {
         .lock()
         .unwrap()
         .register(recording_registration(calls.clone(), "1.2.3", false));
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     let configure = Configure::new(harness.context.clone());
     configure.clone().start().await.unwrap();
 
@@ -674,7 +716,11 @@ async fn reconfigures_when_the_definition_version_changes() {
     emit_interview(&harness);
     tokio::time::sleep(Duration::from_millis(120)).await;
 
-    assert_eq!(calls.lock().unwrap().len(), 2, "new version must re-configure");
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        2,
+        "new version must re-configure"
+    );
     assert_eq!(zh.meta.lock().unwrap()["configured"], json!("1.2.3"));
     configure.stop().await.unwrap();
 }
@@ -689,8 +735,16 @@ async fn mqtt_request_reports_configure_failure() {
         .converters()
         .lock()
         .unwrap()
-        .register(recording_registration(Arc::new(Mutex::new(Vec::new())), "1.2.3", true));
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+        .register(recording_registration(
+            Arc::new(Mutex::new(Vec::new())),
+            "1.2.3",
+            true,
+        ));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     let configure = Configure::new(harness.context.clone());
     configure.clone().start().await.unwrap();
 
@@ -786,7 +840,11 @@ async fn force_configures_after_failed_attempts() {
         .lock()
         .unwrap()
         .register(definition);
-    harness.zigbee.resolve_device(IEEE).unwrap().resolve_definition(false);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
     let configure = Configure::new(harness.context.clone());
     configure.clone().start().await.unwrap();
 
@@ -794,7 +852,11 @@ async fn force_configures_after_failed_attempts() {
         emit_interview(&harness);
         tokio::time::sleep(Duration::from_millis(60)).await;
     }
-    assert_eq!(calls.lock().unwrap().len(), 3, "automatic attempts stop at 3");
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        3,
+        "automatic attempts stop at 3"
+    );
 
     failing.store(false, std::sync::atomic::Ordering::SeqCst);
     harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
@@ -803,6 +865,28 @@ async fn force_configures_after_failed_attempts() {
     }));
     let response = wait_for_publish(&harness.mqtt).await;
     assert_eq!(response["status"], "ok", "{response}");
-    assert_eq!(calls.lock().unwrap().len(), 4, "force must run a fourth attempt");
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        4,
+        "force must run a fourth attempt"
+    );
+    configure.stop().await.unwrap();
+}
+
+/// Case 14: a configure request without an id is an invalid payload.
+#[tokio::test]
+async fn mqtt_request_invalid_payload_returns_error() {
+    let _guard = serial();
+    let harness = harness();
+    let configure = Configure::new(harness.context.clone());
+    configure.clone().start().await.unwrap();
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": "zigbee2mqtt/bridge/request/device/configure",
+        "message": format!(r#"{{"idx":"{IEEE}"}}"#),
+    }));
+    let response = wait_for_publish(&harness.mqtt).await;
+    assert_eq!(response["status"], "error");
+    assert_eq!(response["error"], "Invalid payload");
     configure.stop().await.unwrap();
 }

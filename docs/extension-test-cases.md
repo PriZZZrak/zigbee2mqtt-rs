@@ -28,10 +28,10 @@ Coverage classes:
 
 | Upstream file | Cases | asserted | slice | code | converter-db | adapter | static | omitted | Rust tests |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| availability.test.ts | 31 | 29 | 1 | 0 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
-| bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 75 | 2 | 0 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
-| configure.test.ts | 19 | 18 | 1 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
+| availability.test.ts | 31 | 30 | 0 | 0 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
+| bind.test.ts | 31 | 10 | 0 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
+| bridge.test.ts | 110 | 77 | 0 | 0 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| configure.test.ts | 19 | 19 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
@@ -39,7 +39,7 @@ Coverage classes:
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 87 | 5 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
-| onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
+| onEvent.test.ts | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 27 | 5 | 1 | 77 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
 | receive.test.ts | 34 | 25 | 0 | 0 | 9 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
@@ -53,7 +53,7 @@ Coverage classes:
 | 3 | Should not ping on startup for available or disabled devices | `asserted` | `startup_does_not_ping_passive_devices`, `startup_does_not_ping_available_devices` |
 | 4 | Should publish offline for active device when not seen for 10 minutes | `asserted` | passive_device_publishes_offline_after_timeout_and_online_on_last_seen (paused clock) |
 | 5 | Shouldnt do anything for a device when availability: false is set for device | `asserted` | availability_disabled_via_device_option |
-| 6 | Should publish offline for passive device when not seen for 25 hours | `slice` | passive timeout path; the 25h default differs only by the timeout value |
+| 6 | Should publish offline for passive device when not seen for 25 hours | `asserted` | `default_passive_timeout_is_25_hours` (paused clock, 1500 min + 1 s) |
 | 7 | Should reset ping timer when device last seen changes for active device | `asserted` | `last_seen_resets_the_active_ping_timer` |
 | 8 | Should ping again when first ping fails | `asserted` | `ping_retries_once_for_available_devices` |
 | 9 | Should reset ping timer when device last seen changes for passive device | `asserted` | `global_passive_timeout_controls_the_timer` (last-seen reschedules the passive timer) |
@@ -104,10 +104,10 @@ Coverage classes:
 | 18 | Should bind server clusters to client clusters | `adapter` | bind/reporting goes through a live coordinator |
 | 19 | Should bind to default endpoint returned by endpoints() | `adapter` | bind/reporting goes through a live coordinator |
 | 20 | Should unbind from default_bind_group | `adapter` | bind/reporting goes through a live coordinator |
-| 21 | Error bind fails when source device does not exist | `slice` | binds_clear_validates_payload_and_target (target errors) |
-| 22 | Error bind fails when source device's endpoint does not exist | `slice` | binds_clear_validates_payload_and_target (target errors) |
-| 23 | Error bind fails when target device or group does not exist | `slice` | binds_clear_validates_payload_and_target (target errors) |
-| 24 | Error bind fails when target device's endpoint does not exist | `slice` | binds_clear_validates_payload_and_target (target errors) |
+| 21 | Error bind fails when source device does not exist | `asserted` | `bind_reports_missing_source_and_target` |
+| 22 | Error bind fails when source device's endpoint does not exist | `asserted` | `bind_reports_missing_source_and_target` |
+| 23 | Error bind fails when target device or group does not exist | `asserted` | `bind_reports_missing_source_and_target` |
+| 24 | Error bind fails when target device's endpoint does not exist | `asserted` | `bind_reports_missing_source_and_target` |
 | 25 | Should poll bounded Hue bulb when receiving message from Hue dimmer | `adapter` | bind/reporting goes through a live coordinator |
 | 26 | Should poll bounded Hue bulb when receiving message from scene controller | `adapter` | bind/reporting goes through a live coordinator |
 | 27 | Should poll grouped Hue bulb when receiving message from TRADFRI remote | `adapter` | bind/reporting goes through a live coordinator |
@@ -148,7 +148,7 @@ Coverage classes:
 | 26 | Coverage satisfaction | `asserted` | `unknown_request_is_ignored` |
 | 27 | Should allow a healthcheck | `asserted` | health_check_and_invalid_options |
 | 28 | Should allow a coordinator check | `adapter` | coordinator check needs a live adapter |
-| 29 | Should allow to remove device by string | `slice` | device removal by string id |
+| 29 | Should allow to remove device by string | `asserted` | `remove_device_by_string_id` |
 | 30 | Should allow to remove device by object ID | `asserted` | force_remove_device_blocks_and_keeps_configuration |
 | 31 | Should allow to force remove device | `asserted` | force_remove_device_without_adapter |
 | 32 | Should allow to block device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
@@ -222,7 +222,7 @@ Coverage classes:
 | 100 | Change options with null | `asserted` | options_apply_arrays_null_and_report_restart_required |
 | 101 | Change options invalid payload | `asserted` | `options_reject_an_invalid_payload` |
 | 102 | Change options not valid against schema | `asserted` | options_apply_arrays_null_and_report_restart_required |
-| 103 | Change options consecutively, check restart required | `slice` | consecutive options requests in the same test |
+| 103 | Change options consecutively, check restart required | `asserted` | `consecutive_options_keep_restart_required` |
 | 104 | Icon link handling | `asserted` | `icon_link_handling` |
 | 105 | Should publish bridge info, devices and definitions when a device with custom_clusters joined | `asserted` | definitions_include_custom_clusters |
 | 106 | Should publish bridge info, devices and definitions when a device with custom_clusters is reconfigured | `asserted` | definitions_include_custom_clusters |
@@ -248,7 +248,7 @@ Coverage classes:
 | 11 | Fail to configure via MQTT when device does not exist | `asserted` | unknown device response |
 | 12 | Fail to configure via MQTT when configure fails | `asserted` | `mqtt_request_reports_configure_failure` |
 | 13 | Fail to configure via MQTT when device has no configure | `asserted` | non-configurable device response |
-| 14 | Handles invalid payload for configure via MQTT | `slice` | invalid payload response |
+| 14 | Handles invalid payload for configure via MQTT | `asserted` | `mqtt_request_invalid_payload_returns_error` |
 | 15 | Should not configure when interview not completed | `asserted` | `does_not_configure_when_interview_is_not_completed` |
 | 16 | Should not configure when already configuring | `asserted` | `does_not_configure_twice_concurrently` (in-flight guard) |
 | 17 | Should configure max 3 times when fails | `asserted` | `stops_after_three_failed_attempts` |
@@ -504,8 +504,8 @@ Coverage classes:
 | # | Upstream case | Class | Evidence / reason |
 |---:|---|---|---|
 | 1 | starts & stops | `asserted` | start and stop |
-| 2 | calls on device events | `slice` | device event dispatch |
-| 3 | does not block startup on failure | `slice` | startup is not blocked by a failing handler |
+| 2 | calls on device events | `asserted` | `dispatches_definition_on_event_and_stops` (start first, then join/announce) |
+| 3 | does not block startup on failure | `asserted` | `hanging_on_event_handler_does_not_block_start` |
 
 ## otaUpdate.test.ts
 

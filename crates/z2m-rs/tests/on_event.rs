@@ -142,17 +142,145 @@ async fn dispatches_definition_on_event_and_stops() {
     extension.clone().start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    assert!(events.lock().unwrap().contains(&"start".to_string()));
+    {
+        let events = events.lock().unwrap();
+        assert_eq!(events.first().map(String::as_str), Some("start"));
+    }
 
     event_bus
         .lock()
         .unwrap()
         .emit_device_joined(json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}}));
+    event_bus
+        .lock()
+        .unwrap()
+        .emit_device_announce(json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}}));
     tokio::time::sleep(Duration::from_millis(100)).await;
-    assert!(events.lock().unwrap().contains(&"deviceJoined".to_string()));
+    {
+        let seen = events.lock().unwrap();
+        assert!(seen.contains(&"deviceJoined".to_string()), "{seen:?}");
+        assert!(seen.contains(&"deviceAnnounce".to_string()), "{seen:?}");
+    }
 
     extension.clone().stop().await.unwrap();
     assert!(events.lock().unwrap().contains(&"stop".to_string()));
+
+    let _ = std::fs::remove_file(&database_path);
+    let _ = std::fs::remove_file(&state_path);
+}
+
+/// A hanging on_event handler must not block start.
+#[tokio::test]
+async fn hanging_on_event_handler_does_not_block_start() {
+    let _guard = serial();
+    let database_path = std::env::temp_dir().join(format!(
+        "z2m-onevent-hang-db-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    inject_database(Arc::new(Mutex::new(Database::open(&database_path))));
+    ZhDevice::reset_cache();
+    ZhGroup::reset_cache();
+    ZhDevice::create(
+        DeviceType::Coordinator,
+        "0x00124b0024c16b95",
+        0,
+        None,
+        None,
+        None,
+        None,
+        InterviewState::Successful,
+        None,
+    )
+    .unwrap();
+    let device = ZhDevice::create(
+        DeviceType::Router,
+        IEEE,
+        1234,
+        None,
+        Some("Test".to_string()),
+        None,
+        Some("TEST".to_string()),
+        InterviewState::Successful,
+        None,
+    )
+    .unwrap();
+    device.create_endpoint(1).unwrap();
+    let controller = Arc::new(
+        Controller::new(ControllerOptions {
+            network: NetworkOptions {
+                pan_id: 0x1a62,
+                extended_pan_id: vec![0xdd; 8],
+                channel_list: vec![11],
+                network_key: vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13],
+                network_key_distribute: true,
+                has_default_extended_pan_id: false,
+            },
+            transport: json!({}),
+            database_path: database_path.display().to_string(),
+            database_backup_path: None,
+            backup_path: None,
+            adapter: json!({}),
+            accept_joining_device_handler: None,
+        })
+        .unwrap(),
+    );
+    let settings = Arc::new(Mutex::new(Settings::from_config(
+        json!({"mqtt": {"server": "localhost"}, "devices": {IEEE: {"friendly_name": "lamp"}}}),
+    )));
+    let event_bus = Arc::new(Mutex::new(EventBus::new()));
+    let logger = Arc::new(Mutex::new(Logger::new()));
+    let zigbee = Zigbee::with_controller(
+        controller,
+        event_bus.clone(),
+        settings.clone(),
+        logger.clone(),
+    );
+    let _ = zigbee.resolve_device(IEEE);
+    let state_path = std::env::temp_dir().join(format!(
+        "z2m-onevent-hang-state-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let state = Arc::new(Mutex::new(State::with_file(
+        settings.clone(),
+        event_bus.clone(),
+        logger.clone(),
+        state_path.clone(),
+    )));
+    let context = z2m_rs::extension::extension::ExtensionContext {
+        zigbee: zigbee.clone(),
+        mqtt: Arc::new(tokio::sync::Mutex::new(Mqtt::new(event_bus.clone()))),
+        state,
+        publish_entity_state: Arc::new(|_entity, _payload, _reason| Box::pin(async {})),
+        event_bus: event_bus.clone(),
+        logger,
+        settings,
+        enable_disable_extension: Arc::new(|_, _| Box::pin(async { Ok(()) })),
+        restart: Arc::new(|| Box::pin(async {})),
+        add_extension: Arc::new(|_| Box::pin(async {})),
+        key: 8,
+    };
+    let mut definition = Definition::new("TEST", "Acme", "Test").with_zigbee_model("TEST");
+    definition.on_event.push(Arc::new(|_event: OnEventEvent| {
+        Box::pin(async move {
+            std::future::pending::<()>().await;
+            Ok(())
+        })
+    }));
+    zigbee.converters().lock().unwrap().register(definition);
+
+    let extension = OnEvent::new(context);
+    tokio::time::timeout(Duration::from_millis(500), extension.clone().start())
+        .await
+        .expect("start must not wait for the hanging handler")
+        .unwrap();
 
     let _ = std::fs::remove_file(&database_path);
     let _ = std::fs::remove_file(&state_path);

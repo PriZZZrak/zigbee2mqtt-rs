@@ -1628,3 +1628,77 @@ async fn icon_link_handling() {
     let payload = bridge.get_definition_payload(&device);
     assert_eq!(payload["icon"], "_lumi.plug_TEST_");
 }
+
+/// Case 29: removing a device by a plain string id.
+#[tokio::test]
+async fn remove_device_by_string_id() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_adapter();
+    *adapter.zdo_response.lock().unwrap() = json!([0]);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "device/remove", Value::String("lamp".to_string())).await;
+    let payload = response(&harness, "device/remove").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["id"], "lamp");
+    assert!(harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_device(IEEE)
+        .is_none());
+    bridge.stop().await.unwrap();
+}
+
+/// Case 103: consecutive option changes keep the restart requirement.
+#[tokio::test]
+async fn consecutive_options_keep_restart_required() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "options",
+        json!({"options": {"health": {"reset_on_check": true}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["data"]["restart_required"], false, "{payload}");
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["health"]["reset_on_check"],
+        true
+    );
+
+    harness.mqtt.lock().await.attempted.clear();
+    send(
+        &harness,
+        "options",
+        json!({"options": {"health": {"interval": 11}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(payload["data"]["restart_required"], true, "{payload}");
+
+    harness.mqtt.lock().await.attempted.clear();
+    send(
+        &harness,
+        "options",
+        json!({"options": {"health": {"reset_on_check": false}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+    assert_eq!(
+        payload["data"]["restart_required"], true,
+        "an earlier change still requires a restart: {payload}"
+    );
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["health"]["reset_on_check"],
+        false
+    );
+    bridge.stop().await.unwrap();
+}
