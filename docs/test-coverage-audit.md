@@ -348,11 +348,19 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 - [ ] Для всех **114 `code`** строк добавить assertions upstream-поведения.
 - [ ] Для всех **68 `slice`** строк перечислить непроверенные ожидания и закрыть их.
 - [ ] В первую очередь проверить Groups, Configure, Availability, Bridge и HA.
-- [ ] Availability: timers, jitter/backoff, pause/reset, queue drain/stop,
-  per-device overrides и группы.
-- [ ] Configure: версии, число попыток, force, in-flight guard и event triggers.
+- [x] Availability: timers, jitter/backoff, pause/reset, queue drain/stop,
+  per-device overrides и группы. → `availability.test.ts` 29 asserted / 1 adapter
+  (retrieve-on-reconnect, CP-07) / 1 slice; tests `startup_pings_*`,
+  `last_seen_resets_*`, `ping_retries_once_for_available_devices`,
+  `ping_queue_drains_in_one_run`, `stop_clears_the_ping_queue`,
+  `pings_are_jittered`, `ping_*backoff*`, `publishes_availability_for_groups`,
+  `global_passive_timeout_controls_the_timer` with the recording adapter and a
+  paused clock.
+- [x] Configure: версии, число попыток, force, in-flight guard и event triggers. →
+  `configure.test.ts` 18 asserted / 1 slice / 0 code (`tests/configure.rs`, 17 tests).
 - [ ] Groups/Bridge: изменения membership, fan-out/dedupe, validation,
-  транзакции, ответы, сохранение и ошибки.
+  транзакции, ответы, сохранение и ошибки. → Groups закрыт по membership
+  (23-34, 37: 21 asserted / 18 code / 1 slice); Bridge остаётся (17 code).
 - [ ] HA в пределах scope: точные discovery payloads, unique IDs, availability,
   retained cleanup на rename/remove и повторная публикация.
 - [ ] Проверить применимость **81 `converter-db`** и **91 `omitted`** строк:

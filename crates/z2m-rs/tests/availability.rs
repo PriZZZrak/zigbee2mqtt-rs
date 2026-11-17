@@ -2,6 +2,10 @@
 // Upstream revision: zigbee2mqtt 2.14.3 (3c841fdf).
 
 use std::sync::{Arc, Mutex};
+
+#[path = "support/mock_adapter.rs"]
+mod mock_adapter;
+use mock_adapter::MockAdapter;
 use std::time::Duration;
 
 use serde_json::json;
@@ -26,6 +30,7 @@ use z2m_rs::zigbee::Zigbee;
 const IEEE: &str = "0x0017880104e45519";
 
 struct Harness {
+    adapter: Arc<MockAdapter>,
     context: ExtensionContext,
     mqtt: Arc<tokio::sync::Mutex<Mqtt>>,
     event_bus: Arc<Mutex<EventBus>>,
@@ -41,8 +46,36 @@ fn temp(name: &str) -> std::path::PathBuf {
 }
 
 fn harness(availability_enabled: bool, device_availability: serde_json::Value) -> Harness {
+    harness_with(
+        availability_enabled,
+        device_availability,
+        DeviceType::EndDevice,
+        "Battery",
+        1234,
+    )
+}
+
+fn ping_harness(device_availability: serde_json::Value) -> Harness {
+    harness_with(
+        true,
+        device_availability,
+        DeviceType::Router,
+        "Mains (single phase)",
+        1234,
+    )
+}
+
+fn harness_with(
+    availability_enabled: bool,
+    device_availability: serde_json::Value,
+    r#type: DeviceType,
+    power_source: &str,
+    network_address: u16,
+) -> Harness {
     let database_path = temp("db");
     inject_database(Arc::new(Mutex::new(Database::open(&database_path))));
+    let adapter = MockAdapter::new();
+    zigbee_apiarist::controller::model::entity::Entity::inject_adapter(adapter.clone());
     ZhDevice::reset_cache();
     ZhGroup::reset_cache();
     ZhDevice::create(
@@ -57,18 +90,19 @@ fn harness(availability_enabled: bool, device_availability: serde_json::Value) -
         None,
     )
     .unwrap();
-    ZhDevice::create(
-        DeviceType::EndDevice,
+    let device = ZhDevice::create(
+        r#type,
         IEEE,
-        1234,
+        network_address,
         None,
         Some("Test".to_string()),
-        Some("Battery".to_string()),
+        Some(power_source.to_string()),
         Some("TEST".to_string()),
         InterviewState::Successful,
         None,
     )
     .unwrap();
+    device.create_endpoint(1).unwrap();
 
     let controller = Arc::new(
         Controller::new(ControllerOptions {
@@ -115,6 +149,7 @@ fn harness(availability_enabled: bool, device_availability: serde_json::Value) -
     let publish: PublishEntityState = Arc::new(|_e, _p, _r| Box::pin(async {}));
 
     Harness {
+        adapter,
         context: ExtensionContext {
             zigbee: zigbee.clone(),
             mqtt: mqtt.clone(),
@@ -134,6 +169,25 @@ fn harness(availability_enabled: bool, device_availability: serde_json::Value) -
         database_path,
         state_path,
     }
+}
+
+fn add_router(harness: &Harness, ieee: &str, name: &str, network_address: u16) {
+    harness.context.settings.lock().unwrap().configuration["devices"][ieee] =
+        serde_json::json!({"friendly_name": name});
+    let device = ZhDevice::create(
+        DeviceType::Router,
+        ieee,
+        network_address,
+        None,
+        Some("Test".to_string()),
+        Some("Mains (single phase)".to_string()),
+        Some("TEST".to_string()),
+        InterviewState::Successful,
+        None,
+    )
+    .unwrap();
+    device.create_endpoint(1).unwrap();
+    let _ = harness.zigbee.resolve_device(ieee);
 }
 
 impl Drop for Harness {
@@ -346,11 +400,9 @@ async fn device_timeout_option_controls_the_timer() {
         tokio::task::yield_now().await;
     }
     let mqtt = harness.mqtt.lock().await;
-    assert!(mqtt
-        .attempted
-        .iter()
-        .any(|(topic, payload, _)| topic == "zigbee2mqtt/lamp/availability"
-            && payload == r#"{"state":"offline"}"#));
+    assert!(mqtt.attempted.iter().any(|(topic, payload, _)| topic
+        == "zigbee2mqtt/lamp/availability"
+        && payload == r#"{"state":"offline"}"#));
     drop(mqtt);
 
     availability.stop().await.unwrap();
@@ -415,9 +467,10 @@ async fn availability_can_be_enabled_for_a_single_device() {
 
     let mqtt = harness.mqtt.lock().await;
     assert!(
-        mqtt.attempted.iter().any(|(topic, payload, _)| topic
-            == "zigbee2mqtt/lamp/availability"
-            && payload == r#"{"state":"offline"}"#),
+        mqtt.attempted.iter().any(
+            |(topic, payload, _)| topic == "zigbee2mqtt/lamp/availability"
+                && payload == r#"{"state":"offline"}"#
+        ),
         "per-device override did not publish: {:?}",
         mqtt.attempted
             .iter()
@@ -428,3 +481,560 @@ async fn availability_can_be_enabled_for_a_single_device() {
     availability.stop().await.unwrap();
 }
 
+const IEEE_B: &str = "0x0017880104e45521";
+const IEEE_C: &str = "0x0017880104e45522";
+
+fn read_count(harness: &Harness) -> usize {
+    harness
+        .adapter
+        .endpoint_frames
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|frame| frame.command.name == "read")
+        .count()
+}
+
+fn mark_seen(harness: &Harness, ieee: &str) {
+    harness
+        .zigbee
+        .resolve_device(ieee)
+        .unwrap()
+        .zh
+        .set_last_seen(Some(zigbee_apiarist::utils::datetime::now_ms()));
+}
+
+fn emit_last_seen(harness: &Harness, ieee: &str, name: &str) {
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_last_seen_changed(json!({
+            "device": {"ieeeAddr": ieee, "name": name},
+            "reason": "messageEmitted",
+        }));
+}
+
+async fn settle() {
+    for _ in 0..40 {
+        tokio::task::yield_now().await;
+    }
+}
+
+/// Case 2: an enabled and unavailable active device is pinged on startup.
+#[tokio::test]
+async fn startup_pings_unavailable_active_device() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"max_jitter": 0}));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    assert!(
+        read_count(&harness) >= 1,
+        "the startup ping must read genBasic"
+    );
+    availability.stop().await.unwrap();
+}
+
+/// Case 3a: passive (battery) devices are not pinged on startup.
+#[tokio::test]
+async fn startup_does_not_ping_passive_devices() {
+    let _guard = serial();
+    let harness = harness(true, json!({"max_jitter": 0}));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    assert_eq!(read_count(&harness), 0, "passive devices are not pinged");
+    availability.stop().await.unwrap();
+}
+
+/// Case 3b: an available active device is not pinged on startup.
+#[tokio::test]
+async fn startup_does_not_ping_available_devices() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    assert_eq!(read_count(&harness), 0, "available devices are not pinged");
+    availability.stop().await.unwrap();
+}
+
+/// Case 12: disabled devices are not pinged.
+#[tokio::test]
+async fn startup_does_not_ping_disabled_devices() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"max_jitter": 0}));
+    harness.context.settings.lock().unwrap().configuration["devices"][IEEE]["disabled"] =
+        json!(true);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    assert_eq!(read_count(&harness), 0, "disabled devices are not pinged");
+    assert!(harness.mqtt.lock().await.attempted.is_empty());
+    availability.stop().await.unwrap();
+}
+
+/// Case 8: an available device whose ping fails is tried a second time before
+/// it is reported offline.
+#[tokio::test(start_paused = true)]
+async fn ping_retries_once_for_available_devices() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    harness
+        .adapter
+        .fail_zcl
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    tokio::time::advance(Duration::from_millis(61_000)).await;
+    settle().await;
+    // The retry waits 3 s between attempts.
+    tokio::time::advance(Duration::from_secs(3)).await;
+    settle().await;
+
+    assert_eq!(read_count(&harness), 2, "two ping attempts");
+    availability.stop().await.unwrap();
+}
+
+/// Case 7: a last-seen change restarts the active ping timer.
+#[tokio::test(start_paused = true)]
+async fn last_seen_resets_the_active_ping_timer() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    tokio::time::advance(Duration::from_secs(30)).await;
+    settle().await;
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+
+    // 70 s after start: the original timer (61 s) would have fired already.
+    tokio::time::advance(Duration::from_secs(40)).await;
+    settle().await;
+    assert_eq!(read_count(&harness), 0, "timer was not reset");
+
+    // 95 s after start / 65 s after the reset: the pinged timer fired.
+    tokio::time::advance(Duration::from_secs(25)).await;
+    settle().await;
+    assert_eq!(read_count(&harness), 1, "reset timer did not ping");
+    availability.stop().await.unwrap();
+}
+
+/// Case 14: leaving stops the ping timer.
+#[tokio::test(start_paused = true)]
+async fn device_leave_stops_the_ping_timer() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_leave(json!({"ieeeAddr": IEEE}));
+    settle().await;
+    tokio::time::advance(Duration::from_secs(120)).await;
+    settle().await;
+
+    assert_eq!(read_count(&harness), 0);
+    availability.stop().await.unwrap();
+}
+
+/// Case 15: removing the entity stops the ping timer.
+#[tokio::test(start_paused = true)]
+async fn entity_removed_stops_the_ping_timer() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_entity_removed(json!({"entity": {"ieeeAddr": IEEE}}));
+    settle().await;
+    tokio::time::advance(Duration::from_secs(120)).await;
+    settle().await;
+
+    assert_eq!(read_count(&harness), 0);
+    availability.stop().await.unwrap();
+}
+
+/// Case 6 (paused-clock variant): the passive timeout comes from the global
+/// availability settings and schedules the offline publish.
+#[tokio::test(start_paused = true)]
+async fn global_passive_timeout_controls_the_timer() {
+    let _guard = serial();
+    let harness = harness(true, json!(null));
+    harness.context.settings.lock().unwrap().configuration["availability"]["passive"] =
+        json!({"timeout": 1});
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+
+    assert_eq!(
+        availability.test_ping_delay(IEEE),
+        Some(61_000),
+        "global passive timeout of 1 minute plus 1 s"
+    );
+    availability.stop().await.unwrap();
+}
+
+/// Case 21: device availability is also published for groups.
+#[tokio::test]
+async fn publishes_availability_for_groups() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"max_jitter": 0}));
+    harness.context.settings.lock().unwrap().configuration["groups"]["1"] =
+        json!({"friendly_name": "kitchen"});
+    let group = harness
+        .zigbee
+        .zh_controller()
+        .unwrap()
+        .create_group(1)
+        .unwrap();
+    let device = harness.zigbee.resolve_device(IEEE).unwrap();
+    group.add_member(&device.zh.endpoints()[0]);
+    let _ = harness.zigbee.resolve_group(1);
+
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        mqtt.attempted.iter().any(|(topic, payload, _)| topic
+            == "zigbee2mqtt/kitchen/availability"
+            && payload == r#"{"state":"offline"}"#),
+        "group availability missing: {:?}",
+        mqtt.attempted
+            .iter()
+            .map(|(topic, payload, _)| (topic.clone(), payload.clone()))
+            .collect::<Vec<_>>()
+    );
+    drop(mqtt);
+    availability.stop().await.unwrap();
+}
+
+/// Case 22: stopping clears the ping queue and interrupts the running ping.
+#[tokio::test(start_paused = true)]
+async fn stop_clears_the_ping_queue() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    for (ieee, name, network) in [
+        (IEEE, "lamp", 1234),
+        (IEEE_B, "lamp2", 1235),
+        (IEEE_C, "lamp3", 1236),
+    ] {
+        if ieee != IEEE {
+            add_router(&harness, ieee, name, network);
+        }
+        mark_seen(&harness, ieee);
+    }
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    harness
+        .adapter
+        .delay_ms
+        .store(1_000, std::sync::atomic::Ordering::SeqCst);
+    for ieee in [IEEE_B, IEEE_C] {
+        let device = harness.zigbee.resolve_device(ieee).unwrap();
+        availability.test_add_to_ping_queue(device as Arc<dyn z2m_rs::model::entity::Entity>);
+    }
+    settle().await;
+    availability.clone().stop().await.unwrap();
+    tokio::time::advance(Duration::from_secs(60)).await;
+    settle().await;
+
+    assert_eq!(
+        availability.test_ping_queue_len(),
+        0,
+        "queue was not cleared"
+    );
+    assert_eq!(read_count(&harness), 1, "only the in-flight ping started");
+}
+
+/// Case 23: the queue drains in a single run instead of re-entering per device.
+#[tokio::test(start_paused = true)]
+async fn ping_queue_drains_in_one_run() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    for (ieee, name, network) in [
+        (IEEE, "lamp", 1234),
+        (IEEE_B, "lamp2", 1235),
+        (IEEE_C, "lamp3", 1236),
+    ] {
+        if ieee != IEEE {
+            add_router(&harness, ieee, name, network);
+        }
+        mark_seen(&harness, ieee);
+    }
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    for ieee in [IEEE, IEEE_B, IEEE_C] {
+        let device = harness.zigbee.resolve_device(ieee).unwrap();
+        availability.test_add_to_ping_queue(device as Arc<dyn z2m_rs::model::entity::Entity>);
+    }
+    settle().await;
+    for _ in 0..2 {
+        tokio::time::advance(Duration::from_secs(3)).await;
+        settle().await;
+    }
+
+    assert_eq!(read_count(&harness), 3, "each queued device pinged once");
+    assert_eq!(availability.test_ping_queue_len(), 0, "queue not drained");
+    assert_eq!(
+        availability.test_execute_count(),
+        3,
+        "one executeNext per addToPingQueue"
+    );
+    availability.stop().await.unwrap();
+}
+
+/// Case 25: pings are jittered within the configured maximum.
+#[tokio::test]
+async fn pings_are_jittered() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 60_000}));
+    mark_seen(&harness, IEEE);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+
+    let delay = availability
+        .test_ping_delay(IEEE)
+        .expect("ping delay scheduled");
+    assert!(
+        (61_000..121_000).contains(&delay),
+        "jittered delay out of range: {delay}"
+    );
+    availability.stop().await.unwrap();
+}
+
+/// Case 26: a successful ping does not start a backoff.
+#[tokio::test(start_paused = true)]
+async fn ping_success_does_not_trigger_backoff() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    assert_eq!(availability.test_ping_delay(IEEE), Some(61_000));
+    tokio::time::advance(Duration::from_millis(61_000)).await;
+    settle().await;
+
+    assert_eq!(read_count(&harness), 1);
+    assert_eq!(
+        availability.test_ping_backoff(IEEE),
+        None,
+        "successful pings must not back off"
+    );
+    availability.stop().await.unwrap();
+}
+
+/// Case 27: successive ping failures grow the backoff.
+#[tokio::test(start_paused = true)]
+async fn ping_failures_grow_the_backoff() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    harness
+        .adapter
+        .fail_zcl
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    tokio::time::advance(Duration::from_millis(61_000)).await;
+    settle().await;
+    tokio::time::advance(Duration::from_secs(3)).await;
+    settle().await;
+
+    // Available device: two attempts, then the multiplier becomes 1.5.
+    assert_eq!(read_count(&harness), 2);
+    assert_eq!(availability.test_ping_backoff(IEEE), Some(1.5));
+    assert_eq!(availability.test_ping_delay(IEEE), Some(91_500));
+
+    tokio::time::advance(Duration::from_millis(91_500)).await;
+    settle().await;
+    tokio::time::advance(Duration::from_secs(3)).await;
+    settle().await;
+    assert_eq!(read_count(&harness), 4);
+    assert_eq!(
+        availability.test_ping_backoff(IEEE),
+        Some(2.25),
+        "a second failure multiplies the backoff by 1.5"
+    );
+    availability.stop().await.unwrap();
+}
+
+/// Case 28: a last-seen change resets the backoff.
+#[tokio::test(start_paused = true)]
+async fn last_seen_resets_the_backoff() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 1, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    harness
+        .adapter
+        .fail_zcl
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    tokio::time::advance(Duration::from_millis(61_000)).await;
+    settle().await;
+    tokio::time::advance(Duration::from_secs(3)).await;
+    settle().await;
+    assert_eq!(availability.test_ping_backoff(IEEE), Some(1.5));
+
+    mark_seen(&harness, IEEE);
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    assert_eq!(availability.test_ping_backoff(IEEE), None);
+    assert_eq!(availability.test_ping_delay(IEEE), Some(61_000));
+    availability.stop().await.unwrap();
+}
+
+/// Case 29: reaching the configured backoff threshold pauses pings and a
+/// last-seen change unpauses them again.
+#[tokio::test(start_paused = true)]
+async fn backoff_pauses_at_the_configured_threshold() {
+    let _guard = serial();
+    let harness = ping_harness(json!({
+        "timeout": 1,
+        "max_jitter": 0,
+        "pause_on_backoff_gt": 1.5,
+    }));
+    mark_seen(&harness, IEEE);
+    harness
+        .adapter
+        .fail_zcl
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    tokio::time::advance(Duration::from_millis(61_000)).await;
+    settle().await;
+    tokio::time::advance(Duration::from_secs(3)).await;
+    settle().await;
+    assert_eq!(availability.test_ping_backoff(IEEE), Some(1.5));
+    assert!(!availability.test_backoff_paused(IEEE));
+
+    tokio::time::advance(Duration::from_millis(91_500)).await;
+    settle().await;
+    tokio::time::advance(Duration::from_secs(3)).await;
+    settle().await;
+    assert!(
+        availability.test_backoff_paused(IEEE),
+        "device must be paused at the threshold"
+    );
+
+    mark_seen(&harness, IEEE);
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    assert!(!availability.test_backoff_paused(IEEE));
+    assert_eq!(availability.test_ping_delay(IEEE), Some(61_000));
+    availability.stop().await.unwrap();
+}
+
+/// Case 30: the ping delay is clamped to the maximum supported timeout.
+#[tokio::test(start_paused = true)]
+async fn ping_delay_is_clamped_to_max_timeout() {
+    let _guard = serial();
+    let harness = ping_harness(json!({"timeout": 40_000, "max_jitter": 0}));
+    mark_seen(&harness, IEEE);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    assert_eq!(
+        availability.test_ping_delay(IEEE),
+        Some(2_147_483_647),
+        "40 000 minutes must clamp to the 32-bit timer maximum"
+    );
+    tokio::time::advance(Duration::from_secs(1)).await;
+    settle().await;
+    assert_eq!(read_count(&harness), 0, "clamped delay must not loop");
+    availability.stop().await.unwrap();
+}
+
+/// Case 31: backoff can be disabled per device.
+#[tokio::test(start_paused = true)]
+async fn backoff_can_be_disabled() {
+    let _guard = serial();
+    let harness = ping_harness(json!({
+        "timeout": 1,
+        "max_jitter": 0,
+        "backoff": false,
+    }));
+    mark_seen(&harness, IEEE);
+    harness
+        .adapter
+        .fail_zcl
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+
+    emit_last_seen(&harness, IEEE, "lamp");
+    settle().await;
+    tokio::time::advance(Duration::from_millis(61_000)).await;
+    settle().await;
+    tokio::time::advance(Duration::from_secs(3)).await;
+    settle().await;
+
+    assert_eq!(availability.test_ping_backoff(IEEE), None);
+    assert_eq!(availability.test_ping_delay(IEEE), Some(61_000));
+    tokio::time::advance(Duration::from_millis(61_000)).await;
+    settle().await;
+    assert!(
+        read_count(&harness) >= 2,
+        "pings continue at the normal rate"
+    );
+    availability.stop().await.unwrap();
+}

@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde_json::{json, Value};
@@ -24,6 +24,8 @@ pub struct MockAdapter {
     pub broadcast_frames: Mutex<Vec<(u8, u16, Frame)>>,
     pub fail_zdo: AtomicBool,
     pub fail_zcl: AtomicBool,
+    /// Artificial per-request latency in ms (paused-clock tests).
+    pub delay_ms: AtomicU64,
     pub zdo_response: Mutex<Value>,
     pub zcl_response: Mutex<Option<ZclPayload>>,
 }
@@ -79,8 +81,12 @@ impl ControllerAdapter for MockAdapter {
     ) -> AdapterFuture<'_, Option<ZclPayload>> {
         self.endpoint_frames.lock().unwrap().push(frame.clone());
         let fail = self.fail_zcl.load(Ordering::SeqCst);
+        let delay = self.delay_ms.load(Ordering::SeqCst);
         let response = self.zcl_response.lock().unwrap().clone();
         Box::pin(async move {
+            if delay > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+            }
             if fail {
                 Err("ZCL failed".to_string())
             } else {

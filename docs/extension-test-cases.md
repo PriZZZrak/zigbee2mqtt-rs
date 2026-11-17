@@ -28,7 +28,7 @@ Coverage classes:
 
 | Upstream file | Cases | asserted | slice | code | converter-db | adapter | static | omitted | Rust tests |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| availability.test.ts | 31 | 10 | 1 | 2 | 0 | 18 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
+| availability.test.ts | 31 | 29 | 1 | 0 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
 | bridge.test.ts | 110 | 58 | 2 | 17 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 18 | 1 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
@@ -49,36 +49,36 @@ Coverage classes:
 | # | Upstream case | Class | Evidence / reason |
 |---:|---|---|---|
 | 1 | Should publish availability on startup for device where it is enabled for | `asserted` | publishes_offline_then_online_after_last_seen |
-| 2 | Should ping on startup for enabled and unavailable devices | `adapter` | startup ping needs a live coordinator |
-| 3 | Should not ping on startup for available or disabled devices | `adapter` | startup ping needs a live coordinator |
+| 2 | Should ping on startup for enabled and unavailable devices | `asserted` | `startup_pings_unavailable_active_device` |
+| 3 | Should not ping on startup for available or disabled devices | `asserted` | `startup_does_not_ping_passive_devices`, `startup_does_not_ping_available_devices` |
 | 4 | Should publish offline for active device when not seen for 10 minutes | `asserted` | passive_device_publishes_offline_after_timeout_and_online_on_last_seen (paused clock) |
 | 5 | Shouldnt do anything for a device when availability: false is set for device | `asserted` | availability_disabled_via_device_option |
 | 6 | Should publish offline for passive device when not seen for 25 hours | `slice` | passive timeout path; the 25h default differs only by the timeout value |
-| 7 | Should reset ping timer when device last seen changes for active device | `adapter` | ping timer reset needs a live device |
-| 8 | Should ping again when first ping fails | `adapter` | ping retry needs a live device |
-| 9 | Should reset ping timer when device last seen changes for passive device | `adapter` | ping timer reset needs a live device |
+| 7 | Should reset ping timer when device last seen changes for active device | `asserted` | `last_seen_resets_the_active_ping_timer` |
+| 8 | Should ping again when first ping fails | `asserted` | `ping_retries_once_for_available_devices` |
+| 9 | Should reset ping timer when device last seen changes for passive device | `asserted` | `global_passive_timeout_controls_the_timer` (last-seen reschedules the passive timer) |
 | 10 | Should immediately mark device as online when it lastSeen changes | `asserted` | publishes_offline_then_online_after_last_seen |
 | 11 | Should allow to change availability timeout via device options | `asserted` | device_timeout_option_controls_the_timer |
-| 12 | Should not ping disabled devices | `adapter` | ping suppression needs a live device |
-| 13 | Should allow to change availability timeout via avaiability options | `code` | get_timeout reads availability.{active,passive}.timeout |
-| 14 | Should stop pinging device when it leaves | `adapter` | ping queue removal on leave |
-| 15 | Should stop pinging device when it is removed | `adapter` | ping queue removal on remove |
+| 12 | Should not ping disabled devices | `asserted` | `startup_does_not_ping_disabled_devices` |
+| 13 | Should allow to change availability timeout via avaiability options | `asserted` | `global_passive_timeout_controls_the_timer` |
+| 14 | Should stop pinging device when it leaves | `asserted` | `device_leave_stops_the_ping_timer` |
+| 15 | Should stop pinging device when it is removed | `asserted` | `entity_removed_stops_the_ping_timer` |
 | 16 | Should allow to be disabled | `asserted` | `availability_disabled_globally_publishes_nothing` (global flag falls back per entity; no publish) |
 | 17 | Should allow to enable availability for just one device | `asserted` | `availability_can_be_enabled_for_a_single_device` |
 | 18 | Should retrieve device state when it reconnects | `adapter` | retrieveState pings through the adapter |
 | 19 | Should republish availability when device is renamed | `asserted` | rename_publishes_empty_retained_availability |
 | 20 | Should publish availability payload in JSON format | `asserted` | passive_device_publishes_offline_after_timeout_and_online_on_last_seen |
-| 21 | Should publish availability for groups | `code` | group availability fan-out in publish_availability |
-| 22 | Should clear the ping queue on stop | `code` | ping queue cleared on stop |
-| 23 | Should drain the ping queue in one run instead of re-entering per device | `code` | single-run ping queue drain |
+| 21 | Should publish availability for groups | `asserted` | `publishes_availability_for_groups` |
+| 22 | Should clear the ping queue on stop | `asserted` | `stop_clears_the_ping_queue` |
+| 23 | Should drain the ping queue in one run instead of re-entering per device | `asserted` | `ping_queue_drains_in_one_run` |
 | 24 | Should prevent instance restart | `asserted` | `stopped_availability_cannot_be_restarted` ("This extension cannot be restarted.") |
-| 25 | jitters pings | `code` | jitter via utils::random_f64 in reset_timer |
-| 26 | does not trigger backoff on ping success | `code` | backoff reset on ping success |
-| 27 | triggers backoff on successive ping failures | `code` | backoff growth on failures |
-| 28 | resets backoff on last seen | `code` | backoff cleared on last seen |
-| 29 | pauses when backoff reaches configured value and unpauses on last seen | `code` | pause_on_backoff_gt handling |
-| 30 | clamps the ping delay to the maximum supported timeout | `code` | MAX_TIMEOUT clamp |
-| 31 | allows to disable backoff | `code` | backoff disabled via device option |
+| 25 | jitters pings | `asserted` | `pings_are_jittered` (delay within timeout+jitter bounds) |
+| 26 | does not trigger backoff on ping success | `asserted` | `ping_success_does_not_trigger_backoff` |
+| 27 | triggers backoff on successive ping failures | `asserted` | `ping_failures_grow_the_backoff` |
+| 28 | resets backoff on last seen | `asserted` | `last_seen_resets_the_backoff` |
+| 29 | pauses when backoff reaches configured value and unpauses on last seen | `asserted` | `backoff_pauses_at_the_configured_threshold` |
+| 30 | clamps the ping delay to the maximum supported timeout | `asserted` | `ping_delay_is_clamped_to_max_timeout` |
+| 31 | allows to disable backoff | `asserted` | `backoff_can_be_disabled` |
 
 ## bind.test.ts
 

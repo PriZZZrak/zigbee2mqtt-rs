@@ -2,7 +2,7 @@
 // Upstream revision: zigbee2mqtt 2.14.3 (3c841fdf).
 
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -34,6 +34,10 @@ pub struct Availability {
     ping_queue: Mutex<Vec<Arc<dyn Entity>>>,
     ping_queue_executing: AtomicBool,
     stopped: AtomicBool,
+    /// Test diagnostics: last computed ping delay per IEEE (doc-hidden).
+    test_delays: Mutex<HashMap<String, u64>>,
+    /// Test diagnostics: number of pingQueueExecuteNext entries (doc-hidden).
+    test_executes: AtomicUsize,
 }
 
 impl Availability {
@@ -48,6 +52,8 @@ impl Availability {
             ping_queue: Mutex::new(Vec::new()),
             ping_queue_executing: AtomicBool::new(false),
             stopped: AtomicBool::new(false),
+            test_delays: Mutex::new(HashMap::new()),
+            test_executes: AtomicUsize::new(0),
         })
     }
 
@@ -161,6 +167,7 @@ impl Availability {
                 let delay = (((self.get_timeout(&device) + utils::seconds(1) + jitter) as f64)
                     * backoff)
                     .min(MAX_TIMEOUT as f64) as u64;
+                self.test_delays.lock().unwrap().insert(ieee.clone(), delay);
                 let this = self.clone();
                 let handle = tokio::spawn(async move {
                     tokio::time::sleep(Duration::from_millis(delay)).await;
@@ -170,6 +177,7 @@ impl Availability {
             }
         } else {
             let delay = self.get_timeout(&device) + utils::seconds(1);
+            self.test_delays.lock().unwrap().insert(ieee.clone(), delay);
             let this = self.clone();
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_millis(delay)).await;
@@ -183,6 +191,42 @@ impl Availability {
         if let Some(timer) = self.timers.lock().unwrap().remove(id) {
             timer.abort();
         }
+    }
+
+    /// Test hook: ping queue length (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_ping_queue_len(&self) -> usize {
+        self.ping_queue.lock().unwrap().len()
+    }
+
+    /// Test hook: enqueue an entity for pinging (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_add_to_ping_queue(self: &Arc<Self>, device: Arc<dyn Entity>) {
+        self.add_to_ping_queue(device);
+    }
+
+    /// Test hook: current backoff multiplier (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_ping_backoff(&self, ieee: &str) -> Option<f64> {
+        self.ping_backoffs.lock().unwrap().get(ieee).copied()
+    }
+
+    /// Test hook: whether backoff paused the device (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_backoff_paused(&self, ieee: &str) -> bool {
+        self.backoff_paused_devices.lock().unwrap().contains(ieee)
+    }
+
+    /// Test hook: last computed ping delay in ms (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_ping_delay(&self, ieee: &str) -> Option<u64> {
+        self.test_delays.lock().unwrap().get(ieee).copied()
+    }
+
+    /// Test hook: number of pingQueueExecuteNext entries (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_execute_count(&self) -> usize {
+        self.test_executes.load(Ordering::SeqCst)
     }
 
     /// Upstream `addToPingQueue` (`availability.ts:136-139`).
@@ -202,6 +246,7 @@ impl Availability {
 
     /// Upstream `pingQueueExecuteNext` (`availability.ts:148-209`).
     async fn ping_queue_execute_next(self: Arc<Self>) {
+        self.test_executes.fetch_add(1, Ordering::SeqCst);
         if self.ping_queue.lock().unwrap().is_empty()
             || self.ping_queue_executing.swap(true, Ordering::SeqCst)
         {
