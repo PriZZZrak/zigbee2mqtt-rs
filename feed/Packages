@@ -26,6 +26,20 @@ Filename: zigbee2mqtt-rs_0.0.1-dev.3_aarch64_cortex-a53.ipk
 Size: 5139127
 SHA256sum: b191b116ff3d0f4440193d02cf03f9e84a6bd8b1f248bc7d44f6cec2faff298a
 
+Package: zigbee2mqtt-rs
+Version: 0.0.1-dev.4
+Architecture: aarch64_cortex-a53
+Installed-Size: 12208
+Section: net
+Priority: optional
+Maintainer: zigbee2mqtt-rs <noreply@github.com>
+Source: https://github.com/PriZZZrak/zigbee2mqtt-rs
+Depends: zigbee2mqtt-windfront (= 2.15.1)
+Description: Zigbee to MQTT bridge (pure Rust port)
+Filename: zigbee2mqtt-rs_0.0.1-dev.4_aarch64_cortex-a53.ipk
+Size: 5133351
+SHA256sum: 33b2654256a24a4101ebba3f71bf17b71963f717dbbc5e66e85f18d03fa8ae23
+
 Package: zigbee2mqtt-windfront
 Version: 2.15.1
 Architecture: all
