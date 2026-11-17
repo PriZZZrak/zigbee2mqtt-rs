@@ -35,7 +35,7 @@ Coverage classes:
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
-| groups.test.ts | 40 | 21 | 1 | 18 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
+| groups.test.ts | 40 | 25 | 1 | 14 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 78 | 14 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
@@ -322,10 +322,10 @@ Coverage classes:
 | 3 | Should publish state change of all members when a group changes its state | `asserted` | optimistic state fan-out |
 | 4 | Should not publish state change when group changes state and device is disabled | `code` | group state derivation ported, converter/endpoint dependent |
 | 5 | Should publish state change for group when members state change | `code` | group state derivation ported, converter/endpoint dependent |
-| 6 | Should publish state of device with endpoint name | `code` | group state derivation ported, converter/endpoint dependent |
-| 7 | Should publish state of group when specific state of specific endpoint is changed | `code` | group state derivation ported, converter/endpoint dependent |
+| 6 | Should publish state of device with endpoint name | `asserted` | `group_state_change_uses_endpoint_names_for_members` |
+| 7 | Should publish state of group when specific state of specific endpoint is changed | `asserted` | `specific_endpoint_state_change_updates_the_group` |
 | 8 | Should publish state change of all members when a group changes its state, filtered | `code` | group state derivation ported, converter/endpoint dependent |
-| 9 | Shouldnt publish group state change when a group is not optimistic | `code` | group state derivation ported, converter/endpoint dependent |
+| 9 | Shouldnt publish group state change when a group is not optimistic | `asserted` | `non_optimistic_group_is_not_published` |
 | 10 | Should publish state change of another group with shared device when a group changes its state | `asserted` | optimistic state fan-out |
 | 11 | Should not publish state change off if any lights within are still on when changed via device | `code` | group state derivation ported, converter/endpoint dependent |
 | 12 | Should publish state change off if any lights within are still on when changed via device when off_state: last_member_state is used | `code` | group state derivation ported, converter/endpoint dependent |
@@ -335,7 +335,7 @@ Coverage classes:
 | 16 | Should publish state change off if all lights within turn off with non default-ep, but device state does not use them | `code` | group state derivation ported, converter/endpoint dependent |
 | 17 | Should check the state of the member endpoint by its name when its ID is not its position ('still on') | `code` | group state derivation ported, converter/endpoint dependent |
 | 18 | Should check the state of the member endpoint by its name when its ID is not its position ('off') | `code` | group state derivation ported, converter/endpoint dependent |
-| 19 | Should not publish state change off if any lights within are still on when changed via shared group | `code` | group state derivation ported, converter/endpoint dependent |
+| 19 | Should not publish state change off if any lights within are still on when changed via shared group | `asserted` | `shared_group_is_updated` |
 | 20 | Should publish state change off if all lights within turn off | `code` | group state derivation ported, converter/endpoint dependent |
 | 21 | Should only update group state with changed properties | `code` | group state derivation ported, converter/endpoint dependent |
 | 22 | Should publish state change off even when missing current state | `code` | group state derivation ported, converter/endpoint dependent |

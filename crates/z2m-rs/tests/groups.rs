@@ -862,3 +862,176 @@ async fn group_members_changed_republishes_bridge_groups() {
     );
     bridge.stop().await.unwrap();
 }
+
+/// Register a definition that gives the lamp's endpoint 1 the name `right`
+/// (upstream multi-endpoint devices expose names per endpoint).
+fn register_named_endpoint(harness: &Harness) {
+    let mut definition =
+        zigbee_converters::Definition::new("TEST", "Acme", "Test").with_zigbee_model("TEST");
+    definition.endpoint = vec![("right".to_string(), 1)];
+    definition.exposes = zigbee_converters::Exposes::Static(vec![zigbee_converters::Expose {
+        r#type: "light".to_string(),
+        name: Some("light".to_string()),
+        access: zigbee_converters::access::ALL,
+        features: vec![
+            zigbee_converters::Expose::binary("state", zigbee_converters::access::ALL),
+            zigbee_converters::Expose::numeric("brightness", zigbee_converters::access::ALL),
+        ],
+        ..Default::default()
+    }]);
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    let device = harness.zigbee.resolve_device(IEEE).unwrap();
+    device.resolve_definition(true);
+}
+
+fn emit_group_state(harness: &Harness, payload: Value) {
+    harness.event_bus.lock().unwrap().emit_state_change(json!({
+        "entity": {"ID": 1, "name": "kitchen"},
+        "from": {},
+        "to": payload,
+        "update": payload,
+        "reason": "devicePublish",
+    }));
+}
+
+fn published(harness: &Harness) -> Vec<(String, Value)> {
+    harness
+        .published
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(name, payload, _)| (name.clone(), payload.clone()))
+        .collect()
+}
+
+/// Case 5: a group state change is published to all members and the group.
+#[tokio::test]
+async fn group_state_change_fans_out_to_members() {
+    let _guard = serial();
+    let harness = harness();
+    let groups = Groups::new(harness.context.clone());
+    groups.clone().start().await.unwrap();
+
+    emit_group_state(&harness, json!({"state": "ON"}));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    let published = published(&harness);
+    assert!(
+        published.contains(&("lamp".to_string(), json!({"state": "ON"}))),
+        "{published:?}"
+    );
+    assert!(
+        published.contains(&("bulb".to_string(), json!({"state": "ON"}))),
+        "{published:?}"
+    );
+    // The source group itself is published by the publish/state pipeline
+    // (optimistic state), not by the groups extension.
+}
+
+/// Case 6: a member with a named endpoint is published with the suffixed key.
+#[tokio::test]
+async fn group_state_change_uses_endpoint_names_for_members() {
+    let _guard = serial();
+    let harness = harness();
+    register_named_endpoint(&harness);
+    let groups = Groups::new(harness.context.clone());
+    groups.clone().start().await.unwrap();
+
+    emit_group_state(&harness, json!({"state": "ON"}));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    let published = published(&harness);
+    assert!(
+        published.contains(&("lamp".to_string(), json!({"state_right": "ON"}))),
+        "{published:?}"
+    );
+}
+
+/// Case 7: a change of a specific endpoint updates the group without a command.
+#[tokio::test]
+async fn specific_endpoint_state_change_updates_the_group() {
+    let _guard = serial();
+    let harness = harness();
+    register_named_endpoint(&harness);
+    let groups = Groups::new(harness.context.clone());
+    groups.clone().start().await.unwrap();
+
+    harness.event_bus.lock().unwrap().emit_state_change(json!({
+        "entity": {"ID": IEEE, "ieeeAddr": IEEE, "name": "lamp"},
+        "from": {},
+        "to": {"state_right": "ON"},
+        "update": {"state_right": "ON"},
+        "reason": "devicePublish",
+    }));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    let published = published(&harness);
+    assert!(
+        published.contains(&("kitchen".to_string(), json!({"state": "ON"}))),
+        "group was not updated from the endpoint state: {published:?}"
+    );
+}
+
+/// Case 9: a non-optimistic group is not updated from member state changes.
+#[tokio::test]
+async fn non_optimistic_group_is_not_published() {
+    let _guard = serial();
+    let harness = harness();
+    harness.context.settings.lock().unwrap().configuration["groups"]["1"]["optimistic"] =
+        json!(false);
+    let groups = Groups::new(harness.context.clone());
+    groups.clone().start().await.unwrap();
+
+    harness.event_bus.lock().unwrap().emit_state_change(json!({
+        "entity": {"ID": IEEE, "ieeeAddr": IEEE, "name": "lamp"},
+        "from": {},
+        "to": {"state": "ON"},
+        "update": {"state": "ON"},
+        "reason": "devicePublish",
+    }));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(
+        published(&harness).is_empty(),
+        "non-optimistic group must not be updated: {:?}",
+        published(&harness)
+    );
+}
+
+/// Case 19: another group sharing the member is updated as well.
+#[tokio::test]
+async fn shared_group_is_updated() {
+    let _guard = serial();
+    let harness = harness();
+    harness.context.settings.lock().unwrap().configuration["groups"]["2"] =
+        json!({"friendly_name": "office", "optimistic": true});
+    let office = harness
+        .zigbee
+        .zh_controller()
+        .unwrap()
+        .create_group(2)
+        .unwrap();
+    let lamp = harness.zigbee.resolve_device(IEEE).unwrap();
+    office.add_member(&lamp.zh.endpoints()[0]);
+    let _ = harness.zigbee.resolve_group(2);
+    let groups = Groups::new(harness.context.clone());
+    groups.clone().start().await.unwrap();
+
+    emit_group_state(&harness, json!({"state": "ON"}));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    let published = published(&harness);
+    assert!(
+        published.contains(&("office".to_string(), json!({"state": "ON"}))),
+        "shared group was not updated: {published:?}"
+    );
+    assert!(
+        !published.contains(&("kitchen".to_string(), json!({"state": "ON"}))),
+        "source group must not be republished by the groups extension: {published:?}"
+    );
+}
