@@ -132,7 +132,9 @@ fn harness(configuration: Value) -> Harness {
 
     let context = ExtensionContext {
         zigbee: zigbee.clone(),
-        mqtt: Arc::new(tokio::sync::Mutex::new(z2m_rs::mqtt::Mqtt::new(event_bus.clone()))),
+        mqtt: Arc::new(tokio::sync::Mutex::new(z2m_rs::mqtt::Mqtt::new(
+            event_bus.clone(),
+        ))),
         state: state.clone(),
         publish_entity_state: publish.clone(),
         event_bus: event_bus.clone(),
@@ -526,4 +528,374 @@ async fn debounce_merges_payloads_and_updates_the_state_cache() {
     assert_eq!(recorded.len(), 1, "{recorded:?}");
     assert_eq!(recorded[0].0, json!({"a": 1, "b": 2}));
     assert_eq!(recorded[0].1.as_deref(), Some("publishDebounce"));
+}
+
+fn message_at(cluster: &str, data: Value, endpoint: u8) -> Value {
+    json!({
+        "type": "attributeReport",
+        "device": {"ID": IEEE, "ieeeAddr": IEEE, "name": IEEE},
+        "endpoint": {"ID": endpoint},
+        "cluster": cluster,
+        "data": data,
+        "linkquality": 100,
+        "meta": {"zclTransactionSequenceNumber": 1},
+    })
+}
+
+/// Cases 2-3: converters receive the message endpoint and can act per endpoint.
+#[tokio::test]
+async fn endpoint_specific_converter_actions() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .zh
+        .create_endpoint(2)
+        .unwrap();
+    let mut definition = Definition::new("TEST", "Acme", "Test device")
+        .with_zigbee_model("TEST")
+        .with_exposes(vec![Expose::enumeration(
+            "action",
+            zigbee_converters::access::STATE,
+            &["single_left", "single_right"],
+        )]);
+    definition.from_zigbee.push(FromZigbeeConverter {
+        cluster: "genOnOff".to_string(),
+        types: vec!["attributeReport".to_string()],
+        convert: Arc::new(|_definition, data, _publish, _options, _meta| {
+            Box::pin(async move {
+                let action = if data.endpoint.ID == 1 {
+                    "single_left"
+                } else {
+                    "single_right"
+                };
+                Ok(Some(json!({"action": action})))
+            })
+        }),
+    });
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    for endpoint in [1, 2] {
+        harness
+            .event_bus
+            .lock()
+            .unwrap()
+            .emit_device_message(message_at("genOnOff", json!({"onOff": 1}), endpoint));
+    }
+    wait_for_publishes(&harness.recorded, 2).await;
+
+    let recorded = harness.recorded.lock().unwrap();
+    let actions: Vec<Value> = recorded
+        .iter()
+        .map(|(payload, _)| payload["action"].clone())
+        .collect();
+    assert!(actions.contains(&json!("single_left")), "{recorded:?}");
+    assert!(actions.contains(&json!("single_right")), "{recorded:?}");
+}
+
+/// Case 8: a message that converts to no payload still goes through the
+/// debounce instead of being published immediately.
+#[tokio::test(start_paused = true)]
+async fn empty_payload_does_not_bypass_the_debounce() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "advanced": {"last_seen": "ISO_8601"},
+        "devices": {IEEE: {"friendly_name": "lamp", "debounce": 1}},
+    }));
+    let mut definition = Definition::new("TEST", "Acme", "Test device").with_zigbee_model("TEST");
+    definition.from_zigbee.push(FromZigbeeConverter {
+        cluster: "genOnOff".to_string(),
+        types: vec!["attributeReport".to_string()],
+        convert: Arc::new(|_definition, _data, _publish, _options, _meta| {
+            Box::pin(async move { Ok(None) })
+        }),
+    });
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_message(message("genOnOff", json!({"onOff": 1})));
+    tokio::time::advance(Duration::from_millis(50)).await;
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        harness.recorded.lock().unwrap().is_empty(),
+        "empty payload bypassed the debounce"
+    );
+
+    tokio::time::advance(Duration::from_secs(1)).await;
+    for _ in 0..30 {
+        tokio::task::yield_now().await;
+    }
+    let recorded = harness.recorded.lock().unwrap();
+    assert!(!recorded.is_empty(), "debounced empty payload was dropped");
+    assert_eq!(recorded[0].0, json!({}));
+    assert_eq!(recorded[0].1.as_deref(), Some("publishDebounce"));
+}
+
+/// Case 12: `device_options` debounce applies to devices without their own
+/// option.
+#[tokio::test(start_paused = true)]
+async fn device_options_debounce_is_applied() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "device_options": {"debounce": 1},
+    }));
+    let mut definition = Definition::new("TEST", "Acme", "Test device").with_zigbee_model("TEST");
+    definition.from_zigbee.push(FromZigbeeConverter {
+        cluster: "genOnOff".to_string(),
+        types: vec!["attributeReport".to_string()],
+        convert: Arc::new(|_definition, data, _publish, _options, _meta| {
+            let on = data.data.get("onOff").and_then(Value::as_u64);
+            Box::pin(async move {
+                Ok(match on {
+                    Some(1) => Some(json!({"state": "ON"})),
+                    Some(0) => Some(json!({"state": "OFF"})),
+                    _ => None,
+                })
+            })
+        }),
+    });
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    for on in [1, 0] {
+        harness
+            .event_bus
+            .lock()
+            .unwrap()
+            .emit_device_message(message("genOnOff", json!({"onOff": on})));
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+    }
+    assert!(harness.recorded.lock().unwrap().is_empty());
+    tokio::time::advance(Duration::from_secs(1)).await;
+    for _ in 0..30 {
+        tokio::task::yield_now().await;
+    }
+    let recorded = harness.recorded.lock().unwrap();
+    assert_eq!(recorded.len(), 1, "{recorded:?}");
+    assert_eq!(recorded[0].0, json!({"state": "OFF"}));
+}
+
+/// Case 15: throttled devices only publish at the configured rate.
+#[tokio::test]
+async fn device_options_throttle_is_applied() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost"},
+        "devices": {IEEE: {"friendly_name": "lamp"}},
+        "device_options": {"throttle": 1},
+    }));
+    register_on_off_converter(&harness.zigbee);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    for _ in 0..2 {
+        harness
+            .event_bus
+            .lock()
+            .unwrap()
+            .emit_device_message(message("genOnOff", json!({"onOff": 1})));
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+    }
+    assert_eq!(harness.recorded.lock().unwrap().len(), 1);
+
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_message(message("genOnOff", json!({"onOff": 1})));
+    wait_for_publishes(&harness.recorded, 2).await;
+}
+
+/// Cases 22-23: two matching converters produce one merged publish.
+#[tokio::test]
+async fn multiple_converters_publish_once() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let mut definition = Definition::new("TEST", "Acme", "Test device")
+        .with_zigbee_model("TEST")
+        .with_exposes(vec![
+            Expose::binary("state", zigbee_converters::access::ALL),
+            Expose::numeric("brightness", zigbee_converters::access::ALL),
+        ]);
+    definition.from_zigbee.push(FromZigbeeConverter {
+        cluster: "genOnOff".to_string(),
+        types: vec!["attributeReport".to_string()],
+        convert: Arc::new(|_definition, _data, _publish, _options, _meta| {
+            Box::pin(async move { Ok(Some(json!({"state": "ON"}))) })
+        }),
+    });
+    definition.from_zigbee.push(FromZigbeeConverter {
+        cluster: "genOnOff".to_string(),
+        types: vec!["attributeReport".to_string()],
+        convert: Arc::new(|_definition, _data, _publish, _options, _meta| {
+            Box::pin(async move { Ok(Some(json!({"brightness": 100}))) })
+        }),
+    });
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_message(message("genOnOff", json!({"onOff": 1})));
+    wait_for_publishes(&harness.recorded, 1).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let recorded = harness.recorded.lock().unwrap();
+    assert_eq!(
+        recorded.len(),
+        1,
+        "two converters must merge into one publish"
+    );
+    assert_eq!(recorded[0].0, json!({"state": "ON", "brightness": 100}));
+}
+
+/// Case 28: messages from the coordinator are ignored.
+#[tokio::test]
+async fn coordinator_messages_are_ignored() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+
+    harness.event_bus.lock().unwrap().emit_device_message(json!({
+        "type": "attributeReport",
+        "device": {"ID": "0x00124b0024c16b95", "ieeeAddr": "0x00124b0024c16b95", "name": "Coordinator"},
+        "endpoint": {"ID": 1},
+        "cluster": "genOnOff",
+        "data": {"onOff": 1},
+        "linkquality": 100,
+        "meta": {"zclTransactionSequenceNumber": 1},
+    }));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(harness.recorded.lock().unwrap().is_empty());
+}
+
+/// Case 30: command messages that no converter matches publish nothing.
+#[tokio::test]
+async fn unmatched_command_messages_publish_nothing() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    register_on_off_converter(&harness.zigbee);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_message(json!({
+            "type": "commandOn",
+            "device": {"ID": IEEE, "ieeeAddr": IEEE, "name": IEEE},
+            "endpoint": {"ID": 1},
+            "cluster": "genOnOff",
+            "data": {"onOff": 1},
+            "linkquality": 100,
+            "meta": {"zclTransactionSequenceNumber": 1},
+        }));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(harness.recorded.lock().unwrap().is_empty());
+}
+
+/// Case 34: a converter that announces changed exposes emits the
+/// devices/exposes-changed events.
+#[tokio::test]
+async fn converter_exposes_change_emits_events() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let fired = Arc::new(Mutex::new(0usize));
+    let sink = fired.clone();
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .on_exposes_changed(77, Arc::new(move |_| *sink.lock().unwrap() += 1));
+
+    let mut definition = Definition::new("TEST", "Acme", "Test device").with_zigbee_model("TEST");
+    definition.from_zigbee.push(FromZigbeeConverter {
+        cluster: "genOnOff".to_string(),
+        types: vec!["attributeReport".to_string()],
+        convert: Arc::new(|_definition, _data, _publish, _options, meta| {
+            Box::pin(async move {
+                (meta.device_exposes_changed)();
+                Ok(Some(json!({"state": "ON"})))
+            })
+        }),
+    });
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_message(message("genOnOff", json!({"onOff": 1})));
+    wait_for_publishes(&harness.recorded, 1).await;
+    assert_eq!(*fired.lock().unwrap(), 1, "exposes changed event missing");
 }

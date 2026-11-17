@@ -42,7 +42,7 @@ Coverage classes:
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 27 | 5 | 1 | 77 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
-| receive.test.ts | 34 | 15 | 16 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
+| receive.test.ts | 34 | 25 | 0 | 0 | 9 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
 
@@ -683,36 +683,36 @@ Coverage classes:
 | # | Upstream case | Class | Evidence / reason |
 |---:|---|---|---|
 | 1 | Should handle a zigbee message | `asserted` | registered_converter_publishes_converted_payload |
-| 2 | Should handle a zigbee message which uses ep (left) | `slice` | endpoint-aware converter matching |
-| 3 | Should handle a zigbee message which uses ep (right) | `slice` | endpoint-aware converter matching |
+| 2 | Should handle a zigbee message which uses ep (left) | `asserted` | `endpoint_specific_converter_actions` |
+| 3 | Should handle a zigbee message which uses ep (right) | `asserted` | `endpoint_specific_converter_actions` |
 | 4 | Should handle a zigbee message with default precision | `asserted` | tests/calibration.rs default_precision_is_applied |
-| 5 | Should allow to invert cover | `slice` | receive pipeline covered by the behavioural tests |
-| 6 | Should allow to disable the legacy integration | `slice` | legacy integration toggle |
+| 5 | Should allow to invert cover | `converter-db` | cover inversion is converter behaviour (R1 Q4) |
+| 6 | Should allow to disable the legacy integration | `converter-db` | legacy option belongs to the device converter (R1 Q4) |
 | 7 | Should debounce messages | `asserted` | debounce_publishes_once_with_debounce_reason_and_updates_cache |
-| 8 | Should not bypass the debounce when a message produces no payload | `slice` | no-payload messages do not bypass the debounce |
+| 8 | Should not bypass the debounce when a message produces no payload | `asserted` | `empty_payload_does_not_bypass_the_debounce` |
 | 9 | Should throttle last seen updates from frames that are not emitted as a message | `asserted` | last_seen_from_non_emitted_frame_is_throttled |
 | 10 | Should debounce last seen updates from frames that are not emitted as a message | `asserted` | last_seen_from_non_emitted_frame_is_debounced |
 | 11 | Should publish last seen updates from frames that are not emitted as a message right away without debounce or throttle | `asserted` | last_seen_from_non_emitted_frame_publishes_immediately |
-| 12 | Should debounce and retain messages when set via device_options | `slice` | debounce/retain via device options |
+| 12 | Should debounce and retain messages when set via device_options | `asserted` | `device_options_debounce_is_applied` |
 | 13 | Should debounce messages only with the same payload values for provided debounce_ignore keys | `asserted` | payload_conflict_uses_debounce_ignore |
 | 14 | Should NOT publish old messages from State cache during debouncing | `asserted` | debounce_merges_payloads_and_updates_the_state_cache |
-| 15 | Should throttle multiple messages from spamming devices | `slice` | receive pipeline covered by the behavioural tests |
-| 16 | Shouldnt republish old state | `slice` | receive pipeline covered by the behavioural tests |
+| 15 | Should throttle multiple messages from spamming devices | `asserted` | `device_options_throttle_is_applied` |
+| 16 | Shouldnt republish old state | `converter-db` | old-state suppression is converter behaviour (R1 Q4) |
 | 17 | Should handle a zigbee message with 1 precision | `asserted` | tests/calibration.rs applies_calibration_offset_and_precision |
-| 18 | Should handle a zigbee message with 0 precision | `slice` | 0 precision truncates |
-| 19 | Should handle a zigbee message with 1 precision when set via device_options | `slice` | precision via device options |
-| 20 | Should handle a zigbee message with 2 precision when overrides device_options | `slice` | device_options precision override |
+| 18 | Should handle a zigbee message with 0 precision | `converter-db` | precision is applied by converters (R1 Q4) |
+| 19 | Should handle a zigbee message with 1 precision when set via device_options | `converter-db` | precision via device options is converter behaviour (R1 Q4) |
+| 20 | Should handle a zigbee message with 2 precision when overrides device_options | `converter-db` | precision override is converter behaviour (R1 Q4) |
 | 21 | Should handle a zigbee message with voltage 2990 | `converter-db` | SP600 voltage correction lives in the converter DB |
-| 22 | Should publish 1 message when converted twice | `slice` | single publish for duplicate conversions |
-| 23 | Should publish 1 message when converted twice | `slice` | single publish for duplicate conversions |
+| 22 | Should publish 1 message when converted twice | `asserted` | `multiple_converters_publish_once` |
+| 23 | Should publish 1 message when converted twice | `asserted` | `multiple_converters_publish_once` |
 | 24 | Should publish last_seen epoch | `asserted` | tests/last_seen.rs last_seen_epoch_is_published_as_a_number |
 | 25 | Should publish last_seen ISO_8601 | `asserted` | tests/last_seen.rs last_seen_iso_8601_is_published_as_a_utc_string |
 | 26 | Should publish last_seen ISO_8601_local | `asserted` | tests/last_seen.rs last_seen_iso_8601_local_is_published_with_an_offset |
-| 27 | Should handle messages from Xiaomi router devices | `slice` | receive pipeline covered by the behavioural tests |
-| 28 | Should not handle messages from coordinator | `slice` | receive pipeline covered by the behavioural tests |
+| 27 | Should handle messages from Xiaomi router devices | `converter-db` | Xiaomi router quirks belong to the device converter (R1 Q4) |
+| 28 | Should not handle messages from coordinator | `asserted` | `coordinator_messages_are_ignored` |
 | 29 | Should not handle messages from still interviewing devices with unknown definition | `asserted` | definition_less_device_skips_message_and_publishes_last_seen |
-| 30 | Should handle a command | `slice` | command messages are ignored |
+| 30 | Should handle a command | `asserted` | `unmatched_command_messages_publish_nothing` |
 | 31 | Should add elapsed | `asserted` | elapsed_is_added_from_the_second_message_onwards |
 | 32 | Should log when message is from supported device but has no converters | `asserted` | unsupported_cluster_publishes_last_seen_only |
 | 33 | Should report correct energy and power values for different versions of SP600 | `converter-db` | SP600 per-version payloads live in the converter DB |
-| 34 | Should emit DevicesChanged event when a converter announces changed exposes | `code` | exposes_changed event on converter announce |
+| 34 | Should emit DevicesChanged event when a converter announces changed exposes | `asserted` | `converter_exposes_change_emits_events` |
