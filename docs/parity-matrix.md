@@ -90,7 +90,7 @@ upstream case counts, test-symbol references, map sums and doc links).
 | Backup metadata (`toUnifiedBackup`/`fromUnifiedBackup`/`fromLegacyBackup`) | `utils/backup.ts` | PORTED | unified round-trip against the real router backup; legacy parser unit test |
 | HIL (coordinator in container) | — | PORTED | Dongle Plus `10c4:ea60`, SYS version + NV init, see `docs/hil/2026-11-09-dongle-plus.md` |
 | Upstream z2m oracle (container) | `zigbee2mqtt.14.3` | PORTED | resumed network, 3 devices, MQTT transcripts, see `docs/hil/2026-11-09-z2m-run.md` |
-| HIL (router + Dongle-P) | — | HARDWARE_PARTIAL | Routerich AX3000 + Dongle-P 2026-11-16: coordinator resumed (ZStack3x0, revision 20250321), backup written, 3 devices from the live database, MQTT `bridge/{state,info,devices,groups}` + `permit_join` round-trip, Windfront served on the frontend port; devices report "Not supported" (no converter DB, R1). Evidence: `docs/hil/2026-11-16-rust-port-startup.md` |
+| HIL (router + Dongle-P) | — | PORTED | Routerich AX3000 + Dongle-P 2026-11-16: coordinator resumed (ZStack3x0, revision 20250321), backup written, 3 devices from the live database, MQTT `bridge/{state,info,devices,groups}` + `permit_join` round-trip, Windfront served on the frontend port; devices report "Not supported" (no converter DB, R1). Evidence: `docs/hil/2026-11-16-rust-port-startup.md`, `docs/hil/2026-11-17-crash-recovery.md`, `docs/hil/2026-11-17-packaged-service.md` (packaged install + reboot) |
 
 ## Controller model layer — status and remaining gaps
 

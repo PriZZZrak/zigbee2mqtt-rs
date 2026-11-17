@@ -28,6 +28,11 @@ Two packages, published to an opkg feed on the `gh-pages` branch:
   `aarch64-unknown-linux-musl` binary with cargo-zigbuild, builds the ipk with
   the exact windfront dependency, and updates the same feed.
 
+**ipk container format:** OpenWrt 24.10 opkg reads `.ipk` as a gzipped tar with
+`./debian-binary`, `./data.tar.gz`, `./control.tar.gz`; an `ar` archive is
+rejected with "Malformed package file" (found during the 2026-11-17 install).
+`build-ipk.sh` therefore produces the tar container.
+
 Both workflows share `concurrency: opkg-feed` so the `Packages` index is not
 rewritten concurrently. The feed is updated on a second `actions/checkout` of
 the `gh-pages` branch (`path: feed`) and pushed with the workflow token.
@@ -109,8 +114,10 @@ must be signed for a stock installation: without `USIGN_PRIVATE_KEY` /
 secrets or disable the check for a throwaway feed.
 
 Space: `zigbee2mqtt-windfront` installs ~6.8 MB and `zigbee2mqtt-rs` ~12 MB
-into the overlay. A router that still carries the Node.js installation in
-`/opt/zigbee2mqtt` (53.6 MB) has no room; remove that first.
+into the overlay. If the router still carries the Node.js installation in
+`/opt/zigbee2mqtt` (53.6 MB), remove it first. Re-installing the Node package
+later needs `opkg install --force-space node-zigbee2mqtt` because the overlay
+check runs before our packages are removed.
 
 The service waits for the serial port from `configuration.yaml`, exports
 `ZIGBEE2MQTT_DATA=/etc/zigbee2mqtt` and

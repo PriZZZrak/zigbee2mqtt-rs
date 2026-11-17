@@ -55,10 +55,14 @@ printf '2.0\n' > "$work/debian-binary"
 tar -C "$work/control" -czf "$work/control.tar.gz" .
 tar -C "$payload" -czf "$work/data.tar.gz" .
 
+# OpenWrt >= 23.05 opkg reads .ipk as a gzipped tar with these three members
+# (an `ar` archive is rejected as "Malformed package file" by 24.10).
+mkdir -p "$work/stage"
+cp "$work/debian-binary" "$work/data.tar.gz" "$work/control.tar.gz" "$work/stage/"
 mkdir -p "$out"
 ipk="$out/${package}_${version}_${architecture}.ipk"
 rm -f "$ipk"
-(cd "$work" && ar rc "$ipk" debian-binary control.tar.gz data.tar.gz)
+tar -czf "$ipk" -C "$work/stage" ./debian-binary ./data.tar.gz ./control.tar.gz
 
 # Feed stanza: `update-feed.sh` concatenates these files, so the index never
 # has to unpack the .ipk (no `ar`/`tar` dependency on the publishing step) and

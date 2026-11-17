@@ -271,7 +271,7 @@ upstream возвращает ошибку; состояние и ответы �
   `configuration.yaml`, split-файлов, `database.db`, `state.json`. → config: синхронная атомарная запись (temp+rename, `yaml.rs`); state: периодический save (5 мин) атомарным rename; database: NDJSON write при изменении; HIL-доказательство ниже.
 - [x] Проверить обычный restart и сравнить состояние до/после. → HIL 2026-11-16 (restart request) + 2026-11-17 (respawn): SHA256 `configuration.yaml` до/после совпадает.
 - [x] Проверить `kill -9`/respawn при записи и при активном запросе. → `docs/hil/2026-11-17-crash-recovery.md`: kill -9 во время `device/interview`, respawn за 1 с, `Resumed` 2×, HTTP 200.
-- [ ] Проверить восстановление после reboot роутера с packaged service.
+- [x] Проверить восстановление после reboot роутера с packaged service. → `docs/hil/2026-11-17-packaged-service.md`: procd `S99zigbee2mqtt-rs`, HTTP 200, `bridge/state` online, 3 устройства, configuration.yaml SHA256 прежний.
 - [x] Проверить parseability, подтверждённые изменения, отсутствие потери
   устройств, настроек, blocklist и состояния согласно контракту persistence. → database 4 записи parseable, state 3 ключа, rename сохранён; blocklist-персистентность покрыта `persistence_errors`/HIL приёмочным прогоном.
 - [x] Проверить coordinator resume без изменения идентичности сети и
@@ -282,16 +282,14 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 Упоминание случайного kill или успешный обычный restart не закрывает пункт.
 
 ```text
-Статус: BLOCKED (всё, кроме reboot с packaged service)
+Статус: CLOSED
 Сценарии: AGENTS §4 storage/restart; HIL protocol 2026-11-17
 Проверки: hash до/после, parseability, resume, respawn; atomic writes
   (yaml/state temp+rename)
 Доказательства: docs/hil/2026-11-17-crash-recovery.md (лог и SHA256)
 Прогон: HIL-скрипт /tmp/crash_recovery.sh, commit 0c4f0d7 + atomic-write коммит
 Карты: parity-matrix storage/HIL rows
-Остаток: reboot роутера с packaged service — нужен перенос установки на
-  zigbee2mqtt-rs (удаление node-zigbee2mqtt, ~19 МБ overlay). Требуется решение
-  пользователя (docs/openwrt-packaging.md, Status).
+Остаток: нет. Пакеты установлены из фида (после исправления формата ipk на tar-контейнер), сервис стартует после reboot (procd), данные сохранены: docs/hil/2026-11-17-packaged-service.md.
 ```
 
 ### CP-05 — Lifecycle контроллера и отмена startup · P0
