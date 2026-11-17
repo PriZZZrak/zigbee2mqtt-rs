@@ -403,3 +403,28 @@ async fn stopped_availability_cannot_be_restarted() {
         "unexpected error: {error}"
     );
 }
+
+/// Case 17: a device option enables availability even when it is globally off.
+#[tokio::test]
+async fn availability_can_be_enabled_for_a_single_device() {
+    let _guard = serial();
+    let harness = harness(false, json!(true));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    tokio::task::yield_now().await;
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        mqtt.attempted.iter().any(|(topic, payload, _)| topic
+            == "zigbee2mqtt/lamp/availability"
+            && payload == r#"{"state":"offline"}"#),
+        "per-device override did not publish: {:?}",
+        mqtt.attempted
+            .iter()
+            .map(|(topic, payload, _)| (topic.clone(), payload.clone()))
+            .collect::<Vec<_>>()
+    );
+    drop(mqtt);
+    availability.stop().await.unwrap();
+}
+
