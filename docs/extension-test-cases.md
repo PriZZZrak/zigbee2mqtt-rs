@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 25 | 1 | 14 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 78 | 14 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 87 | 5 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -374,13 +374,13 @@ Coverage classes:
 |---:|---|---|---|
 | 1 | Should not have duplicate type/object_ids in a mapping | `asserted` | discovery_types_are_unique_and_templates_guarded |
 | 2 | Should guard every generated state template against a missing property | `asserted` | discovery_types_are_unique_and_templates_guarded |
-| 3 | Should guard the number entity built from a numeric expose with SET access | `slice` | number entity SET guard |
-| 4 | Should not guard with a form that drops a legitimate 0, false or null | `slice` | presence check (not truthiness) in state_value_template |
+| 3 | Should guard the number entity built from a numeric expose with SET access | `asserted` | `number_entity_template_is_guarded` |
+| 4 | Should not guard with a form that drops a legitimate 0, false or null | `asserted` | `discovery_templates_are_falsy_safe` |
 | 5 | Should mark thermostat configuration toggles as config entities | `asserted` | configuration_switches_are_config_entities |
 | 6 | Should mark device settings as config entities | `asserted` | configuration_switches_are_config_entities |
 | 7 | Should apply expose-level Home Assistant discovery metadata | `asserted` | applies_expose_metadata_and_null_name |
 | 8 | Should set discovery name to null when expose specifies homeassistant name null | `asserted` | applies_expose_metadata_and_null_name |
-| 9 | Should discover devices and groups | `slice` | discovers_numeric_binary_enum_and_switch_entities |
+| 9 | Should discover devices and groups | `asserted` | `discovers_numeric_binary_enum_and_switch_entities` + `group_members_changed_rediscovers_the_group` |
 | 10 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
 | 11 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
 | 12 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
@@ -407,17 +407,17 @@ Coverage classes:
 | 33 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
 | 34 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
 | 35 | Should parse action names correctly | `asserted` | extension::homeassistant::action_value_tests::parses_action_names_like_upstream |
-| 36 | Should not discovery devices which are already discovered | `slice` | discovery dedupe by topic+payload |
+| 36 | Should not discovery devices which are already discovered | `asserted` | `device_message_does_not_rediscover` |
 | 37 | Should discover devices with precision | `asserted` | precision_options_do_not_change_discovery_payloads |
 | 38 | Should discover devices with overridden user configuration | `asserted` | applies_device_option_overrides_and_null_filtering |
 | 39 | Should discover devices with overridden name | `asserted` | applies_device_option_overrides_and_null_filtering |
 | 40 | Should discover devices with overridden user configuration affecting type and object_id | `asserted` | applies_device_option_overrides_and_null_filtering |
 | 41 | Shouldnt discover devices when homeassistant null is set in device options | `asserted` | device_option_homeassistant_false_disables_discovery |
 | 42 | Shouldnt discover sensor when set to null | `asserted` | applies_device_option_overrides_and_null_filtering (temperature: null) |
-| 43 | Should discover devices with fan | `slice` | fan discovery mapping (generic) |
+| 43 | Should discover devices with fan | `asserted` | `discovers_numeric_binary_enum_and_switch_entities` (fan assertions) |
 | 44 | Should discover fan on a non-first endpoint | `asserted` | discovers_endpoint_entities_with_suffixed_topics (fan_f1) |
 | 45 | Should discover speed-controlled fan on a non-first endpoint | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 46 | Should discover siren (HS2WD-E) | `slice` | siren mapping from the warning composite |
+| 46 | Should discover siren (HS2WD-E) | `asserted` | `discovers_numeric_binary_enum_and_switch_entities` (siren assertions) |
 | 47 | Should discover devices with speed-controlled fan | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 48 | Should discover thermostat devices | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 49 | Should discover thermostat devices with read-only PI heating demand | `code` | discovery mapping ported, no dedicated per-device assertion |
@@ -445,14 +445,14 @@ Coverage classes:
 | 71 | Should warn when starting with cache_state false | `asserted` | starting_without_cache_state_warns |
 | 72 | Should not add missing values to the payload | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 73 | Should copy hue/saturtion to h/s if present | `asserted` | adjust_message_copies_hue_and_saturation |
-| 74 | Should not copy hue/saturtion if properties are missing | `slice` | adjust_message copies only when all properties exist |
-| 75 | Should not copy hue/saturtion if color is missing | `slice` | adjust_message copies only when color exists |
+| 74 | Should not copy hue/saturtion if properties are missing | `asserted` | `adjust_message_copies_hue_and_saturation` |
+| 75 | Should not copy hue/saturtion if color is missing | `asserted` | `adjust_message_copies_hue_and_saturation` |
 | 76 | Shouldt discover when already discovered | `asserted` | `device_message_does_not_rediscover` |
 | 77 | Should discover when not discovered yet | `asserted` | `device_message_discovers_when_not_discovered` |
 | 78 | Shouldnt discover when device leaves | `asserted` | `device_leave_does_not_publish_discovery` |
 | 79 | Should discover when options change | `asserted` | entity_options_changed_republishes_discovery |
 | 80 | Should send all status when home assistant comes online (default topic) | `asserted` | status_online_republishes_bridge_state_and_cached_states |
-| 81 | Should send all status when home assistant comes online | `slice` | status republish uses the configured status_topic |
+| 81 | Should send all status when home assistant comes online | `asserted` | `homeassistant_online_republishes_state` |
 | 82 | Should keep the versions of an update payload that already has them | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 83 | Shouldnt send all status when home assistant comes offline | `asserted` | status_offline_or_other_topics_do_not_republish |
 | 84 | Shouldnt send all status when home assistant comes online with different topic | `asserted` | status_offline_or_other_topics_do_not_republish |

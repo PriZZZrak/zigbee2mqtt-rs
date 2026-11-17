@@ -572,6 +572,18 @@ fn adjust_message_copies_hue_and_saturation() {
     ha.adjust_message_before_publish(device.as_ref(), &mut message);
     assert_eq!(message["color"]["h"], 100);
     assert_eq!(message["color"]["s"], 50);
+
+    // Cases 74-75: only existing properties are copied, missing ones are not
+    // invented (hue -> h and saturation -> s are independent).
+    let mut missing_saturation = json!({"color": {"hue": 100}});
+    ha.adjust_message_before_publish(device.as_ref(), &mut missing_saturation);
+    assert_eq!(missing_saturation["color"]["h"], 100);
+    assert!(missing_saturation["color"].get("s").is_none());
+    assert!(missing_saturation["color"].get("saturation").is_none());
+
+    let mut missing_color = json!({"state": "ON"});
+    ha.adjust_message_before_publish(device.as_ref(), &mut missing_color);
+    assert!(missing_color.get("color").is_none());
 }
 
 #[tokio::test]
@@ -1951,5 +1963,127 @@ async fn bridge_entity_config_echo_is_not_cleared() {
             .any(|(published, body, _)| published == topic && body.is_empty()),
         "bridge entity config was cleared after receiving it back"
     );
+    ha.stop().await.unwrap();
+}
+
+/// Case 3: a numeric expose with SET access still yields a guarded number
+/// entity template.
+#[tokio::test]
+async fn number_entity_template_is_guarded() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![Expose {
+            value_min: Some(0.0),
+            value_max: Some(255.0),
+            ..Expose::numeric("effect_speed", access::ALL)
+        }]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let number = config(
+        &harness,
+        &format!("homeassistant/number/{IEEE}/effect_speed/config"),
+    )
+    .await
+    .expect("number entity");
+    assert_eq!(
+        number["value_template"],
+        "{% if \"effect_speed\" in value_json %}{{ value_json[\"effect_speed\"] }}{% endif %}"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 4: discovery templates must not use truthiness that drops 0, false or
+/// null values, and must not use `default(x, True)` outside truncating
+/// templates.
+#[tokio::test]
+async fn discovery_templates_are_falsy_safe() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    let mut offending = Vec::new();
+    for (topic, payload, _) in &mqtt.attempted {
+        if !topic.ends_with("/config") || payload.is_empty() {
+            continue;
+        }
+        if payload.contains("default(")
+            && payload.contains(", True)")
+            && !payload.contains("truncate(")
+        {
+            offending.push(topic.clone());
+        }
+        let value: Value = serde_json::from_str(payload).unwrap_or(Value::Null);
+        fn scan(value: &Value, topic: &str, offending: &mut Vec<String>) {
+            match value {
+                Value::String(text) => {
+                    let mut rest = text.as_str();
+                    while let Some(start) = rest.find("{% if value_json[\"") {
+                        let tail = &rest[start..];
+                        if !tail.contains(" in value_json") {
+                            offending.push(format!("{topic}: {tail}"));
+                        }
+                        rest = &tail[3..];
+                    }
+                }
+                Value::Array(items) => {
+                    for item in items {
+                        scan(item, topic, offending);
+                    }
+                }
+                Value::Object(map) => {
+                    for item in map.values() {
+                        scan(item, topic, offending);
+                    }
+                }
+                _ => {}
+            }
+        }
+        scan(&value, topic, &mut offending);
+    }
+    assert!(
+        offending.is_empty(),
+        "falsy-sensitive templates: {offending:?}"
+    );
+}
+
+/// Case 81: when Home Assistant comes online, bridge state and discovery are
+/// republished after the 30 s debounce.
+#[tokio::test(start_paused = true)]
+async fn homeassistant_online_republishes_state() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": "homeassistant/status",
+        "message": "online",
+    }));
+    tokio::time::sleep(Duration::from_secs(31)).await;
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        mqtt.attempted.iter().any(
+            |(topic, payload, options)| topic == "zigbee2mqtt/bridge/state"
+                && payload == r#"{"state":"online"}"#
+                && options.retain
+        ),
+        "bridge state not republished: {:?}",
+        mqtt.attempted
+            .iter()
+            .map(|(topic, _, _)| topic.clone())
+            .collect::<Vec<_>>()
+    );
+    drop(mqtt);
     ha.stop().await.unwrap();
 }
