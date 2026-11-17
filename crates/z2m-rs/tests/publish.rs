@@ -32,6 +32,7 @@ type Recorded = Arc<Mutex<Vec<(Value, Option<String>)>>>;
 
 struct Harness {
     event_bus: Arc<Mutex<EventBus>>,
+    settings: Arc<Mutex<Settings>>,
     zigbee: Arc<Zigbee>,
     publish: Arc<Publish>,
     logger: Arc<Mutex<Logger>>,
@@ -151,6 +152,7 @@ fn harness(configuration: Value) -> Harness {
 
     Harness {
         event_bus,
+        settings,
         zigbee: zigbee.clone(),
         publish,
         logger,
@@ -348,7 +350,12 @@ async fn missing_endpoint_and_converter_are_logged() {
         .unwrap()
         .resolve_definition(true);
     assert!(
-        harness.zigbee.resolve_device(IEEE).unwrap().definition().is_some(),
+        harness
+            .zigbee
+            .resolve_device(IEEE)
+            .unwrap()
+            .definition()
+            .is_some(),
         "definition not resolved"
     );
 
@@ -369,14 +376,17 @@ async fn missing_endpoint_and_converter_are_logged() {
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    assert!(harness
-        .logger
-        .lock()
-        .unwrap()
-        .winston_logs
-        .iter()
-        .any(|(_, line)| line.contains("has no endpoint 'center'")),
-        "logs={:?}", harness.logger.lock().unwrap().winston_logs);
+    assert!(
+        harness
+            .logger
+            .lock()
+            .unwrap()
+            .winston_logs
+            .iter()
+            .any(|(_, line)| line.contains("has no endpoint 'center'")),
+        "logs={:?}",
+        harness.logger.lock().unwrap().winston_logs
+    );
 
     harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
         "topic": format!("zigbee2mqtt/{IEEE}/set"),
@@ -402,5 +412,335 @@ async fn missing_endpoint_and_converter_are_logged() {
         .winston_logs
         .iter()
         .any(|(_, line)| line.contains("No converter available for 'unknown_property' on")));
+}
 
+fn register_state_converter(
+    zigbee: &Zigbee,
+    calls: Arc<Mutex<Vec<(String, Value)>>>,
+    state: Value,
+) {
+    let get_calls = calls.clone();
+    let converter = ToZigbeeConverter {
+        key: vec!["state".to_string(), "brightness".to_string()],
+        endpoints: None,
+        convert_set: Some(Arc::new(move |_target, key, value, _meta: ToMeta| {
+            let calls = calls.clone();
+            let state = state.clone();
+            Box::pin(async move {
+                calls.lock().unwrap().push((key, value));
+                Ok(ToZigbeeResult {
+                    state: Some(state),
+                    members_state: None,
+                })
+            })
+        })),
+        convert_get: Some(Arc::new(move |_target, key, _value, _meta| {
+            let calls = get_calls.clone();
+            Box::pin(async move {
+                calls
+                    .lock()
+                    .unwrap()
+                    .push((format!("get:{key}"), Value::Null));
+                Ok(ToZigbeeResult::default())
+            })
+        })),
+    };
+    let mut definition = Definition::new("TEST", "Acme", "Test")
+        .with_zigbee_model("TEST")
+        .with_exposes(vec![
+            Expose::binary("state", zigbee_converters::access::ALL),
+            Expose::numeric("brightness", zigbee_converters::access::ALL),
+        ]);
+    definition.to_zigbee.push(converter);
+    zigbee.converters().lock().unwrap().register(definition);
+}
+
+/// Cases 37-41: topics that are not `<base>/<entity>/<get|set>` are ignored.
+#[tokio::test]
+async fn invalid_topics_are_ignored() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    for topic in [
+        format!("zigbee2mqtt1/{IEEE}/set"),
+        format!("zigbee2mqtt1/{IEEE}/sett"),
+        format!("zigbee2mqtt/{IEEE}/write"),
+        "zigbee2mqtt/set".to_string(),
+        "set".to_string(),
+    ] {
+        assert!(
+            harness.publish.parse_topic(&topic).is_none(),
+            "topic '{topic}' must not parse"
+        );
+        harness
+            .event_bus
+            .lock()
+            .unwrap()
+            .emit_mqtt_message(json!({"topic": topic, "message": r#"{"state":"ON"}"#}));
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(harness.recorded.lock().unwrap().is_empty());
+}
+
+/// Cases 48-50, 59 and 60: slashes in the base topic, friendly name and
+/// numeric name suffixes still resolve the entity and endpoint.
+#[tokio::test]
+async fn topic_parsing_handles_slashes() {
+    let _guard = serial();
+    let harness = harness(json!({
+        "mqtt": {"server": "localhost", "base_topic": "zigbee2mqtt/at/my/home"},
+    }));
+    harness.settings.lock().unwrap().configuration["devices"][IEEE]["friendly_name"] =
+        json!("floor0/basement/lamp");
+
+    let parsed = harness
+        .publish
+        .parse_topic("zigbee2mqtt/at/my/home/floor0/basement/lamp/get")
+        .expect("slashed base and device name");
+    assert_eq!(parsed.id, "floor0/basement/lamp");
+    assert_eq!(parsed.r#type, "get");
+
+    let parsed = harness
+        .publish
+        .parse_topic("zigbee2mqtt/at/my/home/floor0/basement/lamp/2/set")
+        .expect("endpoint after a numeric name part");
+    assert_eq!(parsed.endpoint.as_deref(), Some("2"));
+    assert_eq!(parsed.r#type, "set");
+
+    // A friendly name that ends with a number and has a named endpoint postfix.
+    harness.settings.lock().unwrap().configuration["devices"][IEEE]["friendly_name"] =
+        json!("ground_floor/kitchen/switch/2");
+    let parsed = harness
+        .publish
+        .parse_topic("zigbee2mqtt/at/my/home/ground_floor/kitchen/switch/2/1/get")
+        .expect("numeric name suffix with endpoint");
+    assert_eq!(parsed.id, "ground_floor/kitchen/switch/2");
+    assert_eq!(parsed.endpoint.as_deref(), Some("1"));
+}
+
+/// Cases 43-44: get dispatches per endpoint for multi-endpoint devices.
+#[tokio::test]
+async fn get_dispatches_multiple_endpoints() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_state_converter(&harness.zigbee, calls.clone(), json!({"state": "ON"}));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    for endpoint in ["1", "2"] {
+        harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+            "topic": format!("zigbee2mqtt/{IEEE}/{endpoint}/get"),
+            "message": r#"{"state":""}"#,
+        }));
+    }
+    for _ in 0..50 {
+        if calls.lock().unwrap().len() >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(calls.lock().unwrap().len(), 2, "both endpoints were read");
+}
+
+/// Cases 51, 52, 56 and 58: attribute/postfix set topics reach the converter.
+#[tokio::test]
+async fn set_attribute_and_postfix_topics_dispatch() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_state_converter(&harness.zigbee, calls.clone(), json!({"state": "ON"}));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    for topic in [
+        format!("zigbee2mqtt/{IEEE}/set/state"),
+        format!("zigbee2mqtt/{IEEE}/1/set/state"),
+        // IEEE addresses work as the entity id as well (case 53).
+        format!("zigbee2mqtt/{IEEE}/set"),
+    ] {
+        harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+            "topic": topic,
+            "message": "ON",
+        }));
+    }
+    for _ in 0..50 {
+        if calls.lock().unwrap().len() >= 3 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let calls = calls.lock().unwrap();
+    assert_eq!(calls.len(), 3);
+    assert_eq!(calls[0], ("state".to_string(), json!("ON")));
+    assert_eq!(calls[1], ("state".to_string(), json!("ON")));
+    assert_eq!(calls[2], ("state".to_string(), json!("ON")));
+}
+
+/// Case 54: an unknown endpoint postfix is not dispatched.
+#[tokio::test]
+async fn non_existing_postfix_is_not_dispatched() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_state_converter(&harness.zigbee, calls.clone(), json!({"state": "ON"}));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": format!("zigbee2mqtt/{IEEE}/center/set"),
+        "message": r#"{"state":"ON"}"#,
+    }));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+/// Case 57: non-JSON values other than on/off/toggle are rejected.
+#[tokio::test]
+async fn invalid_state_message_is_not_dispatched() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_state_converter(&harness.zigbee, calls.clone(), json!({"state": "ON"}));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": format!("zigbee2mqtt/{IEEE}/set"),
+        "message": "ON_RANDOM",
+    }));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+/// Case 34: `optimistic: false` suppresses the optimistic state publish.
+#[tokio::test]
+async fn optimistic_false_suppresses_the_publish() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    harness.settings.lock().unwrap().configuration["devices"][IEEE]["optimistic"] = json!(false);
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_state_converter(&harness.zigbee, calls.clone(), json!({"state": "ON"}));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": format!("zigbee2mqtt/{IEEE}/set"),
+        "message": r#"{"state":"ON"}"#,
+    }));
+    for _ in 0..50 {
+        if !calls.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(calls.lock().unwrap().len(), 1, "the converter still runs");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        harness.recorded.lock().unwrap().is_empty(),
+        "optimistic:false published {:?}",
+        harness.recorded.lock().unwrap()
+    );
+}
+
+/// Case 35: `filtered_optimistic` removes the listed properties from the
+/// optimistic publish.
+#[tokio::test]
+async fn filtered_optimistic_filters_the_publish() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    harness.settings.lock().unwrap().configuration["devices"][IEEE]["filtered_optimistic"] =
+        json!(["brightness"]);
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_state_converter(
+        &harness.zigbee,
+        calls,
+        json!({"state": "ON", "brightness": 100}),
+    );
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": format!("zigbee2mqtt/{IEEE}/set"),
+        "message": r#"{"brightness":100}"#,
+    }));
+    wait_for_publishes(&harness.recorded, 1).await;
+    assert_eq!(
+        harness.recorded.lock().unwrap()[0].0,
+        json!({"state": "ON"}),
+        "brightness must be filtered out"
+    );
+}
+
+/// Case 44: get with multiple cover endpoints dispatches per endpoint.
+#[tokio::test]
+async fn get_dispatches_multiple_cover_endpoints() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    let get_calls = calls.clone();
+    let converter = ToZigbeeConverter {
+        key: vec!["position".to_string()],
+        endpoints: Some(vec!["1".to_string(), "2".to_string()]),
+        convert_set: None,
+        convert_get: Some(Arc::new(move |_target, key, _value, _meta| {
+            let calls = get_calls.clone();
+            Box::pin(async move {
+                calls
+                    .lock()
+                    .unwrap()
+                    .push((format!("get:{key}"), Value::Null));
+                Ok(ToZigbeeResult::default())
+            })
+        })),
+    };
+    let mut definition = Definition::new("TEST", "Acme", "Test")
+        .with_zigbee_model("TEST")
+        .with_exposes(vec![Expose::numeric(
+            "position",
+            zigbee_converters::access::ALL,
+        )]);
+    definition.to_zigbee.push(converter);
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    for endpoint in ["1", "2"] {
+        harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+            "topic": format!("zigbee2mqtt/{IEEE}/{endpoint}/get"),
+            "message": r#"{"position":""}"#,
+        }));
+    }
+    for _ in 0..50 {
+        if calls.lock().unwrap().len() >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(calls.lock().unwrap().len(), 2);
 }

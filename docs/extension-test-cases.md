@@ -41,7 +41,7 @@ Coverage classes:
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
-| publish.test.ts | 110 | 5 | 27 | 1 | 77 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
+| publish.test.ts | 110 | 27 | 5 | 1 | 77 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
 | receive.test.ts | 34 | 15 | 16 | 1 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
@@ -600,33 +600,33 @@ Coverage classes:
 | 31 | Should publish messages to groups color | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 32 | Should publish messages to groups color temperature | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 33 | Should create and publish to group which is in configuration.yaml but not in zigbee-herdsman | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
-| 34 | Shouldnt publish new state when optimistic = false | `slice` | optimistic=false suppresses the optimistic publish |
-| 35 | Shouldnt publish new brightness state when filtered_optimistic is used | `slice` | filtered_optimistic suppresses the optimistic publish |
+| 34 | Shouldnt publish new state when optimistic = false | `asserted` | `optimistic_false_suppresses_the_publish` |
+| 35 | Shouldnt publish new brightness state when filtered_optimistic is used | `asserted` | `filtered_optimistic_filters_the_publish` |
 | 36 | Shouldnt publish new state when optimistic = false for group | `slice` | optimistic=false for groups |
-| 37 | Should handle non-valid topics | `slice` | parse_message_variants (invalid topics) |
-| 38 | Should handle non-valid topics | `slice` | parse_message_variants (invalid topics) |
-| 39 | Should handle non-valid topics | `slice` | parse_message_variants (invalid topics) |
-| 40 | Should handle non-valid topics | `slice` | parse_message_variants (invalid topics) |
-| 41 | Should handle non-valid topics | `slice` | parse_message_variants (invalid topics) |
+| 37 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |
+| 38 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |
+| 39 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |
+| 40 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |
+| 41 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |
 | 42 | Should handle get | `asserted` | set_and_get_dispatch_to_converters |
-| 43 | Should handle get with multiple endpoints | `slice` | multi-endpoint get dispatch |
-| 44 | Should handle get with multiple cover endpoints | `slice` | multi-endpoint cover get |
+| 43 | Should handle get with multiple endpoints | `asserted` | `get_dispatches_multiple_endpoints` |
+| 44 | Should handle get with multiple cover endpoints | `asserted` | `get_dispatches_multiple_cover_endpoints` |
 | 45 | Should log error when device has no such endpoint (via topic) | `asserted` | missing_endpoint_and_converter_are_logged |
 | 46 | Should log error when device has no definition | `asserted` | unsupported_device_is_rejected (no definition) |
 | 47 | Should log error when device has no such endpoint (via property) | `code` | unknown property endpoint error |
-| 48 | Should parse topic with when base topic has multiple slashes | `slice` | parse_topic_resolves_entity_and_endpoint |
-| 49 | Should parse topic with when deviceID has multiple slashes | `slice` | parse_topic_resolves_entity_and_endpoint |
-| 50 | Should parse topic with when base and deviceID have multiple slashes | `slice` | parse_topic_resolves_entity_and_endpoint |
-| 51 | Should parse set with attribute topic | `slice` | set topic parsing variants |
-| 52 | Should parse set with color attribute topic | `slice` | set topic parsing variants |
-| 53 | Should parse set with ieeeAddr topic | `slice` | set topic parsing variants |
-| 54 | Should parse set with non-existing postfix | `slice` | set topic parsing variants |
+| 48 | Should parse topic with when base topic has multiple slashes | `asserted` | `topic_parsing_handles_slashes` |
+| 49 | Should parse topic with when deviceID has multiple slashes | `asserted` | `topic_parsing_handles_slashes` |
+| 50 | Should parse topic with when base and deviceID have multiple slashes | `asserted` | `topic_parsing_handles_slashes` |
+| 51 | Should parse set with attribute topic | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
+| 52 | Should parse set with color attribute topic | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
+| 53 | Should parse set with ieeeAddr topic | `asserted` | `set_attribute_and_postfix_topics_dispatch` (IEEE entity id) |
+| 54 | Should parse set with non-existing postfix | `asserted` | `non_existing_postfix_is_not_dispatched` |
 | 55 | Should allow to invert cover | `slice` | set topic parsing variants |
-| 56 | Should send state update on toggle specific endpoint | `slice` | set topic parsing variants |
-| 57 | Should not use state converter on non-json message when value is not on/off/toggle | `slice` | set topic parsing variants |
-| 58 | Should parse set with postfix topic and attribute | `slice` | set topic parsing variants |
-| 59 | Should parse set with and slashes in base and deviceID postfix topic | `slice` | parse_topic_resolves_entity_and_endpoint |
-| 60 | Should parse set with number at the end of friendly_name and postfix | `slice` | parse_topic_resolves_entity_and_endpoint |
+| 56 | Should send state update on toggle specific endpoint | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
+| 57 | Should not use state converter on non-json message when value is not on/off/toggle | `asserted` | `invalid_state_message_is_not_dispatched` |
+| 58 | Should parse set with postfix topic and attribute | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
+| 59 | Should parse set with and slashes in base and deviceID postfix topic | `asserted` | `topic_parsing_handles_slashes` |
+| 60 | Should parse set with number at the end of friendly_name and postfix | `asserted` | `topic_parsing_handles_slashes` |
 | 61 | Should not publish messages to zigbee devices when payload is invalid | `slice` | invalid payload is rejected |
 | 62 | Should set state before color | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 63 | Should also use on/off cluster when controlling group with switch | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
@@ -676,7 +676,7 @@ Coverage classes:
 | 107 | Shouldnt use moveToLevelWithOnOff on turn on when no transition has been used as some devices do not turn on in that case | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 108 | Scenes | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 109 | Should sync colors | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
-| 110 | Log an error when entity is not found | `slice` | unsupported_device_is_rejected (entity not found path) |
+| 110 | Log an error when entity is not found | `asserted` | `unsupported_device_is_rejected` |
 
 ## receive.test.ts
 
