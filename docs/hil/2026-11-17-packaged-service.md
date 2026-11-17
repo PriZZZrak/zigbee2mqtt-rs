@@ -32,6 +32,19 @@ http root=200
 mosquitto_sub zigbee2mqtt/bridge/state -> {"state":"online"}
 ```
 
+## Version reporting
+
+Before: `bridge/info.version = "unknown"`, log `Starting Zigbee2MQTT version
+unknown (commit #unknown)` — `get_zigbee2mqtt_version()` read
+`.upstream/zigbee2mqtt/package.json` and `.git` at runtime, which a packaged
+binary does not have. `build.rs` now embeds `CARGO_PKG_VERSION` and
+`git rev-parse --short=8 HEAD`; after installing 0.0.1-dev.4:
+
+```
+info: Starting Zigbee2MQTT version 0.1.0 (commit #4f7c6623)
+bridge/info -> {"commit":"4f7c6623", ...}
+```
+
 ## Reboot recovery
 
 Pre-reboot hashes:

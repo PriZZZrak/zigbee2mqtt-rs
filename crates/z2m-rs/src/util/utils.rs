@@ -26,18 +26,18 @@ pub fn object_has_properties(value: &Value, keys: &[&str]) -> bool {
 }
 
 pub async fn get_zigbee2mqtt_version() -> Value {
-    let package_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.upstream/zigbee2mqtt/package.json");
-    let version = std::fs::read_to_string(package_path)
-        .ok()
-        .and_then(|content| serde_json::from_str::<Value>(&content).ok())
-        .and_then(|package| package.get("version").cloned())
-        .unwrap_or_else(|| Value::String("unknown".to_string()));
-
-    serde_json::json!({"version": version, "commitHash": "unknown"})
+    // Embedded at build time: a packaged binary has no package.json or .git.
+    // Upstream reads both at runtime; the values here are the port's version and
+    // the commit it was built from (the parity target is logged separately).
+    serde_json::json!({
+        "version": env!("Z2M_VERSION"),
+        "commitHash": env!("Z2M_COMMIT"),
+    })
 }
 
 pub async fn get_dependency_version(name: &str) -> Value {
+    // Embedded crate versions are used by the bridge; this fallback only feeds
+    // development diagnostics.
     let package_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../.upstream/zigbee2mqtt/node_modules")
         .join(name)

@@ -173,3 +173,13 @@ fn stable_stringify() {
     // a custom serializer; upstream returns {"a":1,"b":"[Circular]"}.
     // toJSON handling likewise requires a custom serializer.
 }
+
+/// A packaged binary must report a real version/commit, not "unknown"
+/// (upstream reads package.json and git at runtime; the port embeds them).
+#[tokio::test]
+async fn reports_embedded_version_and_commit() {
+    let info = z2m_rs::util::utils::get_zigbee2mqtt_version().await;
+    assert_ne!(info["version"], "unknown", "{info}");
+    assert!(info["version"].as_str().is_some_and(|value| !value.is_empty()));
+    assert_ne!(info["commitHash"], "unknown", "{info}");
+}
