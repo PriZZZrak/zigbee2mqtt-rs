@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 21 | 1 | 18 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 70 | 14 | 29 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 78 | 14 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 1 | 2 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -426,8 +426,8 @@ Coverage classes:
 | 52 | Should discover analog input on unsupported devices with device class and name | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 53 | Should discover analog output on unsupported devices | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 54 | Should apply user configuration after converter compatibility mapping | `slice` | user configuration applied after converter mapping |
-| 55 | does not throw when discovery payload override throws | `code` | overrideHaDiscoveryPayload errors are caught and logged |
-| 56 | passes device options to discovery payload overrides | `code` | overrideHaDiscoveryPayload receives entity options |
+| 55 | does not throw when discovery payload override throws | `asserted` | `discovery_override_panic_is_caught` |
+| 56 | passes device options to discovery payload overrides | `asserted` | `discovery_override_receives_device_options` |
 | 57 | Should discover Bosch BTH-RM230Z with a current_humidity attribute | `converter-db` | Bosch BTH-RM230Z exposes live in the converter DB |
 | 58 | Should discover seperate temperature sensor for thermostat | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 59 | Should use humidity of the same endpoint for multi-endpoint climate | `code` | discovery mapping ported, no dedicated per-device assertion |
@@ -439,7 +439,7 @@ Coverage classes:
 | 65 | Should preserve motor_state and state fallback for covers without position | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 66 | Should discover an infrared emitter entity | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 67 | Should discover an infrared receiver entity | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 68 | Should discover devices with custom homeassistant.discovery_topic | `code` | homeassistant.discovery_topic is honoured by discovery_topic_for |
+| 68 | Should discover devices with custom homeassistant.discovery_topic | `asserted` | `custom_discovery_topic_is_used` |
 | 69 | Should throw error when starting with attributes output | `asserted` | start_rejects_attribute_output_and_conflicting_discovery_topic |
 | 70 | Should throw error when homeassistant.discovery_topic equals the mqtt.base_topic | `asserted` | start_rejects_attribute_output_and_conflicting_discovery_topic |
 | 71 | Should warn when starting with cache_state false | `asserted` | starting_without_cache_state_warns |
@@ -447,9 +447,9 @@ Coverage classes:
 | 73 | Should copy hue/saturtion to h/s if present | `asserted` | adjust_message_copies_hue_and_saturation |
 | 74 | Should not copy hue/saturtion if properties are missing | `slice` | adjust_message copies only when all properties exist |
 | 75 | Should not copy hue/saturtion if color is missing | `slice` | adjust_message copies only when color exists |
-| 76 | Shouldt discover when already discovered | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 77 | Should discover when not discovered yet | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 78 | Shouldnt discover when device leaves | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 76 | Shouldt discover when already discovered | `asserted` | `device_message_does_not_rediscover` |
+| 77 | Should discover when not discovered yet | `asserted` | `device_message_discovers_when_not_discovered` |
+| 78 | Shouldnt discover when device leaves | `asserted` | `device_leave_does_not_publish_discovery` |
 | 79 | Should discover when options change | `asserted` | entity_options_changed_republishes_discovery |
 | 80 | Should send all status when home assistant comes online (default topic) | `asserted` | status_online_republishes_bridge_state_and_cached_states |
 | 81 | Should send all status when home assistant comes online | `slice` | status republish uses the configured status_topic |
@@ -480,13 +480,13 @@ Coverage classes:
 | 106 | Should discover devices with configuration url (zigbee2mqtt-windfront) | `asserted` | configuration_url_points_at_the_frontend |
 | 107 | Should discover devices with configuration url (zigbee2mqtt-frontend) | `asserted` | configuration_url_points_at_the_frontend |
 | 108 | Should rediscover scenes when a scene is changed | `asserted` | scenes_are_discovered_and_rediscovered_on_change |
-| 109 | Should not clear bridge entities unnecessarily | `code` | bridge entities are published once (dedupe) |
+| 109 | Should not clear bridge entities unnecessarily | `asserted` | `bridge_entity_config_echo_is_not_cleared` |
 | 110 | Should discover bridge entities | `asserted` | bridge discovery assertions in discovers_numeric_binary_enum_and_switch_entities |
 | 111 | Should remove discovery entries for removed exposes when device options change | `asserted` | exposes_changed_clears_removed_and_rediscovers_returning_entities |
 | 112 | Should rediscover an entity whose expose comes back after it was removed | `asserted` | exposes_changed_clears_removed_and_rediscovers_returning_entities |
 | 113 | Should publish discovery message when a converter announces changed exposes | `asserted` | exposes_changed_clears_removed_and_rediscovers_returning_entities |
 | 114 | Legacy action sensor | `asserted` | legacy_action_sensor_discovers_and_clears_action |
-| 115 | prevents mismatching setting/extension state | `code` | settings/extension mismatch guard |
+| 115 | prevents mismatching setting/extension state | `asserted` | `homeassistant_enable_disable_requires_matching_settings` (controller_startup) |
 
 ## networkMap.test.ts
 

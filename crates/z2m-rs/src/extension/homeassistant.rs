@@ -121,6 +121,16 @@ impl HomeAssistant {
         })
     }
 
+    /// Test hook: clear the discovered flag for an entity (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_mark_undiscovered(&self, id: &str) {
+        let discovered = self.get_discovered(id);
+        let mut state = discovered.lock().unwrap();
+        state.discovered = false;
+        state.messages.clear();
+        state.triggers.clear();
+    }
+
     fn get_discovered(&self, id: &str) -> Arc<Mutex<Discovered>> {
         let mut map = self.discovered.lock().unwrap();
         map.entry(id.to_string())

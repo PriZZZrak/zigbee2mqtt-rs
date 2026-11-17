@@ -369,14 +369,14 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
     assert_eq!(siren["available_tones"], json!(["emergency", "fire"]));
     assert_eq!(siren["support_volume_set"], true);
     assert_eq!(siren["support_duration"], true);
-    assert!(siren["command_template"].as_str().unwrap().contains("warning"));
+    assert!(siren["command_template"]
+        .as_str()
+        .unwrap()
+        .contains("warning"));
 
-    let text = config(
-        &harness,
-        &format!("homeassistant/text/{IEEE}/note/config"),
-    )
-    .await
-    .expect("text");
+    let text = config(&harness, &format!("homeassistant/text/{IEEE}/note/config"))
+        .await
+        .expect("text");
     assert_eq!(text["command_topic"], "zigbee2mqtt/lamp/set/note");
     assert_eq!(text["state_topic"], "zigbee2mqtt/lamp");
 
@@ -386,10 +386,23 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
     )
     .await;
     if bridge.is_none() {
-        panic!("topics: {:?}", harness.mqtt.lock().await.attempted.iter().map(|(t,_,_)| t.clone()).collect::<Vec<_>>());
+        panic!(
+            "topics: {:?}",
+            harness
+                .mqtt
+                .lock()
+                .await
+                .attempted
+                .iter()
+                .map(|(t, _, _)| t.clone())
+                .collect::<Vec<_>>()
+        );
     }
     let bridge = bridge.unwrap();
-    assert_eq!(bridge["device"]["identifiers"][0], "zigbee2mqtt_bridge_0x00124b0024c16b95");
+    assert_eq!(
+        bridge["device"]["identifiers"][0],
+        "zigbee2mqtt_bridge_0x00124b0024c16b95"
+    );
     assert_eq!(bridge["payload_on"], "online");
 
     let climate = config(
@@ -494,17 +507,23 @@ async fn action_publishes_device_trigger_and_republication() {
     ha.clone().start().await.unwrap();
     harness.mqtt.lock().await.attempted.clear();
 
-    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
-        "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
-        "message": {"action": "single"},
-    }));
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_publish_entity_state(json!({
+            "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+            "message": {"action": "single"},
+        }));
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let mqtt = harness.mqtt.lock().await;
     let trigger = mqtt
         .attempted
         .iter()
-        .find(|(topic, _, _)| topic == &format!("homeassistant/device_automation/{IEEE}/action_single/config"))
+        .find(|(topic, _, _)| {
+            topic == &format!("homeassistant/device_automation/{IEEE}/action_single/config")
+        })
         .expect("trigger discovery");
     let payload: Value = serde_json::from_str(&trigger.1).unwrap();
     assert_eq!(payload["automation_type"], "trigger");
@@ -520,12 +539,10 @@ async fn action_publishes_device_trigger_and_republication() {
 async fn experimental_event_entities_prepare_wildcard_action_types() {
     let _guard = serial();
     let harness = harness();
-    harness
-        .context
-        .settings
-        .lock()
-        .unwrap()
-        .set(&["homeassistant", "experimental_event_entities"], json!(true));
+    harness.context.settings.lock().unwrap().set(
+        &["homeassistant", "experimental_event_entities"],
+        json!(true),
+    );
     let ha = HomeAssistant::new(harness.context.clone());
     ha.clone().start().await.unwrap();
 
@@ -539,7 +556,10 @@ async fn experimental_event_entities_prepare_wildcard_action_types() {
         event["event_types"],
         json!(["single", "recall", "press", "brightness_step"])
     );
-    assert!(event["value_template"].as_str().unwrap().contains("patterns"));
+    assert!(event["value_template"]
+        .as_str()
+        .unwrap()
+        .contains("patterns"));
 }
 
 #[test]
@@ -700,18 +720,14 @@ async fn clears_outdated_discovery_config_from_retained_messages() {
     harness.mqtt.lock().await.attempted.clear();
 
     let topic = "homeassistant/sensor/0xdeadbeefdeadbeef/temperature/config";
-    harness
-        .event_bus
-        .lock()
-        .unwrap()
-        .emit_mqtt_message(json!({
-            "topic": topic,
-            "message": json!({
-                "state_topic": "zigbee2mqtt/removed",
-                "availability": [{"topic": "zigbee2mqtt/bridge/state"}],
-            })
-            .to_string(),
-        }));
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": topic,
+        "message": json!({
+            "state_topic": "zigbee2mqtt/removed",
+            "availability": [{"topic": "zigbee2mqtt/bridge/state"}],
+        })
+        .to_string(),
+    }));
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let mqtt = harness.mqtt.lock().await;
@@ -829,12 +845,9 @@ async fn discovers_endpoint_entities_with_suffixed_topics() {
     assert_eq!(cover["state_topic"], "zigbee2mqtt/lamp/left");
     assert_eq!(cover["command_topic"], "zigbee2mqtt/lamp/left/set");
 
-    let fan = config(
-        &harness,
-        &format!("homeassistant/fan/{IEEE}/fan_f1/config"),
-    )
-    .await
-    .expect("endpoint fan");
+    let fan = config(&harness, &format!("homeassistant/fan/{IEEE}/fan_f1/config"))
+        .await
+        .expect("endpoint fan");
     assert_eq!(fan["name"], "F1");
     assert_eq!(fan["command_topic"], "zigbee2mqtt/lamp/f1/set/state");
 
@@ -845,7 +858,10 @@ async fn discovers_endpoint_entities_with_suffixed_topics() {
     .await
     .expect("endpoint switch");
     assert_eq!(switch["command_topic"], "zigbee2mqtt/lamp/2/set");
-    assert_eq!(switch["value_template"], "{% if \"state_l2\" in value_json %}{{ value_json[\"state_l2\"] }}{% endif %}");
+    assert_eq!(
+        switch["value_template"],
+        "{% if \"state_l2\" in value_json %}{{ value_json[\"state_l2\"] }}{% endif %}"
+    );
 }
 
 #[tokio::test]
@@ -870,10 +886,14 @@ async fn endpoint_state_publish_is_split_per_endpoint_topic() {
     ha.clone().start().await.unwrap();
     harness.mqtt.lock().await.attempted.clear();
 
-    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
-        "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
-        "message": {"state": "ON", "state_l1": "ON", "brightness_l1": 42},
-    }));
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_publish_entity_state(json!({
+            "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+            "message": {"state": "ON", "state_l1": "ON", "brightness_l1": 42},
+        }));
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let mqtt = harness.mqtt.lock().await;
@@ -978,16 +998,19 @@ async fn light_type_select_is_not_republished_as_endpoint_state() {
     .is_some());
     harness.mqtt.lock().await.attempted.clear();
 
-    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
-        "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
-        "message": {"light_type": "switch", "state_l1": "ON"},
-    }));
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_publish_entity_state(json!({
+            "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+            "message": {"light_type": "switch", "state_l1": "ON"},
+        }));
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let mqtt = harness.mqtt.lock().await;
     assert!(
-        mqtt
-            .attempted
+        mqtt.attempted
             .iter()
             .any(|(topic, payload, _)| topic == "zigbee2mqtt/lamp/l1"
                 && payload == r#"{"state":"ON"}"#),
@@ -1045,11 +1068,9 @@ async fn scenes_are_discovered_and_rediscovered_on_change() {
         mqtt.attempted
     );
     assert!(
-        mqtt.attempted
-            .iter()
-            .any(|(topic, payload, _)| topic
-                == &format!("homeassistant/scene/{IEEE}/scene_1/config")
-                && !payload.is_empty()),
+        mqtt.attempted.iter().any(|(topic, payload, _)| topic
+            == &format!("homeassistant/scene/{IEEE}/scene_1/config")
+            && !payload.is_empty()),
         "scene was not rediscovered"
     );
 }
@@ -1077,14 +1098,12 @@ async fn exposes_changed_clears_removed_and_rediscovers_returning_entities() {
     let ha = HomeAssistant::new(harness.context.clone());
     ha.clone().start().await.unwrap();
 
-    assert!(
-        config(
-            &harness,
-            &format!("homeassistant/sensor/{IEEE}/humidity/config")
-        )
-        .await
-        .is_some()
-    );
+    assert!(config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/humidity/config")
+    )
+    .await
+    .is_some());
 
     // Upstream `Should remove discovery entries for removed exposes when device
     // options change` + `exposes_changed` triggering rediscovery.
@@ -1176,7 +1195,8 @@ async fn group_members_changed_rediscovers_the_group() {
         .attempted
         .iter()
         .find(|(topic, _, _)| {
-            topic.starts_with("homeassistant/light/") && topic.ends_with("/light/config")
+            topic.starts_with("homeassistant/light/")
+                && topic.ends_with("/light/config")
                 && !topic.contains(IEEE)
         })
         .expect("group light discovered");
@@ -1234,10 +1254,14 @@ async fn group_state_publish_does_not_republish_endpoint_states() {
     ha.clone().start().await.unwrap();
     harness.mqtt.lock().await.attempted.clear();
 
-    harness.event_bus.lock().unwrap().emit_publish_entity_state(json!({
-        "entity": {"name": "kitchen", "ID": 1},
-        "message": {"state_l1": "ON"},
-    }));
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_publish_entity_state(json!({
+            "entity": {"name": "kitchen", "ID": 1},
+            "message": {"state_l1": "ON"},
+        }));
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let mqtt = harness.mqtt.lock().await;
@@ -1387,14 +1411,10 @@ async fn status_online_republishes_bridge_state_and_cached_states() {
             .unwrap()
             .set(device.as_ref(), json!({"state": "ON"}), None);
     }
-    harness
-        .event_bus
-        .lock()
-        .unwrap()
-        .emit_mqtt_message(json!({
-            "topic": "homeassistant/status",
-            "message": "online",
-        }));
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": "homeassistant/status",
+        "message": "online",
+    }));
     for _ in 0..10 {
         tokio::task::yield_now().await;
     }
@@ -1433,11 +1453,7 @@ async fn status_offline_or_other_topics_do_not_republish() {
         json!({"topic": "homeassistant/status", "message": "offline"}),
         json!({"topic": "homeassistant/other", "message": "online"}),
     ] {
-        harness
-            .event_bus
-            .lock()
-            .unwrap()
-            .emit_mqtt_message(message);
+        harness.event_bus.lock().unwrap().emit_mqtt_message(message);
     }
     tokio::time::advance(Duration::from_secs(31)).await;
     for _ in 0..10 {
@@ -1471,7 +1487,10 @@ async fn discovery_types_are_unique_and_templates_guarded() {
             continue;
         }
         let key = (parts[0].to_string(), parts[2].to_string());
-        assert!(seen.insert(key.clone()), "duplicate discovery entry {key:?}");
+        assert!(
+            seen.insert(key.clone()),
+            "duplicate discovery entry {key:?}"
+        );
 
         let payload: Value = serde_json::from_str(payload).unwrap();
         if let Some(template) = payload["value_template"].as_str() {
@@ -1714,4 +1733,223 @@ async fn availability_entries_cover_bridge_and_entity_topics() {
     let availability = group_light["availability"].as_array().unwrap();
     assert_eq!(availability[1]["topic"], "zigbee2mqtt/kitchen/availability");
     assert_eq!(group_light["availability_mode"], "all");
+}
+
+/// Case 55: an override that panics is caught, logged and the original payload
+/// is still published.
+#[tokio::test]
+async fn discovery_override_panic_is_caught() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.override_ha_discovery_payload =
+            Some(Arc::new(|payload: &mut Value, _options: &Value| {
+                if payload["mode_command_topic"]
+                    .as_str()
+                    .is_some_and(|topic| topic.ends_with("/system_mode"))
+                {
+                    panic!("Failed");
+                }
+            }));
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let climate = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate/config"),
+    )
+    .await
+    .expect("climate discovery still published");
+    assert_eq!(
+        climate["mode_command_topic"],
+        "zigbee2mqtt/lamp/set/system_mode"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 56: overrides receive the device options.
+#[tokio::test]
+async fn discovery_override_receives_device_options() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.override_ha_discovery_payload =
+            Some(Arc::new(|payload: &mut Value, options: &Value| {
+                if payload["mode_command_topic"].is_string() {
+                    payload["discovery_option_marker"] = options
+                        .get("discovery_option_marker")
+                        .cloned()
+                        .unwrap_or(Value::Null);
+                }
+            }));
+    });
+    harness.context.settings.lock().unwrap().configuration["devices"][IEEE]
+        ["discovery_option_marker"] = json!("passed");
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let climate = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate/config"),
+    )
+    .await
+    .expect("climate discovery");
+    assert_eq!(climate["discovery_option_marker"], "passed");
+    ha.stop().await.unwrap();
+}
+
+/// Case 68: `homeassistant.discovery_topic` is used for the config topic.
+#[tokio::test]
+async fn custom_discovery_topic_is_used() {
+    let _guard = serial();
+    let harness = harness();
+    harness.context.settings.lock().unwrap().configuration["homeassistant"]["discovery_topic"] =
+        json!("my_custom_discovery_topic");
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let config_payload = config(
+        &harness,
+        &format!("my_custom_discovery_topic/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("custom discovery topic");
+    assert_eq!(
+        config_payload["state_topic"], "zigbee2mqtt/lamp",
+        "state topics stay on the base topic"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 76: an already discovered device is not discovered again on a message.
+#[tokio::test]
+async fn device_message_does_not_rediscover() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    assert!(config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config")
+    )
+    .await
+    .is_some());
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_message(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "endpoint": {"ID": 1},
+            "cluster": "msTemperatureMeasurement",
+            "type": "attributeReport",
+            "data": {"measuredValue": -85},
+            "linkquality": 10,
+        }));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(
+        !harness
+            .mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic.ends_with("/config")),
+        "rediscovered an already discovered device"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 77: a message from an undiscovered device triggers discovery.
+#[tokio::test]
+async fn device_message_discovers_when_not_discovered() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    ha.test_mark_undiscovered(IEEE);
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_message(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "endpoint": {"ID": 1},
+            "cluster": "msTemperatureMeasurement",
+            "type": "attributeReport",
+            "data": {"measuredValue": -85},
+            "linkquality": 10,
+        }));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    assert!(
+        harness.mqtt.lock().await.attempted.iter().any(
+            |(topic, _, _)| topic == &format!("homeassistant/sensor/{IEEE}/temperature/config")
+        ),
+        "discovery did not run for an undiscovered device"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 78: a device leaving does not publish discovery configs.
+#[tokio::test]
+async fn device_leave_does_not_publish_discovery() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_leave(json!({"ieeeAddr": IEEE}));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(
+        !harness
+            .mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic.ends_with("/config")),
+        "unexpected discovery on leave"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 109: receiving back the bridge entity config does not clear it.
+#[tokio::test]
+async fn bridge_entity_config_echo_is_not_cleared() {
+    let _guard = serial();
+    let harness = harness();
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    let topic = "homeassistant/binary_sensor/0x00124b0024c16b95/connection_state/config";
+    let payload = config(&harness, topic).await.expect("bridge entity");
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": topic,
+        "message": payload.to_string(),
+    }));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(
+        !harness
+            .mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .any(|(published, body, _)| published == topic && body.is_empty()),
+        "bridge entity config was cleared after receiving it back"
+    );
+    ha.stop().await.unwrap();
 }

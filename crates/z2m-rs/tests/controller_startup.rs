@@ -87,7 +87,10 @@ async fn aborting_start_during_the_coordinator_phase_skips_extensions() {
     let _ = tokio::time::timeout(std::time::Duration::from_millis(100), &mut start).await;
     drop(start);
 
-    assert!(!mqtt.lock().await.is_connected(), "MQTT was never connected");
+    assert!(
+        !mqtt.lock().await.is_connected(),
+        "MQTT was never connected"
+    );
     assert_eq!(controller.extensions_len(), 0, "no extension was started");
 }
 
@@ -186,11 +189,16 @@ async fn stop_continues_when_an_extension_fails_to_stop() {
         .expect("add failing extension");
 
     let bridge = controller.make_extension("Bridge").expect("bridge");
-    controller.add_extension(bridge.clone()).expect("add bridge");
+    controller
+        .add_extension(bridge.clone())
+        .expect("add bridge");
 
     controller.stop(false, 0).await;
 
-    assert!(*failing_stopped.lock().unwrap(), "the failing stop still ran");
+    assert!(
+        *failing_stopped.lock().unwrap(),
+        "the failing stop still ran"
+    );
     assert_eq!(
         zigbee
             .test_stop_count
@@ -208,4 +216,36 @@ fn failing_extension_context(
     let mut context = bridge.context().clone();
     context.key = 101;
     context
+}
+
+/// Upstream `prevents mismatching setting/extension state` (homeassistant.test.ts):
+/// the settings flag and the enable/disable request must agree.
+#[tokio::test]
+async fn homeassistant_enable_disable_requires_matching_settings() {
+    let (controller, _zigbee, _mqtt) = harness("mqtt://127.0.0.1:1");
+    controller.settings.lock().unwrap().configuration["homeassistant"] = json!({"enabled": true});
+
+    let error = controller
+        .enable_disable_extension(false, "HomeAssistant".to_string())
+        .await
+        .expect_err("disable while enabled in settings");
+    assert_eq!(
+        error,
+        "Tried to disable HomeAssistant extension enabled in settings"
+    );
+
+    controller.settings.lock().unwrap().configuration["homeassistant"] = json!({"enabled": false});
+    let error = controller
+        .enable_disable_extension(true, "HomeAssistant".to_string())
+        .await
+        .expect_err("enable while disabled in settings");
+    assert_eq!(
+        error,
+        "Tried to enable HomeAssistant extension disabled in settings"
+    );
+
+    controller
+        .enable_disable_extension(false, "HomeAssistant".to_string())
+        .await
+        .expect("disable while disabled in settings is allowed");
 }
