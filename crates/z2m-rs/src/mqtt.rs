@@ -290,11 +290,12 @@ impl Mqtt {
             let offline_topic = format!("{}/bridge/state", self.base_topic);
             let offline_payload =
                 serde_json::to_vec(&json!({"state": "offline"})).unwrap_or_default();
+            // Upstream publishes the offline state with qos 0 (mqtt.ts stop()).
             let _ = client
                 .publish(
                     offline_topic.clone(),
                     offline_payload.clone(),
-                    rumqttc::PublishOptions::new(QoS::AtLeastOnce).retain(true),
+                    rumqttc::PublishOptions::new(QoS::AtMostOnce).retain(true),
                 )
                 .await;
             self.retained_messages.lock().unwrap().insert(

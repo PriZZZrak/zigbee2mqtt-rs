@@ -215,8 +215,8 @@ abort/reconnect; несовпадения устранены без механи
   к ожидаемому значению после ACK/ошибки. → `qos1_publish_is_acknowledged_and_leaves_no_inflight_work`; QoS2 is not used by the bridge (device/bridge publishes are QoS0/1).
 - [x] Проверить применимость MQTT v5 DISCONNECT и message expiry к текущему
   v4-клиенту; явно оформить ограничения совместимости. → в порте `rumqttc` собран без v5; `message_expiry_interval` отслеживается, но не отправляется (ограничение зафиксировано в `parity-matrix.md`, строка MQTT).
-- [ ] Сохранить Node-vs-Rust broker transcript для применимых сценариев:
-  topic, payload, QoS, retain, порядок и ошибки.
+- [x] Сохранить Node-vs-Rust broker transcript для применимых сценариев:
+  topic, payload, QoS, retain, порядок и ошибки. → `tools/oracle/mqtt-transcript.mjs` запускает один и тот же сценарий Rust-клиентом и upstream `dist/mqtt.js`, пишет `docs/fixtures/mqtt-transcript.json`; broker-side записи совпадают (state online, subscribe, retained republish, plain publish). Отличие: upstream фиксирует `bridge/state offline` (qos0) при остановке, наш клиент в этом прогоне его не отдал — см. «Остаток».
 
 **Закрытие:** воспроизводимый прогон управляет локальным broker, гарантированно
 завершается по timeout и проверяет результат после восстановления. Зелёного
@@ -224,7 +224,7 @@ connect/publish smoke недостаточно. Broker-тесты запуска
 а не остаются только незапускаемыми по умолчанию `ignored`.
 
 ```text
-Статус: IN_PROGRESS (остался только Node-vs-Rust transcript)
+Статус: CLOSED (транскрипт сохранён; отличие offline-публикации задокументировано)
 Сценарии: zigbee2mqtt 2.14.3/3c841fdf lib/mqtt.ts onConnect (:177-206), publish (:225-249);
   z2m controller.test.ts cases 77-81
 Проверки: crates/z2m-rs/tests/mqtt_reconnect.rs (7 tests, in-process broker)
@@ -232,7 +232,7 @@ connect/publish smoke недостаточно. Broker-тесты запуска
   2 s republish with bridge/info cancel
 Прогон: cargo test -p z2m-rs --test mqtt_reconnect -> 7 passed (commit ниже)
 Карты: z2m-controller-test-parity rows 77-81 -> mqtt_reconnect tests
-Остаток: сохранить Node-vs-Rust broker transcript (topic/payload/qos/retain/order)
+Остаток: `bridge/state offline` при disconnect не наблюдается в broker-транскрипте (qos0, retain); upstream публикует его. Зафиксировано как известное отличие, требует flush-механизма rumqttc (bounded wait недостаточен).
 ```
 
 ### CP-03 — Ошибки сохранения и ответы API · P0

@@ -1,0 +1,89 @@
+{
+  "rust": {
+    "records": [
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"online\"}",
+        "qos": 1,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/state",
+        "payload": "{\"state\":\"ON\"}",
+        "qos": 1,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/plain",
+        "payload": "{\"plain\":true}",
+        "qos": 0,
+        "retain": false
+      },
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"online\"}",
+        "qos": 1,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/state",
+        "payload": "{\"state\":\"ON\"}",
+        "qos": 1,
+        "retain": true
+      }
+    ],
+    "subscriptions": [
+      "z2m/#"
+    ]
+  },
+  "upstream": {
+    "records": [
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"online\"}",
+        "qos": 1,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/state",
+        "payload": "{\"state\":\"ON\"}",
+        "qos": 1,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/plain",
+        "payload": "{\"plain\":true}",
+        "qos": 0,
+        "retain": false
+      },
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"online\"}",
+        "qos": 1,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/state",
+        "payload": "{\"state\":\"ON\"}",
+        "qos": 1,
+        "retain": true
+      },
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"offline\"}",
+        "qos": 0,
+        "retain": true
+      }
+    ],
+    "subscriptions": [
+      "z2m/#"
+    ]
+  },
+  "comparison": {
+    "match": false,
+    "missing": [
+      "z2m/bridge/state|{\"state\":\"offline\"}|0|true"
+    ],
+    "extra": []
+  }
+}
