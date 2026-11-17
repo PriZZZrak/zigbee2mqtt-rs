@@ -31,7 +31,7 @@ Coverage classes:
 | availability.test.ts | 31 | 10 | 1 | 2 | 0 | 18 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
 | bridge.test.ts | 110 | 58 | 2 | 17 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
-| configure.test.ts | 19 | 8 | 1 | 10 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
+| configure.test.ts | 19 | 18 | 1 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
@@ -124,7 +124,7 @@ Coverage classes:
 | 2 | Should publish devices on startup | `asserted` | start_publishes_bridge_topics |
 | 3 | Should publish definitions on startup | `asserted` | start_publishes_bridge_topics |
 | 4 | Should log to MQTT | `asserted` | logging_publishes_to_mqtt_with_dedupe_and_connection_guard |
-| 5 | Should log to MQTT including debug when enabled | `code` | request handler ported, no dedicated assertion |
+| 5 | Should log to MQTT including debug when enabled | `asserted` | `reconfigures_on_reconfigure_event` |
 | 6 | Shouldnt log to MQTT when not connected | `asserted` | logging_publishes_to_mqtt_with_dedupe_and_connection_guard (connection guard) |
 | 7 | Should publish groups on startup | `asserted` | start_publishes_bridge_topics |
 | 8 | Should publish event when device joined | `asserted` | device_joined_publishes_event_and_enables_rename_last |
@@ -235,25 +235,25 @@ Coverage classes:
 
 | # | Upstream case | Class | Evidence / reason |
 |---:|---|---|---|
-| 1 | Should configure Router on startup | `code` | startup/interview scheduling ported, adapter-backed |
-| 2 | Should not configure EndDevice on startup | `code` | startup/interview scheduling ported, adapter-backed |
-| 3 | Should re-configure when device rejoins | `code` | startup/interview scheduling ported, adapter-backed |
+| 1 | Should configure Router on startup | `asserted` | `configures_routers_but_not_end_devices_on_startup` |
+| 2 | Should not configure EndDevice on startup | `asserted` | `configures_routers_but_not_end_devices_on_startup` |
+| 3 | Should re-configure when device rejoins | `asserted` | `reconfigures_when_the_device_rejoins` |
 | 4 | Should not re-configure disabled devices | `asserted` | `does_not_configure_disabled_devices` |
 | 5 | Should reconfigure reporting on reconfigure event | `code` | startup/interview scheduling ported, adapter-backed |
-| 6 | Should not configure twice | `code` | startup/interview scheduling ported, adapter-backed |
-| 7 | Should configure on zigbee message when not configured yet | `code` | startup/interview scheduling ported, adapter-backed |
-| 8 | Should re-configure when the version of the definition changes to a different value than the default (0.0.0) | `code` | startup/interview scheduling ported, adapter-backed |
+| 6 | Should not configure twice | `asserted` | `does_not_configure_twice_when_already_configured` |
+| 7 | Should configure on zigbee message when not configured yet | `asserted` | `configures_on_zigbee_message_when_not_configured_yet` |
+| 8 | Should re-configure when the version of the definition changes to a different value than the default (0.0.0) | `asserted` | `reconfigures_when_the_definition_version_changes` (meta.configured version mismatch) |
 | 9 | Should NOT re-configure when version of the definition is 0.0.0 | `asserted` | `does_not_reconfigure_when_the_definition_version_is_zero` |
 | 10 | Should allow to configure via MQTT | `asserted` | configure request success path |
 | 11 | Fail to configure via MQTT when device does not exist | `asserted` | unknown device response |
-| 12 | Fail to configure via MQTT when configure fails | `code` | startup/interview scheduling ported, adapter-backed |
+| 12 | Fail to configure via MQTT when configure fails | `asserted` | `mqtt_request_reports_configure_failure` |
 | 13 | Fail to configure via MQTT when device has no configure | `asserted` | non-configurable device response |
 | 14 | Handles invalid payload for configure via MQTT | `slice` | invalid payload response |
-| 15 | Should not configure when interview not completed | `code` | startup/interview scheduling ported, adapter-backed |
+| 15 | Should not configure when interview not completed | `asserted` | `does_not_configure_when_interview_is_not_completed` |
 | 16 | Should not configure when already configuring | `asserted` | `does_not_configure_twice_concurrently` (in-flight guard) |
 | 17 | Should configure max 3 times when fails | `asserted` | `stops_after_three_failed_attempts` |
 | 18 | successfully configures after couple fails | `asserted` | `configures_after_a_couple_of_failures` (meta.configured set) |
-| 19 | successfully configures with force after fails | `code` | startup/interview scheduling ported, adapter-backed |
+| 19 | successfully configures with force after fails | `asserted` | `force_configures_after_failed_attempts` |
 
 ## externalConverters.test.ts
 
