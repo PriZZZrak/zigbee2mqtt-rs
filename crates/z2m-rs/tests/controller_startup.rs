@@ -141,3 +141,71 @@ async fn event_bus_contains_handler_panics() {
         "the second handler still runs and later emits keep working"
     );
 }
+
+/// A test extension whose `start` succeeds and whose `stop` fails.
+struct FailingExtension {
+    context: z2m_rs::extension::extension::ExtensionContext,
+    stopped: Arc<Mutex<bool>>,
+}
+
+impl z2m_rs::extension::extension::Extension for FailingExtension {
+    fn name(&self) -> &'static str {
+        "FailingTest"
+    }
+
+    fn context(&self) -> &z2m_rs::extension::extension::ExtensionContext {
+        &self.context
+    }
+
+    fn start(self: Arc<Self>) -> z2m_rs::extension::extension::ExtensionFuture {
+        Box::pin(async move { Ok(()) })
+    }
+
+    fn stop(self: Arc<Self>) -> z2m_rs::extension::extension::ExtensionFuture {
+        let stopped = self.stopped.clone();
+        Box::pin(async move {
+            *stopped.lock().unwrap() = true;
+            Err("stop failed".to_string())
+        })
+    }
+}
+
+/// Upstream `does not throw when extension stop throws`: a failing `stop` is
+/// logged, the remaining extensions are still stopped and the controller keeps
+/// tearing down MQTT/zigbee-herdsman.
+#[tokio::test]
+async fn stop_continues_when_an_extension_fails_to_stop() {
+    let (controller, zigbee, _mqtt) = harness("mqtt://127.0.0.1:1");
+    let failing_stopped = Arc::new(Mutex::new(false));
+    let failing_context = failing_extension_context(&controller);
+    controller
+        .add_extension(Arc::new(FailingExtension {
+            context: failing_context,
+            stopped: failing_stopped.clone(),
+        }))
+        .expect("add failing extension");
+
+    let bridge = controller.make_extension("Bridge").expect("bridge");
+    controller.add_extension(bridge.clone()).expect("add bridge");
+
+    controller.stop(false, 0).await;
+
+    assert!(*failing_stopped.lock().unwrap(), "the failing stop still ran");
+    assert_eq!(
+        zigbee
+            .test_stop_count
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "teardown continues after the failing extension"
+    );
+}
+
+/// Reuse the controller's own extension context for the test extension.
+fn failing_extension_context(
+    controller: &Arc<Controller>,
+) -> z2m_rs::extension::extension::ExtensionContext {
+    let bridge = controller.make_extension("Bridge").expect("bridge");
+    let mut context = bridge.context().clone();
+    context.key = 101;
+    context
+}

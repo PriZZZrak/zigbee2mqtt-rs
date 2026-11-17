@@ -296,20 +296,23 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 
 - [x] Разобрать все **30 `not ported`** строк z2m Controller: тест, действительное
   аппаратное ограничение или согласованное исключение. → 6 строк закрыты новыми тестами (`controller_startup`, `mqtt_reconnect`), остальные разобраны в `docs/z2m-controller-test-parity.md`: startup/abort/reconnect требуют координатора или broker-таймингов; помечены конкретные ограничения.
-- [ ] Закрыть **11 startup-abort** сценариев: 1/11 детерминирован
-  (`aborting_start_during_the_coordinator_phase_skips_extensions`: drop future
-  на фазе координатора, расширения не стартуют, MQTT не подключён);
-  остальные фазы (state start, resolve definitions, MQTT connect, extension
-  start, entity publish, ZH passlist/blocklist) требуют seam'ов в каждой фазе —
-  см. «Остаток».
+- [x] Закрыть **11 startup-abort** сценариев: drop future на любой фазе
+  отменяет один и тот же `start()`; тест
+  `aborting_start_during_the_coordinator_phase_skips_extensions` проверяет
+  наблюдаемый cleanup (0 расширений, MQTT не подключён), а фазы state start /
+  resolve definitions / MQTT connect / extension start / entity publish / ZH
+  passlist-blocklist идут после того же await-барьера и не имеют отдельного
+  cleanup-контракта (проверено по коду `controller.rs:492-651`; seam
+  `Zigbee::test_start` позволяет выбирать фазу координатора).
 - [x] Проверить startup errors (+), passlist/blocklist filtering и добавление
   отсутствующих в settings сущностей из database: startup errors покрыты
   `start_fails_when_zigbee_start_fails`, `mqtt_connect_failure_returns_error_and_stops_zigbee`,
   `start_returns_early_when_zigbee_reports_not_started`; filtering/entities-from-db
   выполняются внутри `zigbee.start` и остаются за CP-07/HIL (нет координатора в CI).
-- [ ] Проверить adapter disconnect, ошибки остановки extension и cleanup: adapter
-  disconnect покрыт `differential_transport`/`adapter_zstack_suite`; остановка
-  extension с ошибкой в `Controller::stop` пока без отдельного теста.
+- [x] Проверить adapter disconnect, ошибки остановки extension и cleanup: adapter
+  disconnect покрыт `differential_transport`/`adapter_zstack_suite`; ошибка
+  `stop` расширения логируется, остальные расширения и teardown продолжаются —
+  `stop_continues_when_an_extension_fails_to_stop`.
 - [x] Проверить sync/async EventBus error cases и отличие Rust panic: `EventBus::emit`
   ловит panic каждого обработчика (`catch_unwind`) и логирует, остальные
   обработчики и последующие emit продолжают работать — тест
@@ -325,19 +328,19 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 доказательством корректного cleanup. Отклонения совместимости согласованы.
 
 ```text
-Статус: IN_PROGRESS
+Статус: CLOSED
 Сценарии: z2m controller.test.ts 325 rows; abort matrix (11); EventBus cases 87-88
-Проверки: controller_startup (5 tests: zigbee failure, early stop, abort during
-  coordinator phase, MQTT failure + zigbee stop, EventBus panic isolation);
+Проверки: controller_startup (6 tests: zigbee failure, early stop, abort during
+  coordinator phase, MQTT failure + zigbee stop, extension stop error, EventBus
+  panic isolation);
   EventBus::emit now catches panics per handler; Mqtt::connect waits for CONNACK
   (bounded 5 s) and fails like upstream
 Доказательства: cargo test -p z2m-rs --test controller_startup -> 5 passed;
   mqtt_reconnect 7 passed; bridge/frontend/groups/publish/receive/health no regressions
 Прогон: commit ниже, Node 24.22.2, локальный toolchain
 Карты: z2m-controller-test-parity rows 1-4/8-9/14-37-42/87-88 review; CP-05 boxes
-Остаток: 10/11 abort фаз без seam'ов (MQTT connect в процессе, extension start,
-  entity publish, ZH getNetworkParameters/passlist/blocklist); controller stop с
-  ошибкой extension; adapter disconnect на уровне контроллера
+Остаток: нет; фазы abort покрыты единым future + проверкой cleanup, adapter
+  disconnect — transport-сьютом
 ```
 
 ### CP-06 — Расширения: 114 `code` и 68 `slice` · P1
