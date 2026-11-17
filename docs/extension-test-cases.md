@@ -35,7 +35,7 @@ Coverage classes:
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
-| groups.test.ts | 40 | 8 | 1 | 30 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
+| groups.test.ts | 40 | 21 | 1 | 18 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 70 | 14 | 29 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
@@ -339,21 +339,21 @@ Coverage classes:
 | 20 | Should publish state change off if all lights within turn off | `code` | group state derivation ported, converter/endpoint dependent |
 | 21 | Should only update group state with changed properties | `code` | group state derivation ported, converter/endpoint dependent |
 | 22 | Should publish state change off even when missing current state | `code` | group state derivation ported, converter/endpoint dependent |
-| 23 | Add to group via MQTT | `adapter` | add to group goes through the coordinator |
-| 24 | Add to group via MQTT fails | `code` | group state derivation ported, converter/endpoint dependent |
-| 25 | Add to group with slashes via MQTT | `code` | group state derivation ported, converter/endpoint dependent |
-| 26 | Add to group via MQTT with postfix | `code` | group state derivation ported, converter/endpoint dependent |
-| 27 | Add to group via MQTT with postfix shouldnt add it twice | `code` | group state derivation ported, converter/endpoint dependent |
-| 28 | Remove from group via MQTT | `code` | group state derivation ported, converter/endpoint dependent |
-| 29 | Remove from group via MQTT fails | `code` | group state derivation ported, converter/endpoint dependent |
-| 30 | Remove from group via MQTT keeping device reporting | `code` | group state derivation ported, converter/endpoint dependent |
-| 31 | Remove from group via MQTT with postfix variant 1 | `code` | group state derivation ported, converter/endpoint dependent |
-| 32 | Remove from group via MQTT with postfix variant 2 | `code` | group state derivation ported, converter/endpoint dependent |
-| 33 | Remove from group via MQTT with postfix variant 3 | `code` | group state derivation ported, converter/endpoint dependent |
-| 34 | Remove from group all | `code` | group state derivation ported, converter/endpoint dependent |
+| 23 | Add to group via MQTT | `asserted` | `add_to_group_via_mqtt` (+ `group_members_changed_republishes_bridge_groups` for the bridge/groups republish) |
+| 24 | Add to group via MQTT fails | `asserted` | `add_to_group_via_mqtt_fails` |
+| 25 | Add to group with slashes via MQTT | `asserted` | `add_to_group_with_slashes_via_mqtt` |
+| 26 | Add to group via MQTT with postfix | `asserted` | `add_to_group_via_mqtt_with_endpoint_name` |
+| 27 | Add to group via MQTT with postfix shouldnt add it twice | `asserted` | `add_to_group_via_mqtt_does_not_add_twice` |
+| 28 | Remove from group via MQTT | `asserted` | `remove_from_group_via_mqtt` |
+| 29 | Remove from group via MQTT fails | `asserted` | `remove_from_group_via_mqtt_fails` |
+| 30 | Remove from group via MQTT keeping device reporting | `asserted` | `remove_from_group_keeping_reporting` |
+| 31 | Remove from group via MQTT with postfix variant 1 | `asserted` | `remove_from_group_with_postfix_variants` |
+| 32 | Remove from group via MQTT with postfix variant 2 | `asserted` | `remove_from_group_with_postfix_variants` |
+| 33 | Remove from group via MQTT with postfix variant 3 | `asserted` | `remove_from_group_with_postfix_variants` |
+| 34 | Remove from group all | `asserted` | `remove_from_group_all` |
 | 35 | Error when adding to non-existing group | `asserted` | unknown group response |
 | 36 | Error when adding a non-existing device | `asserted` | unknown device response |
-| 37 | Error when adding a non-existing endpoint | `code` | unknown endpoint response |
+| 37 | Error when adding a non-existing endpoint | `asserted` | `error_adding_to_non_existing_endpoint` |
 | 38 | Error when invalid payload | `asserted` | invalid payload response |
 | 39 | Error when add/remove with invalid payload | `slice` | invalid payload for add/remove |
 | 40 | Should only include relevant properties when publishing member states | `asserted` | member_state_filtering_uses_member_exposes |
