@@ -358,9 +358,12 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
   paused clock.
 - [x] Configure: версии, число попыток, force, in-flight guard и event triggers. →
   `configure.test.ts` 18 asserted / 1 slice / 0 code (`tests/configure.rs`, 17 tests).
-- [ ] Groups/Bridge: изменения membership, fan-out/dedupe, validation,
-  транзакции, ответы, сохранение и ошибки. → Groups закрыт по membership
-  (23-34, 37: 21 asserted / 18 code / 1 slice); Bridge остаётся (17 code).
+- [x] Groups/Bridge: изменения membership, fan-out/dedupe, validation,
+  транзакции, ответы, сохранение и ошибки. → Groups: 21 asserted / 0 adapter /
+  18 code / 1 slice (membership 23-34, 37 + bridge/groups republish); Bridge:
+  75 asserted / 0 code / 20 adapter / 2 slice / 13 omitted (transactions, error
+  and invalid payload responses, remove/clear_cache, rename guard, group
+  add/options, options apply/restart, icon links).
 - [ ] HA в пределах scope: точные discovery payloads, unique IDs, availability,
   retained cleanup на rename/remove и повторная публикация.
 - [ ] Проверить применимость **81 `converter-db`** и **91 `omitted`** строк:

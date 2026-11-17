@@ -702,11 +702,11 @@ fn should_keep_homeassistant_null_property_on_device_setting_change() {
 fn should_not_add_duplicate_groups() {
     let mut settings = Settings::from_config(json!({}));
 
-    settings.add_group("test123", None);
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        settings.add_group("test123", None);
-    }));
-    assert!(result.is_err());
+    settings.add_group("test123", None).unwrap();
+    let error = settings
+        .add_group("test123", None)
+        .expect_err("duplicate friendly_name");
+    assert_eq!(error, "friendly_name 'test123' is already in use");
     assert_eq!(
         settings.get()["groups"],
         json!({"1": {"friendly_name": "test123"}})
@@ -717,11 +717,11 @@ fn should_not_add_duplicate_groups() {
 fn should_not_add_duplicate_groups_with_specific_id() {
     let mut settings = Settings::from_config(json!({}));
 
-    settings.add_group("test123", Some("123"));
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        settings.add_group("test_id_123", Some("123"));
-    }));
-    assert!(result.is_err());
+    settings.add_group("test123", Some("123")).unwrap();
+    let error = settings
+        .add_group("test_id_123", Some("123"))
+        .expect_err("duplicate group ID");
+    assert_eq!(error, "Group ID '123' is already in use");
     assert_eq!(
         settings.get()["groups"],
         json!({"123": {"friendly_name": "test123"}})

@@ -450,25 +450,32 @@ impl Settings {
         Ok(())
     }
 
+    /// Upstream `addGroup(name, id?)` (`settings.ts:600-634`).
     pub fn add_group(&mut self, name: &str, id: Option<&str>) -> Result<u64, String> {
-        let groups = self.entities("groups");
-        let id = if let Some(id) = id.filter(|id| !id.is_empty()) {
-            id.to_string()
-        } else {
-            let max = groups
-                .keys()
-                .filter_map(|key| key.parse::<u64>().ok())
-                .max()
-                .unwrap_or(0);
-            (max + 1).to_string()
-        };
-        if groups.contains_key(&id)
-            || groups
-                .values()
-                .any(|group| group.get("friendly_name").and_then(Value::as_str) == Some(name))
-        {
-            panic!("Group with this name or ID already exists");
+        if let Some(error) = Self::validate_friendly_name(name).into_iter().next() {
+            return Err(error);
         }
+        if self.get_group(name).is_some() || self.get_device(name).is_some() {
+            return Err(format!("friendly_name '{name}' is already in use"));
+        }
+        let groups = self.entities("groups");
+        let id = match id.map(str::trim).filter(|id| !id.is_empty()) {
+            Some(id) => {
+                let id = id.to_string();
+                if groups.contains_key(&id) {
+                    return Err(format!("Group ID '{id}' is already in use"));
+                }
+                id
+            }
+            None => {
+                // Upstream scans upwards from "1" for the first free ID.
+                let mut candidate = 1u64;
+                while groups.contains_key(&candidate.to_string()) {
+                    candidate += 1;
+                }
+                candidate.to_string()
+            }
+        };
         self.entities_mut("groups")
             .insert(id.clone(), json!({"friendly_name": name}));
         self.write()?;

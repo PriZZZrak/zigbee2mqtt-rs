@@ -1212,11 +1212,13 @@ impl Bridge {
             return Value::Null;
         };
 
+        // Upstream `getDefinitionPayload`: `device.options.icon ?? definition.icon`.
         let mut icon = device
             .options()
             .get("icon")
             .and_then(Value::as_str)
-            .map(str::to_string);
+            .map(str::to_string)
+            .or_else(|| definition.icon.clone());
         if let Some(value) = &icon {
             let replaced = value
                 .replace(

@@ -162,6 +162,8 @@ pub struct Definition {
     pub model: String,
     pub vendor: String,
     pub description: String,
+    /// Upstream `definition.icon` (optional external-definition icon).
+    pub icon: Option<String>,
     /// Upstream `zigbeeModel` (string or array).
     pub zigbee_model: Vec<String>,
     pub exposes: Exposes,
@@ -205,6 +207,7 @@ impl Definition {
             model: model.to_string(),
             vendor: vendor.to_string(),
             description: description.to_string(),
+            icon: None,
             zigbee_model: Vec::new(),
             exposes: Exposes::Static(Vec::new()),
             options: Vec::new(),

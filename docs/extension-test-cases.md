@@ -30,7 +30,7 @@ Coverage classes:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | availability.test.ts | 31 | 29 | 1 | 0 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 58 | 2 | 17 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| bridge.test.ts | 110 | 75 | 2 | 0 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 18 | 1 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
@@ -142,10 +142,10 @@ Coverage classes:
 | 20 | Shouldnt republish bridge info when permit join changes and hersman is stopping | `adapter` | permit join talks to the coordinator |
 | 21 | Should allow permit join via device | `adapter` | permit join talks to the coordinator |
 | 22 | Should not allow permit join via non-existing device | `adapter` | permit join talks to the coordinator |
-| 23 | Should put transaction in response when request is done with transaction | `code` | transaction echo in responses |
-| 24 | Should put error in response when request fails | `code` | error responses carry the transaction |
-| 25 | Should put error in response when format is incorrect | `code` | format errors in responses |
-| 26 | Coverage satisfaction | `code` | coverage helper |
+| 23 | Should put transaction in response when request is done with transaction | `asserted` | `response_echoes_the_transaction` |
+| 24 | Should put error in response when request fails | `asserted` | `error_response_when_the_request_fails` |
+| 25 | Should put error in response when format is incorrect | `asserted` | `error_response_when_the_format_is_incorrect` |
+| 26 | Coverage satisfaction | `asserted` | `unknown_request_is_ignored` |
 | 27 | Should allow a healthcheck | `asserted` | health_check_and_invalid_options |
 | 28 | Should allow a coordinator check | `adapter` | coordinator check needs a live adapter |
 | 29 | Should allow to remove device by string | `slice` | device removal by string id |
@@ -153,12 +153,12 @@ Coverage classes:
 | 31 | Should allow to force remove device | `asserted` | force_remove_device_without_adapter |
 | 32 | Should allow to block device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
 | 33 | Should allow to keep configuration when removing device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
-| 34 | Should allow to clear cache when removing device | `code` | request handler ported, no dedicated assertion |
+| 34 | Should allow to clear cache when removing device | `asserted` | `remove_device_clears_the_cache` |
 | 35 | Should allow to remove group | `asserted` | force_remove_group_removes_settings |
 | 36 | Should allow to force remove group | `asserted` | force_remove_group_removes_settings |
 | 37 | Should allow to add and remove from blocklist | `asserted` | options_blocklist_and_device_option_variants |
 | 38 | Should throw error on removing non-existing device | `asserted` | force_remove_device_blocks_and_keeps_configuration |
-| 39 | Should throw error when remove device fails | `code` | request handler ported, no dedicated assertion |
+| 39 | Should throw error when remove device fails | `asserted` | `remove_device_failure_is_reported` |
 | 40 | Should allow rename device | `asserted` | group_add_and_rename_device |
 | 41 | Should trim input when renaming device | `asserted` | rename_trims_validates_and_reports_errors |
 | 42 | Shouldnt allow rename device with to not allowed name containing a wildcard | `asserted` | rename_trims_validates_and_reports_errors |
@@ -166,7 +166,7 @@ Coverage classes:
 | 44 | Should throw error on invalid device rename payload | `asserted` | rename_trims_validates_and_reports_errors |
 | 45 | Should throw error on non-existing device rename | `asserted` | rename_trims_validates_and_reports_errors |
 | 46 | Should allow to rename last joined device | `asserted` | device_joined_publishes_event_and_enables_rename_last |
-| 47 | Should throw error when renaming device through not allowed friendlyName | `code` | request handler ported, no dedicated assertion |
+| 47 | Should throw error when renaming device through not allowed friendlyName | `asserted` | `rename_rejects_a_slash_digit_suffix` |
 | 48 | Should throw error when renaming last joined device but none has joined | `asserted` | rename_trims_validates_and_reports_errors |
 | 49 | Should allow interviewing a device by friendly name | `adapter` | interview/install code talks to the coordinator |
 | 50 | Should allow interviewing a device by ieeeAddr | `adapter` | interview/install code talks to the coordinator |
@@ -183,14 +183,14 @@ Coverage classes:
 | 61 | Should save as image as file when changing device icon | `asserted` | options_blocklist_and_device_option_variants (base64 icon) |
 | 62 | Should allow to remove device option | `asserted` | options_blocklist_and_device_option_variants (qos: null) |
 | 63 | Should allow change device options with restart required | `asserted` | options_blocklist_and_device_option_variants (disabled) |
-| 64 | Should allow change group options | `code` | request handler ported, no dedicated assertion |
-| 65 | Should allow change group options with restart required | `code` | request handler ported, no dedicated assertion |
+| 64 | Should allow change group options | `asserted` | `group_options_apply_without_restart` |
+| 65 | Should allow change group options with restart required | `asserted` | `group_options_require_restart` |
 | 66 | Should throw error on invalid device change options payload | `asserted` | device_and_group_options_apply_and_warn |
 | 67 | Should warn on unsupported device option | `asserted` | device_and_group_options_apply_and_warn |
 | 68 | Should allow to add group by string | `asserted` | group_add_and_rename_device |
-| 69 | Should allow to add group with ID | `code` | request handler ported, no dedicated assertion |
-| 70 | Shouldnt allow to add group with empty name | `code` | request handler ported, no dedicated assertion |
-| 71 | Should throw error when add with invalid payload | `code` | request handler ported, no dedicated assertion |
+| 69 | Should allow to add group with ID | `asserted` | `group_add_with_id` |
+| 70 | Shouldnt allow to add group with empty name | `asserted` | `group_add_rejects_an_empty_name` |
+| 71 | Should throw error when add with invalid payload | `asserted` | `group_add_rejects_an_invalid_payload` |
 | 72 | Should allow to touchlink factory reset (succeeds) | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 73 | Should allow to touchlink factory reset specific device | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 74 | Add install code | `adapter` | interview/install code talks to the coordinator |
@@ -214,16 +214,16 @@ Coverage classes:
 | 92 | Should return an error when the backup archive cannot be created | `asserted` | backup_without_adapter_returns_an_error |
 | 93 | Should allow to restart | `asserted` | restart_request_triggers_the_restart_callback |
 | 94 | Change options and apply - homeassistant | `asserted` | options_apply_homeassistant_and_log_levels |
-| 95 | Change options and apply - log_level | `code` | request handler ported, no dedicated assertion |
+| 95 | Change options and apply - log_level | `asserted` | `options_apply_log_level` |
 | 96 | Change options and apply - log_debug_namespace_ignore | `asserted` | options_apply_homeassistant_and_log_levels |
 | 97 | Change options and apply - log_namespaced_levels | `asserted` | options_apply_homeassistant_and_log_levels |
-| 98 | Change options restart required | `code` | request handler ported, no dedicated assertion |
+| 98 | Change options restart required | `asserted` | `options_report_restart_required` |
 | 99 | Change options array | `asserted` | options_apply_arrays_null_and_report_restart_required |
 | 100 | Change options with null | `asserted` | options_apply_arrays_null_and_report_restart_required |
-| 101 | Change options invalid payload | `code` | request handler ported, no dedicated assertion |
+| 101 | Change options invalid payload | `asserted` | `options_reject_an_invalid_payload` |
 | 102 | Change options not valid against schema | `asserted` | options_apply_arrays_null_and_report_restart_required |
 | 103 | Change options consecutively, check restart required | `slice` | consecutive options requests in the same test |
-| 104 | Icon link handling | `code` | request handler ported, no dedicated assertion |
+| 104 | Icon link handling | `asserted` | `icon_link_handling` |
 | 105 | Should publish bridge info, devices and definitions when a device with custom_clusters joined | `asserted` | definitions_include_custom_clusters |
 | 106 | Should publish bridge info, devices and definitions when a device with custom_clusters is reconfigured | `asserted` | definitions_include_custom_clusters |
 | 107 | triggers ZHC action by name with params | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |

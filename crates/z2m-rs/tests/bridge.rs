@@ -11,9 +11,9 @@ use zigbee_apiarist::controller::model::device::{Device as ZhDevice, InterviewSt
 use zigbee_apiarist::controller::model::entity::inject_database;
 use zigbee_apiarist::controller::model::group::Group as ZhGroup;
 use zigbee_apiarist::controller::model::test_support::serial;
+use zigbee_apiarist::models::network_options::NetworkOptions;
 use zigbee_apiarist::zspec::zcl::definition::enums::DataType;
 use zigbee_apiarist::zspec::zcl::utils::{Attribute, Cluster};
-use zigbee_apiarist::models::network_options::NetworkOptions;
 
 use z2m_rs::event_bus::EventBus;
 use z2m_rs::extension::bridge::Bridge;
@@ -341,9 +341,10 @@ async fn definitions_include_custom_clusters() {
     let harness = harness();
     let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
     let mut cluster = Cluster::new("manuSpecificTest", 0xfc00);
-    cluster
-        .attributes
-        .insert("mode".to_string(), Attribute::new("mode", 0x0000, DataType::UINT8));
+    cluster.attributes.insert(
+        "mode".to_string(),
+        Attribute::new("mode", 0x0000, DataType::UINT8),
+    );
     device
         .zh
         .add_custom_cluster("manuSpecificTest", cluster)
@@ -363,7 +364,11 @@ async fn definitions_include_custom_clusters() {
     )
     .unwrap();
     let cluster = &payload["custom_clusters"][IEEE]["manuSpecificTest"];
-    assert_eq!(cluster["name"], "manuSpecificTest", "payload={}", payload["custom_clusters"]);
+    assert_eq!(
+        cluster["name"], "manuSpecificTest",
+        "payload={}",
+        payload["custom_clusters"]
+    );
     assert_eq!(cluster["ID"], 0xfc00);
     assert_eq!(cluster["attributes"]["mode"]["name"], "mode");
     assert_eq!(cluster["attributes"]["mode"]["ID"], 0);
@@ -399,8 +404,14 @@ async fn options_apply_arrays_null_and_report_restart_required() {
     let harness = harness();
     {
         let mut settings = harness.context.settings.lock().unwrap();
-        settings.set(&["advanced", "ext_pan_id"], json!([221, 221, 221, 221, 221, 221, 221, 221]));
-        settings.set(&["serial"], json!({"disable_led": false, "port": "/dev/dummy"}));
+        settings.set(
+            &["advanced", "ext_pan_id"],
+            json!([221, 221, 221, 221, 221, 221, 221, 221]),
+        );
+        settings.set(
+            &["serial"],
+            json!({"disable_led": false, "port": "/dev/dummy"}),
+        );
     }
     let bridge = Bridge::new(harness.context.clone());
     bridge.clone().start().await.unwrap();
@@ -582,7 +593,10 @@ async fn options_apply_homeassistant_and_log_levels() {
     let logger = harness.context.logger.lock().unwrap();
     assert_eq!(logger.level, "debug");
     assert_eq!(
-        logger.namespaced_levels.get("zh:zstack").map(String::as_str),
+        logger
+            .namespaced_levels
+            .get("zh:zstack")
+            .map(String::as_str),
         Some("warning")
     );
     assert_eq!(logger.get_debug_namespace_ignore(), "^zh:.*");
@@ -597,12 +611,18 @@ async fn interview_request_validates_payload_and_entity() {
 
     for (message, error) in [
         (json!({"options": {}}), "Invalid payload".to_string()),
-        (json!({"id": "missing"}), "Device 'missing' does not exist".to_string()),
+        (
+            json!({"id": "missing"}),
+            "Device 'missing' does not exist".to_string(),
+        ),
         (
             json!({"id": format!("{IEEE}/1")}),
             format!("Device '{IEEE}/1' does not exist"),
         ),
-        (json!({"id": "group_1"}), "Device 'group_1' does not exist".to_string()),
+        (
+            json!({"id": "group_1"}),
+            "Device 'group_1' does not exist".to_string(),
+        ),
     ] {
         send(&harness, "device/interview", message).await;
         let payload = response(&harness, "device/interview").await;
@@ -747,7 +767,13 @@ async fn rename_trims_validates_and_reports_errors() {
     assert_eq!(payload["status"], "ok", "{payload}");
     assert_eq!(payload["data"]["to"], "lamp2");
     assert_eq!(
-        harness.context.settings.lock().unwrap().get_device("lamp2").map(|device| device["friendly_name"].clone()),
+        harness
+            .context
+            .settings
+            .lock()
+            .unwrap()
+            .get_device("lamp2")
+            .map(|device| device["friendly_name"].clone()),
         Some(json!("lamp2"))
     );
 
@@ -833,12 +859,7 @@ async fn force_remove_group_removes_settings() {
     let bridge = Bridge::new(harness.context.clone());
     bridge.clone().start().await.unwrap();
 
-    send(
-        &harness,
-        "group/add",
-        json!({"friendly_name": "kitchen"}),
-    )
-    .await;
+    send(&harness, "group/add", json!({"friendly_name": "kitchen"})).await;
     let payload = response(&harness, "group/add").await;
     assert_eq!(payload["status"], "ok", "{payload}");
     let group_id = payload["data"]["id"].as_u64().expect("group id");
@@ -852,12 +873,7 @@ async fn force_remove_group_removes_settings() {
     let payload = response(&harness, "group/remove").await;
     assert_eq!(payload["status"], "ok", "{payload}");
     assert!(harness.context.zigbee.group_by_id(group_id).is_none());
-    assert!(harness
-        .context
-        .settings
-        .lock()
-        .unwrap()
-        .get()["groups"]
+    assert!(harness.context.settings.lock().unwrap().get()["groups"]
         .get(&group_id.to_string())
         .is_none());
 }
@@ -892,7 +908,12 @@ async fn device_joined_publishes_event_and_enables_rename_last() {
     }
 
     // Upstream `Should allow to rename last joined device`.
-    send(&harness, "device/rename", json!({"last": true, "to": "lamp2"})).await;
+    send(
+        &harness,
+        "device/rename",
+        json!({"last": true, "to": "lamp2"}),
+    )
+    .await;
     let payload = response(&harness, "device/rename").await;
     assert_eq!(payload["status"], "ok", "{payload}");
     assert_eq!(payload["data"]["to"], "lamp2");
@@ -959,7 +980,10 @@ async fn zigbee_events_publish_bridge_events_and_devices() {
             .unwrap_or_else(|| panic!("missing bridge/event for {event}"));
         let payload: Value = serde_json::from_str(&published.1).unwrap();
         assert_eq!(payload["type"], expected["type"]);
-        assert_eq!(payload["data"]["ieee_address"], expected["data"]["ieee_address"]);
+        assert_eq!(
+            payload["data"]["ieee_address"],
+            expected["data"]["ieee_address"]
+        );
         if let Some(status) = expected["data"]["status"].as_str() {
             assert_eq!(payload["data"]["status"], status);
             if status == "successful" {
@@ -970,8 +994,7 @@ async fn zigbee_events_publish_bridge_events_and_devices() {
             }
         }
         assert!(
-            mqtt
-                .attempted
+            mqtt.attempted
                 .iter()
                 .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/devices"),
             "devices not republished for {event}"
@@ -1143,4 +1166,465 @@ async fn remove_device_can_clear_the_entity_cache() {
         .unwrap()
         .get_device("lamp")
         .is_none());
+}
+
+#[path = "support/mock_adapter.rs"]
+mod mock_adapter;
+use mock_adapter::MockAdapter;
+use zigbee_converters::Definition;
+
+fn inject_adapter() -> Arc<MockAdapter> {
+    let adapter = MockAdapter::new();
+    zigbee_apiarist::controller::model::entity::Entity::inject_adapter(adapter.clone());
+    adapter
+}
+
+/// Case 23: a request carrying a transaction gets it echoed in the response.
+#[tokio::test]
+async fn response_echoes_the_transaction() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "group/add",
+        json!({"friendly_name": "tx_group", "id": 93, "transaction": 22}),
+    )
+    .await;
+    let payload = response(&harness, "group/add").await;
+
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["transaction"], 22);
+    assert_eq!(payload["data"]["id"], 93);
+    bridge.stop().await.unwrap();
+}
+
+/// Case 24: a failing request produces an error response.
+#[tokio::test]
+async fn error_response_when_the_request_fails() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "group/options",
+        json!({"id": "missing", "options": {"retain": true}}),
+    )
+    .await;
+    let payload = response(&harness, "group/options").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Group 'missing' does not exist");
+    assert_eq!(payload["data"], json!({}));
+    bridge.stop().await.unwrap();
+}
+
+/// Case 25: a well-formed JSON body with the wrong shape is an invalid payload.
+#[tokio::test]
+async fn error_response_when_the_format_is_incorrect() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "options", json!({"options": false})).await;
+    let payload = response(&harness, "options").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Invalid payload");
+    bridge.stop().await.unwrap();
+}
+
+/// Case 26 (coverage satisfaction): an unknown request is ignored and the
+/// bridge keeps handling requests afterwards.
+#[tokio::test]
+async fn unknown_request_is_ignored() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "random", json!({"value": false})).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(
+        !harness
+            .mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/response/random"),
+        "unknown requests must not be answered"
+    );
+
+    send(&harness, "health_check", Value::String(String::new())).await;
+    let payload = response(&harness, "health_check").await;
+    assert_eq!(payload["data"], json!({"healthy": true}));
+    bridge.stop().await.unwrap();
+}
+
+/// Case 34: removing a device with `clear_cache` drops it from the lookup and
+/// reports the flag back.
+#[tokio::test]
+async fn remove_device_clears_the_cache() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_adapter();
+    *adapter.zdo_response.lock().unwrap() = json!([0]);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "device/remove",
+        json!({"id": "lamp", "clear_cache": true}),
+    )
+    .await;
+    let payload = response(&harness, "device/remove").await;
+
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["id"], "lamp");
+    assert_eq!(payload["data"]["clear_cache"], true);
+    assert_eq!(payload["data"]["block"], false);
+    assert!(harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_device(IEEE)
+        .is_none());
+    assert!(harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/devices"));
+    bridge.stop().await.unwrap();
+}
+
+/// Case 39: a failing adapter removal is surfaced in the response.
+#[tokio::test]
+async fn remove_device_failure_is_reported() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_adapter();
+    adapter
+        .fail_zdo
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "device/remove", json!({"id": "lamp"})).await;
+    let payload = response(&harness, "device/remove").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    let error = payload["error"].as_str().unwrap_or_default();
+    assert!(
+        error.starts_with(
+            "Failed to remove device 'lamp' (block: false, force: false, keep config: false, clear cache: false)"
+        ) && error.contains("ZDO failed"),
+        "{payload}"
+    );
+    assert!(harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_device(IEEE)
+        .is_some());
+    bridge.stop().await.unwrap();
+}
+
+/// Case 47: renaming to a friendly name ending in `/<digit>` is rejected.
+#[tokio::test]
+async fn rename_rejects_a_slash_digit_suffix() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "device/rename",
+        json!({"from": "lamp", "to": "lamp/1"}),
+    )
+    .await;
+    let payload = response(&harness, "device/rename").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(
+        payload["error"],
+        "Friendly name cannot end with a \"/DIGIT\" ('lamp/1')"
+    );
+    bridge.stop().await.unwrap();
+}
+
+/// Case 64: group options that apply without a restart.
+#[tokio::test]
+async fn group_options_apply_without_restart() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+    send(
+        &harness,
+        "group/add",
+        json!({"friendly_name": "kitchen", "id": 1}),
+    )
+    .await;
+    assert_eq!(response(&harness, "group/add").await["status"], "ok");
+
+    send(
+        &harness,
+        "group/options",
+        json!({"id": "kitchen", "options": {"retain": true, "transition": 1}}),
+    )
+    .await;
+    let payload = response(&harness, "group/options").await;
+
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["id"], "kitchen");
+    assert_eq!(payload["data"]["restart_required"], false);
+    assert_eq!(payload["data"]["to"]["retain"], true);
+    assert_eq!(payload["data"]["to"]["transition"], 1);
+    let group = harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_group("1")
+        .expect("group");
+    assert_eq!(group["retain"], true);
+    assert_eq!(group["transition"], 1);
+    bridge.stop().await.unwrap();
+}
+
+/// Case 65: group options that require a restart are persisted and reported.
+#[tokio::test]
+async fn group_options_require_restart() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+    send(
+        &harness,
+        "group/add",
+        json!({"friendly_name": "kitchen", "id": 1}),
+    )
+    .await;
+    assert_eq!(response(&harness, "group/add").await["status"], "ok");
+
+    send(
+        &harness,
+        "group/options",
+        json!({"id": "kitchen", "options": {"off_state": "all_members_off"}}),
+    )
+    .await;
+    let payload = response(&harness, "group/options").await;
+
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["restart_required"], true);
+    let group = harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_group("1")
+        .expect("group");
+    assert_eq!(group["off_state"], "all_members_off");
+    bridge.stop().await.unwrap();
+}
+
+/// Case 69: adding a group with an explicit ID.
+#[tokio::test]
+async fn group_add_with_id() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "group/add",
+        json!({"friendly_name": "group_193", "id": 92}),
+    )
+    .await;
+    let payload = response(&harness, "group/add").await;
+
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(
+        payload["data"],
+        json!({"friendly_name": "group_193", "id": 92})
+    );
+    let group = harness
+        .context
+        .settings
+        .lock()
+        .unwrap()
+        .get_group("92")
+        .expect("group 92");
+    assert_eq!(group["ID"], 92);
+    assert_eq!(group["friendly_name"], "group_193");
+    assert!(harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/groups"));
+    bridge.stop().await.unwrap();
+}
+
+/// Case 70: an empty friendly name is rejected.
+#[tokio::test]
+async fn group_add_rejects_an_empty_name() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "group/add", json!({"friendly_name": "", "id": 9})).await;
+    let payload = response(&harness, "group/add").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(
+        payload["error"],
+        "friendly_name must be at least 1 char long"
+    );
+    bridge.stop().await.unwrap();
+}
+
+/// Case 71: a payload without `friendly_name` is invalid.
+#[tokio::test]
+async fn group_add_rejects_an_invalid_payload() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "group/add",
+        json!({"friendly_name9": "group_193"}),
+    )
+    .await;
+    let payload = response(&harness, "group/add").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Invalid payload");
+    bridge.stop().await.unwrap();
+}
+
+/// Case 95: changing `advanced.log_level` applies immediately.
+#[tokio::test]
+async fn options_apply_log_level() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "options",
+        json!({"options": {"advanced": {"log_level": "debug"}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["restart_required"], false);
+    assert_eq!(harness.context.logger.lock().unwrap().get_level(), "debug");
+    assert!(harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/info"));
+    bridge.stop().await.unwrap();
+}
+
+/// Case 98: options that need a restart are reported as such.
+#[tokio::test]
+async fn options_report_restart_required() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "options",
+        json!({"options": {"serial": {"port": "/dev/newport"}}}),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["restart_required"], true);
+    assert_eq!(
+        harness.context.settings.lock().unwrap().get()["serial"]["port"],
+        "/dev/newport"
+    );
+    bridge.stop().await.unwrap();
+}
+
+/// Case 101: a non-object message is an invalid options payload.
+#[tokio::test]
+async fn options_reject_an_invalid_payload() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "options",
+        Value::String("I am invalid".to_string()),
+    )
+    .await;
+    let payload = response(&harness, "options").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Invalid payload");
+    bridge.stop().await.unwrap();
+}
+
+/// Case 104: icon link handling (definition icon fallback, option override and
+/// `$model`/`$zigbeeModel` substitution).
+#[tokio::test]
+async fn icon_link_handling() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+
+    let mut definition = Definition::new("lumi.plug", "abcd", "abcd").with_zigbee_model("TEST");
+    definition.icon = Some("https://www.zigbee2mqtt.io/images/devices/ZNCZ02LM.jpg".to_string());
+    harness
+        .context
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+    device.resolve_definition(false);
+
+    let payload = bridge.get_definition_payload(&device);
+    assert_eq!(
+        payload["icon"],
+        "https://www.zigbee2mqtt.io/images/devices/ZNCZ02LM.jpg"
+    );
+
+    // A device option overrides the definition icon.
+    harness.context.settings.lock().unwrap().configuration["devices"][IEEE]["icon"] =
+        json!("_$model_$zigbeeModel_");
+    device.resolve_definition(true);
+    let payload = bridge.get_definition_payload(&device);
+    assert_eq!(payload["icon"], "_lumi.plug_TEST_");
 }
