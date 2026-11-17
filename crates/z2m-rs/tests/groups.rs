@@ -2,6 +2,10 @@
 // Upstream revision: zigbee2mqtt 2.14.3 (3c841fdf).
 
 use std::sync::{Arc, Mutex};
+
+#[path = "support/mock_adapter.rs"]
+mod mock_adapter;
+use mock_adapter::MockAdapter;
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -47,6 +51,8 @@ fn temp(name: &str) -> std::path::PathBuf {
 fn harness() -> Harness {
     let database_path = temp("db");
     inject_database(Arc::new(Mutex::new(Database::open(&database_path))));
+    let adapter = MockAdapter::new();
+    zigbee_apiarist::controller::model::entity::Entity::inject_adapter(adapter.clone());
     ZhDevice::reset_cache();
     ZhGroup::reset_cache();
     ZhDevice::create(
