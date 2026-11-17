@@ -243,3 +243,210 @@ async fn device_without_configure_returns_error() {
     assert_eq!(response["status"], "error");
     assert_eq!(response["error"], "Device 'lamp' cannot be configured");
 }
+
+/// Build a definition whose `configure` counts calls and fails while
+/// `fail_until` is greater than the current call count.
+fn failing_registration(
+    calls: Arc<Mutex<Vec<String>>>,
+    fail_until: usize,
+    delay_ms: u64,
+) -> Definition {
+    let mut definition = Definition::new("TEST", "Acme", "Test").with_zigbee_model("TEST");
+    definition.version = "1.2.3".to_string();
+    let counter = Arc::new(Mutex::new(0usize));
+    definition.configure = Some(Arc::new(move |_device, _coordinator, _definition| {
+        let calls = calls.clone();
+        let counter = counter.clone();
+        Box::pin(async move {
+            if delay_ms > 0 {
+                tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+            }
+            let mut count = counter.lock().unwrap();
+            *count += 1;
+            calls.lock().unwrap().push("configure".to_string());
+            if *count <= fail_until {
+                Err(format!("configure failure {count}"))
+            } else {
+                Ok(())
+            }
+        })
+    }));
+    definition
+}
+
+fn emit_interview(harness: &Harness) {
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_interview(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "status": "successful",
+        }));
+}
+
+/// Case 17: at most three automatic configure attempts.
+#[tokio::test]
+async fn stops_after_three_failed_attempts() {
+    let _guard = serial();
+    let harness = harness();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(failing_registration(calls.clone(), usize::MAX, 0));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
+    let configure = Configure::new(harness.context.clone());
+    configure.clone().start().await.unwrap();
+
+    for _ in 0..5 {
+        emit_interview(&harness);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        3,
+        "configure must stop after 3 failed attempts"
+    );
+    configure.stop().await.unwrap();
+}
+
+/// Case 18: a successful attempt before the limit is reached configures the
+/// device and records the definition version.
+#[tokio::test]
+async fn configures_after_a_couple_of_failures() {
+    let _guard = serial();
+    let harness = harness();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(failing_registration(calls.clone(), 2, 0));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
+    let configure = Configure::new(harness.context.clone());
+    configure.clone().start().await.unwrap();
+
+    for _ in 0..3 {
+        emit_interview(&harness);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    assert_eq!(calls.lock().unwrap().len(), 3);
+    let zh = harness.zigbee.resolve_device(IEEE).unwrap().zh.clone();
+    assert_eq!(zh.meta.lock().unwrap()["configured"], json!("1.2.3"));
+    configure.stop().await.unwrap();
+}
+
+/// Case 16: a configure that is already running is not started a second time.
+#[tokio::test]
+async fn does_not_configure_twice_concurrently() {
+    let _guard = serial();
+    let harness = harness();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(failing_registration(calls.clone(), 0, 300));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
+    let configure = Configure::new(harness.context.clone());
+    configure.clone().start().await.unwrap();
+
+    emit_interview(&harness);
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    emit_interview(&harness);
+    tokio::time::sleep(Duration::from_millis(600)).await;
+
+    assert_eq!(
+        calls.lock().unwrap().len(),
+        1,
+        "the in-flight guard must skip the second configure"
+    );
+    configure.stop().await.unwrap();
+}
+
+/// Case 9: a definition version of 0.0.0 never triggers a re-configure.
+#[tokio::test]
+async fn does_not_reconfigure_when_the_definition_version_is_zero() {
+    let _guard = serial();
+    let harness = harness();
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let mut definition = failing_registration(calls.clone(), 0, 0);
+    definition.version = "0.0.0".to_string();
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
+    let configure = Configure::new(harness.context.clone());
+    configure.clone().start().await.unwrap();
+
+    emit_interview(&harness);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    emit_interview(&harness);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // The device is configured once and never re-configured afterwards.
+    assert_eq!(calls.lock().unwrap().len(), 1, "0.0.0 must not reconfigure");
+    let zh = harness.zigbee.resolve_device(IEEE).unwrap().zh.clone();
+    assert_eq!(zh.meta.lock().unwrap()["configured"], json!("0.0.0"));
+    configure.stop().await.unwrap();
+}
+
+/// Case 4: disabled devices are skipped by the automatic configure path.
+#[tokio::test]
+async fn does_not_configure_disabled_devices() {
+    let _guard = serial();
+    let harness = harness();
+    harness.context.settings.lock().unwrap().configuration["devices"][IEEE]["disabled"] =
+        json!(true);
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(failing_registration(calls.clone(), 0, 0));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(false);
+    let configure = Configure::new(harness.context.clone());
+    configure.clone().start().await.unwrap();
+
+    emit_interview(&harness);
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(
+        calls.lock().unwrap().is_empty(),
+        "disabled device must not be configured"
+    );
+    configure.stop().await.unwrap();
+}

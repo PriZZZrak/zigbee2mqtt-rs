@@ -31,7 +31,7 @@ Coverage classes:
 | availability.test.ts | 31 | 10 | 1 | 2 | 0 | 18 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
 | bridge.test.ts | 110 | 58 | 2 | 17 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
-| configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
+| configure.test.ts | 19 | 8 | 1 | 10 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
@@ -238,21 +238,21 @@ Coverage classes:
 | 1 | Should configure Router on startup | `code` | startup/interview scheduling ported, adapter-backed |
 | 2 | Should not configure EndDevice on startup | `code` | startup/interview scheduling ported, adapter-backed |
 | 3 | Should re-configure when device rejoins | `code` | startup/interview scheduling ported, adapter-backed |
-| 4 | Should not re-configure disabled devices | `code` | disabled device guard |
+| 4 | Should not re-configure disabled devices | `asserted` | `does_not_configure_disabled_devices` |
 | 5 | Should reconfigure reporting on reconfigure event | `code` | startup/interview scheduling ported, adapter-backed |
 | 6 | Should not configure twice | `code` | startup/interview scheduling ported, adapter-backed |
 | 7 | Should configure on zigbee message when not configured yet | `code` | startup/interview scheduling ported, adapter-backed |
 | 8 | Should re-configure when the version of the definition changes to a different value than the default (0.0.0) | `code` | startup/interview scheduling ported, adapter-backed |
-| 9 | Should NOT re-configure when version of the definition is 0.0.0 | `code` | startup/interview scheduling ported, adapter-backed |
+| 9 | Should NOT re-configure when version of the definition is 0.0.0 | `asserted` | `does_not_reconfigure_when_the_definition_version_is_zero` |
 | 10 | Should allow to configure via MQTT | `asserted` | configure request success path |
 | 11 | Fail to configure via MQTT when device does not exist | `asserted` | unknown device response |
 | 12 | Fail to configure via MQTT when configure fails | `code` | startup/interview scheduling ported, adapter-backed |
 | 13 | Fail to configure via MQTT when device has no configure | `asserted` | non-configurable device response |
 | 14 | Handles invalid payload for configure via MQTT | `slice` | invalid payload response |
 | 15 | Should not configure when interview not completed | `code` | startup/interview scheduling ported, adapter-backed |
-| 16 | Should not configure when already configuring | `code` | startup/interview scheduling ported, adapter-backed |
-| 17 | Should configure max 3 times when fails | `code` | startup/interview scheduling ported, adapter-backed |
-| 18 | successfully configures after couple fails | `code` | startup/interview scheduling ported, adapter-backed |
+| 16 | Should not configure when already configuring | `asserted` | `does_not_configure_twice_concurrently` (in-flight guard) |
+| 17 | Should configure max 3 times when fails | `asserted` | `stops_after_three_failed_attempts` |
+| 18 | successfully configures after couple fails | `asserted` | `configures_after_a_couple_of_failures` (meta.configured set) |
 | 19 | successfully configures with force after fails | `code` | startup/interview scheduling ported, adapter-backed |
 
 ## externalConverters.test.ts
