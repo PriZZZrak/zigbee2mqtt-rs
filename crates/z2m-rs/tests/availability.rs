@@ -355,3 +355,51 @@ async fn device_timeout_option_controls_the_timer() {
 
     availability.stop().await.unwrap();
 }
+
+/// Case 16: `availability.enabled: false` publishes nothing (the per-entity
+/// filter, not an early start-return, is the upstream behaviour).
+#[tokio::test]
+async fn availability_disabled_globally_publishes_nothing() {
+    let _guard = serial();
+    let harness = harness(false, json!(null));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_last_seen_changed(json!({
+            "device": {"ieeeAddr": IEEE, "name": "lamp"},
+            "reason": "messageEmitted",
+        }));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    let mqtt = harness.mqtt.lock().await;
+    assert!(
+        mqtt.attempted.is_empty(),
+        "unexpected publishes: {:?}",
+        mqtt.attempted
+            .iter()
+            .map(|(topic, payload, _)| (topic.clone(), payload.clone()))
+            .collect::<Vec<_>>()
+    );
+    drop(mqtt);
+    availability.stop().await.unwrap();
+}
+
+/// Case 24: a stopped availability instance cannot be restarted.
+#[tokio::test]
+async fn stopped_availability_cannot_be_restarted() {
+    let _guard = serial();
+    let harness = harness(true, json!({}));
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    availability.clone().stop().await.unwrap();
+
+    let error = availability.start().await.expect_err("restart is refused");
+    assert!(
+        error.contains("cannot be restarted"),
+        "unexpected error: {error}"
+    );
+}

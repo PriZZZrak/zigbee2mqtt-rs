@@ -28,7 +28,7 @@ Coverage classes:
 
 | Upstream file | Cases | asserted | slice | code | converter-db | adapter | static | omitted | Rust tests |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| availability.test.ts | 31 | 7 | 1 | 14 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
+| availability.test.ts | 31 | 9 | 1 | 12 | 0 | 9 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
 | bind.test.ts | 31 | 6 | 4 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
 | bridge.test.ts | 110 | 58 | 2 | 17 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 3 | 1 | 15 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
@@ -63,7 +63,7 @@ Coverage classes:
 | 13 | Should allow to change availability timeout via avaiability options | `code` | get_timeout reads availability.{active,passive}.timeout |
 | 14 | Should stop pinging device when it leaves | `adapter` | ping queue removal on leave |
 | 15 | Should stop pinging device when it is removed | `adapter` | ping queue removal on remove |
-| 16 | Should allow to be disabled | `code` | start() returns early when availability is disabled |
+| 16 | Should allow to be disabled | `asserted` | `availability_disabled_globally_publishes_nothing` (global flag falls back per entity; no publish) |
 | 17 | Should allow to enable availability for just one device | `code` | is_availability_enabled_for_entity per-device override |
 | 18 | Should retrieve device state when it reconnects | `adapter` | retrieveState pings through the adapter |
 | 19 | Should republish availability when device is renamed | `asserted` | rename_publishes_empty_retained_availability |
@@ -71,7 +71,7 @@ Coverage classes:
 | 21 | Should publish availability for groups | `code` | group availability fan-out in publish_availability |
 | 22 | Should clear the ping queue on stop | `code` | ping queue cleared on stop |
 | 23 | Should drain the ping queue in one run instead of re-entering per device | `code` | single-run ping queue drain |
-| 24 | Should prevent instance restart | `code` | instance restart guard |
+| 24 | Should prevent instance restart | `asserted` | `stopped_availability_cannot_be_restarted` ("This extension cannot be restarted.") |
 | 25 | jitters pings | `code` | jitter via utils::random_f64 in reset_timer |
 | 26 | does not trigger backoff on ping success | `code` | backoff reset on ping success |
 | 27 | triggers backoff on successive ping failures | `code` | backoff growth on failures |
