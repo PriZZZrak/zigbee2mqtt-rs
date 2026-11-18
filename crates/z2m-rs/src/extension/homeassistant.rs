@@ -80,6 +80,37 @@ fn clean_name(name: &str) -> String {
         .to_string()
 }
 
+/// Upstream `applyHomeAssistantExposeMetadata` (`homeassistant.ts:404-440`).
+fn apply_home_assistant_metadata(expose: &zigbee_converters::Expose, entries: &mut [Entry]) {
+    let Value::Object(ha) = &expose.homeassistant else {
+        return;
+    };
+    for entry in entries.iter_mut() {
+        if let Some(kind) = ha.get("type").and_then(Value::as_str) {
+            entry.r#type = kind.to_string();
+        }
+        for (source, destination) in [
+            ("schema", "schema"),
+            ("entityCategory", "entity_category"),
+            ("deviceClass", "device_class"),
+            ("enabledByDefault", "enabled_by_default"),
+            ("icon", "icon"),
+            ("name", "name"),
+            ("valueTemplate", "value_template"),
+        ] {
+            match ha.get(source) {
+                Some(Value::Null) if destination == "value_template" => {
+                    entry.payload.remove(destination);
+                }
+                Some(value) => {
+                    entry.payload.insert(destination.to_string(), value.clone());
+                }
+                None => {}
+            }
+        }
+    }
+}
+
 fn state_value_template(property: &str) -> String {
     state_value_template_body(property, &format!("{{{{ value_json[\"{property}\"] }}}}"))
 }
@@ -598,15 +629,28 @@ impl HomeAssistant {
                             });
                         }
                     }
-                    if let Some(humidity) = all_exposes
+                    // Upstream prefers the humidity of the same endpoint as the
+                    // climate and falls back to a humidity without endpoint
+                    // (multi-endpoint thermostats, `homeassistant.ts:935-938`).
+                    let humidity = all_exposes
                         .iter()
                         .filter(|e| {
                             e.r#type == "numeric"
                                 && e.name.as_deref() == Some("humidity")
                                 && e.access & access::STATE != 0
                         })
-                        .find(|e| e.endpoint.is_none())
-                    {
+                        .find(|e| e.endpoint == expose.endpoint)
+                        .or_else(|| {
+                            all_exposes
+                                .iter()
+                                .filter(|e| {
+                                    e.r#type == "numeric"
+                                        && e.name.as_deref() == Some("humidity")
+                                        && e.access & access::STATE != 0
+                                })
+                                .find(|e| e.endpoint.is_none())
+                        });
+                    if let Some(humidity) = humidity {
                         payload.insert(
                             "current_humidity_template".into(),
                             Value::String(state_value_template(
@@ -1109,6 +1153,8 @@ impl HomeAssistant {
                         payload.insert("command_topic_postfix".into(), Value::String(property.clone()));
                         merge_lookup(&mut payload, "LIST_DISCOVERY_LOOKUP", expose.name.as_deref().unwrap_or(""));
                         entries.push(Entry { r#type: "text".into(), object_id: property, payload });
+                        let start = entries.len() - 1;
+                        apply_home_assistant_metadata(expose, &mut entries[start..]);
                         continue;
                     }
                     if expose.access & access::STATE != 0 {
@@ -1382,34 +1428,7 @@ impl HomeAssistant {
                 }
             }
             // Upstream `applyHomeAssistantExposeMetadata` (`homeassistant.ts:404-440`).
-            if let Value::Object(ha) = &expose.homeassistant {
-                for entry in new_entries.iter_mut() {
-                    if let Some(kind) = ha.get("type").and_then(Value::as_str) {
-                        entry.r#type = kind.to_string();
-                    }
-                    for (source, destination) in [
-                        ("schema", "schema"),
-                        ("entityCategory", "entity_category"),
-                        ("deviceClass", "device_class"),
-                        ("enabledByDefault", "enabled_by_default"),
-                        ("icon", "icon"),
-                        ("name", "name"),
-                        ("valueTemplate", "value_template"),
-                    ] {
-                        match ha.get(source) {
-                            // `valueTemplate: null` deletes; `name: null` is kept as an
-                            // explicit null so Home Assistant falls back to the device name.
-                            Some(Value::Null) if destination == "value_template" => {
-                                entry.payload.remove(destination);
-                            }
-                            Some(value) => {
-                                entry.payload.insert(destination.to_string(), value.clone());
-                            }
-                            None => {}
-                        }
-                    }
-                }
-            }
+            apply_home_assistant_metadata(expose, new_entries);
             for entry in new_entries.iter_mut() {
                 if (entry.r#type == "binary_sensor" || entry.r#type == "sensor")
                     && entry.payload.get("entity_category").and_then(Value::as_str) == Some("config")
@@ -1599,6 +1618,11 @@ impl HomeAssistant {
         let ha_options = entity.options().get("homeassistant").cloned().unwrap_or(Value::Null);
         if let Value::Object(overrides) = &ha_options {
             configs.retain(|config| !matches!(overrides.get(&config.object_id), Some(Value::Null)));
+            // Upstream: `homeassistant: {device_automation: null}` disables all
+            // device triggers for the entity (`homeassistant.ts:2894-2910`).
+            if matches!(overrides.get("device_automation"), Some(Value::Null)) {
+                configs.retain(|config| config.r#type != "device_automation");
+            }
             for config in &mut configs {
                 if let Some(over) = overrides.get(&config.object_id).and_then(Value::as_object) {
                     if config.r#type == "switch" && over.get("type").and_then(Value::as_str) == Some("light") {
@@ -2238,8 +2262,15 @@ impl HomeAssistant {
         value: &str,
         force: bool,
     ) {
-        if matches!(device.options().get("homeassistant"), Some(Value::Bool(false)) | Some(Value::Null)) {
-            return;
+        let options = device.options();
+        if let Some(ha_options) = options.get("homeassistant") {
+            if matches!(ha_options, Value::Bool(false) | Value::Null)
+                || ha_options
+                    .get("device_automation")
+                    .is_some_and(Value::is_null)
+            {
+                return;
+            }
         }
         let discovered = self.get_discovered(&device.entity_id().key());
         let discovered_key = format!("{key}_{value}");

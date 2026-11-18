@@ -364,8 +364,13 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
   75 asserted / 0 code / 20 adapter / 2 slice / 13 omitted (transactions, error
   and invalid payload responses, remove/clear_cache, rename guard, group
   add/options, options apply/restart, icon links).
-- [ ] HA в пределах scope: точные discovery payloads, unique IDs, availability,
-  retained cleanup на rename/remove и повторная публикация.
+- [x] HA в пределах scope: точные discovery payloads, unique IDs, availability,
+  retained cleanup на rename/remove и повторная публикация. →
+  `homeassistant.test.ts` 112 asserted / 0 slice / 0 code / 3 converter-db:
+  thermostat/climate (setpoint, cooling, emergency heat, PI demand, humidity
+  per endpoint, separate temperature sensor), covers (position, motor_state,
+  fallback), fans (speed, second endpoint), analog input/output, infrared
+  emitter/receiver, update versions, overrides and availability templates.
 - [ ] Проверить применимость **81 `converter-db`** и **91 `omitted`** строк:
   общий converter host не исключается вместе с базой моделей.
 

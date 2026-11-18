@@ -37,7 +37,7 @@ Coverage classes:
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 25 | 1 | 14 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 92 | 0 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 112 | 0 | 0 | 3 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
@@ -416,34 +416,34 @@ Coverage classes:
 | 42 | Shouldnt discover sensor when set to null | `asserted` | applies_device_option_overrides_and_null_filtering (temperature: null) |
 | 43 | Should discover devices with fan | `asserted` | `discovers_numeric_binary_enum_and_switch_entities` (fan assertions) |
 | 44 | Should discover fan on a non-first endpoint | `asserted` | discovers_endpoint_entities_with_suffixed_topics (fan_f1) |
-| 45 | Should discover speed-controlled fan on a non-first endpoint | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 45 | Should discover speed-controlled fan on a non-first endpoint | `asserted` | `fan_speed_on_non_first_endpoint` (second endpoint fan) |
 | 46 | Should discover siren (HS2WD-E) | `asserted` | `discovers_numeric_binary_enum_and_switch_entities` (siren assertions) |
-| 47 | Should discover devices with speed-controlled fan | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 48 | Should discover thermostat devices | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 49 | Should discover thermostat devices with read-only PI heating demand | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 50 | Should discover thermostat devices with writable PI heating demand | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 47 | Should discover devices with speed-controlled fan | `asserted` | `fan_speed_on_non_first_endpoint` / `discovers_numeric_binary_enum_and_switch_entities` |
+| 48 | Should discover thermostat devices | `asserted` | `thermostat_discovery_payload` |
+| 49 | Should discover thermostat devices with read-only PI heating demand | `asserted` | `pi_heating_demand_read_only_is_a_sensor` |
+| 50 | Should discover thermostat devices with writable PI heating demand | `asserted` | `pi_heating_demand_writable_is_a_number` |
 | 51 | Should discover Bosch BTH-RA with a compatibility mapping | `converter-db` | Bosch BTH-RA compatibility mapping lives in the converter DB |
-| 52 | Should discover analog input on unsupported devices with device class and name | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 53 | Should discover analog output on unsupported devices | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 52 | Should discover analog input on unsupported devices with device class and name | `asserted` | `analog_input_and_output_discovery` |
+| 53 | Should discover analog output on unsupported devices | `asserted` | `analog_input_and_output_discovery` |
 | 54 | Should apply user configuration after converter compatibility mapping | `asserted` | `user_configuration_wins_over_the_mapping` |
 | 55 | does not throw when discovery payload override throws | `asserted` | `discovery_override_panic_is_caught` |
 | 56 | passes device options to discovery payload overrides | `asserted` | `discovery_override_receives_device_options` |
 | 57 | Should discover Bosch BTH-RM230Z with a current_humidity attribute | `converter-db` | Bosch BTH-RM230Z exposes live in the converter DB |
-| 58 | Should discover seperate temperature sensor for thermostat | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 59 | Should use humidity of the same endpoint for multi-endpoint climate | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 60 | Should discover climate with cooling-only setpoint | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 61 | Should map emergency_heating to heat for climate | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 62 | Should discover devices with cover_position | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 58 | Should discover seperate temperature sensor for thermostat | `asserted` | `thermostat_gets_a_local_temperature_sensor` |
+| 59 | Should use humidity of the same endpoint for multi-endpoint climate | `asserted` | `climate_prefers_same_endpoint_humidity` |
+| 60 | Should discover climate with cooling-only setpoint | `asserted` | `cooling_only_climate_setpoint` |
+| 61 | Should map emergency_heating to heat for climate | `asserted` | `emergency_heating_maps_to_heat` |
+| 62 | Should discover devices with cover_position | `asserted` | `cover_position_discovery` |
 | 63 | Should discover dual cover devices | `asserted` | `discovers_endpoint_entities_with_suffixed_topics` (cover_left and cover_right) |
-| 64 | Should derive direction-aware cover state from position for motor_state covers | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 65 | Should preserve motor_state and state fallback for covers without position | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 66 | Should discover an infrared emitter entity | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 67 | Should discover an infrared receiver entity | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 64 | Should derive direction-aware cover state from position for motor_state covers | `asserted` | `cover_motor_state_direction_discovery` |
+| 65 | Should preserve motor_state and state fallback for covers without position | `asserted` | `cover_without_position_keeps_state_fallback` |
+| 66 | Should discover an infrared emitter entity | `asserted` | `infrared_emitter_and_receiver_discovery` |
+| 67 | Should discover an infrared receiver entity | `asserted` | `infrared_emitter_and_receiver_discovery` |
 | 68 | Should discover devices with custom homeassistant.discovery_topic | `asserted` | `custom_discovery_topic_is_used` |
 | 69 | Should throw error when starting with attributes output | `asserted` | start_rejects_attribute_output_and_conflicting_discovery_topic |
 | 70 | Should throw error when homeassistant.discovery_topic equals the mqtt.base_topic | `asserted` | start_rejects_attribute_output_and_conflicting_discovery_topic |
 | 71 | Should warn when starting with cache_state false | `asserted` | starting_without_cache_state_warns |
-| 72 | Should not add missing values to the payload | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 72 | Should not add missing values to the payload | `converter-db` | temperature conversion belongs to the device converter (R1 Q4) |
 | 73 | Should copy hue/saturtion to h/s if present | `asserted` | adjust_message_copies_hue_and_saturation |
 | 74 | Should not copy hue/saturtion if properties are missing | `asserted` | `adjust_message_copies_hue_and_saturation` |
 | 75 | Should not copy hue/saturtion if color is missing | `asserted` | `adjust_message_copies_hue_and_saturation` |
@@ -453,7 +453,7 @@ Coverage classes:
 | 79 | Should discover when options change | `asserted` | entity_options_changed_republishes_discovery |
 | 80 | Should send all status when home assistant comes online (default topic) | `asserted` | status_online_republishes_bridge_state_and_cached_states |
 | 81 | Should send all status when home assistant comes online | `asserted` | `homeassistant_online_republishes_state` |
-| 82 | Should keep the versions of an update payload that already has them | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 82 | Should keep the versions of an update payload that already has them | `asserted` | `update_versions_are_preserved` |
 | 83 | Shouldnt send all status when home assistant comes offline | `asserted` | status_offline_or_other_topics_do_not_republish |
 | 84 | Shouldnt send all status when home assistant comes online with different topic | `asserted` | status_offline_or_other_topics_do_not_republish |
 | 85 | Should discover devices with availability | `asserted` | availability_entries_cover_bridge_and_entity_topics |
@@ -467,15 +467,15 @@ Coverage classes:
 | 93 | Should publish /action for MQTT device trigger | `asserted` | action_publishes_device_trigger_and_republication |
 | 94 | Should publish /action for MQTT device trigger | `asserted` | `action_publishes_device_trigger_and_republication` |
 | 95 | Should publish /action for MQTT device trigger | `asserted` | `action_publishes_device_trigger_and_republication` |
-| 96 | Should not discover device_automation when disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 96 | Should not discover device_automation when disabled | `asserted` | `device_automation_can_be_disabled` |
 | 97 | Should enable experimental event entities | `asserted` | experimental_event_entities_prepare_wildcard_action_types |
 | 98 | Should republish payload to postfix topic with lightWithPostfix config | `asserted` | endpoint_state_publish_is_split_per_endpoint_topic |
 | 99 | Should not republish a light_type select as an endpoint light state | `asserted` | light_type_select_is_not_republished_as_endpoint_state |
 | 100 | Shouldnt crash in onPublishEntityState on group publish | `asserted` | group_state_publish_does_not_republish_endpoint_states |
 | 101 | Should clear outdated configs | `asserted` | clears_outdated_discovery_config_from_retained_messages |
 | 102 | Should rediscover group when device is added to it | `asserted` | group_members_changed_rediscovers_the_group |
-| 103 | Should discover with json availability payload value_template | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 104 | Should discover with availability offline when device is disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
+| 103 | Should discover with json availability payload value_template | `asserted` | `discovers_numeric_binary_enum_and_switch_entities` (availability value_template) |
+| 104 | Should discover with availability offline when device is disabled | `asserted` | `disabled_device_is_discovered_as_offline` |
 | 105 | Should discover last_seen when enabled | `asserted` | discovers_last_seen_when_continuous_format_is_enabled |
 | 106 | Should discover devices with configuration url (zigbee2mqtt-windfront) | `asserted` | configuration_url_points_at_the_frontend |
 | 107 | Should discover devices with configuration url (zigbee2mqtt-frontend) | `asserted` | configuration_url_points_at_the_frontend |

@@ -333,7 +333,12 @@ async fn discovers_numeric_binary_enum_and_switch_entities() {
         numeric["unique_id"],
         format!("{IEEE}_temperature_zigbee2mqtt")
     );
-    assert_eq!(numeric["availability"].as_array().unwrap().len(), 2);
+    let availability = numeric["availability"].as_array().unwrap();
+    assert_eq!(availability.len(), 2);
+    assert_eq!(
+        availability[0]["value_template"], "{{ value_json.state }}",
+        "json availability payload template (case 103)"
+    );
 
     let contact = config(
         &harness,
@@ -2178,4 +2183,638 @@ async fn group_removal_clears_discovery() {
         "group discovery was not cleared"
     );
     ha.stop().await.unwrap();
+}
+
+fn climate_expose(endpoint: Option<&str>, features: Vec<Expose>) -> Expose {
+    Expose {
+        r#type: "climate".to_string(),
+        name: Some("climate".to_string()),
+        endpoint: endpoint.map(str::to_string),
+        access: access::ALL,
+        features,
+        ..Default::default()
+    }
+}
+
+fn demand_expose(access: u32, min: Option<f64>, max: Option<f64>) -> Expose {
+    Expose {
+        value_min: min,
+        value_max: max,
+        ..Expose::numeric("pi_heating_demand", access)
+    }
+}
+
+/// Case 48: thermostat discovery payload.
+#[tokio::test]
+async fn thermostat_discovery_payload() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![climate_expose(
+            None,
+            vec![
+                Expose::numeric("local_temperature", access::STATE),
+                Expose {
+                    value_min: Some(5.0),
+                    value_max: Some(30.0),
+                    value_step: Some(0.5),
+                    ..Expose::numeric("occupied_heating_setpoint", access::ALL)
+                },
+                Expose::enumeration("system_mode", access::ALL, &["off", "heat", "sleep"]),
+                Expose::enumeration("running_state", access::STATE, &["idle", "heat"]),
+                Expose::enumeration("fan_mode", access::ALL, &["low", "auto"]),
+            ],
+        )]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let climate = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate/config"),
+    )
+    .await
+    .expect("climate");
+    assert_eq!(climate["min_temp"], "5");
+    assert_eq!(climate["max_temp"], "30");
+    assert_eq!(climate["temp_step"], 0.5);
+    assert_eq!(climate["modes"], json!(["off", "heat"]));
+    assert_eq!(
+        climate["temperature_command_topic"],
+        "zigbee2mqtt/lamp/set/occupied_heating_setpoint"
+    );
+    assert_eq!(
+        climate["temperature_state_template"],
+        "{% if \"occupied_heating_setpoint\" in value_json %}{{ value_json[\"occupied_heating_setpoint\"] }}{% endif %}"
+    );
+    assert_eq!(climate["action_topic"], "zigbee2mqtt/lamp");
+    assert!(climate["action_template"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("heat:heating"));
+    assert_eq!(climate["current_temperature_topic"], "zigbee2mqtt/lamp");
+    assert_eq!(climate["fan_modes"], json!(["low", "auto"]));
+    ha.stop().await.unwrap();
+}
+
+/// Case 49: read-only PI heating demand becomes a diagnostic sensor.
+#[tokio::test]
+async fn pi_heating_demand_read_only_is_a_sensor() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![climate_expose(
+            None,
+            vec![
+                Expose::numeric("local_temperature", access::STATE),
+                Expose {
+                    value_min: Some(5.0),
+                    value_max: Some(30.0),
+                    ..Expose::numeric("occupied_heating_setpoint", access::ALL)
+                },
+                demand_expose(access::STATE, None, None),
+            ],
+        )]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let sensor = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/pi_heating_demand/config"),
+    )
+    .await
+    .expect("read-only demand sensor");
+    assert_eq!(sensor["entity_category"], "diagnostic");
+    assert!(config(
+        &harness,
+        &format!("homeassistant/number/{IEEE}/pi_heating_demand/config")
+    )
+    .await
+    .is_none());
+    ha.stop().await.unwrap();
+}
+
+/// Case 50: writable PI heating demand becomes a number entity.
+#[tokio::test]
+async fn pi_heating_demand_writable_is_a_number() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![climate_expose(
+            None,
+            vec![
+                Expose::numeric("local_temperature", access::STATE),
+                Expose {
+                    value_min: Some(5.0),
+                    value_max: Some(30.0),
+                    ..Expose::numeric("occupied_heating_setpoint", access::ALL)
+                },
+                demand_expose(access::ALL, Some(0.0), Some(100.0)),
+            ],
+        )]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let number = config(
+        &harness,
+        &format!("homeassistant/number/{IEEE}/pi_heating_demand/config"),
+    )
+    .await
+    .expect("writable demand number");
+    assert_eq!(number["min"], 0.0);
+    assert_eq!(number["max"], 100.0);
+    assert_eq!(
+        number["command_topic"],
+        "zigbee2mqtt/lamp/set/pi_heating_demand"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 58: a separate temperature sensor is discovered for the thermostat.
+#[tokio::test]
+async fn thermostat_gets_a_local_temperature_sensor() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![climate_expose(
+            None,
+            vec![
+                Expose {
+                    unit: Some("°C".to_string()),
+                    ..Expose::numeric("local_temperature", access::STATE)
+                },
+                Expose {
+                    value_min: Some(5.0),
+                    value_max: Some(30.0),
+                    ..Expose::numeric("occupied_heating_setpoint", access::ALL)
+                },
+            ],
+        )]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let sensor = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/local_temperature/config"),
+    )
+    .await
+    .expect("local temperature sensor");
+    assert_eq!(sensor["device_class"], "temperature");
+    assert_eq!(sensor["unit_of_measurement"], "°C");
+    assert_eq!(
+        sensor["value_template"],
+        "{% if \"local_temperature\" in value_json %}{{ value_json[\"local_temperature\"] }}{% endif %}"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 60: cooling-only climate uses the cooling setpoint.
+#[tokio::test]
+async fn cooling_only_climate_setpoint() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![climate_expose(
+            None,
+            vec![
+                Expose::numeric("local_temperature", access::STATE),
+                Expose {
+                    value_min: Some(16.0),
+                    value_max: Some(32.0),
+                    value_step: Some(0.5),
+                    ..Expose::numeric("occupied_cooling_setpoint", access::ALL)
+                },
+                Expose::enumeration("system_mode", access::ALL, &["off", "cool"]),
+            ],
+        )]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let climate = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate/config"),
+    )
+    .await
+    .expect("cooling climate");
+    assert_eq!(
+        climate["temperature_command_topic"],
+        "zigbee2mqtt/lamp/set/occupied_cooling_setpoint"
+    );
+    assert_eq!(climate["min_temp"], "16");
+    assert_eq!(climate["max_temp"], "32");
+    ha.stop().await.unwrap();
+}
+
+/// Case 61: emergency_heating maps to heat in the climate mode template.
+#[tokio::test]
+async fn emergency_heating_maps_to_heat() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![climate_expose(
+            None,
+            vec![
+                Expose::numeric("local_temperature", access::STATE),
+                Expose {
+                    value_min: Some(5.0),
+                    value_max: Some(30.0),
+                    ..Expose::numeric("occupied_heating_setpoint", access::ALL)
+                },
+                Expose::enumeration(
+                    "system_mode",
+                    access::ALL,
+                    &["off", "heat", "emergency_heating"],
+                ),
+            ],
+        )]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let climate = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate/config"),
+    )
+    .await
+    .expect("climate");
+    let modes = climate["modes"].as_array().unwrap();
+    assert!(!modes.contains(&json!("emergency_heating")), "{modes:?}");
+    assert_eq!(modes, &vec![json!("off"), json!("heat")]);
+    assert!(climate["mode_state_template"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("heat if mode == emergency_heating else mode"));
+    ha.stop().await.unwrap();
+}
+
+/// Case 59: multi-endpoint climate prefers the humidity of its own endpoint.
+#[tokio::test]
+async fn climate_prefers_same_endpoint_humidity() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        let climate = |endpoint: &str| {
+            climate_expose(
+                Some(endpoint),
+                vec![
+                    Expose::numeric("local_temperature", access::STATE),
+                    Expose {
+                        value_min: Some(5.0),
+                        value_max: Some(30.0),
+                        ..Expose::numeric("occupied_heating_setpoint", access::ALL)
+                    },
+                ],
+            )
+        };
+        definition.exposes = zigbee_converters::Exposes::Static(vec![
+            climate("l1"),
+            climate("l2"),
+            Expose {
+                name: Some("humidity".to_string()),
+                property: Some("humidity_l1".to_string()),
+                endpoint: Some("l1".to_string()),
+                ..Expose::numeric("humidity", access::STATE)
+            },
+            Expose::numeric("humidity", access::STATE),
+        ]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let l1 = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate_l1/config"),
+    )
+    .await
+    .expect("climate l1");
+    assert_eq!(
+        l1["current_humidity_template"],
+        "{% if \"humidity_l1\" in value_json %}{{ value_json[\"humidity_l1\"] }}{% endif %}"
+    );
+    let l2 = config(
+        &harness,
+        &format!("homeassistant/climate/{IEEE}/climate_l2/config"),
+    )
+    .await
+    .expect("climate l2");
+    assert_eq!(
+        l2["current_humidity_template"],
+        "{% if \"humidity\" in value_json %}{{ value_json[\"humidity\"] }}{% endif %}"
+    );
+    ha.stop().await.unwrap();
+}
+
+fn cover_expose(endpoint: Option<&str>, features: Vec<Expose>) -> Expose {
+    Expose {
+        r#type: "cover".to_string(),
+        name: Some("cover".to_string()),
+        endpoint: endpoint.map(str::to_string),
+        access: access::ALL,
+        features,
+        ..Default::default()
+    }
+}
+
+/// Case 62: cover discovery with position.
+#[tokio::test]
+async fn cover_position_discovery() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![cover_expose(
+            None,
+            vec![
+                Expose::binary("state", access::ALL),
+                Expose::numeric("position", access::ALL),
+            ],
+        )]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let cover = config(
+        &harness,
+        &format!("homeassistant/cover/{IEEE}/cover/config"),
+    )
+    .await
+    .expect("cover");
+    assert_eq!(
+        cover["position_template"],
+        "{% if \"position\" in value_json %}{{ value_json[\"position\"] }}{% endif %}"
+    );
+    assert_eq!(cover["position_topic"], "zigbee2mqtt/lamp");
+    assert_eq!(cover["set_position_topic"], "zigbee2mqtt/lamp/set");
+    assert_eq!(cover["state_open"], "OPEN");
+    assert_eq!(cover["state_closed"], "CLOSE");
+    ha.stop().await.unwrap();
+}
+
+/// Case 64: motor_state covers derive direction-aware states.
+#[tokio::test]
+async fn cover_motor_state_direction_discovery() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![
+            cover_expose(
+                None,
+                vec![
+                    Expose::binary("state", access::ALL),
+                    Expose::numeric("position", access::ALL),
+                ],
+            ),
+            Expose::enumeration(
+                "motor_state",
+                access::STATE,
+                &["opening", "closing", "stopped"],
+            ),
+        ]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let cover = config(
+        &harness,
+        &format!("homeassistant/cover/{IEEE}/cover/config"),
+    )
+    .await
+    .expect("cover");
+    assert_eq!(cover["state_opening"], "opening");
+    assert_eq!(cover["state_closing"], "closing");
+    assert_eq!(cover["state_stopped"], "stopped");
+    let template = cover["value_template"].as_str().unwrap_or_default();
+    assert!(
+        template.contains("motor == \"opening\" and position != 100"),
+        "{template}"
+    );
+    assert!(
+        template.contains("motor == \"closing\" and position != 0"),
+        "{template}"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 65: covers without position keep motor_state and the state fallback.
+#[tokio::test]
+async fn cover_without_position_keeps_state_fallback() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![
+            cover_expose(None, vec![Expose::binary("state", access::ALL)]),
+            Expose::enumeration(
+                "motor_state",
+                access::STATE,
+                &["opening", "closing", "stopped"],
+            ),
+        ]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let cover = config(
+        &harness,
+        &format!("homeassistant/cover/{IEEE}/cover/config"),
+    )
+    .await
+    .expect("cover");
+    assert_eq!(cover["state_opening"], "opening");
+    assert_eq!(cover["state_closing"], "closing");
+    let template = cover["value_template"].as_str().unwrap_or_default();
+    assert!(template.contains("set position = none"), "{template}");
+    assert!(
+        template.contains("state in [\"OPEN\", \"CLOSE\"]"),
+        "{template}"
+    );
+    assert_eq!(cover["optimistic"], true);
+    ha.stop().await.unwrap();
+}
+
+/// Cases 45 and 47: speed-controlled fans, including a non-first endpoint.
+#[tokio::test]
+async fn fan_speed_on_non_first_endpoint() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        let fan = |endpoint: Option<&str>| Expose {
+            r#type: "fan".to_string(),
+            name: Some("fan".to_string()),
+            endpoint: endpoint.map(str::to_string),
+            access: access::ALL,
+            features: vec![
+                Expose::binary("state", access::ALL),
+                Expose::enumeration("mode", access::ALL, &["off", "low", "high", "auto"]),
+            ],
+            ..Default::default()
+        };
+        definition.exposes = zigbee_converters::Exposes::Static(vec![fan(None), fan(Some("l2"))]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let fan = config(&harness, &format!("homeassistant/fan/{IEEE}/fan/config"))
+        .await
+        .expect("fan");
+    assert_eq!(fan["speed_range_max"], 2);
+    assert_eq!(fan["percentage_command_topic"], "zigbee2mqtt/lamp/set/mode");
+    assert_eq!(fan["preset_modes"], json!(["auto"]));
+
+    let second = config(&harness, &format!("homeassistant/fan/{IEEE}/fan_l2/config"))
+        .await
+        .expect("second endpoint fan");
+    assert_eq!(second["command_topic"], "zigbee2mqtt/lamp/l2/set/state");
+    assert_eq!(second["state_topic"], "zigbee2mqtt/lamp");
+    ha.stop().await.unwrap();
+}
+
+/// Cases 52-53: analog input/output exposes.
+#[tokio::test]
+async fn analog_input_and_output_discovery() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![
+            Expose {
+                name: Some("analog_in_temperature_1".to_string()),
+                property: Some("analog_in_temperature_1".to_string()),
+                label: Some("my_sensor_name".to_string()),
+                unit: Some("°C".to_string()),
+                homeassistant: json!({"name": "my_sensor_name", "deviceClass": "temperature", "stateClass": "measurement"}),
+                ..Expose::numeric("analog_in_temperature_1", access::STATE)
+            },
+            Expose {
+                name: Some("analog_output_2".to_string()),
+                property: Some("analog_output_2".to_string()),
+                label: Some("my_number_name".to_string()),
+                endpoint: None,
+                ..Expose::numeric("analog_output_2", access::ALL)
+            },
+        ]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let sensor = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/analog_in_temperature_1/config"),
+    )
+    .await
+    .expect("analog input");
+    assert_eq!(sensor["name"], "my_sensor_name");
+    assert_eq!(sensor["device_class"], "temperature");
+    assert_eq!(sensor["unit_of_measurement"], "°C");
+    assert_eq!(
+        sensor["value_template"],
+        "{% if \"analog_in_temperature_1\" in value_json %}{{ value_json[\"analog_in_temperature_1\"] }}{% endif %}"
+    );
+
+    let number = config(
+        &harness,
+        &format!("homeassistant/number/{IEEE}/analog_output_2/config"),
+    )
+    .await
+    .expect("analog output");
+    assert_eq!(number["name"], "my_number_name");
+    assert_eq!(
+        number["command_topic"],
+        "zigbee2mqtt/lamp/set/analog_output_2"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Cases 66-67: infrared emitter and receiver entities.
+#[tokio::test]
+async fn infrared_emitter_and_receiver_discovery() {
+    let _guard = serial();
+    let harness = harness_with(|definition| {
+        definition.exposes = zigbee_converters::Exposes::Static(vec![
+            Expose {
+                r#type: "text".to_string(),
+                name: Some("emitter".to_string()),
+                property: Some("emitter".to_string()),
+                label: Some("Emitter".to_string()),
+                access: access::SET,
+                homeassistant: json!({"type": "infrared", "schema": "emitter", "valueTemplate": null}),
+                ..Default::default()
+            },
+            Expose {
+                r#type: "text".to_string(),
+                name: Some("receiver".to_string()),
+                property: Some("receiver".to_string()),
+                label: Some("Receiver".to_string()),
+                access: access::STATE,
+                homeassistant: json!({"type": "infrared", "schema": "receiver", "valueTemplate": "{{ json_value.emitter }}"}),
+                ..Default::default()
+            },
+        ]);
+    });
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let emitter = config(
+        &harness,
+        &format!("homeassistant/infrared/{IEEE}/emitter/config"),
+    )
+    .await
+    .expect("emitter");
+    assert_eq!(emitter["schema"], "emitter");
+    assert_eq!(emitter["name"], "Emitter");
+    assert!(emitter.get("value_template").is_none());
+
+    let receiver = config(
+        &harness,
+        &format!("homeassistant/infrared/{IEEE}/receiver/config"),
+    )
+    .await
+    .expect("receiver");
+    assert_eq!(receiver["schema"], "receiver");
+    assert_eq!(receiver["name"], "Receiver");
+    assert_eq!(receiver["value_template"], "{{ json_value.emitter }}");
+    ha.stop().await.unwrap();
+}
+
+/// Case 96: device_automation: null disables trigger discovery.
+#[tokio::test]
+async fn device_automation_can_be_disabled() {
+    let _guard = serial();
+    let harness = harness();
+    harness.context.settings.lock().unwrap().configuration["device_options"] =
+        json!({"homeassistant": {"device_automation": null}});
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_publish_entity_state(json!({
+            "entity": {"name": "lamp", "ieeeAddr": IEEE, "ID": IEEE},
+            "message": {"action": "single"},
+        }));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    assert!(
+        !harness
+            .mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .any(|(topic, _, _)| topic.starts_with("homeassistant/device_automation/")),
+        "device triggers were discovered despite device_automation: null"
+    );
+    ha.stop().await.unwrap();
+}
+
+/// Case 82: existing update versions are preserved.
+#[tokio::test]
+async fn update_versions_are_preserved() {
+    let _guard = serial();
+    let harness = harness_with(|definition| definition.ota = Some(json!({})));
+    let ha = HomeAssistant::new(harness.context.clone());
+    let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+
+    let mut with_versions =
+        json!({"update": {"installed_version": "1.0", "latest_version": "1.2"}});
+    ha.adjust_message_before_publish(device.as_ref(), &mut with_versions);
+    assert_eq!(with_versions["update"]["installed_version"], "1.0");
+    assert_eq!(with_versions["update"]["latest_version"], "1.2");
+
+    let mut without_versions = json!({"update": {}});
+    ha.adjust_message_before_publish(device.as_ref(), &mut without_versions);
+    assert_eq!(without_versions["update"]["installed_version"], -1);
+    assert_eq!(without_versions["update"]["latest_version"], -1);
 }
