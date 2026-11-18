@@ -44,6 +44,10 @@ fn temp(name: &str) -> std::path::PathBuf {
 fn harness() -> Harness {
     harness_with(|_| {})
 }
+/// Same as [`harness`] but callable when a local variable shadows it.
+fn fresh_harness() -> Harness {
+    harness_with(|_| {})
+}
 
 fn harness_with(mutate: impl FnOnce(&mut Definition)) -> Harness {
     let database_path = temp("db");
@@ -533,6 +537,7 @@ async fn action_publishes_device_trigger_and_republication() {
         .attempted
         .iter()
         .any(|(topic, payload, _)| topic == "zigbee2mqtt/lamp/action" && payload == "single"));
+    drop(mqtt);
 }
 
 #[tokio::test]
@@ -811,6 +816,17 @@ async fn discovers_endpoint_entities_with_suffixed_topics() {
                 ..Default::default()
             });
             exposes.push(Expose {
+                r#type: "cover".to_string(),
+                name: Some("cover".to_string()),
+                endpoint: Some("right".to_string()),
+                access: access::ALL,
+                features: vec![
+                    Expose::binary("state", access::ALL),
+                    Expose::numeric("position", access::ALL),
+                ],
+                ..Default::default()
+            });
+            exposes.push(Expose {
                 r#type: "fan".to_string(),
                 name: Some("fan".to_string()),
                 endpoint: Some("f1".to_string()),
@@ -856,6 +872,15 @@ async fn discovers_endpoint_entities_with_suffixed_topics() {
     .expect("endpoint cover");
     assert_eq!(cover["state_topic"], "zigbee2mqtt/lamp/left");
     assert_eq!(cover["command_topic"], "zigbee2mqtt/lamp/left/set");
+
+    let right_cover = config(
+        &harness,
+        &format!("homeassistant/cover/{IEEE}/cover_right/config"),
+    )
+    .await
+    .expect("right endpoint cover");
+    assert_eq!(right_cover["state_topic"], "zigbee2mqtt/lamp/right");
+    assert_eq!(right_cover["command_topic"], "zigbee2mqtt/lamp/right/set");
 
     let fan = config(&harness, &format!("homeassistant/fan/{IEEE}/fan_f1/config"))
         .await
@@ -2085,5 +2110,72 @@ async fn homeassistant_online_republishes_state() {
             .collect::<Vec<_>>()
     );
     drop(mqtt);
+    ha.stop().await.unwrap();
+}
+
+/// Case 54: user homeassistant option overrides are applied after the
+/// converter compatibility mapping.
+#[tokio::test]
+async fn user_configuration_wins_over_the_mapping() {
+    let _guard = serial();
+    let harness = harness();
+    harness.context.settings.lock().unwrap().configuration["devices"][IEEE]["homeassistant"] =
+        json!({"temperature": {"name": "Custom temperature"}});
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+
+    let temperature = config(
+        &harness,
+        &format!("homeassistant/sensor/{IEEE}/temperature/config"),
+    )
+    .await
+    .expect("temperature discovery");
+    assert_eq!(temperature["name"], "Custom temperature");
+    ha.stop().await.unwrap();
+}
+
+/// Case 87: removing a group clears its discovery config.
+#[tokio::test]
+async fn group_removal_clears_discovery() {
+    let _guard = serial();
+    let harness = harness();
+    let device = harness.context.zigbee.resolve_device(IEEE).unwrap();
+    let group = harness.context.zigbee.resolve_group(1).unwrap();
+    group.zh.add_member(&device.zh.endpoints()[0]);
+    let ha = HomeAssistant::new(harness.context.clone());
+    ha.clone().start().await.unwrap();
+    let topic = {
+        let mqtt = harness.mqtt.lock().await;
+        mqtt.attempted
+            .iter()
+            .map(|(topic, _, _)| topic.clone())
+            .find(|topic| {
+                topic.starts_with("homeassistant/")
+                    && topic.contains("_1/")
+                    && topic.ends_with("/config")
+            })
+            .expect("group discovery topic")
+    };
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_entity_removed(json!({"entity": {"ID": 1, "type": "group"}}));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    assert!(
+        harness
+            .mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .any(|(published, payload, options)| published == &topic
+                && payload.is_empty()
+                && options.retain),
+        "group discovery was not cleared"
+    );
     ha.stop().await.unwrap();
 }

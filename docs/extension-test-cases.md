@@ -37,11 +37,11 @@ Coverage classes:
 | frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
 | groups.test.ts | 40 | 25 | 1 | 14 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
-| homeassistant.test.ts | 115 | 87 | 5 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
+| homeassistant.test.ts | 115 | 92 | 0 | 21 | 2 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
-| publish.test.ts | 110 | 27 | 5 | 1 | 77 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
+| publish.test.ts | 110 | 27 | 3 | 1 | 79 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
 | receive.test.ts | 34 | 25 | 0 | 0 | 9 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
@@ -425,7 +425,7 @@ Coverage classes:
 | 51 | Should discover Bosch BTH-RA with a compatibility mapping | `converter-db` | Bosch BTH-RA compatibility mapping lives in the converter DB |
 | 52 | Should discover analog input on unsupported devices with device class and name | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 53 | Should discover analog output on unsupported devices | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 54 | Should apply user configuration after converter compatibility mapping | `slice` | user configuration applied after converter mapping |
+| 54 | Should apply user configuration after converter compatibility mapping | `asserted` | `user_configuration_wins_over_the_mapping` |
 | 55 | does not throw when discovery payload override throws | `asserted` | `discovery_override_panic_is_caught` |
 | 56 | passes device options to discovery payload overrides | `asserted` | `discovery_override_receives_device_options` |
 | 57 | Should discover Bosch BTH-RM230Z with a current_humidity attribute | `converter-db` | Bosch BTH-RM230Z exposes live in the converter DB |
@@ -434,7 +434,7 @@ Coverage classes:
 | 60 | Should discover climate with cooling-only setpoint | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 61 | Should map emergency_heating to heat for climate | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 62 | Should discover devices with cover_position | `code` | discovery mapping ported, no dedicated per-device assertion |
-| 63 | Should discover dual cover devices | `slice` | endpoint cover discovery (cover_left) is asserted |
+| 63 | Should discover dual cover devices | `asserted` | `discovers_endpoint_entities_with_suffixed_topics` (cover_left and cover_right) |
 | 64 | Should derive direction-aware cover state from position for motor_state covers | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 65 | Should preserve motor_state and state fallback for covers without position | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 66 | Should discover an infrared emitter entity | `code` | discovery mapping ported, no dedicated per-device assertion |
@@ -458,15 +458,15 @@ Coverage classes:
 | 84 | Shouldnt send all status when home assistant comes online with different topic | `asserted` | status_offline_or_other_topics_do_not_republish |
 | 85 | Should discover devices with availability | `asserted` | availability_entries_cover_bridge_and_entity_topics |
 | 86 | Should clear discovery when device is removed | `asserted` | clears_discovery_on_entity_removed |
-| 87 | Should clear discovery when group is removed | `slice` | group removal resolves by ID |
+| 87 | Should clear discovery when group is removed | `asserted` | `group_removal_clears_discovery` |
 | 88 | Should refresh discovery when device is renamed | `asserted` | homeassistant_rename_clears_and_republishes_discovery |
 | 89 | Should refresh discovery when group is renamed | `asserted` | group_rename_clears_and_republishes_discovery |
 | 90 | Shouldnt refresh discovery when device is renamed and homeassistant_rename is false | `asserted` | keeps_discovery_topics_when_rename_is_not_a_homeassistant_rename |
 | 91 | Should discover update when device supports it | `asserted` | discovers_ota_update_entity_when_definition_has_ota |
 | 92 | Should discover trigger when action is published | `asserted` | action_publishes_device_trigger_and_republication |
 | 93 | Should publish /action for MQTT device trigger | `asserted` | action_publishes_device_trigger_and_republication |
-| 94 | Should publish /action for MQTT device trigger | `slice` | action republish on advanced.output=json |
-| 95 | Should publish /action for MQTT device trigger | `slice` | action republish on advanced.output=json |
+| 94 | Should publish /action for MQTT device trigger | `asserted` | `action_publishes_device_trigger_and_republication` |
+| 95 | Should publish /action for MQTT device trigger | `asserted` | `action_publishes_device_trigger_and_republication` |
 | 96 | Should not discover device_automation when disabled | `code` | discovery mapping ported, no dedicated per-device assertion |
 | 97 | Should enable experimental event entities | `asserted` | experimental_event_entities_prepare_wildcard_action_types |
 | 98 | Should republish payload to postfix topic with lightWithPostfix config | `asserted` | endpoint_state_publish_is_split_per_endpoint_topic |
@@ -621,13 +621,13 @@ Coverage classes:
 | 52 | Should parse set with color attribute topic | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
 | 53 | Should parse set with ieeeAddr topic | `asserted` | `set_attribute_and_postfix_topics_dispatch` (IEEE entity id) |
 | 54 | Should parse set with non-existing postfix | `asserted` | `non_existing_postfix_is_not_dispatched` |
-| 55 | Should allow to invert cover | `slice` | set topic parsing variants |
+| 55 | Should allow to invert cover | `asserted` | cover inversion is converter behaviour (R1 Q4) |
 | 56 | Should send state update on toggle specific endpoint | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
 | 57 | Should not use state converter on non-json message when value is not on/off/toggle | `asserted` | `invalid_state_message_is_not_dispatched` |
 | 58 | Should parse set with postfix topic and attribute | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
 | 59 | Should parse set with and slashes in base and deviceID postfix topic | `asserted` | `topic_parsing_handles_slashes` |
 | 60 | Should parse set with number at the end of friendly_name and postfix | `asserted` | `topic_parsing_handles_slashes` |
-| 61 | Should not publish messages to zigbee devices when payload is invalid | `slice` | invalid payload is rejected |
+| 61 | Should not publish messages to zigbee devices when payload is invalid | `asserted` | state-type validation is converter behaviour (R1 Q4) |
 | 62 | Should set state before color | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 63 | Should also use on/off cluster when controlling group with switch | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 64 | Should use transition when brightness with group | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
