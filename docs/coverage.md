@@ -39,7 +39,7 @@ Artifacts (not committed):
 | Linker | `/tmp/opencode/zigcc-cov` (Zig cc wrapper; forwards `-u` to `-Wl,-u`) |
 | Included crates | `zigbee-apiarist`, `zigbee-converters`, `z2m-rs` |
 | Excluded from report | `tests/`, `examples/`, `benches/`, registry/rustlib, `target/`, external C/asm |
-| Excluded from execution | 19 `#[ignore]` tests: 12 HIL ZNP (`hil_znp.rs`, requires `Z2M_SERIAL_PORT`), 1 real-broker test (`mqtt_broker.rs`, requires `MQTT_TEST_SERVER`), 6 upstream stub-file markers (ember/zboss/zigate/buffalo titles) |
+| Excluded from execution | 12 `#[ignore]` tests: 11 HIL ZNP (`hil_znp.rs`, requires `Z2M_SERIAL_PORT`) and 1 real-broker test (`mqtt_broker.rs`, requires `MQTT_TEST_SERVER`); 7 further markers live in upstream stub-file modules that cargo does not collect as test targets |
 
 ## Result
 

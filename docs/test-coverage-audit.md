@@ -675,8 +675,8 @@ Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
   (`rustc 1.102.0-nightly`).
 - [x] Указать toolchain, инструмент, commit, команды и ignored tests. →
   stable `rustc 1.99.1 (58cf8f9c3)`, rustup llvm-tools, commit `6dbbd7c`;
-  nightly `rustc 1.102.0-nightly (59cbdee2e)` для ветвей; 19 ignored
-  (12 HIL ZNP, 1 real broker, 6 stub markers).
+  nightly `rustc 1.102.0-nightly (59cbdee2e)` для ветвей; 12 ignored
+  (11 HIL ZNP + 1 real broker; ещё 7 маркеров в stub-модулях cargo не собирает).
 - [x] Список непокрытых критических ветвей. → таблица в `docs/coverage.md`
   (transport, runtime_adapter, controller/model, mqtt reconnect, touchlink/GP)
   с указанием, где они покрыты HIL/сценарными тестами.
@@ -703,7 +703,7 @@ Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
   functions 74.10% (2586/3490)
 Crates: zigbee-apiarist, zigbee-converters, z2m-rs
 Toolchain/commit: rustc 1.99.1 stable + 1.102.0-nightly, commit 6dbbd7c
-Ignored: 19 (12 HIL, 1 real broker, 6 stub markers)
+Ignored: 12 (11 HIL ZNP + 1 real broker)
 Gates: workspace tests, clippy, map checker, Node oracle/transcripts, broker
   reconnect, fuzz offline+live; HIL отдельно
 Прогон (6dbbd7c): cargo test --workspace -> 78 suites, 1568 passed, 0 failed,
