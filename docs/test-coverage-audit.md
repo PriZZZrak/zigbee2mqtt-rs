@@ -602,23 +602,50 @@ Gates: workspace tests, map checker, Node oracle/transcripts, broker reconnect,
 
 ### CP-12 — Итоговая R1-приёмка · P1
 
-- [ ] Сопоставить каждое требование AGENTS §9 с конкретным тестом/протоколом.
-- [ ] Подтвердить MQTT/Windfront responsiveness во время startup, interview,
-  networkmap и persistence на целевом роутере.
-- [ ] Зафиксировать время ответа, timeout и результат операций; отдельно
-  проверить задержки/ошибки broker, coordinator и storage.
-- [ ] Подтвердить HA bridge entities и device-registry discovery/cleanup;
-  число discovery topics само по себе недостаточно.
-- [ ] Подтвердить state/config/database recovery по CP-04.
-- [ ] Записать полный SHA256 проверенного бинарника, commit, прошивку,
-  команды, конфигурацию теста и артефакты без секретов.
-- [ ] Сверить итоговые карты с результатами; перечислить оставшиеся исключения
-  и ограничения, не выдавая R1 за device-catalog/global parity.
+- [x] Сопоставить каждое требование AGENTS §9 с конкретным тестом/протоколом.
+  → таблица в `docs/hil/2026-11-18-final-r1-acceptance.md`.
+- [x] Подтвердить MQTT/Windfront responsiveness во время startup, interview,
+  networkmap и persistence на целевом роутере. → startup 2010 ms, health
+  1020 ms, permit_join 1250 ms, networkmap 4300 ms при health 1020 ms во время
+  networkmap; Windfront root/asset/SPA 200; interview уже был завершён.
+- [x] Зафиксировать время ответа, timeout и результат операций; задержки
+  broker/coordinator/storage. → все операции с `-W`-границами; метрики и
+  верхние границы в HIL-документе; state cache reset и database rewrite
+  перечислены как отличия.
+- [x] Подтвердить HA bridge entities и device-registry discovery/cleanup. →
+  8 bridge discovery topics со sw=0.1.0, `bridge/devices` = Coordinator +
+  3 устройства; cleanup asserted в HA-тестах; per-device discovery вне R1.
+- [x] Подтвердить state/config/database recovery по CP-04. → CP-04 HIL
+  kill -9/respawn и packaged reboot; в CP-12 config hash идентичен, database
+  семантически цел (Node открыл те же 3 устройства); state.json — кэш,
+  сброшен в `{}` и задокументирован.
+- [x] Записать полный SHA256, commit, прошивку, команды, конфигурацию и
+  артефакты без секретов. → Routerich AX3000 v1 / OpenWrt 24.10.8 / Dongle-P
+  Z-Stack3x0 20250321; commit f1e9cf78; SHA256
+  `4146b5dce0a35e6c3c5319d0809962e288f6154d9faa33059b531ec3cc8756d6`.
+- [x] Сверить итоговые карты и перечислить исключения/ограничения. → карты
+  проверены `check-parity-maps`; ограничения R1 перечислены в HIL-документе
+  (нет converter DB, per-device HA discovery, OTA/scenes, CC2531).
 
 **Закрытие:** обязательные R1 сценарии подтверждены подходящими тестами,
 применимые CP-01–CP-11 закрыты, аппаратная часть выполнена на Routerich AX3000
 + Dongle-P. Нет необоснованных `PORTED` и неподтверждённых утверждений о
 полной матрице отказов.
+
+```text
+Статус: CLOSED
+CP-01–CP-11: CLOSED
+HIL: 2026-11-18 Routerich AX3000 v1 / OpenWrt 24.10.8 / Dongle-P Z-Stack3x0
+  20250321; commit f1e9cf78; SHA256 4146b5dc…8756d6
+Startup/permit/networkmap/health: 2010/1250/4300/1020 ms (bounded)
+Windfront: root 200 5.3 ms, asset 200 4.0 ms, SPA 200, /api 404
+HA: 8 bridge discovery topics, bridge/devices = 3 devices + Coordinator
+Storage: config hash identical; database semantically intact; state.json cache
+  reset documented
+Software gate: workspace tests + maps + Node transcripts + fuzz + coverage
+  (docs/coverage.md)
+Ограничения: R1 core only; no converter DB/per-device HA discovery/OTA/CC2531
+```
 
 ## 5. Рекомендуемый порядок выполнения
 
