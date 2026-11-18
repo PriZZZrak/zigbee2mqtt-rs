@@ -6,11 +6,12 @@ Rust suite: `crates/z2m-rs/tests/controller_lifecycle_suite.rs` (11 tests) plus
 the existing suites named per row.
 
 Upstream mocks `Zigbee`, `Mqtt` and the zigbee-herdsman controller with vitest
-spies. The Rust port has no such mocks: the cases that need a running
-coordinator (`zigbee.start`), an MQTT broker or the zh controller lifecycle
-cannot be reproduced as unit tests and are mapped to the extension suites that
-assert the same behaviour or to the HIL run. Nothing is claimed as passing
-without a test.
+spies. The Rust port uses deterministic seams instead: `Zigbee::test_start`
+fakes the coordinator phase, `Controller::test_start_pause` holds the startup
+between extensions, and `crates/z2m-rs/tests/support/mqtt_broker.rs` is an
+in-process MQTT broker. Cases that still need a real coordinator (passlist,
+blocklist, cached replay) are mapped to the HIL run. Nothing is claimed as
+passing without a test.
 
 | # | upstream `it` | status |
 |---|---|---|
@@ -34,17 +35,17 @@ without a test.
 | 18 | Start controller and stop with restart | covered by — `bridge/request/restart` + HIL restart evidence |
 | 19 | Start controller and stop without SdNotify | covered by — `crates/z2m-rs/tests/sd_notify.rs` |
 | 20 | Start controller and stop with SdNotify | covered by — `crates/z2m-rs/tests/sd_notify.rs` |
-| 21 | during state start | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 22 | during zigbee resolve definitions | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 23 | during MQTT connect | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 24 | during extension start | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 25 | during entity state publish | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 26 | without signal during state start | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 27 | without signal during MQTT connect | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 28 | during ZH Controller start | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 29 | during ZH Controller getNetworkParameters | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 30 | during ZH Controller passlist | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
-| 31 | during ZH Controller blocklist | not ported — abort-during-startup matrix; the port drops the start future (Rust cancellation), needs a live coordinator to assert |
+| 21 | during state start | N/A — `State::start` (`state.ts:44-49`) is synchronous (load + save timer), so there is no await point to abort; the abort boundary right after it is ported (`controller.ts:107-110`) and `aborting_start_during_the_coordinator_phase_skips_extensions` asserts that no MQTT connect or extension starts |
+| 22 | during zigbee resolve definitions | covered by — `aborting_start_during_the_coordinator_phase_skips_extensions` (future dropped inside `zigbee.start`; MQTT never connects, no extension starts) |
+| 23 | during MQTT connect | `aborting_during_a_slow_mqtt_connect_returns_ok_and_tears_down` (connect is bounded, `stop` sets the abort flag first, the failure is reported as an aborted start) |
+| 24 | during extension start | `aborting_with_active_mqtt_stops_runtime_and_restarts_cleanly` (paused after 3 extensions: listeners, save timer and MQTT connection are closed; a fresh start runs all 10) |
+| 25 | during entity state publish | partial — the abort boundary after every cached publish is ported (`controller.ts:172-180`); the replay itself needs devices from a coordinator-backed `zigbee.start`, so it is exercised by the HIL run (CP-12) |
+| 26 | without signal during state start | N/A — same as 21; `stop()` without a signal aborts with `STOPABORT` and code 0 |
+| 27 | without signal during MQTT connect | same as 23 — `stop(false, 0)` |
+| 28 | during ZH Controller start | `aborting_start_during_the_coordinator_phase_skips_extensions` (`AbortSignal::wait` is passed into `start_with_abort`) |
+| 29 | during ZH Controller getNetworkParameters | inside `zigbee.start`; the abort is checked after the call (`crates/z2m-rs/src/zigbee.rs` passlist/blocklist section); interrupting the call itself needs a fake coordinator, so it stays coordinator-only HIL (CP-12) |
+| 30 | during ZH Controller passlist | abort checked after each `removeFromNetwork` (`crates/z2m-rs/src/zigbee.rs`); removal needs a coordinator, so the interruption stays HIL (CP-12) |
+| 31 | during ZH Controller blocklist | same as 30 |
 | 32 | Start controller adapter disconnects | not ported — needs a live coordinator or MQTT broker |
 | 33 | does not throw when extension fails to stop on controller stop | not ported — needs a live coordinator or MQTT broker |
 | 34 | does not throw when extension stop throws | not ported — needs a live coordinator or MQTT broker |
@@ -112,8 +113,9 @@ without a test.
 - `EventBus` sync/async error cases (87-88) have no Rust analogue: handlers are
   plain closures and there is no exception channel; a panicking handler aborts
   the calling task, which is a documented deviation.
-- The startup/abort/retained-republish matrix (1-4, 12-37, 42, 77-82) is **not**
-  proven by the HIL acceptance run. The HIL run covers start/resume, bridge
-  requests, persistence and a normal restart only; aborts, reconnects and
-  retained republishing need dedicated tests (CP-02, CP-05 in
-  `docs/test-coverage-audit.md`).
+- The abort matrix (21-31) is mapped per phase: 22/24/26-28 need no
+  coordinator and are asserted in `crates/z2m-rs/tests/controller_startup.rs`;
+  25 and 29-31 stay coordinator-only and are exercised by the HIL run (CP-12).
+- Retained republish/reconnect cases 77-81 are asserted against the in-process
+  broker in `crates/z2m-rs/tests/mqtt_reconnect.rs` (CP-02); the remaining
+  startup cases (1, 12-15, 42) still need a live coordinator or the HIL run.

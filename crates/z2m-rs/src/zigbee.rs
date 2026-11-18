@@ -180,7 +180,8 @@ impl Zigbee {
 
     /// Upstream `start(abortSignal)` (`zigbee.ts:31`).
     pub async fn start(self: &Arc<Self>, abort: &AbortSignal) -> Result<bool, String> {
-        if let Some((result, delay_ms)) = self.test_start.lock().unwrap().clone() {
+        let test_start = self.test_start.lock().unwrap().clone();
+        if let Some((result, delay_ms)) = test_start {
             if delay_ms > 0 {
                 crate::util::utils::sleep(delay_ms).await;
             }

@@ -11,6 +11,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${OUT:-$ROOT/target/coverage}"
+
+# TOOLCHAIN=nightly COVERAGE_OPTIONS="-Zcoverage-options=branch" records branch
+# coverage (stable rustc has no branch instrumentation).
+if [ -n "${TOOLCHAIN:-}" ]; then
+  export RUSTUP_TOOLCHAIN="$TOOLCHAIN"
+fi
+COVERAGE_OPTIONS="${COVERAGE_OPTIONS:-}"
 TOOLCHAIN_BIN="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | awk '/host:/ {print $2}')/bin"
 LLVM_PROFDATA="$TOOLCHAIN_BIN/llvm-profdata"
 LLVM_COV="$TOOLCHAIN_BIN/llvm-cov"
@@ -19,7 +26,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT/profile"
 
 cd "$ROOT"
-export RUSTFLAGS="${RUSTFLAGS:-} -Cinstrument-coverage"
+export RUSTFLAGS="${RUSTFLAGS:-} -Cinstrument-coverage $COVERAGE_OPTIONS"
 export LLVM_PROFILE_FILE="$OUT/profile/%p-%m.profraw"
 
 echo "== building instrumented tests =="
@@ -76,19 +83,28 @@ for name in ("summary_z2m.txt",):
         # already covered by the dedicated dependency report.
         if path not in deps_paths:
             rows.append(line)
-# Totals: sum of the deduplicated rows.
-total = [0, 0, 0, 0, 0, 0]
+# Totals: sum of the deduplicated rows. Nightly with
+# `-Zcoverage-options=branch` adds Branches/Missed Branches/Cover columns.
+branch_mode = "Branches" in header[0]
+total = [0, 0, 0, 0, 0, 0] + ([0, 0] if branch_mode else [])
 for line in rows:
     parts = line.split()
     values = [int(parts[1]), int(parts[2]), int(parts[4]), int(parts[5]), int(parts[7]), int(parts[8])]
+    if branch_mode:
+        values += [int(parts[10]), int(parts[11])]
     total = [a + b for a, b in zip(total, values)]
 rows.sort(key=lambda row: row.split()[0])
 number = lambda a, b: f"{100 * (a - b) / a:6.2f}%" if a else "  0.00%"
-r, mr, f, mf, l, ml = total
+r, mr, f, mf, l, ml = total[:6]
 total_line = (
     f"TOTAL {r:>10} {mr:>10} {number(r, mr):>10} {f:>10} {mf:>10} {number(f, mf):>10} "
-    f"{l:>10} {ml:>10} {number(l, ml):>10} {'0':>10} {'0':>10} {'-':>10}"
+    f"{l:>10} {ml:>10} {number(l, ml):>10}"
 )
+if branch_mode:
+    b, mb = total[6], total[7]
+    total_line += f" {b:>10} {mb:>10} {number(b, mb):>10}"
+else:
+    total_line += f" {'0':>10} {'0':>10} {'-':>10}"
 (out / "summary.txt").write_text("\n".join(header + rows + ["-" * 260, total_line]) + "\n")
 PY
 "$LLVM_COV" export "${DEP_BINARIES[@]}" \

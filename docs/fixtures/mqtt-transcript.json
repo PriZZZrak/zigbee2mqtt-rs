@@ -30,6 +30,12 @@
         "payload": "{\"state\":\"ON\"}",
         "qos": 1,
         "retain": true
+      },
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"offline\"}",
+        "qos": 0,
+        "retain": true
       }
     ],
     "subscriptions": [
@@ -80,10 +86,8 @@
     ]
   },
   "comparison": {
-    "match": false,
-    "missing": [
-      "z2m/bridge/state|{\"state\":\"offline\"}|0|true"
-    ],
+    "match": true,
+    "missing": [],
     "extra": []
   }
 }

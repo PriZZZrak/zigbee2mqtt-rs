@@ -728,7 +728,12 @@ impl Bridge {
                     .settings
                     .lock()
                     .unwrap()
-                    .block_device(&device.ieee_addr());
+                    .block_device(&device.ieee_addr())
+                    .map_err(|error| {
+                        format!(
+                            "Failed to remove device '{friendly_name}'{block_force_log} ({error})"
+                        )
+                    })?;
             }
             if force {
                 device.zh.remove_from_database(clear_cache);

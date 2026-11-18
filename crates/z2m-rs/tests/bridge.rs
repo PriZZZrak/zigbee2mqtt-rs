@@ -2084,3 +2084,113 @@ async fn interview_failure_is_reported() {
     assert_eq!(payload["error"], "interview failed");
     bridge.stop().await.unwrap();
 }
+
+/// CP-03 (auditor): a blocklist write failure is returned by device/remove and
+/// the device is not removed from the database.
+#[tokio::test]
+async fn remove_device_reports_blocklist_write_failure() {
+    use z2m_rs::util::settings::{Settings, CONFIGURATION_FILE};
+
+    let _guard = serial();
+    let mut harness = harness();
+    let dir = std::env::temp_dir().join(format!(
+        "z2m-bridge-block-fail-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join(CONFIGURATION_FILE),
+        "version: 5\nmqtt:\n  base_topic: zigbee2mqtt\n  server: mqtt://localhost\ndevices:\n  '0x0017880104e45519':\n    friendly_name: lamp\n",
+    )
+    .unwrap();
+    let settings = Arc::new(Mutex::new(Settings::read_data_dir(&dir).unwrap()));
+    // Make every settings write fail deterministically (EISDIR).
+    std::fs::remove_file(dir.join(CONFIGURATION_FILE)).unwrap();
+    std::fs::create_dir(dir.join(CONFIGURATION_FILE)).unwrap();
+    harness.context.settings = settings;
+
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+    send(
+        &harness,
+        "device/remove",
+        json!({
+            "id": "lamp",
+            "block": true,
+            "force": true,
+            "keep_config": true,
+            "transaction": 7,
+        }),
+    )
+    .await;
+    let payload = response(&harness, "device/remove").await;
+
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["transaction"], 7);
+    let error = payload["error"].as_str().unwrap_or_default();
+    assert!(
+        error.starts_with("Failed to remove device 'lamp' (block: true, force: true, keep config: true, clear cache: false)")
+            && error.contains("configuration.yaml"),
+        "{payload}"
+    );
+    assert!(
+        harness
+            .context
+            .zigbee
+            .zh_controller()
+            .unwrap()
+            .get_device_by_ieee_addr(IEEE)
+            .is_some(),
+        "device was removed despite the blocklist write failure"
+    );
+    bridge.stop().await.unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// Control case for CP-03: the same request succeeds when the settings file is writable.
+#[tokio::test]
+async fn remove_device_blocks_and_keeps_configuration() {
+    use z2m_rs::util::settings::{Settings, CONFIGURATION_FILE};
+
+    let _guard = serial();
+    let mut harness = harness();
+    let dir = std::env::temp_dir().join(format!(
+        "z2m-bridge-block-ok-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join(CONFIGURATION_FILE),
+        "version: 5\nmqtt:\n  base_topic: zigbee2mqtt\n  server: mqtt://localhost\ndevices:\n  '0x0017880104e45519':\n    friendly_name: lamp\n",
+    )
+    .unwrap();
+    let settings = Arc::new(Mutex::new(Settings::read_data_dir(&dir).unwrap()));
+    harness.context.settings = settings.clone();
+
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+    send(
+        &harness,
+        "device/remove",
+        json!({
+            "id": "lamp",
+            "block": true,
+            "force": true,
+            "keep_config": true,
+        }),
+    )
+    .await;
+    let payload = response(&harness, "device/remove").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(settings.lock().unwrap().get()["blocklist"], json!([IEEE]));
+    bridge.stop().await.unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}

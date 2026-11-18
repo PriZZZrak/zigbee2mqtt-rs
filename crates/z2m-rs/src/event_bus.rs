@@ -96,6 +96,12 @@ impl EventBus {
         }
     }
 
+    /// Test/diagnostics hook: number of registered listeners.
+    #[doc(hidden)]
+    pub fn listener_count(&self) -> usize {
+        self.listeners.values().map(Vec::len).sum()
+    }
+
     fn emit(&mut self, event: Event, data: Value) {
         if let Some(listeners) = self.listeners.get(&event) {
             for registration in listeners {

@@ -128,9 +128,9 @@ impl Mqtt {
         let mut options = MqttOptions::new(client_id, (host.as_str(), port));
         if use_tls {
             let config = build_tls_config(mqtt_settings)?;
-            options.set_transport(rumqttc::Transport::Tls(
-                rumqttc::TlsConfiguration::Rustls(config),
-            ));
+            options.set_transport(rumqttc::Transport::Tls(rumqttc::TlsConfiguration::Rustls(
+                config,
+            )));
         }
         if let Some(keepalive) = mqtt_settings["keepalive"].as_u64() {
             options.set_keep_alive(keepalive.min(u16::MAX as u64) as u16);
@@ -233,11 +233,14 @@ impl Mqtt {
                             },
                         );
                         published_topics.lock().unwrap().insert(state_topic.clone());
-                        event_bus.lock().unwrap().emit_mqtt_message_published(json!({
-                            "topic": state_topic,
-                            "payload": text,
-                            "options": {"meta": {"isEntityState": false}},
-                        }));
+                        event_bus
+                            .lock()
+                            .unwrap()
+                            .emit_mqtt_message_published(json!({
+                                "topic": state_topic,
+                                "payload": text,
+                                "options": {"meta": {"isEntityState": false}},
+                            }));
                         let _ = connect_client
                             .subscribe(format!("{base_topic}/#"), QoS::AtLeastOnce)
                             .await;
@@ -325,7 +328,11 @@ impl Mqtt {
                     },
                 },
             );
+            // rumqttc only enqueues; give the event loop a bounded moment to
+            // flush the retained offline state before the task is aborted.
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
             let _ = client.disconnect().await;
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
         }
         self.connected.store(false, Ordering::SeqCst);
         if let Some(task) = self.task.take() {
@@ -372,7 +379,11 @@ impl Mqtt {
         // is set and then does not track the message as retained (mqtt.ts:246, :225).
         let retain = options.retain && !self.force_disable_retain;
         if client
-            .publish(&topic, payload.clone(), rumqttc::PublishOptions::new(qos).retain(retain))
+            .publish(
+                &topic,
+                payload.clone(),
+                rumqttc::PublishOptions::new(qos).retain(retain),
+            )
             .await
             .is_err()
         {
@@ -510,7 +521,9 @@ fn parse_server(server: &str) -> Result<(String, u16, bool), String> {
 }
 
 /// Upstream mqtt.js TLS options: `reject_unauthorized`, `ca`, `cert`, `key`.
-fn build_tls_config(mqtt_settings: &Value) -> Result<Arc<tokio_rustls::rustls::ClientConfig>, String> {
+fn build_tls_config(
+    mqtt_settings: &Value,
+) -> Result<Arc<tokio_rustls::rustls::ClientConfig>, String> {
     use std::sync::Arc as StdArc;
     use tokio_rustls::rustls;
 

@@ -12,6 +12,11 @@ cd ../..
 node tools/oracle/map-extension-cases.mjs /tmp/upstream_ext.json docs/extension-test-cases.md
 ```
 
+Existing classifications and evidence are preserved on regeneration: a case is
+reclassified only by editing its row (delete it to fall back to the defaults
+in `tools/oracle/map-extension-cases.mjs`). `tools/docs/check-parity-maps.mjs`
+recounts every class from these rows and fails when a summary row disagrees.
+
 Coverage classes:
 
 | Class | Meaning |
@@ -239,7 +244,7 @@ Coverage classes:
 | 2 | Should not configure EndDevice on startup | `asserted` | `configures_routers_but_not_end_devices_on_startup` |
 | 3 | Should re-configure when device rejoins | `asserted` | `reconfigures_when_the_device_rejoins` |
 | 4 | Should not re-configure disabled devices | `asserted` | `does_not_configure_disabled_devices` |
-| 5 | Should reconfigure reporting on reconfigure event | `code` | startup/interview scheduling ported, adapter-backed |
+| 5 | Should reconfigure reporting on reconfigure event | `asserted` | `reconfigures_on_reconfigure_event` |
 | 6 | Should not configure twice | `asserted` | `does_not_configure_twice_when_already_configured` |
 | 7 | Should configure on zigbee message when not configured yet | `asserted` | `configures_on_zigbee_message_when_not_configured_yet` |
 | 8 | Should re-configure when the version of the definition changes to a different value than the default (0.0.0) | `asserted` | `reconfigures_when_the_definition_version_changes` (meta.configured version mismatch) |
@@ -621,13 +626,13 @@ Coverage classes:
 | 52 | Should parse set with color attribute topic | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
 | 53 | Should parse set with ieeeAddr topic | `asserted` | `set_attribute_and_postfix_topics_dispatch` (IEEE entity id) |
 | 54 | Should parse set with non-existing postfix | `asserted` | `non_existing_postfix_is_not_dispatched` |
-| 55 | Should allow to invert cover | `asserted` | cover inversion is converter behaviour (R1 Q4) |
+| 55 | Should allow to invert cover | `converter-db` | cover inversion is converter behaviour (R1 Q4) |
 | 56 | Should send state update on toggle specific endpoint | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
 | 57 | Should not use state converter on non-json message when value is not on/off/toggle | `asserted` | `invalid_state_message_is_not_dispatched` |
 | 58 | Should parse set with postfix topic and attribute | `asserted` | `set_attribute_and_postfix_topics_dispatch` |
 | 59 | Should parse set with and slashes in base and deviceID postfix topic | `asserted` | `topic_parsing_handles_slashes` |
 | 60 | Should parse set with number at the end of friendly_name and postfix | `asserted` | `topic_parsing_handles_slashes` |
-| 61 | Should not publish messages to zigbee devices when payload is invalid | `asserted` | state-type validation is converter behaviour (R1 Q4) |
+| 61 | Should not publish messages to zigbee devices when payload is invalid | `converter-db` | state-type validation is converter behaviour (R1 Q4) |
 | 62 | Should set state before color | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 63 | Should also use on/off cluster when controlling group with switch | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 64 | Should use transition when brightness with group | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |

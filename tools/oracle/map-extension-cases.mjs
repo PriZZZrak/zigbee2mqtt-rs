@@ -431,6 +431,36 @@ const CASES = {
 
 const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
 
+// Preserve curated classifications when regenerating: the checked-in map is
+// refined as Rust tests land (a case moves from `code` to `asserted` with a
+// test name), so a plain regeneration must not reset it. Delete a row to fall
+// back to the class configured above.
+const curated = new Map();
+const curatedSummary = new Map();
+const curatedPath = fs.existsSync(outPath) ? outPath : "docs/extension-test-cases.md";
+if (fs.existsSync(curatedPath)) {
+    const previous = fs.readFileSync(curatedPath, "utf8");
+    let section = null;
+    for (const line of previous.split("\n")) {
+        const header = line.match(/^## (.+\.test\.ts)$/);
+        if (header) {
+            section = header[1];
+            continue;
+        }
+        if (!section) continue;
+        const row = line.match(/^\|\s*(\d+)\s*\|.*\|\s*`([a-z-]+)`\s*\|\s*(.*?)\s*\|$/);
+        if (row) {
+            curated.set(`${section}#${row[1]}`, { klass: row[2], evidence: row[3] });
+        }
+    }
+    for (const line of previous.split("\n")) {
+        const row = line.match(/^\|\s*([a-zA-Z]+\.test\.ts)\s*\|.*\|\s*(.*?)\s*\|$/);
+        if (row && !row[1].startsWith("|---")) {
+            curatedSummary.set(row[1], row[2]);
+        }
+    }
+}
+
 const ORDER = Object.keys(CASES);
 const rows = [];
 const summary = [];
@@ -444,7 +474,10 @@ for (const file of ORDER) {
     const counts = {};
     for (const [index, assertion] of result.assertionResults.entries()) {
         const oneBased = index + 1;
-        const resolved = config.map?.[oneBased] ?? config.default;
+        const curatedRow = curated.get(`${file}#${oneBased}`);
+        const resolved = curatedRow
+            ? [curatedRow.klass, curatedRow.evidence]
+            : config.map?.[oneBased] ?? config.default;
         const [klass, evidence] = resolved;
         counts[klass] = (counts[klass] ?? 0) + 1;
         rows.push({
@@ -480,6 +513,13 @@ lines.push(
 );
 lines.push("```");
 lines.push("");
+lines.push(
+    "Existing classifications and evidence are preserved on regeneration: a case is",
+    "reclassified only by editing its row (delete it to fall back to the defaults",
+    "in `tools/oracle/map-extension-cases.mjs`). `tools/docs/check-parity-maps.mjs`",
+    "recounts every class from these rows and fails when a summary row disagrees.",
+);
+lines.push("");
 lines.push("Coverage classes:");
 lines.push("");
 lines.push("| Class | Meaning |");
@@ -489,7 +529,7 @@ lines.push("| `slice` | a broader Rust test covers part of the behaviour |");
 lines.push("| `code` | ported and reachable, no dedicated Rust assertion yet |");
 lines.push("| `converter-db` | depends on `zigbee-herdsman-converters` definitions, excluded from R1 (Q4) |");
 lines.push("| `adapter` | needs a live coordinator/adapter, HIL pending |");
-lines.push("| `static` | frontend static assets deferred to OpenWrt packaging |");
+lines.push("| `static` | reserved for package-level asset checks that are not covered by a Rust test (currently empty: the Windfront/packaging tests in `crates/z2m-rs/tests/frontend.rs` cover them) |");
 lines.push("| `omitted` | approved OMITTED (AGENTS §5 Q5) |");
 lines.push("");
 lines.push("## Summary");
@@ -499,7 +539,7 @@ lines.push("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|");
 for (const entry of summary) {
     const cell = (klass) => entry.counts[klass] ?? 0;
     lines.push(
-        `| ${entry.file} | ${entry.total} | ${cell(A)} | ${cell(S)} | ${cell(C)} | ${cell(CDB)} | ${cell(AD)} | ${cell(ST)} | ${cell(OM)} | ${entry.rust ?? "—"} |`,
+        `| ${entry.file} | ${entry.total} | ${cell(A)} | ${cell(S)} | ${cell(C)} | ${cell(CDB)} | ${cell(AD)} | ${cell(ST)} | ${cell(OM)} | ${curatedSummary.get(entry.file) ?? entry.rust ?? "—"} |`,
     );
 }
 lines.push("");

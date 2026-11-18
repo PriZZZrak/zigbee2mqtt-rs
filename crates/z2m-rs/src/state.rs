@@ -192,8 +192,8 @@ impl State {
         // Rollback-safe: temp file + rename (the state file is rewritten while
         // the bridge may be killed at any moment).
         let temporary = self.file.with_extension("json.tmp");
-        let result = std::fs::write(&temporary, json)
-            .and_then(|_| std::fs::rename(&temporary, &self.file));
+        let result =
+            std::fs::write(&temporary, json).and_then(|_| std::fs::rename(&temporary, &self.file));
         if let Err(error) = result {
             self.logger.lock().unwrap().error(
                 &format!(
@@ -254,6 +254,18 @@ impl State {
     /// Upstream `remove(id)` (`state.ts:128-130`).
     pub fn remove(&mut self, id: &EntityId) -> bool {
         self.state.remove(&id.key()).is_some()
+    }
+
+    /// Test hook: whether the periodic save timer is running (doc-hidden).
+    #[doc(hidden)]
+    pub fn has_save_timer(&self) -> bool {
+        self.timer.is_some()
+    }
+
+    /// Test hook: insert a raw cache entry (doc-hidden).
+    #[doc(hidden)]
+    pub fn test_insert(&mut self, key: &str, value: Value) {
+        self.state.insert(key.to_string(), value);
     }
 
     /// Raw cache contents (test/diagnostics helper, equivalent to iterating the

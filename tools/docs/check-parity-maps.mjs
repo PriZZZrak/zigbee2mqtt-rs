@@ -8,7 +8,9 @@
 //      test function (or is a known non-test symbol);
 //   3. every `docs/...`, `tests/...`, `crates/...` path mentioned in the maps
 //      exists;
-//   4. `docs/extension-test-cases.md` per-class counts sum to its declared total;
+//   4. `docs/extension-test-cases.md` summary rows match the classes counted on
+//      the per-file case rows (cases, asserted, slice, code, converter-db,
+//      adapter, static, omitted);
 //   5. the docs referenced from `docs/parity-matrix.md` exist.
 //
 // Usage: node tools/docs/check-parity-maps.mjs
@@ -106,10 +108,11 @@ for (const doc of maps) {
   }
 }
 
-// 4: extension-test-cases per-file rows must sum to their case count.
+// 4: extension-test-cases summary rows must equal the per-file case rows.
 {
   const file = join(docsDir, "extension-test-cases.md");
   const text = readFileSync(file, "utf8");
+  const classes = ["asserted", "slice", "code", "converter-db", "adapter", "static", "omitted"];
   const rows = [...text.matchAll(
     /^\|\s*([a-zA-Z]+\.test\.ts)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|/gm,
   )];
@@ -118,16 +121,42 @@ for (const doc of maps) {
   } else {
     let sum = 0;
     for (const row of rows) {
-      const cases = Number(row[2]);
-      const classes = row
-        .slice(3, 10)
-        .map(Number)
-        .reduce((left, right) => left + right, 0);
-      sum += cases;
-      if (cases !== classes) {
+      const name = row[1];
+      const declaredCases = Number(row[2]);
+      const declared = Object.fromEntries(
+        classes.map((klass, index) => [klass, Number(row[3 + index])]),
+      );
+      const start = text.indexOf(`## ${name}`);
+      const sectionEnd = text.indexOf("## ", start + 3);
+      if (start < 0) {
+        errors.push(`extension-test-cases.md: no case section for ${name}`);
+        continue;
+      }
+      const section = text.slice(start, sectionEnd < 0 ? undefined : sectionEnd);
+      const actual = Object.fromEntries(classes.map((klass) => [klass, 0]));
+      let counted = 0;
+      for (const line of section.split("\n")) {
+        const match = line.match(/^\|\s*\d+\s*\|[^|]*\|\s*`([a-z-]+)`\s*\|/);
+        if (!match) continue;
+        if (!(match[1] in actual)) {
+          errors.push(`extension-test-cases.md: ${name} has unknown class \`${match[1]}\``);
+          continue;
+        }
+        actual[match[1]] += 1;
+        counted += 1;
+      }
+      sum += counted;
+      if (counted !== declaredCases) {
         errors.push(
-          `extension-test-cases.md: ${row[1]} declares ${cases} cases but classes sum to ${classes}`,
+          `extension-test-cases.md: ${name} declares ${declaredCases} cases but has ${counted} case rows`,
         );
+      }
+      for (const klass of classes) {
+        if (declared[klass] !== actual[klass]) {
+          errors.push(
+            `extension-test-cases.md: ${name} summary has ${klass}=${declared[klass]} but rows have ${actual[klass]}`,
+          );
+        }
       }
     }
     console.log(`extension-test-cases.md: ${rows.length} files, ${sum} cases`);

@@ -16,10 +16,10 @@ use crate::extension::{
     frontend::Frontend, groups::Groups, health::Health, homeassistant::HomeAssistant,
     network_map::NetworkMap, on_event::OnEvent, publish::Publish, receive::Receive,
 };
-use crate::util::abort::AbortSignal;
 use crate::model::entity::Entity;
 use crate::mqtt::{Mqtt, MqttPublishOptions};
 use crate::state::State;
+use crate::util::abort::AbortSignal;
 use crate::util::logger::Logger;
 use crate::util::settings::Settings;
 use crate::util::stringify::stringify;
@@ -35,9 +35,34 @@ pub struct Controller {
     pub logger: Arc<Mutex<Logger>>,
     extensions: Mutex<Vec<Arc<dyn Extension>>>,
     next_extension_key: AtomicUsize,
+    /// EventBus key of the controller's own listeners (upstream `this` in
+    /// `eventBus.onLastSeenChanged(this, ...)`, removed by `stop()`).
+    listener_key: Mutex<Option<usize>>,
     abort: Mutex<Option<AbortSignal>>,
-    restart_callback: Mutex<Option<Arc<dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync>>>,
-    exit_callback: Mutex<Option<Arc<dyn Fn(i32, bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send + Sync>>>,
+    /// Test seam (doc-hidden): pause `start` after `n` extensions have started
+    /// until `Notify` fires or the controller is stopped. Mirrors upstream
+    /// aborting an in-flight startup phase (`controller.ts:107-110`); unset in
+    /// production.
+    #[doc(hidden)]
+    pub test_start_pause: Mutex<Option<(usize, Arc<tokio::sync::Notify>)>>,
+    restart_callback: Mutex<
+        Option<
+            Arc<
+                dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                    + Send
+                    + Sync,
+            >,
+        >,
+    >,
+    exit_callback: Mutex<
+        Option<
+            Arc<
+                dyn Fn(i32, bool) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                    + Send
+                    + Sync,
+            >,
+        >,
+    >,
 }
 
 impl Controller {
@@ -58,7 +83,9 @@ impl Controller {
             logger,
             extensions: Mutex::new(Vec::new()),
             next_extension_key: AtomicUsize::new(1),
+            listener_key: Mutex::new(None),
             abort: Mutex::new(None),
+            test_start_pause: Mutex::new(None),
             restart_callback: Mutex::new(None),
             exit_callback: Mutex::new(None),
         }
@@ -294,7 +321,8 @@ impl Controller {
                     Some(controller) => controller.enable_disable_extension(enable, name).await,
                     None => Err("Controller dropped".to_string()),
                 }
-            }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send>>
+            })
+                as std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send>>
         });
         let restart_weak = weak.clone();
         let restart = Arc::new(move || {
@@ -333,15 +361,15 @@ impl Controller {
         }
     }
 
-    fn publish_callback(
-        self: &Arc<Self>,
-    ) -> crate::model::entity::PublishEntityState {
+    fn publish_callback(self: &Arc<Self>) -> crate::model::entity::PublishEntityState {
         let weak = Arc::downgrade(self);
         Arc::new(move |entity, payload, reason| {
             let weak = weak.clone();
             Box::pin(async move {
                 if let Some(controller) = weak.upgrade() {
-                    controller.publish_entity_state(entity, payload, reason).await;
+                    controller
+                        .publish_entity_state(entity, payload, reason)
+                        .await;
                 }
             })
         })
@@ -426,7 +454,9 @@ impl Controller {
                     let allowed = {
                         let settings = self.settings.lock().unwrap().get();
                         if name == "HomeAssistant" {
-                            settings["homeassistant"]["enabled"].as_bool().unwrap_or(false)
+                            settings["homeassistant"]["enabled"]
+                                .as_bool()
+                                .unwrap_or(false)
                         } else {
                             settings["frontend"]["enabled"].as_bool().unwrap_or(false)
                         }
@@ -462,7 +492,9 @@ impl Controller {
                     let enabled = {
                         let settings = self.settings.lock().unwrap().get();
                         if name == "HomeAssistant" {
-                            settings["homeassistant"]["enabled"].as_bool().unwrap_or(false)
+                            settings["homeassistant"]["enabled"]
+                                .as_bool()
+                                .unwrap_or(false)
                         } else {
                             settings["frontend"]["enabled"].as_bool().unwrap_or(false)
                         }
@@ -475,9 +507,9 @@ impl Controller {
                     self.remove_extension_by_name(&name).await;
                     Ok(())
                 }
-                other if BUILT_INS.contains(&other) => {
-                    Err(format!("Built-in extension {name} cannot be disabled at runtime"))
-                }
+                other if BUILT_INS.contains(&other) => Err(format!(
+                    "Built-in extension {name} cannot be disabled at runtime"
+                )),
                 _ => {
                     self.remove_extension_by_name(&name).await;
                     Ok(())
@@ -509,6 +541,12 @@ impl Controller {
         *self.abort.lock().unwrap() = Some(abort.clone());
         State::start(&self.state);
 
+        // Upstream checks the signal right after `state.start()`
+        // (`controller.ts:107-110`).
+        if abort.aborted() {
+            return Ok(());
+        }
+
         let settings = self.settings.lock().unwrap().get();
         logger_init(&self.logger, &settings);
         logger_info(
@@ -530,10 +568,7 @@ impl Controller {
         }
 
         let mut device_count = 0;
-        for device in self
-            .zigbee
-            .devices_iterator(utils::device_not_coordinator)
-        {
+        for device in self.zigbee.devices_iterator(utils::device_not_coordinator) {
             device_count += 1;
             let model = if device.is_supported() {
                 device
@@ -566,19 +601,27 @@ impl Controller {
 
         if let Err(error) = self.mqtt.lock().await.connect(&settings).await {
             let _ = self.zigbee.stop().await;
+            // Upstream skips the failure when `stop()` aborted the connect
+            // (`controller.ts:126-128,146-150`).
+            if abort.aborted() {
+                return Ok(());
+            }
             return Err(format!("MQTT failed to connect, exiting... ({error})"));
         }
         if abort.aborted() {
             return Ok(());
         }
 
-        if settings["advanced"]["enable_external_js"].as_bool().unwrap_or(false) {
+        if settings["advanced"]["enable_external_js"]
+            .as_bool()
+            .unwrap_or(false)
+        {
             logger_info(
                 &self.logger,
                 "External JS (converters/extensions) is disabled",
             );
         }
-        for name in [
+        for (index, name) in [
             "OnEvent",
             "Bridge",
             "Publish",
@@ -589,10 +632,26 @@ impl Controller {
             "Bind",
             "Availability",
             "Health",
-        ] {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             if let Some(extension) = self.make_extension(name) {
                 self.extensions.lock().unwrap().push(extension.clone());
                 self.start_extension(extension).await;
+            }
+            // Test seam: hold the startup between extension starts so a test
+            // can abort with a live MQTT connection and partially started
+            // extensions (upstream `controller.test.ts` "during extension
+            // start").
+            let pause = self.test_start_pause.lock().unwrap().clone();
+            if let Some((after, release)) = pause {
+                if index + 1 >= after {
+                    tokio::select! {
+                        _ = release.notified() => {}
+                        _ = abort.wait() => {}
+                    }
+                }
             }
             if abort.aborted() {
                 return Ok(());
@@ -604,7 +663,10 @@ impl Controller {
                 self.start_extension(extension).await;
             }
         }
-        if settings["homeassistant"]["enabled"].as_bool().unwrap_or(false) {
+        if settings["homeassistant"]["enabled"]
+            .as_bool()
+            .unwrap_or(false)
+        {
             if let Some(extension) = self.make_extension("HomeAssistant") {
                 self.extensions.lock().unwrap().push(extension.clone());
                 self.start_extension(extension).await;
@@ -614,7 +676,9 @@ impl Controller {
         if settings["advanced"]["cache_state_send_on_startup"]
             .as_bool()
             .unwrap_or(true)
-            && settings["advanced"]["cache_state"].as_bool().unwrap_or(true)
+            && settings["advanced"]["cache_state"]
+                .as_bool()
+                .unwrap_or(true)
         {
             for entity in self.zigbee.devices_and_groups_iterator() {
                 let id = entity.entity_id();
@@ -622,13 +686,20 @@ impl Controller {
                     let payload = self.state.lock().unwrap().get(&id);
                     self.publish_entity_state(entity, payload, Some("publishCached".to_string()))
                         .await;
+                    // Upstream checks the signal after every cached publish
+                    // (`controller.ts:172-180`).
+                    if abort.aborted() {
+                        return Ok(());
+                    }
                 }
             }
         }
 
         let weak = Arc::downgrade(self);
+        let listener_key = self.next_extension_key.fetch_add(1, Ordering::SeqCst);
+        *self.listener_key.lock().unwrap() = Some(listener_key);
         self.event_bus.lock().unwrap().on_last_seen_changed(
-            self.next_extension_key.fetch_add(1, Ordering::SeqCst),
+            listener_key,
             Arc::new(move |data| {
                 let weak = weak.clone();
                 tokio::spawn(async move {
@@ -676,7 +747,20 @@ impl Controller {
         for extension in extensions {
             self.stop_extension(extension).await;
         }
-        self.state.lock().unwrap().stop(Some(&|ieee| self.zigbee.resolve_entity(ieee).is_some()));
+        // Upstream `this.eventBus.removeListeners(this)` (`controller.ts:359`).
+        if let Some(key) = self.listener_key.lock().unwrap().take() {
+            self.event_bus.lock().unwrap().remove_listeners(key);
+        }
+        // Upstream only prunes cached devices when a herdsman controller
+        // exists (`state.ts:51-61`); a failed startup must not wipe the cache.
+        if self.zigbee.zh_controller().is_some() {
+            self.state
+                .lock()
+                .unwrap()
+                .stop(Some(&|ieee| self.zigbee.resolve_entity(ieee).is_some()));
+        } else {
+            self.state.lock().unwrap().stop(None);
+        }
         self.mqtt.lock().await.disconnect().await;
         let _ = self.zigbee.stop().await;
         logger_info(&self.logger, "Stopped Zigbee2MQTT");

@@ -18,6 +18,21 @@ use z2m_rs::util::logger::Logger;
 use z2m_rs::util::settings::Settings;
 use z2m_rs::zigbee::Zigbee;
 
+#[path = "support/mqtt_broker.rs"]
+mod mqtt_broker;
+use mqtt_broker::Broker;
+
+async fn wait_for<F: Fn() -> bool>(what: &str, timeout: std::time::Duration, predicate: F) {
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        if predicate() {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    panic!("timeout waiting for {what}");
+}
+
 fn harness(server: &str) -> (Arc<Controller>, Arc<Zigbee>, Arc<tokio::sync::Mutex<Mqtt>>) {
     let settings = Arc::new(Mutex::new(Settings::from_config(json!({
         "mqtt": {"base_topic": "z2m", "server": server},
@@ -279,4 +294,206 @@ async fn frontend_enable_disable_requires_matching_settings() {
         .enable_disable_extension(false, "Frontend".to_string())
         .await
         .expect("disable while disabled in settings is allowed");
+}
+
+/// CP-04 regression: a failed startup must not wipe the state cache when no
+/// herdsman controller exists (upstream `state.stop()` only prunes then).
+#[tokio::test]
+async fn failed_startup_keeps_the_state_cache() {
+    let (controller, zigbee, _mqtt) = harness("mqtt://127.0.0.1:1");
+    *zigbee.test_start.lock().unwrap() = Some((Err("boom".to_string()), 0));
+
+    let error = controller.start().await.expect_err("startup failure");
+    assert!(error.contains("boom"), "{error}");
+    controller
+        .state
+        .lock()
+        .unwrap()
+        .test_insert("0xa4c13887bf43cc0f", json!({"state": "ON"}));
+    controller.stop(false, 0).await;
+
+    assert!(
+        controller
+            .state
+            .lock()
+            .unwrap()
+            .exists(&z2m_rs::model::entity::EntityId::Ieee(
+                "0xa4c13887bf43cc0f".to_string()
+            )),
+        "state cache was pruned without a herdsman controller"
+    );
+    assert_eq!(
+        controller
+            .state
+            .lock()
+            .unwrap()
+            .get(&z2m_rs::model::entity::EntityId::Ieee(
+                "0xa4c13887bf43cc0f".to_string()
+            )),
+        json!({"state": "ON"})
+    );
+}
+
+/// CP-05: abort after MQTT is connected and three extensions are running.
+///
+/// Upstream `controller.test.ts` "during extension start": `stop()` aborts the
+/// in-flight start, all started extensions are stopped, MQTT is disconnected
+/// and the controller can start again.
+#[tokio::test]
+async fn aborting_with_active_mqtt_stops_runtime_and_restarts_cleanly() {
+    let broker = Broker::start().await;
+    let (controller, zigbee, mqtt) = harness(&broker.server());
+    *zigbee.test_start.lock().unwrap() = Some((Ok(true), 0));
+
+    let release = Arc::new(tokio::sync::Notify::new());
+    *controller.test_start_pause.lock().unwrap() = Some((3, release));
+
+    let start = tokio::spawn({
+        let controller = controller.clone();
+        async move { controller.start().await }
+    });
+
+    wait_for("MQTT connect", std::time::Duration::from_secs(5), || {
+        mqtt.try_lock()
+            .map(|guard| guard.is_connected())
+            .unwrap_or(false)
+    })
+    .await;
+    wait_for(
+        "three extensions",
+        std::time::Duration::from_secs(5),
+        || controller.extensions_len() >= 3,
+    )
+    .await;
+    assert_eq!(
+        controller.extensions_len(),
+        3,
+        "start must pause before the fourth extension"
+    );
+    assert_eq!(
+        broker.active_connections(),
+        1,
+        "the client holds one MQTT connection"
+    );
+    assert!(
+        broker
+            .subscriptions()
+            .iter()
+            .any(|filter| filter == "z2m/#"),
+        "the bridge subscribed on connect"
+    );
+    let subscriptions_before = broker.subscriptions().len();
+    assert!(
+        controller.event_bus.lock().unwrap().listener_count() > 0,
+        "the started extensions registered event-bus listeners"
+    );
+    assert!(
+        controller.state.lock().unwrap().has_save_timer(),
+        "the state save timer is running"
+    );
+
+    controller.stop(false, 0).await;
+    start
+        .await
+        .expect("start task")
+        .expect("an aborted start returns Ok");
+
+    assert!(!mqtt.lock().await.is_connected(), "MQTT was disconnected");
+    // Upstream keeps the extension instances registered after stop.
+    assert_eq!(controller.extensions_len(), 3);
+    assert_eq!(
+        controller.event_bus.lock().unwrap().listener_count(),
+        0,
+        "every started extension removed its listeners in stop()"
+    );
+    assert!(
+        !controller.state.lock().unwrap().has_save_timer(),
+        "the state save timer was stopped"
+    );
+    wait_for(
+        "broker sees the closed connection",
+        std::time::Duration::from_secs(5),
+        || broker.active_connections() == 0,
+    )
+    .await;
+
+    // A fresh controller over the same shared state is the in-process
+    // equivalent of the process restart: it must reconnect, resubscribe and
+    // start the full built-in extension set.
+    let restarted = Arc::new(Controller::new(
+        controller.event_bus.clone(),
+        controller.zigbee.clone(),
+        controller.state.clone(),
+        controller.mqtt.clone(),
+        controller.settings.clone(),
+        controller.logger.clone(),
+    ));
+    restarted.start().await.expect("second start");
+    assert!(mqtt.lock().await.is_connected());
+    assert_eq!(restarted.extensions_len(), 10);
+    assert!(restarted.event_bus.lock().unwrap().listener_count() > 0);
+    assert!(restarted.state.lock().unwrap().has_save_timer());
+    wait_for("resubscribed", std::time::Duration::from_secs(5), || {
+        broker.subscriptions().len() > subscriptions_before
+    })
+    .await;
+    assert_eq!(broker.active_connections(), 1);
+
+    restarted.stop(false, 0).await;
+    assert!(!mqtt.lock().await.is_connected());
+    assert_eq!(restarted.event_bus.lock().unwrap().listener_count(), 0);
+    wait_for(
+        "final disconnect",
+        std::time::Duration::from_secs(5),
+        || broker.active_connections() == 0,
+    )
+    .await;
+}
+
+/// CP-05: abort while `mqtt.connect()` is in flight. The connect is bounded
+/// (5 s CONNACK timeout); `stop()` sets the abort flag first, so the failure is
+/// reported as an aborted start (upstream `controller.ts:126-128,146-150`)
+/// and no extension is started.
+#[tokio::test]
+async fn aborting_during_a_slow_mqtt_connect_returns_ok_and_tears_down() {
+    // Accept TCP but never answer CONNECT.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("blackhole listener");
+    let port = listener.local_addr().unwrap().port();
+    let blackhole = tokio::spawn(async move {
+        let mut sockets = Vec::new();
+        loop {
+            let Ok((socket, _)) = listener.accept().await else {
+                return;
+            };
+            sockets.push(socket);
+        }
+    });
+
+    let (controller, zigbee, mqtt) = harness(&format!("mqtt://127.0.0.1:{port}"));
+    *zigbee.test_start.lock().unwrap() = Some((Ok(true), 0));
+
+    let start = tokio::spawn({
+        let controller = controller.clone();
+        async move { controller.start().await }
+    });
+    wait_for(
+        "MQTT connect in flight",
+        std::time::Duration::from_secs(2),
+        || mqtt.try_lock().is_err(),
+    )
+    .await;
+
+    controller.stop(false, 0).await;
+    let result = start.await.expect("start task");
+    blackhole.abort();
+
+    assert!(
+        result.is_ok(),
+        "an aborted connect is not a startup failure: {result:?}"
+    );
+    assert!(!mqtt.lock().await.is_connected());
+    assert_eq!(controller.extensions_len(), 0, "no extension was started");
+    assert!(!controller.state.lock().unwrap().has_save_timer());
 }
