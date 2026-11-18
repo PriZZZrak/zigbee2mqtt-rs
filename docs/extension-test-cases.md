@@ -35,13 +35,13 @@ Coverage classes:
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
-| groups.test.ts | 40 | 26 | 0 | 14 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
+| groups.test.ts | 40 | 34 | 0 | 6 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
 | health.test.ts | 5 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 112 | 0 | 0 | 3 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
-| publish.test.ts | 110 | 28 | 3 | 0 | 79 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
+| publish.test.ts | 110 | 31 | 0 | 0 | 79 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
 | receive.test.ts | 34 | 25 | 0 | 0 | 9 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
@@ -320,15 +320,15 @@ Coverage classes:
 | 1 | Should publish group state change when a device in it changes state | `asserted` | optimistic state fan-out |
 | 2 | Should not republish identical optimistic group states | `asserted` | identical optimistic states are deduped |
 | 3 | Should publish state change of all members when a group changes its state | `asserted` | optimistic state fan-out |
-| 4 | Should not publish state change when group changes state and device is disabled | `code` | group state derivation ported, converter/endpoint dependent |
-| 5 | Should publish state change for group when members state change | `code` | group state derivation ported, converter/endpoint dependent |
+| 4 | Should not publish state change when group changes state and device is disabled | `asserted` | `group_set_skips_disabled_members` (groups_publish) |
+| 5 | Should publish state change for group when members state change | `asserted` | `group_set_fans_out_to_members` (groups_publish) |
 | 6 | Should publish state of device with endpoint name | `asserted` | `group_state_change_uses_endpoint_names_for_members` |
 | 7 | Should publish state of group when specific state of specific endpoint is changed | `asserted` | `specific_endpoint_state_change_updates_the_group` |
-| 8 | Should publish state change of all members when a group changes its state, filtered | `code` | group state derivation ported, converter/endpoint dependent |
+| 8 | Should publish state change of all members when a group changes its state, filtered | `asserted` | `group_filtered_attributes_are_applied` (groups_publish) |
 | 9 | Shouldnt publish group state change when a group is not optimistic | `asserted` | `non_optimistic_group_is_not_published` |
 | 10 | Should publish state change of another group with shared device when a group changes its state | `asserted` | optimistic state fan-out |
-| 11 | Should not publish state change off if any lights within are still on when changed via device | `code` | group state derivation ported, converter/endpoint dependent |
-| 12 | Should publish state change off if any lights within are still on when changed via device when off_state: last_member_state is used | `code` | group state derivation ported, converter/endpoint dependent |
+| 11 | Should not publish state change off if any lights within are still on when changed via device | `asserted` | `group_stays_on_while_a_member_is_on` (groups_publish) |
+| 12 | Should publish state change off if any lights within are still on when changed via device when off_state: last_member_state is used | `asserted` | `last_member_state_publishes_the_member_state` (groups_publish) |
 | 13 | Should not publish state change off if any lights within with non default-ep are still on when changed via device | `code` | group state derivation ported, converter/endpoint dependent |
 | 14 | Should not publish state change off if any lights within are still on when changed via device with non default-ep | `code` | group state derivation ported, converter/endpoint dependent |
 | 15 | Should publish state change off if all lights within turn off with non default-ep | `code` | group state derivation ported, converter/endpoint dependent |
@@ -336,9 +336,9 @@ Coverage classes:
 | 17 | Should check the state of the member endpoint by its name when its ID is not its position ('still on') | `code` | group state derivation ported, converter/endpoint dependent |
 | 18 | Should check the state of the member endpoint by its name when its ID is not its position ('off') | `code` | group state derivation ported, converter/endpoint dependent |
 | 19 | Should not publish state change off if any lights within are still on when changed via shared group | `asserted` | `shared_group_is_updated` |
-| 20 | Should publish state change off if all lights within turn off | `code` | group state derivation ported, converter/endpoint dependent |
-| 21 | Should only update group state with changed properties | `code` | group state derivation ported, converter/endpoint dependent |
-| 22 | Should publish state change off even when missing current state | `code` | group state derivation ported, converter/endpoint dependent |
+| 20 | Should publish state change off if all lights within turn off | `asserted` | `group_turns_off_when_all_members_are_off` (groups_publish) |
+| 21 | Should only update group state with changed properties | `asserted` | `group_state_merges_cached_properties` (groups_publish) |
+| 22 | Should publish state change off even when missing current state | `asserted` | `group_off_publishes_with_missing_current_state` (groups_publish) |
 | 23 | Add to group via MQTT | `asserted` | `add_to_group_via_mqtt` (+ `group_members_changed_republishes_bridge_groups` for the bridge/groups republish) |
 | 24 | Add to group via MQTT fails | `asserted` | `add_to_group_via_mqtt_fails` |
 | 25 | Add to group with slashes via MQTT | `asserted` | `add_to_group_with_slashes_via_mqtt` |
@@ -591,10 +591,10 @@ Coverage classes:
 | 22 | Should publish messages to zigbee devices with color rgb object | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 23 | Should publish messages to zigbee devices with color rgb string | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 24 | Should publish messages to zigbee devices with brightness | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
-| 25 | Should publish messages groups | `slice` | group message fan-out through members |
+| 25 | Should publish messages groups | `asserted` | `group_set_fans_out_to_members` (groups_publish) |
 | 26 | Should publish messages to groups with brightness_percent | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 27 | Should publish messages to groups when converter is not in the default list but device in it supports it | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
-| 28 | Should publish messages to group with just 1 Hue Twilight in int (convers have an `endpoint` on it) | `slice` | group endpoint handling |
+| 28 | Should publish messages to group with just 1 Hue Twilight in int (convers have an `endpoint` on it) | `asserted` | `group_set_fans_out_to_members` (groups_publish) |
 | 29 | Should publish messages to groups with on and brightness | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 30 | Should publish messages to groups with off and brightness | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 31 | Should publish messages to groups color | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
@@ -602,7 +602,7 @@ Coverage classes:
 | 33 | Should create and publish to group which is in configuration.yaml but not in zigbee-herdsman | `converter-db` | toZigbee converter behaviour from zigbee-herdsman-converters (R1 Q4) |
 | 34 | Shouldnt publish new state when optimistic = false | `asserted` | `optimistic_false_suppresses_the_publish` |
 | 35 | Shouldnt publish new brightness state when filtered_optimistic is used | `asserted` | `filtered_optimistic_filters_the_publish` |
-| 36 | Shouldnt publish new state when optimistic = false for group | `slice` | optimistic=false for groups |
+| 36 | Shouldnt publish new state when optimistic = false for group | `asserted` | `non_optimistic_group_does_not_publish` (groups_publish) |
 | 37 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |
 | 38 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |
 | 39 | Should handle non-valid topics | `asserted` | `invalid_topics_are_ignored` |

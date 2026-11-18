@@ -272,8 +272,23 @@ impl Groups {
             let id = device.entity_id();
             if self.context.state.lock().unwrap().exists(&id) {
                 let state = self.context.state.lock().unwrap().get(&id);
+                // Upstream `areAllMembersOffOrClosed`: multi-endpoint devices
+                // use the endpoint-suffixed state key (`groups.ts:236-241`).
+                let endpoint_name = device
+                    .definition()
+                    .filter(|definition| {
+                        definition
+                            .meta
+                            .get("multiEndpoint")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false)
+                    })
+                    .and_then(|_| device.endpoint_name(&member));
+                let state_key = endpoint_name
+                    .map(|name| format!("state_{name}"))
+                    .unwrap_or_else(|| "state".to_string());
                 if matches!(
-                    state.get("state").and_then(Value::as_str),
+                    state.get(&state_key).and_then(Value::as_str),
                     Some("ON" | "OPEN")
                 ) {
                     return false;
