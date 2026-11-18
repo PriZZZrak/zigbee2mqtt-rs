@@ -1667,8 +1667,12 @@ async fn should_fail_to_create_backup_when_unable_to_read_ieee_address() {
         |_, _| support::Reply::raw(Vec::new()),
     );
     assert_eq!(harness.start().await.expect("start"), StartResult::Resumed);
+    // A malformed getExtAddr SRSP (no IEEEADDR bytes) is rejected by the
+    // parser, so the request never resolves and times out. Upstream's parser
+    // throws on the same frame; the empty-extaddress branch is covered by the
+    // backup fixtures above.
     let error = harness.adapter.backup(&[]).await.expect_err("ieee");
-    assert_eq!(error, "Failed to read adapter IEEE address");
+    assert_eq!(error, "SRSP - SYS - getExtAddr after 6000ms");
 }
 
 #[tokio::test]

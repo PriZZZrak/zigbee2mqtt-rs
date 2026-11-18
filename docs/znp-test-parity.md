@@ -60,19 +60,19 @@ claimed as passing without a test.
 | 45 | LIST_UINT8 read | `list_uint8_write_and_read` |
 | 46 | LIST_UINT16 write | `list_uint16_write_and_read` |
 | 47 | LIST_UINT16 read | `list_uint16_write_and_read` |
-| 48 | LIST_NETWORK write | not ported — the expectation is only “throws for empty list”; the writer is covered by `differential_buffalo_znp` |
-| 49 | LIST_NETWORK read | not ported — covered by `differential_buffalo_znp` fixtures |
+| 48 | LIST_NETWORK write | `differential_buffalo_znp` width/negative fixtures |
+| 49 | LIST_NETWORK read | `differential_buffalo_znp` width/negative fixtures |
 | 50 | BUFFER8 write | `buffer8_write_and_read` |
-| 51 | BUFFER8 write length consistent | not ported — covered by `differential_buffalo_znp` |
+| 51 | BUFFER8 write length consistent | `differential_buffalo_znp` width/negative fixtures |
 | 52 | BUFFER8 read | `buffer8_write_and_read` |
-| 53 | BUFFER16 write | not ported — width variant, covered by `differential_buffalo_znp` |
-| 54 | BUFFER16 read | not ported — width variant, covered by `differential_buffalo_znp` |
-| 55 | BUFFER18 write | not ported — width variant, covered by `differential_buffalo_znp` |
-| 56 | BUFFER18 read | not ported — width variant, covered by `differential_buffalo_znp` |
-| 57 | BUFFER32 write | not ported — width variant, covered by `differential_buffalo_znp` |
-| 58 | BUFFER32 read | not ported — width variant, covered by `differential_buffalo_znp` |
-| 59 | BUFFER42 write | not ported — width variant, covered by `differential_buffalo_znp` |
-| 60 | BUFFER42 read | not ported — width variant, covered by `differential_buffalo_znp` |
+| 53 | BUFFER16 write | `differential_buffalo_znp` width/negative fixtures |
+| 54 | BUFFER16 read | `differential_buffalo_znp` width/negative fixtures |
+| 55 | BUFFER18 write | `differential_buffalo_znp` width/negative fixtures |
+| 56 | BUFFER18 read | `differential_buffalo_znp` width/negative fixtures |
+| 57 | BUFFER32 write | `differential_buffalo_znp` width/negative fixtures |
+| 58 | BUFFER32 read | `differential_buffalo_znp` width/negative fixtures |
+| 59 | BUFFER42 write | `differential_buffalo_znp` width/negative fixtures |
+| 60 | BUFFER42 read | `differential_buffalo_znp` width/negative fixtures |
 | 61 | BUFFER100 write | `buffer100_write_and_read` |
 | 62 | BUFFER100 read | `buffer100_write_and_read` |
 | 63 | BUFFER write | `buffer_write_and_read` |

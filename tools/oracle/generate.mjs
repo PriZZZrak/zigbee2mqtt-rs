@@ -124,6 +124,19 @@ const cases = {
         {id: "write-list-uint16", op: "write", type: "LIST_UINT16", value: [1, 2, 3]},
         {id: "write-int8", op: "write", type: "INT8", value: -1},
         {id: "write-list-network", op: "write", type: "LIST_NETWORK", value: []},
+        // Width variants and negative cases (audit CP-08).
+        {id: "read-buffer16", op: "read", type: "BUFFER16", buffer: "000102030405060708090a0b0c0d0e0f"},
+        {id: "read-buffer18", op: "read", type: "BUFFER18", buffer: "000102030405060708090a0b0c0d0e0f1011"},
+        {id: "read-buffer32", op: "read", type: "BUFFER32", buffer: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"},
+        {id: "read-buffer42", op: "read", type: "BUFFER42", buffer: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"},
+        {id: "read-buffer100", op: "read", type: "BUFFER100", buffer: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60616263"},
+        {id: "write-buffer16", op: "write", type: "BUFFER16", value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]},
+        {id: "write-buffer18", op: "write", type: "BUFFER18", value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]},
+        {id: "write-buffer32", op: "write", type: "BUFFER32", value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]},
+        {id: "write-buffer42", op: "write", type: "BUFFER42", value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41]},
+        {id: "write-buffer100", op: "write", type: "BUFFER100", value: Array.from({length: 100}, (_, index) => index)},
+        {id: "read-buffer8-short", op: "read", type: "BUFFER8", buffer: "0102"},
+        {id: "read-list-uint8-short", op: "read", type: "LIST_UINT8", buffer: "0102", options: {length: 3}},
     ],
     zpi_object: [
         {

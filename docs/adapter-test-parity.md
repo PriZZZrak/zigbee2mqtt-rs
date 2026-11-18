@@ -23,14 +23,14 @@ entries.
 | 5 | handles nested mdns error during find all devices | `handles_serial_and_mdns_errors_during_find_all_devices` |
 | 6 | mDNS: for zstack as znp | `discovers_mdns_services_as_tcp_paths` |
 | 7 | mDNS: falls back to host if no addresses | `discovers_mdns_services_as_tcp_paths` |
-| 8 | mDNS: times out | not ported — `DiscoveryContext` is synchronous; a timed-out browser maps to `mdns_start_error` (row 5) |
-| 9 | mDNS: given invalid path | not ported — no mDNS path is enabled in R1 |
-| 10 | mDNS: returns invalid format | not ported — same |
+| 8 | mDNS: times out | ``mdns_create_times_out_invalid_path_and_format`` |
+| 9 | mDNS: given invalid path | ``mdns_create_times_out_invalid_path_and_format`` |
+| 10 | mDNS: returns invalid format | ``mdns_create_times_out_invalid_path_and_format`` |
 | 11 | mDNS: errors inside mdns | `handles_serial_and_mdns_errors_during_find_all_devices` (`mdns_start_error`) |
 | 12 | TCP: returns config with tcp path | `tcp_discovery_parses_supported_paths` |
 | 13 | TCP: returns config with socket path | `tcp_discovery_parses_supported_paths` |
 | 14 | TCP: returns config with hostname path | `tcp_discovery_parses_supported_paths` |
-| 15 | TCP: invalid adapter | not ported — adapter-name validation for TCP is a `create` concern |
+| 15 | TCP: invalid adapter | ``tcp_create_requires_an_adapter`` |
 | 16 | TCP: handles IPv4 | `tcp_discovery_parses_supported_paths` |
 | 17 | TCP: handles IPv6 | `tcp_discovery_parses_supported_paths` (`[::1]`, `[fe80::1]`) |
 | 18 | TCP: handles domain name | `tcp_discovery_parses_supported_paths` |
@@ -44,7 +44,7 @@ entries.
 | 26 | detects with conflict vendor+product IDs | `detects_each_adapter` (the detection table resolves the conflicts deterministically; ZWA-2 wins as *not detected*) |
 | 27 | returns first from list with multiple adapters - nothing to match against | `sorts_serial_ports_by_path` |
 | 28 | throws on failure to get autoDetect().list | `handles_serial_and_mdns_errors_during_find_all_devices` (upstream throws in `create`, the port reports the error from `discover_live_adapters`; `find_all_devices` returns an empty list) |
-| 29 | throws on failure to detect with conflict vendor+product IDs | not ported — `create` path validation |
+| 29 | throws on failure to detect with conflict vendor+product IDs | ``conflict_vendor_product_throws_without_config`` |
 | 30 | detects SkyConnect ZBT-1 when ZWA-2 present | `does_not_detect_zwa2_and_windows_cp210x` (ZWA-2 excluded) |
 | 31 | detects SkyConnect ZBT-2 when ZWA-2 present | `detects_ember_variants_and_skyconnect_defaults` |
 | 32 | USB with adapter+path config: detects each adapter | `detects_each_adapter` |
@@ -52,19 +52,19 @@ entries.
 | 34 | detects with pnpId instead of path | `uses_pnp_id_and_friendly_name_for_the_display_name` |
 | 35 | uses default transportOptions of adapter | `uses_pnp_id_and_friendly_name_for_the_display_name` |
 | 36 | detects with conflict vendor+product IDs | `detects_each_adapter` |
-| 37 | returns instance anyway on failure to match | not ported — `create` fallback behavior |
-| 38 | returns instance anyway on failure to match with different path | not ported — same |
-| 39 | returns instance anyway on failure to get autoDetect().list | not ported — same |
-| 40 | throws on failure to match invalid adapter | not ported — same |
+| 37 | returns instance anyway on failure to match | ``adapter_path_fallbacks_return_an_instance`` |
+| 38 | returns instance anyway on failure to match with different path | ``adapter_path_fallbacks_return_an_instance`` |
+| 39 | returns instance anyway on failure to get autoDetect().list | ``adapter_path_fallbacks_return_an_instance`` |
+| 40 | throws on failure to match invalid adapter | ``invalid_adapter_throws`` |
 | 41 | USB with adapter only config: detects each adapter | `detects_each_adapter` |
 | 42 | detects with multiple adapters connected | `sorts_serial_ports_by_path` |
 | 43 | detects with pnpId instead of path | `uses_pnp_id_and_friendly_name_for_the_display_name` |
-| 44 | throws on failure to detect with conflict vendor+product IDs | not ported — `create` path |
+| 44 | throws on failure to detect with conflict vendor+product IDs | ``adapter_only_conflict_throws`` |
 | 45 | USB with path only config: detects each adapter | `detects_each_adapter` |
 | 46 | detects with multiple adapters connected | `sorts_serial_ports_by_path` |
 | 47 | detects with pnpId instead of path | `uses_pnp_id_and_friendly_name_for_the_display_name` |
-| 48 | throws on failure to match with different path | not ported — `create` path |
-| 49 | throws on failure to match when port info too limited | not ported — `create` path |
+| 48 | throws on failure to match with different path | ``path_only_different_path_throws`` |
+| 49 | throws on failure to match when port info too limited | ``limited_port_info_throws`` |
 | 50 | emits disconnected on transport close | covered by `differential_transport` (close event) and `adapter_zstack_suite` |
 | 51 | does not emit disconnected on unopened transport | covered by `differential_transport` |
 | 52 | does not emit disconnected on manual close of transport | covered by `differential_transport` (manual close path) |

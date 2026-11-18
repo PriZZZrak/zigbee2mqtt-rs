@@ -39,10 +39,29 @@ impl Buffalo {
         self.position += values.len();
     }
 
+    /// Upstream `readUInt8`/`readUInt32LE`/`readBigUInt64LE` range checks
+    /// (`buffalo.ts`, Node Buffer): reading past the end throws with the Node
+    /// message instead of returning a truncated value.
+    fn read_exact(&mut self, length: usize) -> Vec<u8> {
+        let len = self.buffer.len();
+        if self.position + length > len {
+            let max = len as isize - length as isize;
+            panic!(
+                "The value of \"offset\" is out of range. It must be >= 0 and <= {max}. Received {}",
+                self.position
+            );
+        }
+        let values = self.buffer[self.position..self.position + length].to_vec();
+        self.position += length;
+        values
+    }
+
+    /// Upstream `readBuffer(length)`: the returned value is clamped by the
+    /// buffer end, but the position still advances by `length` (`buffalo.ts`).
     fn read_slice(&mut self, length: usize) -> Vec<u8> {
         let end = (self.position + length).min(self.buffer.len());
-        let values = self.buffer[self.position..end].to_vec();
-        self.position = end;
+        let values = self.buffer[self.position.min(end)..end].to_vec();
+        self.position += length;
         values
     }
 
@@ -52,7 +71,7 @@ impl Buffalo {
     }
 
     fn read_unsigned(&mut self, length: usize) -> u64 {
-        let bytes = self.read_slice(length);
+        let bytes = self.read_exact(length);
         let mut value = 0u64;
         for (index, byte) in bytes.iter().enumerate() {
             value |= u64::from(*byte) << (index * 8);
@@ -173,7 +192,7 @@ impl Buffalo {
         self.write_slice(&(value as f32).to_le_bytes());
     }
     pub fn read_float_le(&mut self) -> f64 {
-        let bytes = self.read_slice(4);
+        let bytes = self.read_exact(4);
         let mut array = [0u8; 4];
         array[..bytes.len()].copy_from_slice(&bytes);
         f64::from(f32::from_le_bytes(array))
@@ -182,7 +201,7 @@ impl Buffalo {
         self.write_slice(&value.to_le_bytes());
     }
     pub fn read_double_le(&mut self) -> f64 {
-        let bytes = self.read_slice(8);
+        let bytes = self.read_exact(8);
         let mut array = [0u8; 8];
         array[..bytes.len()].copy_from_slice(&bytes);
         f64::from_le_bytes(array)
@@ -200,7 +219,7 @@ impl Buffalo {
     }
 
     pub fn read_ieee_addr(&mut self) -> String {
-        let bytes = self.read_slice(8);
+        let bytes = self.read_exact(8);
         let hex = bytes
             .iter()
             .rev()

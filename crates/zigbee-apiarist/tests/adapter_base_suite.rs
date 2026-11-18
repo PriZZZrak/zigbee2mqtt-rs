@@ -48,8 +48,20 @@ fn context(ports: Vec<SerialPortInfo>) -> DiscoveryContext {
 #[test]
 fn detects_each_adapter() {
     let devices = find_all_devices(&context(vec![
-        port("/dev/conbee", "1cf1", "0030", Some("dresden elektronik"), None),
-        port("/dev/cc2538", "0451", "16c8", Some("Texas Instruments"), None),
+        port(
+            "/dev/conbee",
+            "1cf1",
+            "0030",
+            Some("dresden elektronik"),
+            None,
+        ),
+        port(
+            "/dev/cc2538",
+            "0451",
+            "16c8",
+            Some("Texas Instruments"),
+            None,
+        ),
         port("/dev/zboss", "2fe3", "0100", Some("Nordic"), None),
         port("/dev/zigate", "0403", "6015", Some("FTDI"), None),
     ]));
@@ -137,7 +149,13 @@ fn uses_pnp_id_and_friendly_name_for_the_display_name() {
     // A Z-Stack dongle keeps the adapter default baud rate.
     assert_eq!(devices[0].baud_rate, None);
 
-    let info = port("/dev/ttyACM0", "1cf1", "0030", Some("dresden elektronik"), None);
+    let info = port(
+        "/dev/ttyACM0",
+        "1cf1",
+        "0030",
+        Some("dresden elektronik"),
+        None,
+    );
     let devices = find_all_devices(&context(vec![info]));
     assert_eq!(devices[0].name, "/dev/ttyACM0 (dresden elektronik)");
 }
@@ -240,4 +258,155 @@ fn adapter_kind_names_and_json_payload() {
         "live serial enumeration must not fail on a host without dongles"
     );
     let _ = json!({});
+}
+
+// --- Adapter::create_with_context (rows 8-10, 15, 29, 37-40, 44, 48-49) ---
+
+use zigbee_apiarist::adapter::adapter::Adapter;
+
+fn create_context(
+    context: &DiscoveryContext,
+    options: serde_json::Value,
+) -> Result<zigbee_apiarist::adapter::adapter::AdapterInstance, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(Adapter::create_with_context(
+        context,
+        json!({}),
+        options,
+        "test.db.backup",
+        json!({}),
+    ))
+}
+
+fn no_valid_usb() -> String {
+    "USB adapter discovery error (No valid USB adapter found). Specify valid 'adapter' and 'port' in your configuration.".to_string()
+}
+
+#[test]
+fn mdns_create_times_out_invalid_path_and_format() {
+    let empty = context(Vec::new());
+    let timeout =
+        create_context(&empty, json!({"path": "mdns://mdns_test_device"})).expect_err("timeout");
+    assert_eq!(
+        timeout,
+        "Coordinator [mdns_test_device] not found after timeout of 2000ms!"
+    );
+
+    let invalid = create_context(&empty, json!({"path": "mdns://"})).expect_err("invalid path");
+    assert!(invalid.starts_with("No mdns device specified."));
+
+    let mut wrong_format = context(Vec::new());
+    wrong_format.mdns_services = vec![MdnsService {
+        name: Some("Mock Adapter".to_string()),
+        radio_type: None,
+        host: "my_adapter.local".to_string(),
+        port: "1122".to_string(),
+        addresses: vec!["192.168.1.123".to_string()],
+    }];
+    let error = create_context(&wrong_format, json!({"path": "mdns://my_adapter"}))
+        .expect_err("wrong format");
+    assert!(error.starts_with("Coordinator returned wrong Zeroconf format!"));
+}
+
+#[test]
+fn tcp_create_requires_an_adapter() {
+    let context = context(Vec::new());
+    let error = create_context(&context, json!({"path": "tcp://192.168.1.321:3456"}))
+        .expect_err("missing adapter");
+    assert_eq!(
+        error,
+        "Cannot discover TCP adapters at this time. Specify valid 'adapter' and 'port' in your configuration."
+    );
+}
+
+#[test]
+fn conflict_vendor_product_throws_without_config() {
+    let context = context(vec![port("/dev/ttyACM0", "10c4", "ea60", None, None)]);
+    let error = create_context(&context, json!({})).expect_err("ambiguous conflict");
+    assert_eq!(error, no_valid_usb());
+}
+
+#[test]
+fn adapter_path_fallbacks_return_an_instance() {
+    // Empty port list.
+    let empty = context(Vec::new());
+    let instance = create_context(&empty, json!({"adapter": "zstack", "path": "dev/ttyUSB0"}))
+        .expect("fallback instance");
+    assert_eq!(instance.kind, AdapterKind::ZStack);
+    assert_eq!(instance.serial_port_options["path"], json!("dev/ttyUSB0"));
+
+    // A different path than the connected device.
+    let different = context(vec![port(
+        "/dev/conbee",
+        "1cf1",
+        "0030",
+        Some("dresden"),
+        None,
+    )]);
+    let instance = create_context(
+        &different,
+        json!({"adapter": "deconz", "path": "/dev/ttyUSB0"}),
+    )
+    .expect("fallback instance");
+    assert_eq!(instance.kind, AdapterKind::Deconz);
+    assert_eq!(instance.serial_port_options["path"], json!("/dev/ttyUSB0"));
+
+    // Serial list failure.
+    let mut failing = context(Vec::new());
+    failing.serial_ports = Err("spawn udevadm ENOENT".to_string());
+    let instance = create_context(
+        &failing,
+        json!({"adapter": "zstack", "path": "/dev/ttyUSB0"}),
+    )
+    .expect("fallback instance");
+    assert_eq!(instance.kind, AdapterKind::ZStack);
+}
+
+#[test]
+fn invalid_adapter_throws() {
+    let context = context(Vec::new());
+    let error = create_context(
+        &context,
+        json!({"adapter": "invalid", "path": "dev/ttyUSB0"}),
+    )
+    .expect_err("invalid adapter");
+    assert_eq!(
+        error,
+        "Adapter 'invalid' does not exists, possible options: zstack, ember, deconz, zigate, zboss, zoh, ezsp"
+    );
+}
+
+#[test]
+fn adapter_only_conflict_throws() {
+    let context = context(vec![port("/dev/ttyACM0", "10c4", "ea60", None, None)]);
+    let error = create_context(&context, json!({"adapter": "zstack"})).expect_err("no match");
+    assert_eq!(error, no_valid_usb());
+}
+
+#[test]
+fn path_only_different_path_throws() {
+    let context = context(vec![port(
+        "/dev/conbee",
+        "1cf1",
+        "0030",
+        Some("dresden"),
+        None,
+    )]);
+    let error =
+        create_context(&context, json!({"path": "/dev/ttyUSB0"})).expect_err("different path");
+    assert_eq!(error, no_valid_usb());
+}
+
+#[test]
+fn limited_port_info_throws() {
+    for (vendor, product) in [(None, Some("0030")), (Some("1cf1"), None)] {
+        let mut limited = port("/dev/conbee", "1cf1", "0030", Some("dresden"), None);
+        limited.vendor_id = vendor.map(str::to_string);
+        limited.product_id = product.map(str::to_string);
+        let error = create_context(&context(vec![limited]), json!({})).expect_err("limited info");
+        assert_eq!(error, no_valid_usb());
+    }
 }

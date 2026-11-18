@@ -454,12 +454,18 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
   включая ошибки, изменение registry/DB и порядок событий.
 - [ ] Проверить документированные отклонения порядка multi-attribute payload
   и Green Power EUI64/srcID; разрешить вопросы совместимости.
-- [ ] Разобрать **12 непортированных discovery-сценариев**, особенно R1
-  выбор порта, validation, fallback и ошибки обнаружения.
+- [x] Разобрать **12 непортированных discovery-сценариев**: mDNS timeout/
+  invalid path/wrong format, TCP missing adapter, USB conflict/no-match
+  fallbacks and limited port info — `tests/adapter_base_suite.rs` (18 tests,
+  `Adapter::create_with_context`).
 - [ ] В ZNP закрыть missing subsystem, long-timeout branch, request без reply
   и bootloader-проверки на подходящем уровне.
-- [ ] Проверить, что ссылки на Buffalo/ZpiObject differential действительно
-  содержат заявленные negative/width cases.
+- [x] Проверить Buffalo/ZpiObject differential: расширены `buffalo_znp`
+  fixtures (BUFFER16/18/32/42/100 read+write, short-buffer reads with Node
+  range errors); `Buffalo::read_exact` теперь воспроизводит Node-ошибку
+  позиции, `read_slice` — upstream-семантику `readBuffer` (значение
+  обрезается, позиция сдвигается). ZpiObject negative case остаётся
+  (см. «Остаток»).
 - [ ] Сохранить полный per-case map для 130 заявленных Z-Stack тестов.
 
 **Закрытие:** каждый R1 gap имеет тест и необходимый oracle; каждый
