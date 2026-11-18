@@ -744,3 +744,47 @@ async fn get_dispatches_multiple_cover_endpoints() {
     }
     assert_eq!(calls.lock().unwrap().len(), 2);
 }
+
+/// Case 47: a property with an unknown endpoint postfix logs an error.
+#[tokio::test]
+async fn unknown_endpoint_property_is_logged() {
+    let _guard = serial();
+    let harness = harness(json!({"mqtt": {"server": "localhost"}}));
+    let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    register_state_converter(&harness.zigbee, calls.clone(), json!({"state": "ON"}));
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    harness.event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": format!("zigbee2mqtt/{IEEE}/get"),
+        "message": r#"{"state_left":""}"#,
+    }));
+    for _ in 0..50 {
+        if harness
+            .logger
+            .lock()
+            .unwrap()
+            .winston_logs
+            .iter()
+            .any(|(_, line)| line.contains("No converter available for 'state_left'"))
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        harness
+            .logger
+            .lock()
+            .unwrap()
+            .winston_logs
+            .iter()
+            .any(|(_, line)| { line.contains("No converter available for 'state_left'") }),
+        "logs={:?}",
+        harness.logger.lock().unwrap().winston_logs
+    );
+    assert!(calls.lock().unwrap().is_empty());
+}

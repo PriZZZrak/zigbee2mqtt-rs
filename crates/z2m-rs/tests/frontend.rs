@@ -31,7 +31,13 @@ fn harness(auth_token: Option<&str>) -> Harness {
 }
 
 fn harness_with_host(auth_token: Option<&str>, host: &str) -> Harness {
-    let mut frontend = json!({"enabled": true, "port": 0, "base_url": "/", "host": host});
+    harness_with_frontend(
+        json!({"enabled": true, "port": 0, "base_url": "/", "host": host}),
+        auth_token,
+    )
+}
+
+fn harness_with_frontend(mut frontend: Value, auth_token: Option<&str>) -> Harness {
     if let Some(token) = auth_token {
         frontend["auth_token"] = json!(token);
     }
@@ -131,13 +137,13 @@ async fn replay_retained_and_receive_messages() {
         .lock()
         .unwrap()
         .insert(
-        "zigbee2mqtt/bridge/info".to_string(),
-        RetainedMessage {
-            topic: "zigbee2mqtt/bridge/info".to_string(),
-            payload: r#"{"version":"2.14.3"}"#.to_string(),
-            options: MqttPublishOptions::default(),
-        },
-    );
+            "zigbee2mqtt/bridge/info".to_string(),
+            RetainedMessage {
+                topic: "zigbee2mqtt/bridge/info".to_string(),
+                payload: r#"{"version":"2.14.3"}"#.to_string(),
+                options: MqttPublishOptions::default(),
+            },
+        );
     let received = Arc::new(Mutex::new(Vec::new()));
     let sink = received.clone();
     harness.event_bus.lock().unwrap().on(
@@ -425,7 +431,10 @@ async fn serves_windfront_assets_with_cache_and_spa_fallback() {
 
     let (status, asset) = http_get(addr, "/assets/app.js", "*/*").await;
     assert_eq!(status, 200, "{asset}");
-    assert!(asset.contains("public, max-age=31536000, immutable"), "{asset}");
+    assert!(
+        asset.contains("public, max-age=31536000, immutable"),
+        "{asset}"
+    );
 
     // SPA fallback for client-side routes.
     let (status, fallback) = http_get(addr, "/devices/0x0017880104e45519", "text/html").await;
@@ -534,13 +543,33 @@ async fn serves_single_content_length_and_empty_304() {
     .await;
     assert!(conditional.starts_with("HTTP/1.1 304"), "{conditional}");
     assert!(
-        !conditional
-            .to_ascii_lowercase()
-            .contains("content-length"),
+        !conditional.to_ascii_lowercase().contains("content-length"),
         "{conditional}"
     );
 
     frontend.stop().await.unwrap();
     std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// Cases 5-6: an invalid/missing TLS configuration falls back to plain HTTP.
+#[tokio::test]
+async fn invalid_tls_configuration_falls_back_to_http() {
+    for frontend_settings in [
+        // Missing key configuration.
+        json!({"enabled": true, "port": 0, "base_url": "/", "host": "127.0.0.1", "ssl_cert": "/nonexistent/cert.pem"}),
+        // Missing files.
+        json!({"enabled": true, "port": 0, "base_url": "/", "host": "127.0.0.1", "ssl_cert": "/nonexistent/cert.pem", "ssl_key": "/nonexistent/key.pem"}),
+    ] {
+        let harness = harness_with_frontend(frontend_settings, None);
+        let frontend = Frontend::new(harness.context.clone());
+        frontend.clone().start().await.expect("frontend starts");
+        let addr = frontend.bound_addr().expect("bound address");
+        let stream = TcpStream::connect(addr).await.unwrap();
+        let (socket, _) = tokio_tungstenite::client_async(format!("ws://{addr}/api"), stream)
+            .await
+            .expect("plain websocket fallback");
+        drop(socket);
+        frontend.clone().stop().await.unwrap();
+    }
 }

@@ -205,3 +205,4 @@ fn mqqtt_payload(mqtt: &Mqtt) -> String {
         .map(|(_, payload, _)| payload.clone())
         .unwrap()
 }
+

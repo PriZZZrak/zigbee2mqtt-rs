@@ -34,14 +34,14 @@ Coverage classes:
 | configure.test.ts | 19 | 19 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
-| frontend.test.ts | 16 | 12 | 0 | 4 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
-| groups.test.ts | 40 | 25 | 1 | 14 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
-| health.test.ts | 5 | 3 | 0 | 2 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
+| frontend.test.ts | 16 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
+| groups.test.ts | 40 | 26 | 0 | 14 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
+| health.test.ts | 5 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 112 | 0 | 0 | 3 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
 | networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
-| publish.test.ts | 110 | 27 | 3 | 1 | 79 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
+| publish.test.ts | 110 | 28 | 3 | 0 | 79 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
 | receive.test.ts | 34 | 25 | 0 | 0 | 9 | 0 | 0 | 0 | crates/z2m-rs/tests/receive.rs |
 
 ## availability.test.ts
@@ -300,17 +300,17 @@ Coverage classes:
 | 2 | Start/stop without host | `asserted` | start/stop without host |
 | 3 | Start/stop unix socket | `asserted` | unix_socket_frontend_serves_websocket |
 | 4 | Start/stop HTTPS valid | `asserted` | tls_frontend_serves_websocket |
-| 5 | Start/stop HTTPS invalid : missing config | `code` | missing TLS config falls back to plain HTTP (build_tls_acceptor) |
-| 6 | Start/stop HTTPS invalid : missing file | `code` | missing TLS file logs and falls back (build_tls_acceptor) |
+| 5 | Start/stop HTTPS invalid : missing config | `asserted` | `invalid_tls_configuration_falls_back_to_http` |
+| 6 | Start/stop HTTPS invalid : missing file | `asserted` | `invalid_tls_configuration_falls_back_to_http` |
 | 7 | Websocket interaction | `asserted` | replay_retained_and_receive_messages |
-| 8 | onRequest/onUpgrade | `code` | generic serve() handles request/upgrade callbacks |
+| 8 | onRequest/onUpgrade | `asserted` | `auth_token_is_enforced` + `replay_retained_and_receive_messages` (HTTP/upgrade handling) |
 | 9 | Should serve device icons | `asserted` | `serves_windfront_assets_with_cache_and_spa_fallback` (static server serves any file, icons included) |
 | 10 | Static server | `asserted` | `serves_windfront_assets_with_cache_and_spa_fallback` + `serves_single_content_length_and_empty_304` |
 | 11 | Authentication | `asserted` | auth_token_is_enforced |
 | 12 | Works with non-default base url /z2m/ | `asserted` | `serves_assets_under_a_custom_base_url` |
 | 13 | Works with non-default base url /z2m | `asserted` | `serves_assets_under_a_custom_base_url` |
 | 14 | Works with non-default complex base url | `asserted` | `serves_assets_under_a_custom_base_url` |
-| 15 | prevents mismatching setting/extension state | `code` | settings/extension mismatch guard in start() |
+| 15 | prevents mismatching setting/extension state | `asserted` | `frontend_enable_disable_requires_matching_settings` (controller_startup) |
 | 16 | disables serving | `asserted` | disables serving when disable_ui_serving is set |
 
 ## groups.test.ts
@@ -355,7 +355,7 @@ Coverage classes:
 | 36 | Error when adding a non-existing device | `asserted` | unknown device response |
 | 37 | Error when adding a non-existing endpoint | `asserted` | `error_adding_to_non_existing_endpoint` |
 | 38 | Error when invalid payload | `asserted` | invalid payload response |
-| 39 | Error when add/remove with invalid payload | `slice` | invalid payload for add/remove |
+| 39 | Error when add/remove with invalid payload | `asserted` | `invalid_member_request_returns_error_response` |
 | 40 | Should only include relevant properties when publishing member states | `asserted` | member_state_filtering_uses_member_exposes |
 
 ## health.test.ts
@@ -364,8 +364,8 @@ Coverage classes:
 |---:|---|---|---|
 | 1 | checks health at default interval | `asserted` | publishes_bridge_health_payload |
 | 2 | checks health at given interval | `asserted` | publishes_bridge_health_payload (interval) |
-| 3 | init device health from leave | `code` | init device health from leave |
-| 4 | init device health from network address change | `code` | init device health from network address change |
+| 3 | init device health from leave | `asserted` | `device_health_tracks_leave_and_network_address_changes` |
+| 4 | init device health from network address change | `asserted` | `device_health_tracks_leave_and_network_address_changes` |
 | 5 | checks health then resets possible stats | `asserted` | reset_on_check_clears_stats |
 
 ## homeassistant.test.ts
@@ -613,7 +613,7 @@ Coverage classes:
 | 44 | Should handle get with multiple cover endpoints | `asserted` | `get_dispatches_multiple_cover_endpoints` |
 | 45 | Should log error when device has no such endpoint (via topic) | `asserted` | missing_endpoint_and_converter_are_logged |
 | 46 | Should log error when device has no definition | `asserted` | unsupported_device_is_rejected (no definition) |
-| 47 | Should log error when device has no such endpoint (via property) | `code` | unknown property endpoint error |
+| 47 | Should log error when device has no such endpoint (via property) | `asserted` | `unknown_endpoint_property_is_logged` |
 | 48 | Should parse topic with when base topic has multiple slashes | `asserted` | `topic_parsing_handles_slashes` |
 | 49 | Should parse topic with when deviceID has multiple slashes | `asserted` | `topic_parsing_handles_slashes` |
 | 50 | Should parse topic with when base and deviceID have multiple slashes | `asserted` | `topic_parsing_handles_slashes` |

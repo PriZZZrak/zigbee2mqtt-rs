@@ -249,3 +249,34 @@ async fn homeassistant_enable_disable_requires_matching_settings() {
         .await
         .expect("disable while disabled in settings is allowed");
 }
+
+/// Upstream prevents-mismatching-setting-extension-state for Frontend
+/// (frontend.test.ts).
+#[tokio::test]
+async fn frontend_enable_disable_requires_matching_settings() {
+    let (controller, _zigbee, _mqtt) = harness("mqtt://127.0.0.1:1");
+    controller.settings.lock().unwrap().configuration["frontend"] = json!({"enabled": true});
+    let error = controller
+        .enable_disable_extension(false, "Frontend".to_string())
+        .await
+        .expect_err("disable while enabled in settings");
+    assert_eq!(
+        error,
+        "Tried to disable Frontend extension enabled in settings"
+    );
+
+    controller.settings.lock().unwrap().configuration["frontend"] = json!({"enabled": false});
+    let error = controller
+        .enable_disable_extension(true, "Frontend".to_string())
+        .await
+        .expect_err("enable while disabled in settings");
+    assert_eq!(
+        error,
+        "Tried to enable Frontend extension disabled in settings"
+    );
+
+    controller
+        .enable_disable_extension(false, "Frontend".to_string())
+        .await
+        .expect("disable while disabled in settings is allowed");
+}

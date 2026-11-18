@@ -136,3 +136,29 @@ fn clear_stats_clears_devices_and_mqtt() {
     assert!(bus.stats.devices.is_empty());
     assert_eq!(bus.stats.mqtt.received, 0);
 }
+
+/// Cases 3-4: leave and network-address-change events feed device health.
+#[tokio::test]
+async fn device_health_tracks_leave_and_network_address_changes() {
+    let (context, mqtt, event_bus) = context(false);
+    {
+        let mut bus = event_bus.lock().unwrap();
+        bus.emit_device_leave(json!({"ieeeAddr": "0x0017880104e45519"}));
+        bus.emit_device_leave(json!({"ieeeAddr": "0x0017880104e45519"}));
+        bus.emit_device_network_address_changed(json!({
+            "device": {"ieeeAddr": "0x0017880104e45519"},
+            "networkAddress": 123,
+        }));
+    }
+
+    let health = Health::new(context);
+    health.check_health().await;
+
+    let mqtt = mqtt.lock().await;
+    let payload: serde_json::Value = serde_json::from_str(&mqtt.attempted[0].1).unwrap();
+    assert_eq!(payload["devices"]["0x0017880104e45519"]["leave_count"], 2);
+    assert_eq!(
+        payload["devices"]["0x0017880104e45519"]["network_address_changes"],
+        1
+    );
+}
