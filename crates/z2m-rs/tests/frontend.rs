@@ -108,6 +108,7 @@ async fn next_json(socket: &mut tokio_tungstenite::WebSocketStream<TcpStream>) -
 
 #[tokio::test]
 async fn auth_token_is_enforced() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
     let harness = harness(Some("secret"));
     let frontend = Frontend::new(harness.context.clone());
     frontend.clone().start().await.unwrap();
@@ -128,6 +129,7 @@ async fn auth_token_is_enforced() {
 
 #[tokio::test]
 async fn replay_retained_and_receive_messages() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
     let harness = harness(None);
     harness
         .mqtt
@@ -186,6 +188,7 @@ async fn replay_retained_and_receive_messages() {
 
 #[tokio::test]
 async fn broadcasts_published_messages_and_skips_entity_states() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
     let harness = harness(None);
     let frontend = Frontend::new(harness.context.clone());
     frontend.clone().start().await.unwrap();
@@ -232,6 +235,7 @@ async fn broadcasts_published_messages_and_skips_entity_states() {
 
 #[tokio::test]
 async fn stop_sends_offline_state() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
     let harness = harness(None);
     let frontend = Frontend::new(harness.context.clone());
     frontend.clone().start().await.unwrap();
@@ -250,6 +254,7 @@ async fn stop_sends_offline_state() {
 #[cfg(unix)]
 #[tokio::test]
 async fn unix_socket_frontend_serves_websocket() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
     let socket_path = std::env::temp_dir().join(format!(
         "z2m-frontend-{}-{}.sock",
         std::process::id(),
@@ -322,6 +327,7 @@ impl rustls::client::danger::ServerCertVerifier for NoVerify {
 
 #[tokio::test]
 async fn tls_frontend_serves_websocket() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
     let harness = harness_with_host(None, "127.0.0.1");
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     {
@@ -555,6 +561,7 @@ async fn serves_single_content_length_and_empty_304() {
 /// Cases 5-6: an invalid/missing TLS configuration falls back to plain HTTP.
 #[tokio::test]
 async fn invalid_tls_configuration_falls_back_to_http() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
     for frontend_settings in [
         // Missing key configuration.
         json!({"enabled": true, "port": 0, "base_url": "/", "host": "127.0.0.1", "ssl_cert": "/nonexistent/cert.pem"}),

@@ -81,9 +81,9 @@ Error/retry/cancellation/persistence/reconnect specifically:
 
 | Gate | Command | Status |
 |---|---|---|
-| Format | `cargo fmt --check` | repo has pre-existing formatting drift; changed files are formatted |
-| Lints | `cargo clippy --workspace --all-targets` | run in CP-12 final acceptance |
-| Workspace tests | `cargo test --workspace` | 33+ suites green (apiarist alone: 33 suites / 1015 tests) |
+| Format | `cargo fmt --all -- --check` | **fails on 167 pre-existing files**; all files changed by this work are rustfmt-formatted, repo-wide reformat is a separate change |
+| Lints | `cargo clippy --workspace --all-targets` | exit 0 (warnings only) |
+| Workspace tests | `cargo test --workspace` | 78 suites / 1563 tests, 0 failed (final CP-12 run) |
 | Map checker | `node tools/docs/check-parity-maps.mjs` | `OK: 11 maps checked, 0 errors` |
 | Node oracle | `node tools/oracle/generate.mjs` | regenerates 8 committed fixture sets |
 | Model/ MQTT transcripts | `node tools/oracle/model-transcript.mjs`, `node tools/oracle/mqtt-transcript.mjs` | both report match |

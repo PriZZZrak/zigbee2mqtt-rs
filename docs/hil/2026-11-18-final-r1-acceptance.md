@@ -140,3 +140,13 @@ same data directory.
   joined and interviewed.
 - The state cache reset and the database format rewrite are real differences
   from Node and are listed above rather than claimed as parity.
+
+## Final software gate (same commit)
+
+```text
+cargo test --workspace            78 suites, 1563 tests, 0 failed
+cargo clippy --workspace --all-targets   exit 0 (warnings only)
+cargo fmt --all -- --check         fails on 167 pre-existing files (repo-wide drift;
+                                   all files changed for the audit are formatted)
+node tools/docs/check-parity-maps.mjs    OK: 11 maps checked, 0 errors
+```
