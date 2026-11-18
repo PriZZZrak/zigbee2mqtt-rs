@@ -35,10 +35,10 @@ Coverage classes:
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
 | frontend.test.ts | 16 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/frontend.rs |
-| groups.test.ts | 40 | 34 | 0 | 6 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs |
+| groups.test.ts | 40 | 40 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs + tests/groups_publish.rs |
 | health.test.ts | 5 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 112 | 0 | 0 | 3 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
-| networkMap.test.ts | 6 | 4 | 0 | 1 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
+| networkMap.test.ts | 6 | 5 | 0 | 0 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 31 | 0 | 0 | 79 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
@@ -329,12 +329,12 @@ Coverage classes:
 | 10 | Should publish state change of another group with shared device when a group changes its state | `asserted` | optimistic state fan-out |
 | 11 | Should not publish state change off if any lights within are still on when changed via device | `asserted` | `group_stays_on_while_a_member_is_on` (groups_publish) |
 | 12 | Should publish state change off if any lights within are still on when changed via device when off_state: last_member_state is used | `asserted` | `last_member_state_publishes_the_member_state` (groups_publish) |
-| 13 | Should not publish state change off if any lights within with non default-ep are still on when changed via device | `code` | group state derivation ported, converter/endpoint dependent |
-| 14 | Should not publish state change off if any lights within are still on when changed via device with non default-ep | `code` | group state derivation ported, converter/endpoint dependent |
-| 15 | Should publish state change off if all lights within turn off with non default-ep | `code` | group state derivation ported, converter/endpoint dependent |
-| 16 | Should publish state change off if all lights within turn off with non default-ep, but device state does not use them | `code` | group state derivation ported, converter/endpoint dependent |
-| 17 | Should check the state of the member endpoint by its name when its ID is not its position ('still on') | `code` | group state derivation ported, converter/endpoint dependent |
-| 18 | Should check the state of the member endpoint by its name when its ID is not its position ('off') | `code` | group state derivation ported, converter/endpoint dependent |
+| 13 | Should not publish state change off if any lights within with non default-ep are still on when changed via device | `asserted` | `groups_publish` (non-default endpoints and endpoint-name state lookup) |
+| 14 | Should not publish state change off if any lights within are still on when changed via device with non default-ep | `asserted` | `groups_publish` (non-default endpoints and endpoint-name state lookup) |
+| 15 | Should publish state change off if all lights within turn off with non default-ep | `asserted` | `groups_publish` (non-default endpoints and endpoint-name state lookup) |
+| 16 | Should publish state change off if all lights within turn off with non default-ep, but device state does not use them | `asserted` | `groups_publish` (non-default endpoints and endpoint-name state lookup) |
+| 17 | Should check the state of the member endpoint by its name when its ID is not its position ('still on') | `asserted` | `groups_publish` (non-default endpoints and endpoint-name state lookup) |
+| 18 | Should check the state of the member endpoint by its name when its ID is not its position ('off') | `asserted` | `groups_publish` (non-default endpoints and endpoint-name state lookup) |
 | 19 | Should not publish state change off if any lights within are still on when changed via shared group | `asserted` | `shared_group_is_updated` |
 | 20 | Should publish state change off if all lights within turn off | `asserted` | `group_turns_off_when_all_members_are_off` (groups_publish) |
 | 21 | Should only update group state with changed properties | `asserted` | `group_state_merges_cached_properties` (groups_publish) |
@@ -496,7 +496,7 @@ Coverage classes:
 | 2 | Output graphviz networkmap | `asserted` | graphviz network map output |
 | 3 | Output plantuml networkmap | `asserted` | plantuml network map output |
 | 4 | Should throw error when requesting invalid type | `asserted` | unsupported type error |
-| 5 | Should exclude disabled devices from networkmap | `code` | disabled devices filtered out |
+| 5 | Should exclude disabled devices from networkmap | `asserted` | `disabled_devices_are_excluded_from_the_scan` |
 | 6 | Handles retrying request when first attempt fails | `adapter` | retry needs a live adapter |
 
 ## onEvent.test.ts

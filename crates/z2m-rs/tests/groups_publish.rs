@@ -28,6 +28,8 @@ use zigbee_converters::{access, Definition, Expose, ToMeta, ToZigbeeConverter, T
 
 const IEEE: &str = "0x0017880104e45519";
 const IEEE2: &str = "0x0017880104e45520";
+const IEEE3: &str = "0x0017880104e45542";
+const IEEE4: &str = "0x0017880104e45543";
 
 type Recorded = Arc<Mutex<Vec<(String, Value, Option<String>)>>>;
 
@@ -47,6 +49,10 @@ fn temp(name: &str) -> std::path::PathBuf {
 }
 
 fn harness(configuration: Value) -> Harness {
+    harness_members(configuration, &[(IEEE, 1), (IEEE2, 1)])
+}
+
+fn harness_members(configuration: Value, members: &[(&str, u8)]) -> Harness {
     let database_path = temp("db");
     inject_database(Arc::new(Mutex::new(Database::open(&database_path))));
     ZhDevice::reset_cache();
@@ -63,7 +69,12 @@ fn harness(configuration: Value) -> Harness {
         None,
     )
     .unwrap();
-    for (ieee, network) in [(IEEE, 1234), (IEEE2, 1235)] {
+    for (ieee, network, model, endpoints) in [
+        (IEEE, 1234, "TEST", vec![1u8]),
+        (IEEE2, 1235, "SWITCH", vec![1, 2, 3]),
+        (IEEE3, 1236, "ZIGFRED", vec![7]),
+        (IEEE4, 1237, "PLAIN", vec![1, 2]),
+    ] {
         let device = ZhDevice::create(
             DeviceType::Router,
             ieee,
@@ -71,12 +82,14 @@ fn harness(configuration: Value) -> Harness {
             None,
             Some("Test".to_string()),
             Some("Mains (single phase)".to_string()),
-            Some("TEST".to_string()),
+            Some(model.to_string()),
             InterviewState::Successful,
             None,
         )
         .unwrap();
-        device.create_endpoint(1).unwrap();
+        for endpoint in endpoints {
+            device.create_endpoint(endpoint).unwrap();
+        }
     }
     let controller = Arc::new(
         Controller::new(ControllerOptions {
@@ -107,9 +120,11 @@ fn harness(configuration: Value) -> Harness {
         settings.clone(),
         logger.clone(),
     );
-    for ieee in [IEEE, IEEE2] {
+    for (ieee, endpoint_id) in members {
         if let Some(device) = zigbee.resolve_device(ieee) {
-            group.add_member(&device.zh.endpoints()[0]);
+            if let Some(endpoint) = device.zh.get_endpoint(*endpoint_id) {
+                group.add_member(&endpoint);
+            }
         }
     }
     let _ = zigbee.resolve_group(1);
@@ -192,7 +207,7 @@ impl Drop for Harness {
     }
 }
 
-fn register_converter(zigbee: &Zigbee) {
+fn light_converters() -> Vec<ToZigbeeConverter> {
     let state = ToZigbeeConverter {
         key: vec!["state".to_string()],
         endpoints: None,
@@ -232,8 +247,21 @@ fn register_converter(zigbee: &Zigbee) {
         })),
         convert_get: None,
     };
-    let mut definition = Definition::new("TEST", "Acme", "Test")
-        .with_zigbee_model("TEST")
+    vec![state, brightness, color_temp]
+}
+
+fn register_model(zigbee: &Zigbee, model: &str, endpoints: Vec<(&str, u8)>) {
+    register_model_with_meta(zigbee, model, endpoints, true);
+}
+
+fn register_model_with_meta(
+    zigbee: &Zigbee,
+    model: &str,
+    endpoints: Vec<(&str, u8)>,
+    multi_endpoint: bool,
+) {
+    let mut definition = Definition::new(model, "Acme", "Test")
+        .with_zigbee_model(model)
         .with_exposes(vec![Expose {
             r#type: "light".to_string(),
             name: Some("light".to_string()),
@@ -245,11 +273,25 @@ fn register_converter(zigbee: &Zigbee) {
             ],
             ..Default::default()
         }]);
-    definition.to_zigbee.push(state);
-    definition.to_zigbee.push(brightness);
-    definition.to_zigbee.push(color_temp);
+    if !endpoints.is_empty() {
+        if multi_endpoint {
+            definition.meta = json!({"multiEndpoint": true});
+        }
+        definition.endpoint = endpoints
+            .iter()
+            .map(|(name, id)| (name.to_string(), *id))
+            .collect();
+    }
+    definition.to_zigbee.extend(light_converters());
     zigbee.converters().lock().unwrap().register(definition);
-    for ieee in [IEEE, IEEE2] {
+}
+
+fn register_converter(zigbee: &Zigbee) {
+    register_model(zigbee, "TEST", vec![]);
+    register_model(zigbee, "SWITCH", vec![("left", 2), ("right", 3)]);
+    register_model(zigbee, "ZIGFRED", vec![("l2", 7)]);
+    register_model_with_meta(zigbee, "PLAIN", vec![("left", 2)], false);
+    for ieee in [IEEE, IEEE2, IEEE3, IEEE4] {
         if let Some(device) = zigbee.resolve_device(ieee) {
             device.resolve_definition(true);
         }
@@ -280,15 +322,19 @@ async fn send(harness: &Harness, topic: &str, message: Value) {
     tokio::time::sleep(Duration::from_millis(100)).await;
 }
 
-fn baseline() -> Harness {
-    harness(json!({
+fn baseline_configuration() -> Value {
+    json!({
         "mqtt": {"server": "localhost"},
         "devices": {
             IEEE: {"friendly_name": "lamp"},
             IEEE2: {"friendly_name": "bulb"},
         },
         "groups": {"1": {"friendly_name": "kitchen"}},
-    }))
+    })
+}
+
+fn baseline() -> Harness {
+    harness(baseline_configuration())
 }
 
 /// Cases 4-5 and publish 25: a group command is published for the group and
@@ -537,6 +583,129 @@ async fn non_optimistic_group_does_not_publish() {
         harness.recorded.lock().unwrap().is_empty(),
         "non-optimistic group published {:?}",
         harness.recorded.lock().unwrap()
+    );
+    groups.stop().await.unwrap();
+}
+
+/// Case 13: a non-default endpoint that is still on keeps the group on.
+#[tokio::test]
+async fn non_default_endpoint_on_keeps_group_on() {
+    let _guard = serial();
+    let harness = harness_members(baseline_configuration(), &[(IEEE, 1), (IEEE2, 2)]);
+    register_converter(&harness.zigbee);
+    let (_publish, groups) = start(&harness).await;
+    send(&harness, "zigbee2mqtt/kitchen/set", json!({"state": "ON"})).await;
+    harness.recorded.lock().unwrap().clear();
+
+    send(&harness, "zigbee2mqtt/lamp/set", json!({"state": "OFF"})).await;
+
+    assert_eq!(last_group_state(&harness), None, "group turned off early");
+    groups.stop().await.unwrap();
+}
+
+/// Case 14: turning only the left endpoint off keeps the group on because the
+/// right endpoint is still on.
+#[tokio::test]
+async fn non_default_endpoints_keep_group_on() {
+    let _guard = serial();
+    let harness = harness_members(
+        baseline_configuration(),
+        &[(IEEE, 1), (IEEE2, 2), (IEEE2, 3)],
+    );
+    register_converter(&harness.zigbee);
+    let (_publish, groups) = start(&harness).await;
+    send(&harness, "zigbee2mqtt/kitchen/set", json!({"state": "ON"})).await;
+    harness.recorded.lock().unwrap().clear();
+
+    send(
+        &harness,
+        "zigbee2mqtt/bulb/set",
+        json!({"state_left": "OFF"}),
+    )
+    .await;
+
+    assert_eq!(last_group_state(&harness), None, "group turned off early");
+    let member = harness
+        .recorded
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(name, _, _)| name == "bulb")
+        .cloned();
+    assert_eq!(
+        member.map(|(_, payload, _)| payload),
+        Some(json!({"state_left": "OFF", "state_right": "ON"}))
+    );
+    groups.stop().await.unwrap();
+}
+
+/// Case 15: the group turns off once all endpoints are off.
+#[tokio::test]
+async fn all_endpoints_off_publishes_group_off() {
+    let _guard = serial();
+    let harness = harness_members(baseline_configuration(), &[(IEEE, 1), (IEEE2, 2)]);
+    register_converter(&harness.zigbee);
+    let (_publish, groups) = start(&harness).await;
+    send(&harness, "zigbee2mqtt/kitchen/set", json!({"state": "ON"})).await;
+    harness.recorded.lock().unwrap().clear();
+
+    send(&harness, "zigbee2mqtt/lamp/set", json!({"state": "OFF"})).await;
+    assert_eq!(last_group_state(&harness), None);
+    send(
+        &harness,
+        "zigbee2mqtt/bulb/set",
+        json!({"state_left": "OFF"}),
+    )
+    .await;
+
+    assert_eq!(last_group_state(&harness), Some(json!({"state": "OFF"})));
+    groups.stop().await.unwrap();
+}
+
+/// Cases 17-18: the member endpoint is looked up by name, not by position.
+#[tokio::test]
+async fn endpoint_state_is_resolved_by_name() {
+    for (state_l2, expect_off) in [("ON", false), ("OFF", true)] {
+        let _guard = serial();
+        let harness = harness_members(baseline_configuration(), &[(IEEE, 1), (IEEE3, 7)]);
+        register_converter(&harness.zigbee);
+        let (_publish, groups) = start(&harness).await;
+        send(&harness, "zigbee2mqtt/kitchen/set", json!({"state": "ON"})).await;
+        {
+            let device = entity(&harness, IEEE3);
+            harness.context.state.lock().unwrap().set(
+                device.as_ref(),
+                json!({"state_l2": state_l2}),
+                Some("devicePublish".to_string()),
+            );
+        }
+        harness.recorded.lock().unwrap().clear();
+
+        send(&harness, "zigbee2mqtt/lamp/set", json!({"state": "OFF"})).await;
+
+        let group_off = last_group_state(&harness) == Some(json!({"state": "OFF"}));
+        assert_eq!(group_off, expect_off, "state_l2={state_l2}");
+        groups.stop().await.unwrap();
+    }
+}
+
+/// Case 16: with a device whose state does not use the endpoint, the group off
+/// is published even though an endpoint-suffixed state exists.
+#[tokio::test]
+async fn group_off_when_device_state_does_not_use_the_endpoint() {
+    let _guard = serial();
+    let harness = harness_members(baseline_configuration(), &[(IEEE, 1), (IEEE4, 2)]);
+    register_converter(&harness.zigbee);
+    let (_publish, groups) = start(&harness).await;
+    send(&harness, "zigbee2mqtt/kitchen/set", json!({"state": "ON"})).await;
+    harness.recorded.lock().unwrap().clear();
+
+    send(&harness, "zigbee2mqtt/lamp/set", json!({"state": "OFF"})).await;
+
+    assert_eq!(
+        last_group_state(&harness),
+        Some(json!({"state": "OFF"})),
+        "group off was suppressed by an endpoint-suffixed state"
     );
     groups.stop().await.unwrap();
 }

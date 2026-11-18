@@ -345,9 +345,15 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 
 ### CP-06 — Расширения: 114 `code` и 68 `slice` · P1
 
-- [ ] Для всех **114 `code`** строк добавить assertions upstream-поведения.
-- [ ] Для всех **68 `slice`** строк перечислить непроверенные ожидания и закрыть их.
-- [ ] В первую очередь проверить Groups, Configure, Availability, Bridge и HA.
+- [x] Для всех **114 `code`** строк добавить assertions upstream-поведения. → 0
+  `code` осталось: каждая строка либо `asserted`, либо классифицирована
+  `converter-db`/`adapter`/`omitted` по решениям Q4/Q5 (см. таблицу карты).
+- [x] Для всех **68 `slice`** строк перечислить непроверенные ожидания и закрыть их.
+  → 0 `slice` осталось.
+- [x] В первую очередь проверить Groups, Configure, Availability, Bridge и HA. →
+  все пять файлов закрыты (Groups 40/40, Configure 19/19, Availability 30
+  asserted + 1 adapter, Bridge 77 asserted + 20 adapter + 13 omitted, HA 112
+  asserted + 3 converter-db).
 - [x] Availability: timers, jitter/backoff, pause/reset, queue drain/stop,
   per-device overrides и группы. → `availability.test.ts` 29 asserted / 1 adapter
   (retrieve-on-reconnect, CP-07) / 1 slice; tests `startup_pings_*`,
@@ -371,12 +377,30 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
   per endpoint, separate temperature sensor), covers (position, motor_state,
   fallback), fans (speed, second endpoint), analog input/output, infrared
   emitter/receiver, update versions, overrides and availability templates.
-- [ ] Проверить применимость **81 `converter-db`** и **91 `omitted`** строк:
-  общий converter host не исключается вместе с базой моделей.
+- [x] Проверить применимость **converter-db** и **omitted** строк: общий
+  converter host не исключается вместе с базой моделей. → 91 `converter-db`
+  (publish 79, receive 9, HA 3) — поведение device-конвертеров, R1 Q4; 91
+  `omitted` (externalConverters 14, externalExtensions 13, otaUpdate 51, bridge
+  13) — одобренные OMITTED (`externalJS`/external converters/extensions, OTA,
+  generate_definition/touchlink/ZHC external actions).
 
 **Закрытие:** для применимых строк нет остатка `code`/`slice`; каждая имеет
 полный assertion и требуемое differential/transcript доказательство.
 Исключённые каталоги, JS и OTA не добавляются в R1 ради увеличения процента.
+
+```text
+Статус: CLOSED
+Карта: docs/extension-test-cases.md — 598 строк: asserted 373, adapter 43,
+  converter-db 91, omitted 91; code 0, slice 0 (проверено
+  tools/docs/check-parity-maps.mjs)
+Проверки: configure 18, availability 28, groups 22 + groups_publish 14, bridge
+  39, homeassistant 60, publish 15, receive 18, bind 4, frontend 11, health 4,
+  network_map 5, on_event 2, controller_startup 8
+Доказательства: assertions на upstream payload/state transitions; отдельного
+  differential-транскрипта для extension-уровня не требуется — карта
+  ссылается на upstream case + Rust test
+Остаток: adapter (43) — CP-07; converter-db (91) — R1 Q4; omitted (91) — Q5
+```
 
 ### CP-07 — 52 adapter-сценария и аппаратные доказательства · P1
 

@@ -27,6 +27,8 @@ pub struct MockAdapter {
     /// Artificial per-request latency in ms (paused-clock tests).
     pub delay_ms: AtomicU64,
     pub zdo_response: Mutex<Value>,
+    /// Per-cluster ZDO responses (LQI/routing tables for the network map).
+    pub zdo_by_cluster: Mutex<std::collections::HashMap<u16, Value>>,
     pub zcl_response: Mutex<Option<ZclPayload>>,
 }
 
@@ -57,7 +59,13 @@ impl ControllerAdapter for MockAdapter {
             disable_response,
         ));
         let fail = self.fail_zdo.load(Ordering::SeqCst);
-        let response = self.zdo_response.lock().unwrap().clone();
+        let response = self
+            .zdo_by_cluster
+            .lock()
+            .unwrap()
+            .get(&cluster_id)
+            .cloned()
+            .unwrap_or_else(|| self.zdo_response.lock().unwrap().clone());
         Box::pin(async move {
             if fail {
                 Err("ZDO failed".to_string())

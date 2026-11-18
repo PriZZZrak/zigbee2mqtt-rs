@@ -6,6 +6,17 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
+#[path = "support/mock_adapter.rs"]
+mod mock_adapter;
+use mock_adapter::MockAdapter;
+
+use zigbee_apiarist::controller::controller::{Controller, ControllerOptions};
+use zigbee_apiarist::controller::database::{Database, DeviceType};
+use zigbee_apiarist::controller::model::device::{Device as ZhDevice, InterviewState};
+use zigbee_apiarist::controller::model::entity::inject_database;
+use zigbee_apiarist::controller::model::group::Group as ZhGroup;
+use zigbee_apiarist::models::network_options::NetworkOptions;
+
 use z2m_rs::event_bus::EventBus;
 use z2m_rs::extension::extension::{Extension, ExtensionContext};
 use z2m_rs::extension::network_map::NetworkMap;
@@ -206,3 +217,175 @@ fn mqqtt_payload(mqtt: &Mqtt) -> String {
         .unwrap()
 }
 
+fn scan_harness() -> (
+    ExtensionContext,
+    Arc<Mutex<EventBus>>,
+    Arc<tokio::sync::Mutex<Mqtt>>,
+) {
+    let database_path = std::env::temp_dir().join(format!(
+        "z2m-netmap-scan-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    inject_database(Arc::new(Mutex::new(Database::open(&database_path))));
+    ZhDevice::reset_cache();
+    ZhGroup::reset_cache();
+    ZhDevice::create(
+        DeviceType::Coordinator,
+        "0x00124b0024c16b95",
+        0,
+        None,
+        None,
+        None,
+        None,
+        InterviewState::Successful,
+        None,
+    )
+    .unwrap();
+    for (ieee, network) in [
+        ("0x0017880104e45519", 4660u16),
+        ("0x0017880104e45520", 22136u16),
+    ] {
+        let device = ZhDevice::create(
+            DeviceType::Router,
+            ieee,
+            network,
+            None,
+            Some("Test".to_string()),
+            Some("Mains (single phase)".to_string()),
+            Some("TEST".to_string()),
+            InterviewState::Successful,
+            None,
+        )
+        .unwrap();
+        device.create_endpoint(1).unwrap();
+    }
+    let controller = Arc::new(
+        Controller::new(ControllerOptions {
+            network: NetworkOptions {
+                pan_id: 0x1a62,
+                extended_pan_id: vec![0xdd; 8],
+                channel_list: vec![11],
+                network_key: vec![1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 13],
+                network_key_distribute: true,
+                has_default_extended_pan_id: false,
+            },
+            transport: json!({}),
+            database_path: database_path.display().to_string(),
+            database_backup_path: None,
+            backup_path: None,
+            adapter: json!({}),
+            accept_joining_device_handler: None,
+        })
+        .unwrap(),
+    );
+    let settings = Arc::new(Mutex::new(Settings::from_config(json!({
+        "mqtt": {"server": "localhost"},
+        "devices": {
+            "0x0017880104e45519": {"friendly_name": "lamp", "disabled": true},
+            "0x0017880104e45520": {"friendly_name": "sensor"},
+        },
+    }))));
+    let event_bus = Arc::new(Mutex::new(EventBus::new()));
+    let logger = Arc::new(Mutex::new(Logger::new()));
+    let adapter = MockAdapter::new();
+    zigbee_apiarist::controller::model::entity::Entity::inject_adapter(adapter.clone());
+    adapter.zdo_by_cluster.lock().unwrap().insert(
+        0x0031,
+        json!([0, {
+            "neighborTableEntries": 1,
+            "entryList": [{
+                "networkAddress": 4660,
+                "lqi": 42,
+                "depth": 1,
+                "relationship": 2,
+            }],
+        }]),
+    );
+    adapter.zdo_by_cluster.lock().unwrap().insert(
+        0x0032,
+        json!([0, {"routingTableEntries": 0, "entryList": []}]),
+    );
+    let zigbee = Zigbee::with_controller(
+        controller,
+        event_bus.clone(),
+        settings.clone(),
+        logger.clone(),
+    );
+    let _ = zigbee.resolve_device("0x0017880104e45519");
+    let _ = zigbee.resolve_device("0x0017880104e45520");
+    let state_path = std::env::temp_dir().join(format!(
+        "z2m-netmap-scan-state-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let state = Arc::new(Mutex::new(State::with_file(
+        settings.clone(),
+        event_bus.clone(),
+        logger.clone(),
+        state_path,
+    )));
+    let mqtt = Arc::new(tokio::sync::Mutex::new(Mqtt::new(event_bus.clone())));
+    let context = ExtensionContext {
+        zigbee,
+        mqtt: mqtt.clone(),
+        state,
+        publish_entity_state: Arc::new(|_e, _p, _r| Box::pin(async {})),
+        event_bus: event_bus.clone(),
+        logger,
+        settings,
+        enable_disable_extension: Arc::new(|_, _| Box::pin(async { Ok(()) })),
+        restart: Arc::new(|| Box::pin(async {})),
+        add_extension: Arc::new(|_| Box::pin(async {})),
+        key: 13,
+    };
+    (context, event_bus, mqtt)
+}
+
+/// Case 5: disabled devices are excluded from the network map scan.
+#[tokio::test]
+async fn disabled_devices_are_excluded_from_the_scan() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
+    let (context, event_bus, mqtt) = scan_harness();
+    let map = NetworkMap::new(context);
+    map.clone().start().await.unwrap();
+
+    event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": "zigbee2mqtt/bridge/request/networkmap",
+        "message": json!({"type": "raw", "routes": true}).to_string(),
+    }));
+
+    let mut response = None;
+    for _ in 0..600 {
+        if let Some((_, payload, _)) = mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .find(|(topic, _, _)| topic == "zigbee2mqtt/bridge/response/networkmap")
+            .cloned()
+        {
+            response = Some(serde_json::from_str::<Value>(&payload).unwrap());
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let response = response.expect("networkmap response");
+    let nodes = response["data"]["value"]["nodes"].as_array().unwrap();
+    assert!(
+        !nodes
+            .iter()
+            .any(|node| node["ieeeAddr"] == "0x0017880104e45519"),
+        "disabled device in the network map: {nodes:?}"
+    );
+    assert!(nodes
+        .iter()
+        .any(|node| node["ieeeAddr"] == "0x0017880104e45520"));
+    map.stop().await.unwrap();
+}
