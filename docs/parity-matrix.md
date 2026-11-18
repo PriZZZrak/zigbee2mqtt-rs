@@ -110,15 +110,21 @@ promise, so the port enqueues and awaits the response without holding the lock.
 Known gaps (not parity claims):
 
 - **OTA** is omitted per the user decision (see the matrix row above).
-- No Node differential fixture/transcript yet for the model layer; evidence is
-  the ported upstream unit cases (device.test.ts) plus frame-level assertions
-  through a recording `FakeAdapter`.
+- Model differential: `tools/oracle/model-transcript.mjs` runs the same
+  Device/Endpoint/Group operations with the pinned herdsman model classes and
+  the Rust example (`model_transcript.rs`) and compares the transcripts
+  (`docs/fixtures/model-transcript.json`); 16 operations match, including
+  duplicate-entity and invalid-group errors and membership ordering.
 - `serde_json::Map` keeps keys sorted, so object-iteration order is normalised
   (array-index keys ascending first, like JavaScript; remaining keys sorted
-  instead of insertion order). Only visible in multi-attribute write/read-rsp
-  payload ordering.
+  instead of insertion order). Decision: ZCL multi-attribute payload keys are
+  attribute IDs (numeric, ordered ascending as upstream) or definition-resolved
+  names, so the observable wire order is deterministic and matches; no caller
+  relies on non-numeric insertion order.
 - Green Power `removeFromNetwork` derives `srcID` from the exact EUI64 integer
-  instead of the JavaScript double.
+  instead of the JavaScript double. Decision: exact u64 is kept (upstream's
+  `Number` loses bits above 2^53 and can overflow the 32-bit writer); GP devices
+  are outside R1 acceptance, and this is a documented, deliberate deviation.
 
 ## Controller orchestration — status and remaining gaps
 

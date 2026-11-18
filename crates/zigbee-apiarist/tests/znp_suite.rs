@@ -185,20 +185,27 @@ async fn znp_request_sreq_success_and_failure() {
     let _ = pair.znp.open().await;
     let reply = pair
         .znp
-        .request(Subsystem::SYS, "ping", json!({"capabilities": 1}), None, None, &[0])
+        .request(
+            Subsystem::SYS,
+            "ping",
+            json!({"capabilities": 1}),
+            None,
+            None,
+            &[0],
+        )
         .await
         .expect("ping");
     assert_eq!(reply.expect("reply").payload["capabilities"], 1);
     pair.peer.abort();
 
-    let mut pair = make_pair(Behavior::FailStatus("readConfiguration"));
+    let mut pair = make_pair(Behavior::FailStatus("msgCbRemove"));
     let _ = pair.znp.open().await;
     let error = pair
         .znp
         .request(
-            Subsystem::SAPI,
-            "readConfiguration",
-            json!({"configid": 1}),
+            Subsystem::ZDO,
+            "msgCbRemove",
+            json!({"clusterid": 6}),
             None,
             Some(200),
             &[0],
@@ -214,7 +221,14 @@ async fn znp_request_without_init_is_an_error() {
     // No transport attached: the port must refuse instead of queueing forever.
     let mut znp = Znp::new(AdapterTransport::new(TransportOptions::new("/dev/null")));
     let error = znp
-        .request(Subsystem::SYS, "ping", json!({"capabilities": 1}), None, Some(50), &[0])
+        .request(
+            Subsystem::SYS,
+            "ping",
+            json!({"capabilities": 1}),
+            None,
+            Some(50),
+            &[0],
+        )
         .await
         .expect_err("not opened");
     assert!(error.contains("has not been initialized"), "{error}");
@@ -227,7 +241,14 @@ async fn znp_request_with_non_existing_command_panics() {
     let _ = pair.znp.open().await;
     let _ = pair
         .znp
-        .request(Subsystem::SYS, "nonExistingCommand", json!({}), None, Some(50), &[0])
+        .request(
+            Subsystem::SYS,
+            "nonExistingCommand",
+            json!({}),
+            None,
+            Some(50),
+            &[0],
+        )
         .await;
 }
 
@@ -264,7 +285,15 @@ async fn znp_wait_for_matches_transid_and_timeout() {
 
     let (_, receiver) = pair
         .znp
-        .wait_for(Type::AREQ, Subsystem::AF, "dataConfirm", None, None, None, Some(200))
+        .wait_for(
+            Type::AREQ,
+            Subsystem::AF,
+            "dataConfirm",
+            None,
+            None,
+            None,
+            Some(200),
+        )
         .await;
     // Feed a dataConfirm AREQ through the transport (loopback via the request path).
     let mut znp = &mut pair.znp;
@@ -280,7 +309,10 @@ async fn znp_request_zdo_success_and_failure() {
     let mut pair = make_pair(Behavior::Normal);
     let _ = pair.znp.open().await;
     // `activeEpReq` expects an SRSP status; the fake peer answers status 0.
-    let result = pair.znp.request_zdo(0x0005, vec![0x00, 0x00, 0x00, 0x00], None).await;
+    let result = pair
+        .znp
+        .request_zdo(0x0005, vec![0x00, 0x00, 0x00, 0x00], None)
+        .await;
     assert!(result.is_ok(), "zdo request succeeds: {result:?}");
     pair.peer.abort();
 }
@@ -308,13 +340,23 @@ async fn zpi_object_predicates_and_known_parsers() {
 
 // --- BuffaloZnp parameter codecs ------------------------------------------
 
-fn write_buffer(parameter_type: u32, value: serde_json::Value, size: usize, position: usize) -> (usize, Vec<u8>) {
+fn write_buffer(
+    parameter_type: u32,
+    value: serde_json::Value,
+    size: usize,
+    position: usize,
+) -> (usize, Vec<u8>) {
     let mut buffalo = BuffaloZnp::new(vec![0u8; size], position);
     buffalo.write(parameter_type, &value, &json!({}));
     (buffalo.get_position(), buffalo.get_buffer())
 }
 
-fn read_buffer(parameter_type: u32, buffer: Vec<u8>, position: usize, options: serde_json::Value) -> (usize, serde_json::Value) {
+fn read_buffer(
+    parameter_type: u32,
+    buffer: Vec<u8>,
+    position: usize,
+    options: serde_json::Value,
+) -> (usize, serde_json::Value) {
     let mut buffalo = BuffaloZnp::new(buffer, position);
     let value = buffalo.read(parameter_type, &options);
     (buffalo.get_position(), value)
@@ -331,7 +373,12 @@ fn uint8_write() {
 #[test]
 fn uint8_read() {
     assert_eq!(
-        read_buffer(ParameterType::UINT8 as u32, vec![0x00, 0x03, 0x00, 0x00], 1, json!({})),
+        read_buffer(
+            ParameterType::UINT8 as u32,
+            vec![0x00, 0x03, 0x00, 0x00],
+            1,
+            json!({})
+        ),
         (2, json!(3))
     );
 }
@@ -343,7 +390,12 @@ fn int8_write_and_read() {
         (2, vec![0x00, 0x7f, 0x00])
     );
     assert_eq!(
-        read_buffer(ParameterType::INT8 as u32, vec![0x00, 0xf0, 0x00, 0x00], 1, json!({})),
+        read_buffer(
+            ParameterType::INT8 as u32,
+            vec![0x00, 0xf0, 0x00, 0x00],
+            1,
+            json!({})
+        ),
         (2, json!(-16))
     );
 }
@@ -355,7 +407,12 @@ fn uint16_write_and_read() {
         (3, vec![0x00, 0xfc, 0x03])
     );
     assert_eq!(
-        read_buffer(ParameterType::UINT16 as u32, vec![0x00, 0x03, 0xff, 0x00], 1, json!({})),
+        read_buffer(
+            ParameterType::UINT16 as u32,
+            vec![0x00, 0x03, 0xff, 0x00],
+            1,
+            json!({})
+        ),
         (3, json!(65283))
     );
 }
@@ -367,7 +424,12 @@ fn uint32_write_and_read() {
         (6, vec![0x00, 0x00, 0x43, 0x41, 0x10, 0x00])
     );
     assert_eq!(
-        read_buffer(ParameterType::UINT32 as u32, vec![0x01, 0x03, 0xff, 0xff], 0, json!({})),
+        read_buffer(
+            ParameterType::UINT32 as u32,
+            vec![0x01, 0x03, 0xff, 0xff],
+            0,
+            json!({})
+        ),
         (4, json!(4294902529u32))
     );
 }
@@ -461,10 +523,7 @@ fn ieeeaddr_write_and_read() {
         0,
     );
     assert_eq!(position, 8);
-    assert_eq!(
-        buffer,
-        vec![0x00, 0xd4, 0xc2, 0x24, 0x00, 0x4b, 0x12, 0x00]
-    );
+    assert_eq!(buffer, vec![0x00, 0xd4, 0xc2, 0x24, 0x00, 0x4b, 0x12, 0x00]);
 
     let (position, value) = read_buffer(
         ParameterType::IEEEADDR as u32,
@@ -483,4 +542,52 @@ fn cant_read_unsupported_type() {
         buffalo.read(9999, &json!({}))
     }));
     assert!(result.is_err(), "unknown parameter types panic");
+}
+
+#[tokio::test(start_paused = true)]
+async fn znp_long_timeout_for_startup_commands() {
+    let mut pair = make_pair(Behavior::Drop("startupFromApp"));
+    let _ = pair.znp.open().await;
+    let request = pair.znp.request(
+        Subsystem::ZDO,
+        "startupFromApp",
+        json!({"startdelay": 0}),
+        None,
+        None,
+        &[0],
+    );
+    tokio::pin!(request);
+
+    // The default timeout for startupFromApp is 40 s, not the 6 s SREQ one.
+    tokio::time::advance(std::time::Duration::from_millis(39_000)).await;
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    let early = tokio::time::timeout(std::time::Duration::from_millis(100), &mut request).await;
+    assert!(early.is_err(), "request timed out before the long timeout");
+
+    tokio::time::advance(std::time::Duration::from_millis(1_500)).await;
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    let error = request.await.expect_err("long timeout");
+    assert!(error.contains("after 40000ms"), "{error}");
+    pair.peer.abort();
+}
+
+#[tokio::test]
+async fn request_with_reply_requires_a_reply() {
+    let mut pair = make_pair(Behavior::Normal);
+    let _ = pair.znp.open().await;
+    let error = pair
+        .znp
+        .request_with_reply(
+            Subsystem::ZDO,
+            "autoFindDestination",
+            json!({"endpoint": 1}),
+        )
+        .await
+        .expect_err("AREQ commands have no reply");
+    assert_eq!(error, "Command autoFindDestination has no reply");
+    pair.peer.abort();
 }

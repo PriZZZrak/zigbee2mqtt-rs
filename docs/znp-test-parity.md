@@ -24,10 +24,10 @@ claimed as passing without a test.
 | 9 | znp request AREQ reset | covered by `differential_znp` (reset/AREQ transcript) |
 | 10 | znp request AREQ | `znp_wait_for_matches_transid_and_timeout` (`dataRequest` AREQ) |
 | 11 | znp request without init | `znp_request_without_init_is_an_error` |
-| 12 | znp request with non-existing subsystem | not ported — `ZpiObject::create_request` panics for a missing subsystem, same as upstream throwing; the command variant is #13 |
+| 12 | znp request with non-existing subsystem | `static` — `Subsystem` is a Rust enum, so an invalid subsystem cannot be constructed; the command variant (#13) panics in `ZpiObject::create_request` and is covered by `znp_request_with_non_existing_command_panics` |
 | 13 | znp request with non-existing cmd | `znp_request_with_non_existing_command_panics` |
 | 14 | znp request timeout | `znp_request_timeout_and_late_response` |
-| 15 | znp request timeout for startupFromApp is longer | not ported — needs a 40 s wait; the `LONG_TIMEOUT` branch is code (`znp.rs`, `startupFromApp`/`bdbStartCommissioning`) |
+| 15 | znp request timeout for startupFromApp is longer | `znp_long_timeout_for_startup_commands` (paused clock: still pending at 39 s, times out with `after 40000ms`) |
 | 16 | znp request, responses comes after timeout | `znp_request_timeout_and_late_response` |
 | 17 | znp request, waitFor | `znp_wait_for_matches_transid_and_timeout` |
 | 18 | znp request ZDO | `znp_request_zdo_success_and_failure` |
@@ -40,7 +40,7 @@ claimed as passing without a test.
 | 25 | znp waitFor with target as IEEE forced to timeout because invalid ZDO status | covered by `differential_znp` |
 | 26 | znp waitFor with state | covered by `differential_znp` |
 | 27 | znp waitFor with payload mismatch | covered by `differential_znp` |
-| 28 | znp requestWithReply should throw error when request as no reply | not ported — needs a command whose definition has no response |
+| 28 | znp requestWithReply should throw error when request as no reply | `request_with_reply_requires_a_reply` (`Command autoFindDestination has no reply`) |
 | 29 | ZpiObject throw error on missing write parser | covered by `differential_zpi_object` (fixture errors) |
 | 30 | ZpiObject throw error on unknown command | `znp_request_with_non_existing_command_panics` |
 | 31 | ZpiObject throw error on unknown parameters | covered by `differential_zpi_object` |

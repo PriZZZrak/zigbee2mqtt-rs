@@ -1,0 +1,213 @@
+{
+  "match": true,
+  "node": [
+    {
+      "op": "create-device",
+      "value": {
+        "type": "Router",
+        "ieeeAddr": "0x0017880104e45519",
+        "networkAddress": 1234,
+        "manufacturerName": "Test",
+        "modelID": "TEST",
+        "interviewState": "SUCCESSFUL"
+      }
+    },
+    {
+      "op": "create-duplicate-device",
+      "error": "Device with IEEE address '0x0017880104e45519' already exists"
+    },
+    {
+      "op": "endpoint1",
+      "value": {
+        "ID": 1,
+        "deviceIeeeAddress": "0x0017880104e45519",
+        "deviceNetworkAddress": 1234,
+        "profileID": null,
+        "deviceID": null,
+        "inputClusters": [],
+        "outputClusters": []
+      }
+    },
+    {
+      "op": "endpoint-count",
+      "value": 2
+    },
+    {
+      "op": "create-duplicate-endpoint",
+      "error": "Device '0x0017880104e45519' already has an endpoint '1'"
+    },
+    {
+      "op": "get-endpoint",
+      "value": 2
+    },
+    {
+      "op": "endpoint-clusters",
+      "value": {
+        "input": [
+          6,
+          8
+        ],
+        "output": [
+          25
+        ]
+      }
+    },
+    {
+      "op": "create-group",
+      "value": {
+        "groupID": 1,
+        "members": 0
+      }
+    },
+    {
+      "op": "create-duplicate-group",
+      "error": "Group with groupID '1' already exists"
+    },
+    {
+      "op": "create-invalid-group-low",
+      "error": "GroupID must be >= 1 and <= 65527"
+    },
+    {
+      "op": "create-invalid-group-high",
+      "error": "GroupID must be >= 1 and <= 65527"
+    },
+    {
+      "op": "group-add-duplicate",
+      "value": [
+        1
+      ]
+    },
+    {
+      "op": "group-members",
+      "value": [
+        [
+          "0x0017880104e45519",
+          1
+        ],
+        [
+          "0x0017880104e45519",
+          2
+        ]
+      ]
+    },
+    {
+      "op": "group-has-member",
+      "value": true
+    },
+    {
+      "op": "group-remove",
+      "value": [
+        2
+      ]
+    },
+    {
+      "op": "group-by-id",
+      "value": 1
+    }
+  ],
+  "rust": [
+    {
+      "op": "create-device",
+      "value": {
+        "type": "Router",
+        "ieeeAddr": "0x0017880104e45519",
+        "networkAddress": 1234,
+        "manufacturerName": "Test",
+        "modelID": "TEST",
+        "interviewState": "SUCCESSFUL"
+      }
+    },
+    {
+      "op": "create-duplicate-device",
+      "error": "Device with IEEE address '0x0017880104e45519' already exists"
+    },
+    {
+      "op": "endpoint1",
+      "value": {
+        "ID": 1,
+        "deviceIeeeAddress": "0x0017880104e45519",
+        "deviceNetworkAddress": 1234,
+        "profileID": null,
+        "deviceID": null,
+        "inputClusters": [],
+        "outputClusters": []
+      }
+    },
+    {
+      "op": "endpoint-count",
+      "value": 2
+    },
+    {
+      "op": "create-duplicate-endpoint",
+      "error": "Device '0x0017880104e45519' already has an endpoint '1'"
+    },
+    {
+      "op": "get-endpoint",
+      "value": 2
+    },
+    {
+      "op": "endpoint-clusters",
+      "value": {
+        "input": [
+          6,
+          8
+        ],
+        "output": [
+          25
+        ]
+      }
+    },
+    {
+      "op": "create-group",
+      "value": {
+        "groupID": 1,
+        "members": 0
+      }
+    },
+    {
+      "op": "create-duplicate-group",
+      "error": "Group with groupID '1' already exists"
+    },
+    {
+      "op": "create-invalid-group-low",
+      "error": "GroupID must be >= 1 and <= 65527"
+    },
+    {
+      "op": "create-invalid-group-high",
+      "error": "GroupID must be >= 1 and <= 65527"
+    },
+    {
+      "op": "group-add-duplicate",
+      "value": [
+        1
+      ]
+    },
+    {
+      "op": "group-members",
+      "value": [
+        [
+          "0x0017880104e45519",
+          1
+        ],
+        [
+          "0x0017880104e45519",
+          2
+        ]
+      ]
+    },
+    {
+      "op": "group-has-member",
+      "value": true
+    },
+    {
+      "op": "group-remove",
+      "value": [
+        2
+      ]
+    },
+    {
+      "op": "group-by-id",
+      "value": 1
+    }
+  ]
+}

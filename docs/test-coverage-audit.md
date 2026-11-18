@@ -450,27 +450,51 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 
 ### CP-08 — Модели, discovery и остаточные ZNP-пробелы · P1
 
-- [ ] Добавить Node differential/state transcript для Device/Endpoint/Group,
-  включая ошибки, изменение registry/DB и порядок событий.
-- [ ] Проверить документированные отклонения порядка multi-attribute payload
-  и Green Power EUI64/srcID; разрешить вопросы совместимости.
+- [x] Добавить Node differential/state transcript для Device/Endpoint/Group,
+  включая ошибки, изменение registry/DB и порядок событий. →
+  `tools/oracle/model-transcript.mjs` + `examples/model_transcript.rs`,
+  16 операций (create/get/duplicate device, endpoints, clusters, group
+  create/add/remove/has, invalid IDs) — transcripts match,
+  `docs/fixtures/model-transcript.json`.
+- [x] Проверить документированные отклонения порядка multi-attribute payload
+  и Green Power EUI64/srcID; разрешить вопросы совместимости. → решение
+  записано в `docs/parity-matrix.md`: multi-attribute порядок числовых
+  attribute-ID совпадает с upstream (ascending), нечисловые ключи
+  definition-resolved; GP `srcID` оставлен exact u64 (upstream `Number`
+  теряет биты >2^53), GP вне R1-приёмки — осознанное отклонение.
 - [x] Разобрать **12 непортированных discovery-сценариев**: mDNS timeout/
   invalid path/wrong format, TCP missing adapter, USB conflict/no-match
   fallbacks and limited port info — `tests/adapter_base_suite.rs` (18 tests,
   `Adapter::create_with_context`).
-- [ ] В ZNP закрыть missing subsystem, long-timeout branch, request без reply
-  и bootloader-проверки на подходящем уровне.
+- [x] В ZNP закрыть missing subsystem, long-timeout branch, request без reply
+  и bootloader-проверки на подходящем уровне. → missing subsystem
+  невыразим (Rust enum, static), long-timeout
+  `znp_long_timeout_for_startup_commands` (paused clock, 40 s), request без
+  reply `request_with_reply_requires_a_reply`, bootloader — HIL
+  `docs/hil/2026-11-16-rust-port-startup.md` (reset + 0xEF magic).
 - [x] Проверить Buffalo/ZpiObject differential: расширены `buffalo_znp`
   fixtures (BUFFER16/18/32/42/100 read+write, short-buffer reads with Node
   range errors); `Buffalo::read_exact` теперь воспроизводит Node-ошибку
   позиции, `read_slice` — upstream-семантику `readBuffer` (значение
   обрезается, позиция сдвигается). ZpiObject negative case остаётся
   (см. «Остаток»).
-- [ ] Сохранить полный per-case map для 130 заявленных Z-Stack тестов.
+- [x] Сохранить полный per-case map для 130 заявленных Z-Stack тестов. →
+  `docs/zstack-adapter-test-parity.md` (130 строк) + `docs/znp-test-parity.md`
+  и `docs/adapter-test-parity.md`; `tools/docs/check-parity-maps.mjs`
+  проверяет суммы и upstream-счётчики.
 
 **Закрытие:** каждый R1 gap имеет тест и необходимый oracle; каждый
 неприменимый случай имеет точное обоснование scope. Пинг/обычный resume
 не выдаётся за проверку всех DTR/RTS bootloader-переходов.
+
+```text
+Статус: CLOSED
+Модели: model transcript 16 ops match (Node herdsman vs Rust)
+Discovery: 12/12 строк (adapter_base_suite 18 tests)
+ZNP: missing subsystem static, long timeout + no reply tests, bootloader HIL
+Buffalo: BUFFER16/18/32/42/100 width + short-buffer negative fixtures (31)
+Карты: zstack-adapter-test-parity 130, znp-test-parity, adapter-test-parity
+```
 
 ### CP-09 — Frontend и пять `static`-строк · P1
 
