@@ -20,21 +20,22 @@ upstream-сценариев нельзя использовать как про�
 
 ## Статус выполнения плана (2026-11-18)
 
-Повторная проверка `9229287`: R1 остаётся на доработке. Этот список задаёт
-текущий статус; отметки `CLOSED` и протоколы в §4 отражают предыдущее закрытие.
+Повторная проверка `9229287` (2026-11-18) выявила семь задач; все они закрыты
+на ревизии `6dbbd7c` и подтверждены новым HIL/гейтами (см. ниже). Отметки
+`CLOSED` и протоколы в §4 обновлены по этим доказательствам.
 
-- [ ] **CP-01** — достоверность карт и статусов (OPEN)
-- [ ] **CP-02** — MQTT reconnect, retained и ошибки доставки (OPEN)
-- [ ] **CP-03** — ошибки сохранения и ответы API (OPEN)
-- [ ] **CP-04** — crash, respawn и reboot recovery (OPEN)
-- [ ] **CP-05** — lifecycle контроллера и отмена startup (OPEN)
-- [ ] **CP-06** — расширения: сверка построчных доказательств (OPEN)
+- [x] **CP-01** — достоверность карт и статусов (CLOSED)
+- [x] **CP-02** — MQTT reconnect, retained и ошибки доставки (CLOSED)
+- [x] **CP-03** — ошибки сохранения и ответы API (CLOSED)
+- [x] **CP-04** — crash, respawn и reboot recovery (CLOSED)
+- [x] **CP-05** — lifecycle контроллера и отмена startup (CLOSED)
+- [x] **CP-06** — расширения: сверка построчных доказательств (CLOSED)
 - [x] **CP-07** — 52/52 adapter-сценария (CLOSED)
 - [x] **CP-08** — модели, discovery и остаточные ZNP-пробелы (CLOSED)
 - [x] **CP-09** — frontend и пять `static`-строк (CLOSED)
 - [x] **CP-10** — fuzz/property, malformed input и границы (CLOSED)
-- [ ] **CP-11** — покрытие и воспроизводимые gates (OPEN)
-- [ ] **CP-12** — итоговая R1-приёмка на Routerich AX3000 + Dongle-P (BLOCKED до закрытия открытых CP)
+- [x] **CP-11** — покрытие и воспроизводимые gates (CLOSED)
+- [x] **CP-12** — итоговая R1-приёмка на Routerich AX3000 + Dongle-P (CLOSED)
 
 ### Задачи после повторной проверки `9229287`
 
@@ -71,6 +72,17 @@ upstream-сценариев нельзя использовать как про�
    данных на Routerich AX3000 + Dongle-P: проверить сохранность состояния из CP-04 и отклик MQTT/Windfront
    во время interview и записи. Записать commit, хеш бинарника, команды и результаты до/после.
    Возвращать `CLOSED` только после сверки этих доказательств и закрытия предыдущих пунктов.
+
+**Итог (2026-11-18/19):** все семь задач выполнены. CP-02: `mqtt-transcript.mjs`
+совпадает с Node, включая retained offline QoS0. CP-03: ошибка blocklist
+возвращается через `device/remove`, устройство остаётся в БД. CP-04: причина
+сброса `state.json` найдена, исправлена и проверена на непустом кэше
+(`docs/hil/2026-11-18-cp12-repeat.md`). CP-05: отмена при живом MQTT и трёх
+расширениях, закрытие соединения/listeners/таймера, повторный старт. CP-01/06:
+checker считает классы построчно, генератор карты идемпотентен, lifecycle
+21-31 размечен. CP-11: stable+branch coverage и все гейты на `6dbbd7c`.
+CP-12: повторный HIL (interview 29.4 с при health ~1.05 с, две записи конфига
+при health ~1.06 с, state сохранён через `kill -9`/respawn/stop).
 
 Нормативные документы:
 
@@ -232,8 +244,12 @@ zigbee2mqtt **2.14.3 / `3c841fdf`**, Windfront **2.15.1**.
   доказательства (`crates/z2m-rs/tests/frontend.rs`).
 - [x] Проверять суммы и существование ссылок/имён тестов при регенерации карт.
   → `tools/docs/check-parity-maps.mjs`: upstream `it`-counts, Rust-символы и
-  stem-модули, пути `docs|tests|crates`, per-file суммы классов (598/15) и
-  ссылки из `parity-matrix.md`.
+  stem-модули, пути `docs|tests|crates`, **построчный пересчёт классов каждого
+  файла против строки Summary** (598/15, падает при расхождении; проверено
+  искусственным `asserted=32` против 31 строки) и ссылки из
+  `parity-matrix.md`. `tools/oracle/map-extension-cases.mjs` сохраняет
+  курированные классы/evidence при регенерации: повторный прогон на текущей
+  карте байт-в-байт совпадает (`diff` пуст).
 
 **Закрытие:** каждая строка имеет непротиворечивый статус и проверяемое
 доказательство; обычный startup smoke не используется как доказательство
@@ -246,14 +262,17 @@ abort/reconnect; несовпадения устранены без механи
   / 130 Rust, extension-test-cases.md 598 случаев в 15 файлах
 Проверки: parity-matrix status vocabulary; zstack-adapter-test-parity.md
   (124 строки, все Rust-имена существуют); z2m-controller-test-parity.md
-  (325 строк, 320 PORTED / 5 PENDING с причиной)
+  (90 it: 24 named tests, 49 covered by a named suite, 17 coordinator-only/N/A
+  with the reason and HIL/test pointer)
 Доказательства: tools/docs/check-parity-maps.mjs -> "OK: 11 maps checked,
   0 errors, 2 warnings"; extension-test-cases.md -> 15 files, 598 cases
+  (asserted 416 / converter-db 91 / omitted 91; code 0, slice 0, adapter 0)
 Прогон: node tools/docs/check-parity-maps.mjs (commit после этого блока),
   окружение: Node 24.22.2 (локальный toolchain)
 Карты: parity-matrix (vocabulary + 3 строки), adapter-test-parity,
   zstack-adapter-test-parity (новая), z2m-controller-test-parity,
-  extension-test-cases (frontend static -> asserted: asserted 192/426)
+  extension-test-cases (598 rows: asserted 416 / converter-db 91 / omitted 91;
+  code 0, slice 0, adapter 0)
 Остаток: нет; новые несовпадения ловит скрипт (exit != 0).
 ```
 
@@ -270,7 +289,7 @@ abort/reconnect; несовпадения устранены без механи
 - [x] Проверить применимость MQTT v5 DISCONNECT и message expiry к текущему
   v4-клиенту; явно оформить ограничения совместимости. → в порте `rumqttc` собран без v5; `message_expiry_interval` отслеживается, но не отправляется (ограничение зафиксировано в `parity-matrix.md`, строка MQTT).
 - [x] Сохранить Node-vs-Rust broker transcript для применимых сценариев:
-  topic, payload, QoS, retain, порядок и ошибки. → `tools/oracle/mqtt-transcript.mjs` запускает один и тот же сценарий Rust-клиентом и upstream `dist/mqtt.js`, пишет `docs/fixtures/mqtt-transcript.json`; broker-side записи совпадают (state online, subscribe, retained republish, plain publish). Отличие: upstream фиксирует `bridge/state offline` (qos0) при остановке, наш клиент в этом прогоне его не отдал — см. «Остаток».
+  topic, payload, QoS, retain, порядок и ошибки. → `tools/oracle/mqtt-transcript.mjs` запускает один и тот же сценарий Rust-клиентом и upstream `dist/mqtt.js`, пишет `docs/fixtures/mqtt-transcript.json`; broker-side записи совпадают (state online, subscribe, retained republish, plain publish, retained `bridge/state {"state":"offline"}` с QoS 0 при остановке).
 
 **Закрытие:** воспроизводимый прогон управляет локальным broker, гарантированно
 завершается по timeout и проверяет результат после восстановления. Зелёного
@@ -278,7 +297,7 @@ connect/publish smoke недостаточно. Broker-тесты запуска
 а не остаются только незапускаемыми по умолчанию `ignored`.
 
 ```text
-Статус: CLOSED (транскрипт сохранён; отличие offline-публикации задокументировано)
+Статус: CLOSED
 Сценарии: zigbee2mqtt 2.14.3/3c841fdf lib/mqtt.ts onConnect (:177-206), publish (:225-249);
   z2m controller.test.ts cases 77-81
 Проверки: crates/z2m-rs/tests/mqtt_reconnect.rs (7 tests, in-process broker)
@@ -286,7 +305,11 @@ connect/publish smoke недостаточно. Broker-тесты запуска
   2 s republish with bridge/info cancel
 Прогон: cargo test -p z2m-rs --test mqtt_reconnect -> 7 passed (commit ниже)
 Карты: z2m-controller-test-parity rows 77-81 -> mqtt_reconnect tests
-Остаток: `bridge/state offline` при disconnect не наблюдается в broker-транскрипте (qos0, retain); upstream публикует его. Зафиксировано как известное отличие, требует flush-механизма rumqttc (bounded wait недостаточен).
+Остаток: нет. `Mqtt::disconnect` публикует offline qos0 retain и ждёт
+  ограниченные 250 ms до/после DISCONNECT, чтобы rumqttc успел отдать пакет;
+  `node tools/oracle/mqtt-transcript.mjs` -> "OK: rust and upstream broker
+  traffic match". Отключение остаётся ограниченным по времени (не более
+  500 ms сверх обычного teardown).
 ```
 
 ### CP-03 — Ошибки сохранения и ответы API · P0
@@ -297,6 +320,12 @@ connect/publish smoke недостаточно. Broker-тесты запуска
   с root, где один `chmod` может не запретить запись. → целевой файл заменяется каталогом (`EISDIR`), работает под root: `crates/z2m-rs/tests/persistence_errors.rs`.
 - [x] Проверить `/submit`, options, rename, remove/blocklist и group mutations
   при ошибке сохранения; сопоставить ответы и изменения памяти с upstream. → 6 тестов: `/submit` 406 `{success:false}`; `apply`/rename/remove/blocklist/group возвращают ошибку с путём файла; память изменена до записи (как upstream).
+- [x] Вернуть ошибку записи blocklist через bridge API, а не только через
+  `Settings::write`. → `extension/bridge.rs` пробрасывает ошибку
+  `block_device()` в ответ `device/remove`; `remove_device_reports_blocklist_write_failure`
+  проверяет `status:"error"`, исходную транзакцию, текст ошибки и то, что
+  устройство осталось в БД; контрольный `remove_device_blocks_and_keeps_configuration`
+  проверяет успешную запись blocklist.
 - [x] Проверить обычную и split devices/groups конфигурацию. → `split_devices_write_failure_leaves_the_configuration_file_intact` (ошибка в `devices.yaml`, `configuration.yaml` байт-в-байт прежний).
 - [x] Проверить сохранность предыдущих файлов и последующее чтение после отказа. → `a_failed_write_does_not_replace_the_previous_file` (файл-каталог не удаляется, исходное содержимое восстанавливается и читается).
 
@@ -314,7 +343,8 @@ upstream возвращает ошибку; состояние и ответы �
 Доказательства: ошибки содержат путь файла; /submit -> {success:false,error};
   split-конфиг сохраняет configuration.yaml нетронутым
 Прогон: cargo test -p z2m-rs --test persistence_errors -> 6 passed;
-  settings 67 / onboarding 19 / bridge 21 без регрессий (commit ниже)
+  cargo test -p z2m-rs --test bridge remove_device_ -> 8 passed (blocklist
+  failure + success); settings 67 / onboarding 19 без регрессий (commit ниже)
 Карты: onboarding-test-parity case 19 -> ported; parity-matrix storage row
 Остаток: нет
 ```
@@ -328,6 +358,15 @@ upstream возвращает ошибку; состояние и ответы �
 - [x] Проверить восстановление после reboot роутера с packaged service. → `docs/hil/2026-11-17-packaged-service.md`: procd `S99zigbee2mqtt-rs`, HTTP 200, `bridge/state` online, 3 устройства, configuration.yaml SHA256 прежний.
 - [x] Проверить parseability, подтверждённые изменения, отсутствие потери
   устройств, настроек, blocklist и состояния согласно контракту persistence. → database 4 записи parseable, state 3 ключа, rename сохранён; blocklist-персистентность покрыта `persistence_errors`/HIL приёмочным прогоном.
+- [x] Установить причину сброса `state.json` в финальном HIL и закрыть её
+  регрессионным тестом. → `Controller::stop` передавал resolver в
+  `State::stop` даже при неудачном старте, когда `zh_controller()` ещё нет, и
+  вычищал кэш; теперь resolver передаётся только при наличии контроллера
+  (`state.ts:51-61`), добавлен `failed_startup_keeps_the_state_cache`.
+- [x] Проверить непустой `state.json` на копии данных: до старта, после
+  остановки, `kill -9`/respawn. → `docs/hil/2026-11-18-cp12-repeat.md`:
+  1849 байт / 3 ключа, SHA256 `a8b6c73e…` не меняется через 5-минутный save,
+  `kill -9`, respawn и graceful stop (раньше после stop было `{}`).
 - [x] Проверить coordinator resume без изменения идентичности сети и
   восстановление MQTT/WebSocket после запуска. → `Started with result 'Resumed'` дважды; сеть не менялась (backup/panID те же); WS replay/QoS покрыты `mqtt_reconnect` и `frontend` тестами.
 
@@ -340,8 +379,10 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 Сценарии: AGENTS §4 storage/restart; HIL protocol 2026-11-17
 Проверки: hash до/после, parseability, resume, respawn; atomic writes
   (yaml/state temp+rename)
-Доказательства: docs/hil/2026-11-17-crash-recovery.md (лог и SHA256)
-Прогон: HIL-скрипт /tmp/crash_recovery.sh, commit 0c4f0d7 + atomic-write коммит
+Доказательства: docs/hil/2026-11-17-crash-recovery.md (лог и SHA256);
+  docs/hil/2026-11-18-cp12-repeat.md (непустой state: save/kill -9/respawn/stop)
+Прогон: HIL-скрипт /tmp/crash_recovery.sh, commit 0c4f0d7 + atomic-write коммит;
+  повторный CP-12 HIL на commit 6dbbd7c, binary SHA256 e1c83404…
 Карты: parity-matrix storage/HIL rows
 Остаток: нет. Пакеты установлены из фида (после исправления формата ipk на tar-контейнер), сервис стартует после reboot (procd), данные сохранены: docs/hil/2026-11-17-packaged-service.md.
 ```
@@ -350,14 +391,16 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 
 - [x] Разобрать все **30 `not ported`** строк z2m Controller: тест, действительное
   аппаратное ограничение или согласованное исключение. → 6 строк закрыты новыми тестами (`controller_startup`, `mqtt_reconnect`), остальные разобраны в `docs/z2m-controller-test-parity.md`: startup/abort/reconnect требуют координатора или broker-таймингов; помечены конкретные ограничения.
-- [x] Закрыть **11 startup-abort** сценариев: drop future на любой фазе
-  отменяет один и тот же `start()`; тест
-  `aborting_start_during_the_coordinator_phase_skips_extensions` проверяет
-  наблюдаемый cleanup (0 расширений, MQTT не подключён), а фазы state start /
-  resolve definitions / MQTT connect / extension start / entity publish / ZH
-  passlist-blocklist идут после того же await-барьера и не имеют отдельного
-  cleanup-контракта (проверено по коду `controller.rs:492-651`; seam
-  `Zigbee::test_start` позволяет выбирать фазу координатора).
+- [x] Закрыть **11 startup-abort** сценариев (rows 21-31 карты lifecycle):
+  каждая строка сопоставлена фазе и проверяемому эффекту.
+  `aborting_start_during_the_coordinator_phase_skips_extensions` покрывает
+  state-start/zigbee-start/ZH start; `aborting_during_a_slow_mqtt_connect_returns_ok_and_tears_down`
+  — MQTT connect; `aborting_with_active_mqtt_stops_runtime_and_restarts_cleanly`
+  — extension start (пауза после 3 расширений, живой MQTT). Проверены
+  закрытие соединения (broker active=0), снятие всех EventBus listeners,
+  остановка save-таймера и успешный повторный старт (10 расширений). Entity
+  publish и ZH passlist/blocklist остаются coordinator-only (HIL), причина
+  записана в `z2m-controller-test-parity.md`.
 - [x] Проверить startup errors (+), passlist/blocklist filtering и добавление
   отсутствующих в settings сущностей из database: startup errors покрыты
   `start_fails_when_zigbee_start_fails`, `mqtt_connect_failure_returns_error_and_stops_zigbee`,
@@ -383,18 +426,19 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 
 ```text
 Статус: CLOSED
-Сценарии: z2m controller.test.ts 325 rows; abort matrix (11); EventBus cases 87-88
-Проверки: controller_startup (6 tests: zigbee failure, early stop, abort during
-  coordinator phase, MQTT failure + zigbee stop, extension stop error, EventBus
-  panic isolation);
-  EventBus::emit now catches panics per handler; Mqtt::connect waits for CONNACK
-  (bounded 5 s) and fails like upstream
-Доказательства: cargo test -p z2m-rs --test controller_startup -> 5 passed;
+Сценарии: z2m controller.test.ts 90 it; abort matrix 21-31; EventBus 87-88
+Проверки: controller_startup (11 tests: startup errors, abort during coordinator /
+  MQTT connect / extension start with live MQTT, stop teardown, restart,
+  failed-start state cache, EventBus panic isolation, extension stop error);
+  EventBus::emit catches panics per handler; Mqtt::connect waits for CONNACK
+  (bounded 5 s) and an aborted connect returns Ok like upstream; stop removes
+  the controller's own EventBus listener
+Доказательства: cargo test -p z2m-rs --test controller_startup -> 11 passed;
   mqtt_reconnect 7 passed; bridge/frontend/groups/publish/receive/health no regressions
-Прогон: commit ниже, Node 24.22.2, локальный toolchain
-Карты: z2m-controller-test-parity rows 1-4/8-9/14-37-42/87-88 review; CP-05 boxes
-Остаток: нет; фазы abort покрыты единым future + проверкой cleanup, adapter
-  disconnect — transport-сьютом
+Прогон: commit 6dbbd7c, Node 24.22.2, локальный stable toolchain
+Карты: z2m-controller-test-parity rows 21-31 -> tests/HIL; CP-05 boxes
+Остаток: entity-publish abort and ZH passlist/blocklist interruption are
+  coordinator-only (HIL, CP-12); documented in the lifecycle map
 ```
 
 ### CP-06 — Расширения: 114 `code` и 68 `slice` · P1
@@ -445,15 +489,17 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 ```text
 Статус: CLOSED
 Карта: docs/extension-test-cases.md — 598 строк: asserted 416, adapter 0,
-  converter-db 91, omitted 91; code 0, slice 0 (проверено
-  tools/docs/check-parity-maps.mjs)
+  converter-db 91, omitted 91; code 0, slice 0 (построчно пересчитано
+  tools/docs/check-parity-maps.mjs; Configure #5 -> asserted,
+  Publish #55/#61 -> converter-db/Q4)
 Проверки: configure 18, availability 28, groups 22 + groups_publish 14, bridge
   39, homeassistant 60, publish 15, receive 18, bind 4, frontend 11, health 4,
-  network_map 5, on_event 2, controller_startup 8
+  network_map 5, on_event 2, controller_startup 11
 Доказательства: assertions на upstream payload/state transitions; отдельного
   differential-транскрипта для extension-уровня не требуется — карта
   ссылается на upstream case + Rust test
-Остаток: adapter (43) — CP-07; converter-db (91) — R1 Q4; omitted (91) — Q5
+Остаток: adapter 0 (строки закрыты MockAdapter-тестами CP-07);
+  converter-db (91) — R1 Q4; omitted (91) — Q5
 ```
 
 ### CP-07 — 52 adapter-сценария и аппаратные доказательства · P1
@@ -620,12 +666,16 @@ Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
 ### CP-11 — Измерение покрытия и воспроизводимые gates · P1
 
 - [x] Получить отчёт покрытия строк/функций/ветвей с перечнем crates и
-  исключений. → `docs/coverage.md`; `tools/coverage.sh` →
-  `target/coverage/summary.txt` + `lcov.info`: regions 72.96%, functions
-  74.23% (2552/3438), lines 72.73% (25502/35066); crates `zigbee-apiarist`,
+  исключений. → `docs/coverage.md`; stable `tools/coverage.sh` →
+  `target/coverage/summary.txt` + `lcov.info`: regions 73.17%, functions
+  74.75% (2573/3442), lines 72.94% (25628/35134); crates `zigbee-apiarist`,
   `zigbee-converters`, `z2m-rs`; tests/examples/registry/HIL excluded.
+  Ветви: nightly `-Zcoverage-options=branch` → `target/coverage-branch/`:
+  branches 73.11% (3470/4746), при lines 71.76% и functions 74.10%
+  (`rustc 1.102.0-nightly`).
 - [x] Указать toolchain, инструмент, commit, команды и ignored tests. →
-  `rustc 1.99.1 (58cf8f9c3)`, rustup llvm-tools, commit `a4023a5`; 19 ignored
+  stable `rustc 1.99.1 (58cf8f9c3)`, rustup llvm-tools, commit `6dbbd7c`;
+  nightly `rustc 1.102.0-nightly (59cbdee2e)` для ветвей; 19 ignored
   (12 HIL ZNP, 1 real broker, 6 stub markers).
 - [x] Список непокрытых критических ветвей. → таблица в `docs/coverage.md`
   (transport, runtime_adapter, controller/model, mqtt reconnect, touchlink/GP)
@@ -645,13 +695,24 @@ Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
 
 ```text
 Статус: CLOSED
-Отчёт: target/coverage/summary.txt + lcov.info (воспроизводится tools/coverage.sh)
-Метрики: regions 72.96%, functions 74.23%, lines 72.73%
+Отчёт: target/coverage/summary.txt + lcov.info (stable),
+  target/coverage-branch/summary.txt + lcov.info (nightly branch)
+Метрики stable: regions 73.17%, functions 74.75% (2573/3442),
+  lines 72.94% (25628/35134)
+Метрики branch (nightly): branches 73.11% (3470/4746), lines 71.76%,
+  functions 74.10% (2586/3490)
 Crates: zigbee-apiarist, zigbee-converters, z2m-rs
-Toolchain/commit: rustc 1.99.1, commit a4023a5
+Toolchain/commit: rustc 1.99.1 stable + 1.102.0-nightly, commit 6dbbd7c
 Ignored: 19 (12 HIL, 1 real broker, 6 stub markers)
-Gates: workspace tests, map checker, Node oracle/transcripts, broker reconnect,
-  fuzz offline+live; HIL отдельно
+Gates: workspace tests, clippy, map checker, Node oracle/transcripts, broker
+  reconnect, fuzz offline+live; HIL отдельно
+Прогон (6dbbd7c): cargo test --workspace -> 78 suites, 1568 passed, 0 failed,
+  12 ignored; cargo clippy --workspace --all-targets -> exit 0 (warnings only);
+  cargo fmt --all -- --check -> 134 pre-existing files (all changed files clean);
+  map checker -> OK 11 maps, 0 errors; model transcript -> 16/16 match; MQTT
+  transcript -> match incl. offline qos0; fuzz_boundaries -> 3 passed
+Ограничение: branch regions доступны только на nightly; stable gate остаётся
+  основным, nightly-прогон добавляет метрику ветвей и не требуется для сборки
 ```
 
 ### CP-12 — Итоговая R1-приёмка · P1
@@ -659,9 +720,12 @@ Gates: workspace tests, map checker, Node oracle/transcripts, broker reconnect,
 - [x] Сопоставить каждое требование AGENTS §9 с конкретным тестом/протоколом.
   → таблица в `docs/hil/2026-11-18-final-r1-acceptance.md`.
 - [x] Подтвердить MQTT/Windfront responsiveness во время startup, interview,
-  networkmap и persistence на целевом роутере. → startup 2010 ms, health
-  1020 ms, permit_join 1250 ms, networkmap 4300 ms при health 1020 ms во время
-  networkmap; Windfront root/asset/SPA 200; interview уже был завершён.
+  networkmap и persistence на целевом роутере. → первый прогон: startup
+  2010 ms, health 1020 ms, permit_join 1250 ms, networkmap 4300 ms при health
+  1020 ms во время networkmap; Windfront root/asset/SPA 200. Повторный прогон
+  (`docs/hil/2026-11-18-cp12-repeat.md`) выполнил interview 29 350 ms при
+  health 1051 ms и HTTP 200/3.2 ms, а также две записи `configuration.yaml`
+  при health 1060 ms и HTTP 200/24-30 ms.
 - [x] Зафиксировать время ответа, timeout и результат операций; задержки
   broker/coordinator/storage. → все операции с `-W`-границами; метрики и
   верхние границы в HIL-документе; state cache reset и database rewrite
@@ -670,13 +734,18 @@ Gates: workspace tests, map checker, Node oracle/transcripts, broker reconnect,
   8 bridge discovery topics со sw=0.1.0, `bridge/devices` = Coordinator +
   3 устройства; cleanup asserted в HA-тестах; per-device discovery вне R1.
 - [x] Подтвердить state/config/database recovery по CP-04. → CP-04 HIL
-  kill -9/respawn и packaged reboot; в CP-12 config hash идентичен, database
-  семантически цел (Node открыл те же 3 устройства); state.json — кэш,
-  сброшен в `{}` и задокументирован.
+  kill -9/respawn и packaged reboot. В первом CP-12 прогоне state.json был
+  сброшен в `{}`; причина найдена и исправлена (`Controller::stop` больше не
+  чистит кэш без herdsman controller), повторный прогон на непустом state
+  сохранил 1849 байт / 3 ключа / SHA256 `a8b6c73e…` через 5-минутный save,
+  `kill -9`, respawn и graceful stop. Config hash идентичен, database
+  семантически цел (Node открыл те же 3 устройства).
 - [x] Записать полный SHA256, commit, прошивку, команды, конфигурацию и
   артефакты без секретов. → Routerich AX3000 v1 / OpenWrt 24.10.8 / Dongle-P
-  Z-Stack3x0 20250321; commit f1e9cf78; SHA256
-  `4146b5dce0a35e6c3c5319d0809962e288f6154d9faa33059b531ec3cc8756d6`.
+  Z-Stack3x0 20250321; первый прогон commit f1e9cf78 / SHA256
+  `4146b5dce0a35e6c3c5319d0809962e288f6154d9faa33059b531ec3cc8756d6`;
+  повторный прогон commit 6dbbd7c / SHA256
+  `e1c834046ad86d40645546c684e06d6f9ff5f792152a1218ba95613cfceaca3c`.
 - [x] Сверить итоговые карты и перечислить исключения/ограничения. → карты
   проверены `check-parity-maps`; ограничения R1 перечислены в HIL-документе
   (нет converter DB, per-device HA discovery, OTA/scenes, CC2531).
@@ -691,13 +760,17 @@ Gates: workspace tests, map checker, Node oracle/transcripts, broker reconnect,
 CP-01–CP-11: CLOSED
 HIL: 2026-11-18 Routerich AX3000 v1 / OpenWrt 24.10.8 / Dongle-P Z-Stack3x0
   20250321; commit f1e9cf78; SHA256 4146b5dc…8756d6
+  repeat: commit 6dbbd7c; SHA256 e1c83404…caca3c
 Startup/permit/networkmap/health: 2010/1250/4300/1020 ms (bounded)
+Interview/write responsiveness (repeat): interview 29 350 ms at health 1051 ms /
+  HTTP 3.2 ms; rename writes at health 1060 ms / HTTP 24-30 ms
 Windfront: root 200 5.3 ms, asset 200 4.0 ms, SPA 200, /api 404
 HA: 8 bridge discovery topics, bridge/devices = 3 devices + Coordinator
-Storage: config hash identical; database semantically intact; state.json cache
-  reset documented
-Software gate: workspace tests + maps + Node transcripts + fuzz + coverage
-  (docs/coverage.md)
+Storage: non-empty state.json preserved through save/kill -9/respawn/stop;
+  config semantics unchanged (YAML indentation normalized by the writer);
+  database semantically intact
+Software gate: workspace tests + maps + Node transcripts + fuzz + stable
+  line/function coverage + nightly branch coverage (docs/coverage.md)
 Ограничения: R1 core only; no converter DB/per-device HA discovery/OTA/CC2531
 ```
 

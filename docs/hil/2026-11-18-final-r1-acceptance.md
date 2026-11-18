@@ -95,7 +95,12 @@ database.db        rewritten by the Rust port (7442 bytes); Node reopened it and
 state.json         44136fa3… (`{}`, 2 bytes)
 ```
 
-`configuration.yaml` is byte-identical. `database.db` is semantically intact
+`configuration.yaml` is byte-identical. **Follow-up:** the `state.json` reset
+was traced to `Controller::stop` pruning the cache without a herdsman
+controller and fixed; the repeat run with a non-empty state file
+([2026-11-18-cp12-repeat.md](2026-11-18-cp12-repeat.md)) keeps the same 3 keys
+and SHA256 through save, `kill -9`, respawn and graceful stop.
+`database.db` is semantically intact
 (Node listed `Термостат кухня`, `Датчик температуры`,
 `Термостат спальная/детская`, plus Coordinator; all interviewed). The Rust port
 rewrote the database in its NDJSON layout, so the hash differs from Node's
