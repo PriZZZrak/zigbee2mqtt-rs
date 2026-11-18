@@ -18,6 +18,21 @@ upstream-сценариев нельзя использовать как про�
 Наличие реализации, зелёный upstream-прогон и число Rust-тестов сами по себе
 не доказывают эквивалентность поведения.
 
+## Статус выполнения плана (2026-11-18)
+
+- [x] **CP-01** — достоверность карт и статусов (CLOSED)
+- [x] **CP-02** — MQTT reconnect, retained и ошибки доставки (CLOSED)
+- [x] **CP-03** — ошибки сохранения и ответы API (CLOSED)
+- [x] **CP-04** — crash, respawn и reboot recovery (CLOSED)
+- [x] **CP-05** — lifecycle контроллера и отмена startup (CLOSED)
+- [x] **CP-06** — расширения: 0 `code` / 0 `slice` (CLOSED)
+- [x] **CP-07** — 52/52 adapter-сценария (CLOSED)
+- [x] **CP-08** — модели, discovery и остаточные ZNP-пробелы (CLOSED)
+- [x] **CP-09** — frontend и пять `static`-строк (CLOSED)
+- [x] **CP-10** — fuzz/property, malformed input и границы (CLOSED)
+- [x] **CP-11** — покрытие и воспроизводимые gates (CLOSED)
+- [x] **CP-12** — итоговая R1-приёмка на Routerich AX3000 + Dongle-P (CLOSED)
+
 Нормативные документы:
 
 - [AGENTS.md](../AGENTS.md): границы R1, ограничения и аппаратная приёмка;
