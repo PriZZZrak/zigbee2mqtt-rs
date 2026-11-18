@@ -35,6 +35,9 @@ pub struct Bridge {
     restart_required: AtomicBool,
     last_joined_device_ieee_addr: Mutex<Option<String>>,
     last_bridge_logging_payload: Mutex<Option<String>>,
+    /// Test hook: replaces the coordinator interview (audit CP-07).
+    #[doc(hidden)]
+    pub test_reinterview: Mutex<Option<Result<(), String>>>,
 }
 
 impl Bridge {
@@ -56,6 +59,7 @@ impl Bridge {
             restart_required: AtomicBool::new(false),
             last_joined_device_ieee_addr: Mutex::new(None),
             last_bridge_logging_payload: Mutex::new(None),
+            test_reinterview: Mutex::new(None),
         })
     }
 
@@ -503,7 +507,12 @@ impl Bridge {
             .zigbee
             .resolve_device(&device.entity_id().key())
             .ok_or_else(|| format!("Device '{}' does not exist", id))?;
-        device.re_interview(self.context.event_bus.clone()).await?;
+        let test_reinterview = self.test_reinterview.lock().unwrap().clone();
+        if let Some(result) = test_reinterview {
+            result?;
+        } else {
+            device.re_interview(self.context.event_bus.clone()).await?;
+        }
         Ok(utils::get_response(
             message,
             json!({"id": message["id"]}),

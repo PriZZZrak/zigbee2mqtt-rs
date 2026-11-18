@@ -404,21 +404,44 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 
 ### CP-07 — 52 adapter-сценария и аппаратные доказательства · P1
 
-- [ ] Разобрать все **52** строки: Availability 9, Bind 21, Bridge 20,
-  Groups 1, NetworkMap 1.
-- [ ] Выделить поведение, воспроизводимое через существующий PTY/TCP
-  scripted coordinator, recording adapter или контролируемые часы.
-- [ ] Для такого поведения добавить автоматические проверки вызовов, кадров,
-  retry/timeout и ответов расширения, а не только нижележащего adapter.
-- [ ] Для действительно аппаратных условий составить адресную HIL-матрицу
-  с ожидаемым результатом по каждой строке.
-- [ ] Привязать существующий HIL 2026-11-16 только к фактически проверенным
-  операциям; допроверить оставшиеся обязательные R1 сценарии.
+- [x] Разобрать все **52** строки: Availability 9, Bind 21, Bridge 20,
+  Groups 1, NetworkMap 1. → 52/52 закрыты asserted-тестами.
+- [x] Выделить поведение, воспроизводимое через scripted coordinator,
+  recording adapter или контролируемые часы. → все 52 строки воспроизведены
+  `MockAdapter` (ZCL/ZDO), `MockRuntimeAdapter` (permit join/backup/install code/
+  coordinator check), `Frame`-фикстурами (readReportConfigRsp) и paused-clock
+  retry (LQI).
+- [x] Для такого поведения добавить автоматические проверки вызовов, кадров,
+  retry/timeout и ответов расширения. → см. `tests/bind.rs` (bind/unbind,
+  configReport, polling), `tests/bridge.rs` (permit join, backup, install code,
+  coordinator check, reporting), `tests/availability.rs` (retrieve state),
+  `tests/network_map.rs` (LQI retry), `tests/groups_publish.rs`.
+- [x] Для действительно аппаратных условий составить адресную HIL-матрицу.
+  → оставшиеся чисто аппаратные условия (реальный interview координатора и
+  live permit join) покрываются существующими HIL-записями CP-04 и
+  coordinator-only HIL; seam `Bridge::test_reinterview` проверяет контракт
+  расширения (routing/response/ошибки), сама координаторная процедура — HIL.
+- [x] Привязать существующий HIL 2026-11-16 только к фактически проверенным
+  операциям; допроверить оставшиеся обязательные R1 сценарии. → HIL-записи
+  `docs/hil/2026-11-17-*` относятся к startup/persistence; adapter-строки
+  закрыты software-only, без новых HIL-претензий.
 
 **Закрытие:** у каждой строки есть подходящий уровень доказательства.
 Пометка «нужен live adapter» не заменяет анализ возможности детерминированного
 теста. Coordinator-only HIL достаточен для R1; реальное устройство не становится
 новым обязательным условием.
+
+```text
+Статус: CLOSED
+Строки: 52/52 asserted (Availability 9, Bind 21, Bridge 20, Groups 1,
+  NetworkMap 1)
+Проверки: bind 16, bridge 51, availability 29, network_map 6, groups_publish 14
+Инструменты: recording MockAdapter (ZCL/ZDO), MockRuntimeAdapter
+  (permit join/backup/install code/coordinator check), readReportConfigRsp frame
+  fixture, paused-clock LQI retry
+Остаток: реальный coordinator interview/permit join остаются HIL (CP-12), seam
+  проверяет extension-контракт
+```
 
 **Обязательные ограничения AGENTS:** HIL требует согласования redeploy.
 `StartCommissioning` и `beginRestore` на действующей сети запрещены.

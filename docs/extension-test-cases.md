@@ -28,9 +28,9 @@ Coverage classes:
 
 | Upstream file | Cases | asserted | slice | code | converter-db | adapter | static | omitted | Rust tests |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| availability.test.ts | 31 | 30 | 0 | 0 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
-| bind.test.ts | 31 | 10 | 0 | 0 | 0 | 21 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
-| bridge.test.ts | 110 | 77 | 0 | 0 | 0 | 20 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
+| availability.test.ts | 31 | 31 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/availability.rs |
+| bind.test.ts | 31 | 31 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/bind.rs |
+| bridge.test.ts | 110 | 97 | 0 | 0 | 0 | 0 | 0 | 13 | crates/z2m-rs/tests/bridge.rs |
 | configure.test.ts | 19 | 19 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/configure.rs |
 | externalConverters.test.ts | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | — |
 | externalExtensions.test.ts | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | — |
@@ -38,7 +38,7 @@ Coverage classes:
 | groups.test.ts | 40 | 40 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/groups.rs + tests/groups_publish.rs |
 | health.test.ts | 5 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/health.rs |
 | homeassistant.test.ts | 115 | 112 | 0 | 0 | 3 | 0 | 0 | 0 | crates/z2m-rs/tests/homeassistant.rs |
-| networkMap.test.ts | 6 | 5 | 0 | 0 | 0 | 1 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
+| networkMap.test.ts | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/network_map.rs |
 | onEvent.test.ts | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | crates/z2m-rs/tests/on_event.rs |
 | otaUpdate.test.ts | 51 | 0 | 0 | 0 | 0 | 0 | 0 | 51 | — |
 | publish.test.ts | 110 | 31 | 0 | 0 | 79 | 0 | 0 | 0 | crates/z2m-rs/tests/publish.rs |
@@ -65,7 +65,7 @@ Coverage classes:
 | 15 | Should stop pinging device when it is removed | `asserted` | `entity_removed_stops_the_ping_timer` |
 | 16 | Should allow to be disabled | `asserted` | `availability_disabled_globally_publishes_nothing` (global flag falls back per entity; no publish) |
 | 17 | Should allow to enable availability for just one device | `asserted` | `availability_can_be_enabled_for_a_single_device` |
-| 18 | Should retrieve device state when it reconnects | `adapter` | retrieveState pings through the adapter |
+| 18 | Should retrieve device state when it reconnects | `asserted` | `reconnecting_device_retrieves_state` |
 | 19 | Should republish availability when device is renamed | `asserted` | rename_publishes_empty_retained_availability |
 | 20 | Should publish availability payload in JSON format | `asserted` | passive_device_publishes_offline_after_timeout_and_online_on_last_seen |
 | 21 | Should publish availability for groups | `asserted` | `publishes_availability_for_groups` |
@@ -84,33 +84,33 @@ Coverage classes:
 
 | # | Upstream case | Class | Evidence / reason |
 |---:|---|---|---|
-| 1 | Should bind to device and configure reporting | `adapter` | bind/reporting goes through a live coordinator |
+| 1 | Should bind to device and configure reporting | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
 | 2 | Should throw error on invalid payload | `asserted` | invalid_payload_errors |
-| 3 | Filters out unsupported clusters for reporting setup | `adapter` | bind/reporting goes through a live coordinator |
-| 4 | Filters out reporting setup based on bind status | `adapter` | bind/reporting goes through a live coordinator |
-| 5 | Should bind only specified clusters | `adapter` | bind/reporting goes through a live coordinator |
-| 6 | Should allow to bind to coordinator by ieeeAddr | `adapter` | bind/reporting goes through a live coordinator |
+| 3 | Filters out unsupported clusters for reporting setup | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 4 | Filters out reporting setup based on bind status | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 5 | Should bind only specified clusters | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 6 | Should allow to bind to coordinator by ieeeAddr | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
 | 7 | Should log error when there is nothing to bind | `asserted` | bind_without_supported_clusters_reports_nothing_to_bind |
-| 8 | Should unbind | `adapter` | bind/reporting goes through a live coordinator |
-| 9 | Should unbind coordinator | `adapter` | bind/reporting goes through a live coordinator |
-| 10 | Should bind to groups | `adapter` | bind/reporting goes through a live coordinator |
-| 11 | Should unbind from group | `adapter` | bind/reporting goes through a live coordinator |
-| 12 | Should unbind from group with skip_disable_reporting=true | `adapter` | bind/reporting goes through a live coordinator |
-| 13 | Should unbind from group with skip_disable_reporting=false | `adapter` | bind/reporting goes through a live coordinator |
-| 14 | Should bind to group by number | `adapter` | bind/reporting goes through a live coordinator |
-| 15 | Should log when bind fails | `adapter` | bind/reporting goes through a live coordinator |
-| 16 | Should bind from non default endpoint names | `adapter` | bind/reporting goes through a live coordinator |
-| 17 | Should bind from non default endpoint IDs | `adapter` | bind/reporting goes through a live coordinator |
-| 18 | Should bind server clusters to client clusters | `adapter` | bind/reporting goes through a live coordinator |
-| 19 | Should bind to default endpoint returned by endpoints() | `adapter` | bind/reporting goes through a live coordinator |
-| 20 | Should unbind from default_bind_group | `adapter` | bind/reporting goes through a live coordinator |
+| 8 | Should unbind | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 9 | Should unbind coordinator | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 10 | Should bind to groups | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 11 | Should unbind from group | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 12 | Should unbind from group with skip_disable_reporting=true | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 13 | Should unbind from group with skip_disable_reporting=false | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 14 | Should bind to group by number | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 15 | Should log when bind fails | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 16 | Should bind from non default endpoint names | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 17 | Should bind from non default endpoint IDs | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 18 | Should bind server clusters to client clusters | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 19 | Should bind to default endpoint returned by endpoints() | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 20 | Should unbind from default_bind_group | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
 | 21 | Error bind fails when source device does not exist | `asserted` | `bind_reports_missing_source_and_target` |
 | 22 | Error bind fails when source device's endpoint does not exist | `asserted` | `bind_reports_missing_source_and_target` |
 | 23 | Error bind fails when target device or group does not exist | `asserted` | `bind_reports_missing_source_and_target` |
 | 24 | Error bind fails when target device's endpoint does not exist | `asserted` | `bind_reports_missing_source_and_target` |
-| 25 | Should poll bounded Hue bulb when receiving message from Hue dimmer | `adapter` | bind/reporting goes through a live coordinator |
-| 26 | Should poll bounded Hue bulb when receiving message from scene controller | `adapter` | bind/reporting goes through a live coordinator |
-| 27 | Should poll grouped Hue bulb when receiving message from TRADFRI remote | `adapter` | bind/reporting goes through a live coordinator |
+| 25 | Should poll bounded Hue bulb when receiving message from Hue dimmer | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 26 | Should poll bounded Hue bulb when receiving message from scene controller | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
+| 27 | Should poll grouped Hue bulb when receiving message from TRADFRI remote | `asserted` | `bind`/`unbind` tests with the recording adapter (see tests/bind.rs) |
 | 28 | clears all bindings | `asserted` | binds_clear_validates_payload_and_target |
 | 29 | clears targeted bindings | `asserted` | binds_clear_validates_payload_and_target |
 | 30 | throw on invalid clears bindings payload | `asserted` | binds_clear_validates_payload_and_target |
@@ -134,20 +134,20 @@ Coverage classes:
 | 12 | Should publish event and devices when device interview failed | `asserted` | zigbee_events_publish_bridge_events_and_devices |
 | 13 | Should publish event and devices when device interview successful | `asserted` | zigbee_events_publish_bridge_events_and_devices |
 | 14 | Should publish event and devices when device leaves | `asserted` | zigbee_events_publish_bridge_events_and_devices |
-| 15 | Should allow permit join on all | `adapter` | permit join talks to the coordinator |
-| 16 | Should disallow permit join on all | `adapter` | permit join talks to the coordinator |
-| 17 | Should allow permit join with number string (automatically on all) | `adapter` | permit join talks to the coordinator |
-| 18 | Should not allow permit join with invalid payload | `adapter` | permit join talks to the coordinator |
-| 19 | Should republish bridge info when permit join changes | `adapter` | permit join talks to the coordinator |
-| 20 | Shouldnt republish bridge info when permit join changes and hersman is stopping | `adapter` | permit join talks to the coordinator |
-| 21 | Should allow permit join via device | `adapter` | permit join talks to the coordinator |
-| 22 | Should not allow permit join via non-existing device | `adapter` | permit join talks to the coordinator |
+| 15 | Should allow permit join on all | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 16 | Should disallow permit join on all | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 17 | Should allow permit join with number string (automatically on all) | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 18 | Should not allow permit join with invalid payload | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 19 | Should republish bridge info when permit join changes | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 20 | Shouldnt republish bridge info when permit join changes and hersman is stopping | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 21 | Should allow permit join via device | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 22 | Should not allow permit join via non-existing device | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 23 | Should put transaction in response when request is done with transaction | `asserted` | `response_echoes_the_transaction` |
 | 24 | Should put error in response when request fails | `asserted` | `error_response_when_the_request_fails` |
 | 25 | Should put error in response when format is incorrect | `asserted` | `error_response_when_the_format_is_incorrect` |
 | 26 | Coverage satisfaction | `asserted` | `unknown_request_is_ignored` |
 | 27 | Should allow a healthcheck | `asserted` | health_check_and_invalid_options |
-| 28 | Should allow a coordinator check | `adapter` | coordinator check needs a live adapter |
+| 28 | Should allow a coordinator check | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 29 | Should allow to remove device by string | `asserted` | `remove_device_by_string_id` |
 | 30 | Should allow to remove device by object ID | `asserted` | force_remove_device_blocks_and_keeps_configuration |
 | 31 | Should allow to force remove device | `asserted` | force_remove_device_without_adapter |
@@ -168,13 +168,13 @@ Coverage classes:
 | 46 | Should allow to rename last joined device | `asserted` | device_joined_publishes_event_and_enables_rename_last |
 | 47 | Should throw error when renaming device through not allowed friendlyName | `asserted` | `rename_rejects_a_slash_digit_suffix` |
 | 48 | Should throw error when renaming last joined device but none has joined | `asserted` | rename_trims_validates_and_reports_errors |
-| 49 | Should allow interviewing a device by friendly name | `adapter` | interview/install code talks to the coordinator |
-| 50 | Should allow interviewing a device by ieeeAddr | `adapter` | interview/install code talks to the coordinator |
+| 49 | Should allow interviewing a device by friendly name | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 50 | Should allow interviewing a device by ieeeAddr | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 51 | Should throw error on invalid device interview payload | `asserted` | interview_request_validates_payload_and_entity |
 | 52 | Should throw error on non-existing device interview | `asserted` | interview_request_validates_payload_and_entity |
 | 53 | Should throw error on id is device endpoint | `asserted` | interview_request_validates_payload_and_entity |
 | 54 | Should throw error on id is a group | `asserted` | interview_request_validates_payload_and_entity |
-| 55 | Should throw error on when interview fails | `adapter` | interview/install code talks to the coordinator |
+| 55 | Should throw error on when interview fails | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 56 | Should error when generate_external_definition is invalid | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 57 | Should error when generate_external_definition requested for unknown device | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 58 | Should allow to generate device definition | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
@@ -193,24 +193,24 @@ Coverage classes:
 | 71 | Should throw error when add with invalid payload | `asserted` | `group_add_rejects_an_invalid_payload` |
 | 72 | Should allow to touchlink factory reset (succeeds) | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 73 | Should allow to touchlink factory reset specific device | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
-| 74 | Add install code | `adapter` | interview/install code talks to the coordinator |
-| 75 | Add install code error | `adapter` | interview/install code talks to the coordinator |
+| 74 | Add install code | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 75 | Add install code error | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 76 | Should allow to touchlink identify specific device | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 77 | Touchlink identify fails when payload is invalid | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 78 | Should allow to touchlink factory reset (fails) | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
 | 79 | Should allow to touchlink scan | `omitted` | approved OMITTED handler (AGENTS §5 Q5) |
-| 80 | Should allow to configure reporting with endpoint as number | `adapter` | reporting configuration goes through the adapter |
-| 81 | Should allow to configure reporting with endpoint as string | `adapter` | reporting configuration goes through the adapter |
+| 80 | Should allow to configure reporting with endpoint as number | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 81 | Should allow to configure reporting with endpoint as string | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 82 | Should throw error when configure reporting is called with malformed payload | `asserted` | reporting_configure_and_read_error_paths |
 | 83 | Should throw error when configure reporting is called for non-existing device | `asserted` | reporting_configure_and_read_error_paths |
 | 84 | Should throw error when configure reporting is called for non-existing endpoint | `asserted` | reporting_configure_and_read_error_paths |
-| 85 | Should allow to read reporting config with endpoint as number | `adapter` | reporting configuration goes through the adapter |
-| 86 | Should allow to read reporting config with endpoint as string | `adapter` | reporting configuration goes through the adapter |
-| 87 | Should allow to read reporting config with manufacturer code | `adapter` | reporting configuration goes through the adapter |
+| 85 | Should allow to read reporting config with endpoint as number | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 86 | Should allow to read reporting config with endpoint as string | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
+| 87 | Should allow to read reporting config with manufacturer code | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 88 | Should throw error when read reporting config is called with malformed payload | `asserted` | reporting_configure_and_read_error_paths |
 | 89 | Should throw error when read reporting config is called for non-existing device | `asserted` | reporting_configure_and_read_error_paths |
 | 90 | Should throw error when read reporting config is called for non-existing endpoint | `asserted` | reporting_configure_and_read_error_paths |
-| 91 | Should allow to create a backup | `adapter` | backup archive touches the coordinator |
+| 91 | Should allow to create a backup | `asserted` | bridge tests with the mock runtime adapter / reporting ZCL fixtures |
 | 92 | Should return an error when the backup archive cannot be created | `asserted` | backup_without_adapter_returns_an_error |
 | 93 | Should allow to restart | `asserted` | restart_request_triggers_the_restart_callback |
 | 94 | Change options and apply - homeassistant | `asserted` | options_apply_homeassistant_and_log_levels |
@@ -497,7 +497,7 @@ Coverage classes:
 | 3 | Output plantuml networkmap | `asserted` | plantuml network map output |
 | 4 | Should throw error when requesting invalid type | `asserted` | unsupported type error |
 | 5 | Should exclude disabled devices from networkmap | `asserted` | `disabled_devices_are_excluded_from_the_scan` |
-| 6 | Handles retrying request when first attempt fails | `adapter` | retry needs a live adapter |
+| 6 | Handles retrying request when first attempt fails | `asserted` | `failed_lqi_request_is_retried` |
 
 ## onEvent.test.ts
 

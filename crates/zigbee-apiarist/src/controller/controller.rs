@@ -1061,6 +1061,24 @@ impl Controller {
             .ok_or_else(|| "Network parameters unavailable".to_string())
     }
 
+    /// Test/diagnostics hook: inject the runtime adapter (doc-hidden).
+    #[doc(hidden)]
+    pub fn inject_test_adapter(self: &Arc<Self>, adapter: Arc<dyn ControllerRuntimeAdapter>) {
+        let _ = self.adapter.set(adapter);
+    }
+
+    /// Test/diagnostics hook: inject the database (doc-hidden).
+    #[doc(hidden)]
+    pub fn inject_test_database(self: &Arc<Self>, database: Arc<Mutex<Database>>) {
+        let _ = self.database.set(database);
+    }
+
+    /// Test/diagnostics hook: toggle the stopping flag (doc-hidden).
+    #[doc(hidden)]
+    pub fn set_stopping_for_test(&self, value: bool) {
+        self.stopping.store(value, std::sync::atomic::Ordering::SeqCst);
+    }
+
     /// Upstream `getDevices()` — controller.ts:529.
     pub fn get_devices(&self) -> Vec<Arc<Device>> {
         Device::all()

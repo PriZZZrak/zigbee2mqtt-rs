@@ -50,7 +50,7 @@ fn harness() -> Harness {
     inject_database(Arc::new(Mutex::new(Database::open(&database_path))));
     ZhDevice::reset_cache();
     ZhGroup::reset_cache();
-    ZhDevice::create(
+    let coordinator = ZhDevice::create(
         DeviceType::Coordinator,
         "0x00124b0024c16b95",
         0,
@@ -62,6 +62,7 @@ fn harness() -> Harness {
         None,
     )
     .unwrap();
+    coordinator.create_endpoint(1).unwrap();
     let device = ZhDevice::create(
         DeviceType::Router,
         IEEE,
@@ -89,7 +90,7 @@ fn harness() -> Harness {
             transport: json!({}),
             database_path: database_path.display().to_string(),
             database_backup_path: None,
-            backup_path: None,
+            backup_path: Some(temp("backup.json").display().to_string()),
             adapter: json!({}),
             accept_joining_device_handler: None,
         })
@@ -1171,6 +1172,10 @@ async fn remove_device_can_clear_the_entity_cache() {
 #[path = "support/mock_adapter.rs"]
 mod mock_adapter;
 use mock_adapter::MockAdapter;
+
+#[path = "support/mock_runtime_adapter.rs"]
+mod mock_runtime_adapter;
+use mock_runtime_adapter::MockRuntimeAdapter;
 use zigbee_converters::Definition;
 
 fn inject_adapter() -> Arc<MockAdapter> {
@@ -1700,5 +1705,382 @@ async fn consecutive_options_keep_restart_required() {
         harness.context.settings.lock().unwrap().get()["health"]["reset_on_check"],
         false
     );
+    bridge.stop().await.unwrap();
+}
+
+fn reporting_frame_count(adapter: &Arc<MockAdapter>, name: &str) -> usize {
+    adapter
+        .endpoint_frames
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|frame| frame.command.name.eq_ignore_ascii_case(name))
+        .count()
+}
+
+/// Cases 80-81: reporting configuration accepts the endpoint as number or string.
+#[tokio::test]
+async fn reporting_configure_accepts_number_and_string_endpoints() {
+    for endpoint in [json!(1), json!("1")] {
+        let _guard = serial();
+        let harness = harness();
+        let adapter = inject_adapter();
+        *adapter.zdo_response.lock().unwrap() = json!([0]);
+        let bridge = Bridge::new(harness.context.clone());
+        bridge.clone().start().await.unwrap();
+
+        send(
+            &harness,
+            "device/reporting/configure",
+            json!({
+                "id": "lamp",
+                "endpoint": endpoint,
+                "cluster": "genOnOff",
+                "attribute": "onOff",
+                "minimum_report_interval": 1,
+                "maximum_report_interval": 10,
+                "reportable_change": 0,
+            }),
+        )
+        .await;
+        let payload = response(&harness, "device/reporting/configure").await;
+        assert_eq!(payload["status"], "ok", "{endpoint}: {payload}");
+        assert!(
+            reporting_frame_count(&adapter, "configReport") >= 1,
+            "{endpoint}: no configReport frame"
+        );
+        bridge.stop().await.unwrap();
+    }
+}
+
+fn inject_runtime(harness: &Harness) -> Arc<MockRuntimeAdapter> {
+    let adapter = MockRuntimeAdapter::new();
+    harness
+        .context
+        .zigbee
+        .zh_controller()
+        .expect("controller")
+        .inject_test_adapter(adapter.clone());
+    adapter
+}
+
+/// Cases 15-18: permit join all, off, number string and invalid payload.
+#[tokio::test]
+async fn permit_join_all_variants() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_runtime(&harness);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "permit_join", json!({"time": 254})).await;
+    let payload = response(&harness, "permit_join").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["time"], 254);
+    assert_eq!(
+        adapter.permit_joins.lock().unwrap().as_slice(),
+        &[(254, None)]
+    );
+
+    send(&harness, "permit_join", json!({"time": 0})).await;
+    let payload = response(&harness, "permit_join").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(
+        adapter.permit_joins.lock().unwrap().last(),
+        Some(&(0, None))
+    );
+
+    send(&harness, "permit_join", json!({"time": "254"})).await;
+    let payload = response(&harness, "permit_join").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(
+        adapter.permit_joins.lock().unwrap().last(),
+        Some(&(254, None))
+    );
+
+    send(&harness, "permit_join", json!({"time": "invalid"})).await;
+    let payload = response(&harness, "permit_join").await;
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Invalid payload");
+    bridge.stop().await.unwrap();
+}
+
+/// Cases 21-22: permit join via a device and an unknown device.
+#[tokio::test]
+async fn permit_join_via_device() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_runtime(&harness);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(
+        &harness,
+        "permit_join",
+        json!({"time": 60, "device": "lamp"}),
+    )
+    .await;
+    let payload = response(&harness, "permit_join").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["device"], "lamp");
+    assert_eq!(
+        adapter.permit_joins.lock().unwrap().last(),
+        Some(&(60, Some(1234)))
+    );
+
+    send(
+        &harness,
+        "permit_join",
+        json!({"time": 60, "device": "missing"}),
+    )
+    .await;
+    let payload = response(&harness, "permit_join").await;
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Device 'missing' does not exist");
+    bridge.stop().await.unwrap();
+}
+
+/// Case 19: bridge info is republished when permit join changes.
+#[tokio::test]
+async fn permit_join_changed_republishes_bridge_info() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_permit_join_changed(json!({"state": true, "permit_join_end": 1}));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, options)| topic == "zigbee2mqtt/bridge/info" && options.retain));
+    bridge.stop().await.unwrap();
+}
+
+/// Case 20: no republish while zigbee-herdsman is stopping.
+#[tokio::test]
+async fn permit_join_changed_skips_stopping_controller() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+    harness
+        .context
+        .zigbee
+        .zh_controller()
+        .expect("controller")
+        .set_stopping_for_test(true);
+    harness.mqtt.lock().await.attempted.clear();
+
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_permit_join_changed(json!({"state": true}));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(!harness
+        .mqtt
+        .lock()
+        .await
+        .attempted
+        .iter()
+        .any(|(topic, _, _)| topic == "zigbee2mqtt/bridge/info"));
+    harness
+        .context
+        .zigbee
+        .zh_controller()
+        .expect("controller")
+        .set_stopping_for_test(false);
+    bridge.stop().await.unwrap();
+}
+
+/// Case 28: coordinator check reports routers missing from the backup.
+#[tokio::test]
+async fn coordinator_check_reports_missing_routers() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_runtime(&harness);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "coordinator_check", Value::String(String::new())).await;
+    let payload = response(&harness, "coordinator_check").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    let missing = payload["data"]["missing_routers"].as_array().unwrap();
+    assert!(
+        missing.iter().any(|device| device["ieee_address"] == IEEE),
+        "{payload}"
+    );
+    assert_eq!(*adapter.backup_calls.lock().unwrap(), 1);
+    bridge.stop().await.unwrap();
+}
+
+/// Case 91: backup delegates to the adapter and returns a zip.
+#[tokio::test]
+async fn backup_returns_a_zip() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_runtime(&harness);
+    harness
+        .context
+        .zigbee
+        .zh_controller()
+        .expect("controller")
+        .inject_test_database(Arc::new(Mutex::new(
+            zigbee_apiarist::controller::database::Database::open(&harness.database_path),
+        )));
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "backup", Value::String(String::new())).await;
+    let payload = response(&harness, "backup").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert!(
+        payload["data"]["zip"]
+            .as_str()
+            .is_some_and(|zip| !zip.is_empty()),
+        "{payload}"
+    );
+    assert_eq!(*adapter.backup_calls.lock().unwrap(), 1);
+    bridge.stop().await.unwrap();
+}
+
+/// Case 75: install code add rejects an invalid payload.
+#[tokio::test]
+async fn install_code_invalid_payload() {
+    let _guard = serial();
+    let harness = harness();
+    inject_runtime(&harness);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "install_code/add", json!({"wrong": "my-code"})).await;
+    let payload = response(&harness, "install_code/add").await;
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "Invalid payload");
+    bridge.stop().await.unwrap();
+}
+
+/// Case 74: a valid install code is forwarded to the adapter.
+#[tokio::test]
+async fn install_code_is_forwarded() {
+    let _guard = serial();
+    let harness = harness();
+    let adapter = inject_runtime(&harness);
+    let bridge = Bridge::new(harness.context.clone());
+    bridge.clone().start().await.unwrap();
+
+    let code = "Z:0011223344556677$I:00112233445566778899AABBCCDDEEFF";
+    send(&harness, "install_code/add", json!({"value": code})).await;
+    let payload = response(&harness, "install_code/add").await;
+    assert_eq!(payload["status"], "ok", "{payload}");
+    assert_eq!(payload["data"]["value"], code);
+    assert!(adapter.install_codes.lock().unwrap().len() >= 1);
+    bridge.stop().await.unwrap();
+}
+
+/// Cases 85-87: reporting read accepts number/string endpoints and a
+/// manufacturer code and returns the parsed configuration.
+#[tokio::test]
+async fn reporting_read_accepts_endpoints_and_manufacturer_code() {
+    use zigbee_apiarist::adapter::events::ZclPayload;
+    use zigbee_apiarist::zspec::zcl::zcl_header::{Direction, FrameControl, FrameType, Header};
+
+    for (endpoint, manufacturer) in [
+        (json!(1), Value::Null),
+        (json!("1"), Value::Null),
+        (json!("1"), json!(4476)),
+    ] {
+        let _guard = serial();
+        let harness = harness();
+        let adapter = inject_adapter();
+        // readReportConfigRsp: status 0, direction 0, attrId 0, uint8,
+        // min 1, max 3600, change 0
+        *adapter.zcl_response.lock().unwrap() = Some(ZclPayload {
+            cluster_id: 6,
+            data: vec![0x00, 0x00, 0x00, 0x00, 0x20, 0x01, 0x00, 0x10, 0x0e, 0x00],
+            header: Some(Header::new(
+                FrameControl {
+                    reserved_bits: 0,
+                    frame_type: FrameType::GLOBAL,
+                    direction: Direction::SERVER_TO_CLIENT,
+                    disable_default_response: true,
+                    manufacturer_specific: false,
+                },
+                None,
+                1,
+                9,
+            )),
+            address: json!({}),
+            endpoint: 1,
+            destination_endpoint: 1,
+            linkquality: 100,
+            group_id: 0,
+            was_broadcast: false,
+        });
+        let bridge = Bridge::new(harness.context.clone());
+        bridge.clone().start().await.unwrap();
+        let mut message = json!({
+            "id": "lamp",
+            "endpoint": endpoint,
+            "cluster": "genOnOff",
+            "configs": [{"attribute": "onOff"}],
+        });
+        if !manufacturer.is_null() {
+            message["manufacturer_code"] = manufacturer.clone();
+        }
+
+        send(&harness, "device/reporting/read", message).await;
+        let payload = response(&harness, "device/reporting/read").await;
+        assert_eq!(
+            payload["status"], "ok",
+            "endpoint={endpoint} manufacturer={manufacturer}: {payload}"
+        );
+        assert_eq!(reporting_frame_count(&adapter, "readReportConfig"), 1);
+        bridge.stop().await.unwrap();
+    }
+}
+
+/// Cases 49-50: interview by friendly name and IEEE address.
+#[tokio::test]
+async fn interview_by_name_and_ieee() {
+    for id in [json!("lamp"), json!(IEEE)] {
+        let _guard = serial();
+        let harness = harness();
+        let bridge = Bridge::new(harness.context.clone());
+        *bridge.test_reinterview.lock().unwrap() = Some(Ok(()));
+        bridge.clone().start().await.unwrap();
+
+        send(&harness, "device/interview", json!({"id": id})).await;
+        let payload = response(&harness, "device/interview").await;
+        assert_eq!(payload["status"], "ok", "{id}: {payload}");
+        assert_eq!(payload["data"]["id"], id);
+        bridge.stop().await.unwrap();
+    }
+}
+
+/// Case 55: a failing interview is reported.
+#[tokio::test]
+async fn interview_failure_is_reported() {
+    let _guard = serial();
+    let harness = harness();
+    let bridge = Bridge::new(harness.context.clone());
+    *bridge.test_reinterview.lock().unwrap() = Some(Err("interview failed".to_string()));
+    bridge.clone().start().await.unwrap();
+
+    send(&harness, "device/interview", json!({"id": "lamp"})).await;
+    let payload = response(&harness, "device/interview").await;
+    assert_eq!(payload["status"], "error", "{payload}");
+    assert_eq!(payload["error"], "interview failed");
     bridge.stop().await.unwrap();
 }

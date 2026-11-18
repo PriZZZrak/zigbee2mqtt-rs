@@ -217,7 +217,9 @@ fn mqqtt_payload(mqtt: &Mqtt) -> String {
         .unwrap()
 }
 
-fn scan_harness() -> (
+fn scan_harness(
+    fail_lqi_once: bool,
+) -> (
     ExtensionContext,
     Arc<Mutex<EventBus>>,
     Arc<tokio::sync::Mutex<Mqtt>>,
@@ -352,7 +354,7 @@ fn scan_harness() -> (
 #[tokio::test]
 async fn disabled_devices_are_excluded_from_the_scan() {
     let _guard = zigbee_apiarist::controller::model::test_support::serial();
-    let (context, event_bus, mqtt) = scan_harness();
+    let (context, event_bus, mqtt) = scan_harness(false);
     let map = NetworkMap::new(context);
     map.clone().start().await.unwrap();
 
@@ -384,6 +386,46 @@ async fn disabled_devices_are_excluded_from_the_scan() {
             .any(|node| node["ieeeAddr"] == "0x0017880104e45519"),
         "disabled device in the network map: {nodes:?}"
     );
+    assert!(nodes
+        .iter()
+        .any(|node| node["ieeeAddr"] == "0x0017880104e45520"));
+    map.stop().await.unwrap();
+}
+
+/// Case 6: a failed LQI request is retried and the scan still succeeds.
+#[tokio::test(start_paused = true)]
+async fn failed_lqi_request_is_retried() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
+    let (context, event_bus, mqtt) = scan_harness(true);
+    let map = NetworkMap::new(context);
+    map.clone().start().await.unwrap();
+
+    event_bus.lock().unwrap().emit_mqtt_message(json!({
+        "topic": "zigbee2mqtt/bridge/request/networkmap",
+        "message": json!({"type": "raw", "routes": true}).to_string(),
+    }));
+
+    let mut response = None;
+    for _ in 0..40 {
+        tokio::time::advance(Duration::from_secs(1)).await;
+        for _ in 0..50 {
+            tokio::task::yield_now().await;
+        }
+        if let Some((_, payload, _)) = mqtt
+            .lock()
+            .await
+            .attempted
+            .iter()
+            .find(|(topic, _, _)| topic == "zigbee2mqtt/bridge/response/networkmap")
+            .cloned()
+        {
+            response = Some(serde_json::from_str::<Value>(&payload).unwrap());
+            break;
+        }
+    }
+    let response = response.expect("networkmap response after the retry");
+    assert_eq!(response["status"], "ok", "{response}");
+    let nodes = response["data"]["value"]["nodes"].as_array().unwrap();
     assert!(nodes
         .iter()
         .any(|node| node["ieeeAddr"] == "0x0017880104e45520"));

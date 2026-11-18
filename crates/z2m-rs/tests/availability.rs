@@ -1058,3 +1058,71 @@ async fn default_passive_timeout_is_25_hours() {
     );
     availability.stop().await.unwrap();
 }
+
+/// Case 18: reconnecting devices retrieve their state through the converter.
+#[tokio::test(start_paused = true)]
+async fn reconnecting_device_retrieves_state() {
+    let _guard = serial();
+    let harness = harness(true, json!(null));
+    let retrieved = Arc::new(Mutex::new(0usize));
+    let counter = retrieved.clone();
+    let mut definition = zigbee_converters::Definition::new("TEST", "Acme", "Test")
+        .with_zigbee_model("TEST")
+        .with_exposes(vec![zigbee_converters::Expose::binary(
+            "state",
+            zigbee_converters::access::ALL,
+        )]);
+    definition
+        .to_zigbee
+        .push(zigbee_converters::ToZigbeeConverter {
+            key: vec!["state".to_string()],
+            endpoints: None,
+            convert_set: None,
+            convert_get: Some(Arc::new(move |_target, _key, _value, meta| {
+                let counter = counter.clone();
+                Box::pin(async move {
+                    if let Some(endpoint) = meta
+                        .device
+                        .as_ref()
+                        .and_then(|device| device.endpoints().first().cloned())
+                    {
+                        let _ = endpoint
+                            .read(
+                                serde_json::json!("genOnOff"),
+                                serde_json::json!(["onOff"]),
+                                None,
+                            )
+                            .await;
+                    }
+                    *counter.lock().unwrap() += 1;
+                    Ok(zigbee_converters::ToZigbeeResult::default())
+                })
+            })),
+        });
+    harness
+        .zigbee
+        .converters()
+        .lock()
+        .unwrap()
+        .register(definition);
+    harness
+        .zigbee
+        .resolve_device(IEEE)
+        .unwrap()
+        .resolve_definition(true);
+
+    let availability = Availability::new(harness.context.clone());
+    availability.clone().start().await.unwrap();
+    settle().await;
+    harness
+        .event_bus
+        .lock()
+        .unwrap()
+        .emit_device_announce(json!({"device": {"ieeeAddr": IEEE, "name": "lamp"}}));
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    settle().await;
+
+    assert_eq!(*retrieved.lock().unwrap(), 1, "state was not retrieved");
+    assert!(read_count(&harness) >= 1, "no read after reconnect");
+    availability.stop().await.unwrap();
+}
