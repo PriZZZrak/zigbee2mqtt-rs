@@ -531,17 +531,37 @@ Package: base_url, SPA fallback, hashed caching, version gate, single
 
 ### CP-10 — Fuzz/property, malformed input и границы · P1
 
-- [ ] Найти существующие property/fuzz проверки и зафиксировать их результаты;
-  при отсутствии добавить обязательное покрытие buffers/codecs/parsers.
-- [ ] Проверить truncated/empty/oversized buffers, длины, FCS, неизвестные
-  команды/типы, chunk boundaries и восстановление после malformed frame.
-- [ ] Использовать фиксируемые seeds, corpus и ограниченное время выполнения.
-- [ ] Для parity сравнивать с pinned Node oracle, сохраняя counterexamples
-  как регрессионные fixtures.
-- [ ] Обеспечить offline replay в обычном Rust gate и отдельный live-oracle run.
+- [x] Найти property/fuzz проверки и зафиксировать результаты; добавить покрытие
+  buffers/codecs/parsers. → `docs/fuzz.md`, `tests/fuzz_boundaries.rs`,
+  `tools/oracle/fuzz-corpus.mjs`.
+- [x] Проверить truncated/empty/oversized buffers, длины, FCS, неизвестные
+  команды/типы, chunk boundaries и восстановление. → 120-case UNPI corpus
+  (truncated/overlapping FCS, empty data, random command bytes), 500 Buffalo
+  round-trips/truncated reads, 500 ZCL buffers; chunk boundaries остаются
+  покрытыми transport/znp dwell-тестами (`znp_receive`, split responses).
+  Неизвестные subsystem/type — вне типизированного контракта Rust enum
+  (задокументировано).
+- [x] Фиксируемые seeds, corpus и ограниченное время. → seed `0x5eed1234` /
+  `0xfeed9876`, 120/500/500 итераций, без внешнего fuzz-крейта.
+- [x] Для parity сравнивать с pinned Node oracle, counterexamples как fixtures.
+  → corpus сгенерирован upstream `Frame.fromBuffer`; Rust replay сравнивает
+  accept/reject и поля; fixture `fixtures/fuzz_unpi.json`.
+- [x] Offline replay в Rust gate и отдельный live-oracle run. →
+  `cargo test -p zigbee-apiarist --test fuzz_boundaries` (offline) и
+  `node tools/oracle/fuzz-corpus.mjs` (live oracle).
 
 **Закрытие:** есть corpus, команды и результаты; исключённые inputs объяснены
 контрактом. Round-trip Rust→Rust сам по себе не доказывает upstream parity.
+
+```text
+Статус: CLOSED
+Corpus: fixtures/fuzz_unpi.json — 120 cases (53 valid), seed 0x5eed1234
+Property: 500 Buffalo + 500 ZCL, seed 0xfeed9876
+Offline: cargo test -p zigbee-apiarist --test fuzz_boundaries -> 3 passed
+Live oracle: node tools/oracle/fuzz-corpus.mjs -> 120 cases
+Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
+  round-trips declared non-parity
+```
 
 ### CP-11 — Измерение покрытия и воспроизводимые gates · P1
 

@@ -60,14 +60,20 @@ impl Frame {
 
     /// Upstream `Frame.fromBuffer(...)` — frame.ts:33.
     pub fn from_buffer(length: u8, fcs_position: usize, buffer: &[u8]) -> Option<Self> {
-        if buffer.len() < fcs_position + 1 {
+        if buffer.len() < 4 || fcs_position < 1 || fcs_position >= buffer.len() {
             return None;
         }
 
         let r#type = Type::from_u8(buffer[2] >> 5)?;
         let subsystem = Subsystem::from_u8(buffer[2] & 0x1f)?;
         let command_id = buffer[3];
-        let data = buffer[4..fcs_position].to_vec();
+        // Node's `subarray(4, fcsPosition)` is empty when the FCS overlaps the
+        // command bytes; mirror that instead of panicking.
+        let data = if fcs_position >= 4 {
+            buffer[4..fcs_position].to_vec()
+        } else {
+            Vec::new()
+        };
         let fcs = buffer[fcs_position];
 
         // Upstream: validate the checksum to see if we fully received the message.

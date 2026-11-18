@@ -1,0 +1,1121 @@
+[
+  {
+    "id": "frame-0",
+    "buffer": "fecb04c982840a",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": true,
+    "type": 0,
+    "subsystem": 4,
+    "commandID": 201,
+    "data": "82"
+  },
+  {
+    "id": "frame-1",
+    "buffer": "fe7d69ce2252ce6c8b6dcb43e4fd4559e1e0",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-2",
+    "buffer": "fe8463d39807d873105ce8a31a43e19904bdaa",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 3,
+    "subsystem": 3,
+    "commandID": 211,
+    "data": "9807d8"
+  },
+  {
+    "id": "frame-3",
+    "buffer": "fee522d9987c5cde687054",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-4",
+    "buffer": "fe0d26f3928b9f3ef50d1b0cfdd1ca127b6854",
+    "length": 14,
+    "fcsPosition": 16,
+    "ok": true,
+    "type": 1,
+    "subsystem": 6,
+    "commandID": 243,
+    "data": "928b9f3ef50d1b0cfdd1ca12"
+  },
+  {
+    "id": "frame-5",
+    "buffer": "fecb4423cfac",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-6",
+    "buffer": "fe66224703751b95a8dd90",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 1,
+    "subsystem": 2,
+    "commandID": 71,
+    "data": ""
+  },
+  {
+    "id": "frame-7",
+    "buffer": "fe484623f8b42cb41d688e2eed0abc6f3ab2",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-8",
+    "buffer": "fe416fbdfdf59b122728d4",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": true,
+    "type": 3,
+    "subsystem": 15,
+    "commandID": 189,
+    "data": "fdf5"
+  },
+  {
+    "id": "frame-9",
+    "buffer": "fefa41",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-10",
+    "buffer": "feaa222211adcd90161b8cca644966a7c0",
+    "length": 9,
+    "fcsPosition": 11,
+    "ok": true,
+    "type": 1,
+    "subsystem": 2,
+    "commandID": 34,
+    "data": "11adcd90161b8c"
+  },
+  {
+    "id": "frame-11",
+    "buffer": "fe6a09ba58034fbbdb",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-12",
+    "buffer": "fe28634bcf",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 3,
+    "subsystem": 3,
+    "commandID": 75,
+    "data": ""
+  },
+  {
+    "id": "frame-13",
+    "buffer": "fe5866c34a15ec9278347800b4debd40",
+    "length": 7,
+    "fcsPosition": 9,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-14",
+    "buffer": "fe16224c787f34a344265f5c51e008f3",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 1,
+    "subsystem": 2,
+    "commandID": 76,
+    "data": ""
+  },
+  {
+    "id": "frame-15",
+    "buffer": "febc480049cba4cb986dd17608f8cd",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-16",
+    "buffer": "fe2069d4eb2dabf06095289e68d295",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 3,
+    "subsystem": 9,
+    "commandID": 212,
+    "data": "eb2dab"
+  },
+  {
+    "id": "frame-17",
+    "buffer": "fe5647dbde3496a92c5e5db0da",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-18",
+    "buffer": "fe1820fbc314af0ec5a9d76ca6",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 1,
+    "subsystem": 0,
+    "commandID": 251,
+    "data": ""
+  },
+  {
+    "id": "frame-19",
+    "buffer": "febb691e068aeb",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-20",
+    "buffer": "fe7d211d4c8e37b4d0c8b6fc",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 1,
+    "subsystem": 1,
+    "commandID": 29,
+    "data": "4c8e37"
+  },
+  {
+    "id": "frame-21",
+    "buffer": "fec000cbd5c323f1d6a2079b6bb9",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-22",
+    "buffer": "fec822f5e86594705dfb07d72a2b",
+    "length": 9,
+    "fcsPosition": 11,
+    "ok": true,
+    "type": 1,
+    "subsystem": 2,
+    "commandID": 245,
+    "data": "e86594705dfb07"
+  },
+  {
+    "id": "frame-23",
+    "buffer": "fe6f010a7dee4b3b6e3cd51c924abe7d530b",
+    "length": 11,
+    "fcsPosition": 13,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-24",
+    "buffer": "fe47295dbb880f20deec1dd08ebbb25f8e",
+    "length": 8,
+    "fcsPosition": 10,
+    "ok": true,
+    "type": 1,
+    "subsystem": 9,
+    "commandID": 93,
+    "data": "bb880f20deec"
+  },
+  {
+    "id": "frame-25",
+    "buffer": "feca64a96b3811c0919872b7",
+    "length": 8,
+    "fcsPosition": 10,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-26",
+    "buffer": "fece07",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-27",
+    "buffer": "fe0906ba4a4321e99d9c057e511d9784581299",
+    "length": 15,
+    "fcsPosition": 17,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-28",
+    "buffer": "fea26603c502d002",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": true,
+    "type": 3,
+    "subsystem": 6,
+    "commandID": 3,
+    "data": "c5"
+  },
+  {
+    "id": "frame-29",
+    "buffer": "fe154336fa3deb92fdd8c174f73004ce",
+    "length": 8,
+    "fcsPosition": 10,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-30",
+    "buffer": "fe74247f2f0d",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 1,
+    "subsystem": 4,
+    "commandID": 127,
+    "data": ""
+  },
+  {
+    "id": "frame-31",
+    "buffer": "fee5",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 1. Received 2"
+  },
+  {
+    "id": "frame-32",
+    "buffer": "fe6500c7515611266efc43e3eab18c1e",
+    "length": 7,
+    "fcsPosition": 9,
+    "ok": true,
+    "type": 0,
+    "subsystem": 0,
+    "commandID": 199,
+    "data": "515611266e"
+  },
+  {
+    "id": "frame-33",
+    "buffer": "fe3205c9781b4b2afa1cfa",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-34",
+    "buffer": "fe202421bc8f169233cf02e2a3caab59b2d7",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": true,
+    "type": 1,
+    "subsystem": 4,
+    "commandID": 33,
+    "data": "bc8f"
+  },
+  {
+    "id": "frame-35",
+    "buffer": "feab754909ebbd30e7",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-36",
+    "buffer": "fee44f862d7c737c2f",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 2,
+    "subsystem": 15,
+    "commandID": 134,
+    "data": ""
+  },
+  {
+    "id": "frame-37",
+    "buffer": "feac",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 1. Received 2"
+  },
+  {
+    "id": "frame-38",
+    "buffer": "fe5160",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-39",
+    "buffer": "fe2944990f2d4a18c09698b3f036e1",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-40",
+    "buffer": "fe300ff6c91ef38c",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 0,
+    "subsystem": 15,
+    "commandID": 246,
+    "data": ""
+  },
+  {
+    "id": "frame-41",
+    "buffer": "fed10f27669e26428532dd8e2129ae0a1e801d",
+    "length": 14,
+    "fcsPosition": 16,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-42",
+    "buffer": "fe0764088a1d52ae15f5db593b04a15b7dc8",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 3,
+    "subsystem": 4,
+    "commandID": 8,
+    "data": "8a1d52"
+  },
+  {
+    "id": "frame-43",
+    "buffer": "fef644d8b987573ad26522c6",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-44",
+    "buffer": "fea6",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 1. Received 2"
+  },
+  {
+    "id": "frame-45",
+    "buffer": "fece0617f7be015df5461783",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-46",
+    "buffer": "feb57557b82c474600029abe4c",
+    "length": 7,
+    "fcsPosition": 9,
+    "ok": true,
+    "type": 3,
+    "subsystem": 21,
+    "commandID": 87,
+    "data": "b82c474600"
+  },
+  {
+    "id": "frame-47",
+    "buffer": "fea725",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-48",
+    "buffer": "fe912871441234aad915b889c3",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 1,
+    "subsystem": 8,
+    "commandID": 113,
+    "data": "441234"
+  },
+  {
+    "id": "frame-49",
+    "buffer": "fea625ea3961d65840de946a4e",
+    "length": 9,
+    "fcsPosition": 11,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-50",
+    "buffer": "fe3c64356d7f2a",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 3,
+    "subsystem": 4,
+    "commandID": 53,
+    "data": ""
+  },
+  {
+    "id": "frame-51",
+    "buffer": "fe960f63ce7bbbcf17184a981ab5b63f",
+    "length": 12,
+    "fcsPosition": 14,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-52",
+    "buffer": "fe8f058a6a3591f3fe",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 0,
+    "subsystem": 5,
+    "commandID": 138,
+    "data": ""
+  },
+  {
+    "id": "frame-53",
+    "buffer": "feb7616918d7a2ae81",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-54",
+    "buffer": "fe6c43d7ae6ff903f598822cb67028d1a65614",
+    "length": 9,
+    "fcsPosition": 11,
+    "ok": true,
+    "type": 2,
+    "subsystem": 3,
+    "commandID": 215,
+    "data": "ae6ff903f59882"
+  },
+  {
+    "id": "frame-55",
+    "buffer": "fef6",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 1. Received 2"
+  },
+  {
+    "id": "frame-56",
+    "buffer": "feb2751c5da1064babbc57545826d6",
+    "length": 11,
+    "fcsPosition": 13,
+    "ok": true,
+    "type": 3,
+    "subsystem": 21,
+    "commandID": 28,
+    "data": "5da1064babbc575458"
+  },
+  {
+    "id": "frame-57",
+    "buffer": "fef345ff7bbfe0ec7d413b",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-58",
+    "buffer": "fe8a2f",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-59",
+    "buffer": "fe2f",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 1. Received 2"
+  },
+  {
+    "id": "frame-60",
+    "buffer": "febe09b768f816093a0c",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 0,
+    "subsystem": 9,
+    "commandID": 183,
+    "data": ""
+  },
+  {
+    "id": "frame-61",
+    "buffer": "fec268831ae9d2e20867",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-62",
+    "buffer": "fe634023",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 2,
+    "subsystem": 0,
+    "commandID": 35,
+    "data": ""
+  },
+  {
+    "id": "frame-63",
+    "buffer": "fe51639a9664359f2f2f6d7c7cd8",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-64",
+    "buffer": "febd05ccd85600fa690caf5de6",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 0,
+    "subsystem": 5,
+    "commandID": 204,
+    "data": "d85600"
+  },
+  {
+    "id": "frame-65",
+    "buffer": "fe3360ca43e9134b5d829d79f680",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-66",
+    "buffer": "fe4549",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-67",
+    "buffer": "feb0436d9637cf814cd8a0ab",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-68",
+    "buffer": "feee0301ec009836a1a1c41c68eec34f96",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": true,
+    "type": 0,
+    "subsystem": 3,
+    "commandID": 1,
+    "data": "ec"
+  },
+  {
+    "id": "frame-69",
+    "buffer": "fe633555b5c397643f1c648e9ce7a4c762",
+    "length": 13,
+    "fcsPosition": 15,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-70",
+    "buffer": "fe0c434f64e5638d",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 2,
+    "subsystem": 3,
+    "commandID": 79,
+    "data": ""
+  },
+  {
+    "id": "frame-71",
+    "buffer": "fe1468b47ec2869c19cb5780703b4ccc988cf0",
+    "length": 15,
+    "fcsPosition": 17,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-72",
+    "buffer": "fe11647ae2e2e6fd75237b98bd271e280d91bb",
+    "length": 14,
+    "fcsPosition": 16,
+    "ok": true,
+    "type": 3,
+    "subsystem": 4,
+    "commandID": 122,
+    "data": "e2e2e6fd75237b98bd271e28"
+  },
+  {
+    "id": "frame-73",
+    "buffer": "feff0f171a8d07f8a713dbd4cf03",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-74",
+    "buffer": "fe7404179b14192d3716fdab",
+    "length": 8,
+    "fcsPosition": 10,
+    "ok": true,
+    "type": 0,
+    "subsystem": 4,
+    "commandID": 23,
+    "data": "9b14192d3716"
+  },
+  {
+    "id": "frame-75",
+    "buffer": "fe7e69afd61ac2911334",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-76",
+    "buffer": "fe4c458a4f3ef207dc",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": true,
+    "type": 2,
+    "subsystem": 5,
+    "commandID": 138,
+    "data": "4f3e"
+  },
+  {
+    "id": "frame-77",
+    "buffer": "fedf41",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-78",
+    "buffer": "fe6444d331c27cce",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": true,
+    "type": 2,
+    "subsystem": 4,
+    "commandID": 211,
+    "data": "31"
+  },
+  {
+    "id": "frame-79",
+    "buffer": "fe464129727dc1",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-80",
+    "buffer": "feaf65c733c1ed12f3",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 3,
+    "subsystem": 5,
+    "commandID": 199,
+    "data": "33c1ed"
+  },
+  {
+    "id": "frame-81",
+    "buffer": "feb166af9c925ee93694a57ca7d71059e9",
+    "length": 7,
+    "fcsPosition": 9,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-82",
+    "buffer": "fefc006ace58a7",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": true,
+    "type": 0,
+    "subsystem": 0,
+    "commandID": 106,
+    "data": "ce"
+  },
+  {
+    "id": "frame-83",
+    "buffer": "fecc063615ad2ecd26c438ee85a3aa1a8d",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-84",
+    "buffer": "feb842fa895c24",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 2,
+    "subsystem": 2,
+    "commandID": 250,
+    "data": ""
+  },
+  {
+    "id": "frame-85",
+    "buffer": "fe994815ef1c9d260c32615346843fe1",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-86",
+    "buffer": "fef100f1",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 0,
+    "subsystem": 0,
+    "commandID": 241,
+    "data": ""
+  },
+  {
+    "id": "frame-87",
+    "buffer": "fe5304af96d9a3ab43487b9e9487",
+    "length": 8,
+    "fcsPosition": 10,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-88",
+    "buffer": "fe6064e250b65cd26f",
+    "length": 3,
+    "fcsPosition": 5,
+    "ok": true,
+    "type": 3,
+    "subsystem": 4,
+    "commandID": 226,
+    "data": "50"
+  },
+  {
+    "id": "frame-89",
+    "buffer": "fe532926b8d9d8",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-90",
+    "buffer": "fe93455d8b2fb1",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 2,
+    "subsystem": 5,
+    "commandID": 93,
+    "data": ""
+  },
+  {
+    "id": "frame-91",
+    "buffer": "fea82945ff500c7af7d1",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-92",
+    "buffer": "fe4555",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 2. Received 3"
+  },
+  {
+    "id": "frame-93",
+    "buffer": "fe4f00a1e93c",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-94",
+    "buffer": "fed135b9d4650e03e1f7b4c3ebedfb5866c5c1",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": true,
+    "type": 1,
+    "subsystem": 21,
+    "commandID": 185,
+    "data": "d4650e03"
+  },
+  {
+    "id": "frame-95",
+    "buffer": "fe3a21cbf37ce7ff02",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-96",
+    "buffer": "fe4c0549",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 0,
+    "subsystem": 5,
+    "commandID": 73,
+    "data": ""
+  },
+  {
+    "id": "frame-97",
+    "buffer": "fe5d43b6f6773176bb48282e528669b50f93",
+    "length": 11,
+    "fcsPosition": 13,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-98",
+    "buffer": "feea68c7eb2ca321caca658a2726f453",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 3,
+    "subsystem": 8,
+    "commandID": 199,
+    "data": "eb2ca3"
+  },
+  {
+    "id": "frame-99",
+    "buffer": "fecf55812211",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-100",
+    "buffer": "fe5220f44f7aad7427ac0feee3dbb3884441",
+    "length": 9,
+    "fcsPosition": 11,
+    "ok": true,
+    "type": 1,
+    "subsystem": 0,
+    "commandID": 244,
+    "data": "4f7aad7427ac0f"
+  },
+  {
+    "id": "frame-101",
+    "buffer": "feb127ddd6df5a752d5d0c7719",
+    "length": 7,
+    "fcsPosition": 9,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-102",
+    "buffer": "fed661e5a1a161fb56d40842ff3f",
+    "length": 9,
+    "fcsPosition": 11,
+    "ok": true,
+    "type": 3,
+    "subsystem": 1,
+    "commandID": 229,
+    "data": "a1a161fb56d408"
+  },
+  {
+    "id": "frame-103",
+    "buffer": "fe4445daeca4f596ff83c728a9",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-104",
+    "buffer": "fee640651679acaa908ca6ea",
+    "length": 4,
+    "fcsPosition": 6,
+    "ok": true,
+    "type": 2,
+    "subsystem": 0,
+    "commandID": 101,
+    "data": "1679"
+  },
+  {
+    "id": "frame-105",
+    "buffer": "feca498f4cfdcba8d9dac6",
+    "length": 6,
+    "fcsPosition": 8,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-106",
+    "buffer": "fe89098002",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 0,
+    "subsystem": 9,
+    "commandID": 128,
+    "data": ""
+  },
+  {
+    "id": "frame-107",
+    "buffer": "feb306a0fcb491c495e51722b5",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-108",
+    "buffer": "fe7601e2ae5c53dd8d0c687c6e8a51",
+    "length": 8,
+    "fcsPosition": 10,
+    "ok": true,
+    "type": 0,
+    "subsystem": 1,
+    "commandID": 226,
+    "data": "ae5c53dd8d0c"
+  },
+  {
+    "id": "frame-109",
+    "buffer": "feb309a8878e16fa4a",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-110",
+    "buffer": "fe06261f3f0077261497",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 1,
+    "subsystem": 6,
+    "commandID": 31,
+    "data": ""
+  },
+  {
+    "id": "frame-111",
+    "buffer": "fe0e44c1",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-112",
+    "buffer": "fe6b051876bbcea719d5a0",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": true,
+    "type": 0,
+    "subsystem": 5,
+    "commandID": 24,
+    "data": ""
+  },
+  {
+    "id": "frame-113",
+    "buffer": "fe354110c4c06793aecd1140",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-114",
+    "buffer": "fedd",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": false,
+    "error": "The value of \"offset\" is out of range. It must be >= 0 and <= 1. Received 2"
+  },
+  {
+    "id": "frame-115",
+    "buffer": "feb02f56a12dc281aec584b9ff1d",
+    "length": 7,
+    "fcsPosition": 9,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-116",
+    "buffer": "fea904ad",
+    "length": 1,
+    "fcsPosition": 3,
+    "ok": true,
+    "type": 0,
+    "subsystem": 4,
+    "commandID": 173,
+    "data": ""
+  },
+  {
+    "id": "frame-117",
+    "buffer": "febe448b52389e19ad2d359b1622c90957e9fe",
+    "length": 2,
+    "fcsPosition": 4,
+    "ok": false,
+    "error": "Invalid checksum"
+  },
+  {
+    "id": "frame-118",
+    "buffer": "fe3c064639111a4e89fa878b77",
+    "length": 5,
+    "fcsPosition": 7,
+    "ok": true,
+    "type": 0,
+    "subsystem": 6,
+    "commandID": 70,
+    "data": "39111a"
+  },
+  {
+    "id": "frame-119",
+    "buffer": "fe1764626efb586ef5b7dea2de166e222ed5",
+    "length": 7,
+    "fcsPosition": 9,
+    "ok": false,
+    "error": "Invalid checksum"
+  }
+]
