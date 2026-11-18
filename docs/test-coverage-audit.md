@@ -565,19 +565,40 @@ Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
 
 ### CP-11 — Измерение покрытия и воспроизводимые gates · P1
 
-- [ ] Получить отчёт покрытия строк/функций и, где поддержано инструментом,
-  ветвей Rust-кода с перечнем включённых crates и исключений.
-- [ ] Указать toolchain, инструмент, commit, команды и отдельно ignored tests.
-- [ ] Составить список непокрытых критических ветвей, прежде всего error/retry,
-  cancellation, persistence и reconnect.
-- [ ] Проверить фактическое наличие gates из `porting-parity.md`: workspace
-  tests, Node oracle, broker integrations, fuzz/live oracle.
-- [ ] Разделить автоматический software gate и отдельную HIL-приёмку.
-- [ ] Для изменяемого кода проверить dependency policy и pure-Rust ограничения.
+- [x] Получить отчёт покрытия строк/функций/ветвей с перечнем crates и
+  исключений. → `docs/coverage.md`; `tools/coverage.sh` →
+  `target/coverage/summary.txt` + `lcov.info`: regions 72.96%, functions
+  74.23% (2552/3438), lines 72.73% (25502/35066); crates `zigbee-apiarist`,
+  `zigbee-converters`, `z2m-rs`; tests/examples/registry/HIL excluded.
+- [x] Указать toolchain, инструмент, commit, команды и ignored tests. →
+  `rustc 1.99.1 (58cf8f9c3)`, rustup llvm-tools, commit `a4023a5`; 19 ignored
+  (12 HIL ZNP, 1 real broker, 6 stub markers).
+- [x] Список непокрытых критических ветвей. → таблица в `docs/coverage.md`
+  (transport, runtime_adapter, controller/model, mqtt reconnect, touchlink/GP)
+  с указанием, где они покрыты HIL/сценарными тестами.
+- [x] Фактическое наличие gates из `porting-parity.md`. → workspace tests,
+  `check-parity-maps`, Node `generate.mjs`, model/MQTT transcripts,
+  `mqtt_reconnect` (+ broker test), fuzz offline/live — команды и статусы в
+  `docs/coverage.md`.
+- [x] Разделить software gate и HIL-приёмку. → раздел «Software vs HIL split».
+- [x] Проверить dependency policy и pure-Rust ограничения. → `cargo tree`:
+  нет `ring`, `openssl-sys` или других `-sys`/C crates; zlib — `zlib-rs`,
+  zip — `zopfli` (pure Rust).
 
 **Закрытие:** отчёт воспроизводится, артефакт доступен, перечень реально
 запускаемых тестов известен. Произвольный общий порог вроде «90% строк»
 не заменяет закрытие обязательных сценариев и ветвей отказа.
+
+```text
+Статус: CLOSED
+Отчёт: target/coverage/summary.txt + lcov.info (воспроизводится tools/coverage.sh)
+Метрики: regions 72.96%, functions 74.23%, lines 72.73%
+Crates: zigbee-apiarist, zigbee-converters, z2m-rs
+Toolchain/commit: rustc 1.99.1, commit a4023a5
+Ignored: 19 (12 HIL, 1 real broker, 6 stub markers)
+Gates: workspace tests, map checker, Node oracle/transcripts, broker reconnect,
+  fuzz offline+live; HIL отдельно
+```
 
 ### CP-12 — Итоговая R1-приёмка · P1
 
