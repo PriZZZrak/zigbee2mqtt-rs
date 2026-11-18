@@ -573,3 +573,21 @@ async fn invalid_tls_configuration_falls_back_to_http() {
         frontend.clone().stop().await.unwrap();
     }
 }
+
+/// A Windfront package with a different version is rejected at startup.
+#[tokio::test]
+async fn rejects_a_mismatched_windfront_version() {
+    let _guard = zigbee_apiarist::controller::model::test_support::serial();
+    let dir = assets_dir();
+    std::fs::write(dir.join("package.json"), r#"{"version":"9.9.9"}"#).unwrap();
+    std::env::set_var("ZIGBEE2MQTT_FRONTEND_ASSETS", &dir);
+    let harness = harness(None);
+    let frontend = Frontend::new(harness.context.clone());
+    let error = frontend.start().await.expect_err("version mismatch");
+    assert!(
+        error.contains("does not match the tested version") && error.contains("9.9.9"),
+        "{error}"
+    );
+    std::env::remove_var("ZIGBEE2MQTT_FRONTEND_ASSETS");
+    let _ = std::fs::remove_dir_all(dir);
+}

@@ -390,7 +390,7 @@ HIL-протокол на Routerich AX3000 + Dongle-P с before/after артеф
 
 ```text
 Статус: CLOSED
-Карта: docs/extension-test-cases.md — 598 строк: asserted 373, adapter 43,
+Карта: docs/extension-test-cases.md — 598 строк: asserted 416, adapter 0,
   converter-db 91, omitted 91; code 0, slice 0 (проверено
   tools/docs/check-parity-maps.mjs)
 Проверки: configure 18, availability 28, groups 22 + groups_publish 14, bridge
@@ -498,17 +498,36 @@ Buffalo: BUFFER16/18/32/42/100 width + short-buffer negative fixtures (31)
 
 ### CP-09 — Frontend и пять `static`-строк · P1
 
-- [ ] Сопоставить пять отложенных строк с уже описанными packaging/static tests
-  и HIL-раздачей Windfront.
-- [ ] Уточнить границу frontend protocol/API и package-level assets по AGENTS Q5.
-- [ ] Для применимых сценариев проверить auth/path, retained/device-state replay,
-  inbound dispatch, offline/reconnect и совместимость с pinned Windfront.
-- [ ] На package-level проверить base_url, SPA fallback, asset caching/version,
-  одиночный `Content-Length` и пустой ответ 304.
+- [x] Сопоставить пять отложенных строк с уже описанными packaging/static tests
+  и HIL-раздачей Windfront. → таблица в `docs/extension-test-parity.md`:
+  `serves_assets_under_a_custom_base_url`,
+  `serves_windfront_assets_with_cache_and_spa_fallback` (SPA + caching),
+  `rejects_a_mismatched_windfront_version` + `accepts_windfront_package_json_from_the_package_root`,
+  `serves_single_content_length_and_empty_304`.
+- [x] Уточнить границу frontend protocol/API и package-level assets по AGENTS Q5.
+  → bridge владеет HTTP/WS протоколом и version gate; Windfront-ассеты —
+  отдельный opkg (`packaging/windfront.version`, `docs/openwrt-packaging.md`).
+- [x] Для применимых сценариев проверить auth/path, retained/device-state replay,
+  inbound dispatch, offline/reconnect и совместимость с pinned Windfront. →
+  `auth_token_is_enforced`, `replay_retained_and_receive_messages`,
+  `broadcasts_published_messages_and_skips_entity_states`,
+  `stop_sends_offline_state`, `serves_*`, TLS fallback tests; frontend 12 passed.
+- [x] На package-level проверить base_url, SPA fallback, asset caching/version,
+  одиночный `Content-Length` и пустой ответ 304. → перечисленные тесты +
+  packaged install/reboot HIL (`docs/hil/2026-11-17-packaged-service.md`).
 
 **Закрытие:** старые `static/deferred` статусы заменены точными доказательствами
 или действующим scope-решением. HTTP 200 не считается проверкой всего
 WebSocket-протокола. Знаменатель метрик явно отражает принятое решение.
+
+```text
+Статус: CLOSED
+Static rows: 5/5 mapped to frontend tests
+Protocol: auth/path, replay, dispatch, broadcast, offline, TLS fallback
+Package: base_url, SPA fallback, hashed caching, version gate, single
+  Content-Length, empty 304; Windfront assets remain a separate opkg
+Доказательства: frontend 12 passed; packaged install/reboot HIL
+```
 
 ### CP-10 — Fuzz/property, malformed input и границы · P1
 
