@@ -8,7 +8,7 @@
 // writes `docs/fixtures/mqtt-transcript.json` plus a pass/fail summary.
 //
 // Usage: node tools/oracle/mqtt-transcript.mjs
-import { createServer } from "node:net";
+import { createConnection, createServer } from "node:net";
 import { spawn } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -81,7 +81,9 @@ function startBroker() {
               );
               if (!matches) continue;
               const body = Buffer.concat([Buffer.from([topic.length >> 8, topic.length & 0xff]), Buffer.from(topic), payload]);
-              socket.write(Buffer.concat([Buffer.from([0x30]), encodeLength(body.length), body]));
+              // A retained message delivered to a new subscription has the
+              // retain flag set (MQTT 3.1.1 section 3.3.1.3).
+              socket.write(Buffer.concat([Buffer.from([0x31]), encodeLength(body.length), body]));
             }
           } else if (type === 3) {
             const retain = (flags & 0x01) !== 0;
@@ -170,13 +172,166 @@ function summarize(records) {
   }));
 }
 
-function compare(rust, upstream) {
-  const key = (record) => `${record.topic}|${record.payload}|${record.qos}|${record.retain}`;
-  const rustKeys = rust.map(key).sort();
-  const upstreamKeys = upstream.map(key).sort();
-  const missing = upstreamKeys.filter((entry) => !rustKeys.includes(entry));
-  const extra = rustKeys.filter((entry) => !upstreamKeys.includes(entry));
-  return { match: missing.length === 0 && extra.length === 0, missing, extra };
+function connectPacket(clientId) {
+  const name = Buffer.from("MQTT");
+  const body = Buffer.concat([
+    Buffer.from([0, name.length]),
+    name,
+    Buffer.from([4, 0x02, 0, 60]), // protocol level 4, clean session
+    Buffer.from([0, clientId.length]),
+    Buffer.from(clientId),
+  ]);
+  return Buffer.concat([Buffer.from([0x10]), encodeLength(body.length), body]);
+}
+
+function subscribePacket(filter) {
+  const body = Buffer.concat([
+    Buffer.from([0, 1]), // packet id
+    Buffer.from([0, filter.length]),
+    Buffer.from(filter),
+    Buffer.from([0]), // requested qos 0
+  ]);
+  return Buffer.concat([Buffer.from([0x82]), encodeLength(body.length), body]);
+}
+
+/// Connect as a brand-new subscriber and return the retained PUBLISH packets
+/// the broker delivers for `filter` (upstream `mqtt.js` behaviour: a new
+/// subscription receives retained `bridge/state offline`).
+function readRetained(port, filter, waitMs = 800) {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host: "127.0.0.1", port });
+    let buffer = Buffer.alloc(0);
+    let timer = null;
+    const received = [];
+    const finish = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      socket.destroy();
+      resolve(received);
+    };
+    socket.on("connect", () => socket.write(connectPacket(`transcript-reader-${process.pid}`)));
+    socket.on("error", finish);
+    socket.on("close", finish);
+    socket.on("data", (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      for (;;) {
+        if (buffer.length < 2) break;
+        let index = 1;
+        let length = 0;
+        let multiplier = 1;
+        let complete = false;
+        while (index < buffer.length) {
+          const byte = buffer[index++];
+          length += (byte & 0x7f) * multiplier;
+          if ((byte & 0x80) === 0) {
+            complete = true;
+            break;
+          }
+          multiplier *= 128;
+        }
+        if (!complete || buffer.length < index + length) break;
+        const type = buffer[0] >> 4;
+        const flags = buffer[0] & 0x0f;
+        const packet = buffer.subarray(index, index + length);
+        buffer = buffer.subarray(index + length);
+        if (type === 2) {
+          socket.write(subscribePacket(filter));
+          timer = setTimeout(finish, waitMs);
+        } else if (type === 3) {
+          const topicLength = packet.readUInt16BE(0);
+          const topic = packet.subarray(2, 2 + topicLength).toString();
+          const qos = (flags >> 1) & 0x03;
+          let offset = 2 + topicLength + (qos > 0 ? 2 : 0);
+          received.push({ topic, payload: packet.subarray(offset).toString(), qos, retain: (flags & 0x01) !== 0 });
+        }
+      }
+    });
+  });
+}
+
+function recordKey(record) {
+  return `${record.topic}|${record.payload}|${record.qos}|${record.retain}`;
+}
+
+/// Order-sensitive, duplicate-preserving comparison (a reordering or a lost
+/// duplicate is a mismatch, unlike the previous sorted-set comparison).
+function compareRecords(rust, upstream) {
+  const limit = Math.min(rust.length, upstream.length);
+  let firstMismatch = null;
+  for (let index = 0; index < limit; index++) {
+    if (recordKey(rust[index]) !== recordKey(upstream[index])) {
+      firstMismatch = { index, rust: rust[index], upstream: upstream[index] };
+      break;
+    }
+  }
+  const lengthMatch = rust.length === upstream.length;
+  return {
+    match: lengthMatch && firstMismatch === null,
+    rustCount: rust.length,
+    upstreamCount: upstream.length,
+    firstMismatch,
+  };
+}
+
+function compareSubscriptions(rust, upstream) {
+  return {
+    match: rust.length === upstream.length && rust.every((value, index) => value === upstream[index]),
+    rust,
+    upstream,
+  };
+}
+
+function offlineIsDelivered(records) {
+  return records.some(
+    (record) =>
+      record.topic === "z2m/bridge/state" &&
+      record.payload === '{"state":"offline"}' &&
+      record.retain === true,
+  );
+}
+
+/// Guard the comparison itself: a comparator that ignores order, duplicates or
+/// missing entries would let a regression through.
+function selfTestComparators() {
+  const base = [
+    { topic: "a", payload: "1", qos: 0, retain: false },
+    { topic: "b", payload: "2", qos: 0, retain: false },
+  ];
+  if (compareRecords(base, [base[1], base[0]]).match) {
+    throw new Error("comparator did not detect a reordered publish");
+  }
+  if (compareRecords(base, [base[0]]).match) {
+    throw new Error("comparator did not detect a lost publish/duplicate");
+  }
+  if (compareRecords(base, [...base, base[0]]).match) {
+    throw new Error("comparator did not detect an extra publish");
+  }
+  if (compareSubscriptions(["a/#"], ["a/#", "a/#"]).match) {
+    throw new Error("comparator did not detect a duplicate subscription");
+  }
+  if (compareSubscriptions(["a/#"], []).match) {
+    throw new Error("comparator did not detect a missing subscription");
+  }
+  if (offlineIsDelivered([{ topic: "z2m/bridge/state", payload: '{"state":"online"}', retain: true }])) {
+    throw new Error("offline detector accepted the online state");
+  }
+}
+
+selfTestComparators();
+
+function compare(rust, upstream, rustOffline, upstreamOffline, rustSubscriptions, upstreamSubscriptions) {
+  const records = compareRecords(rust, upstream);
+  const subscriptions = compareSubscriptions(rustSubscriptions, upstreamSubscriptions);
+  const offlineSubscriber = {
+    rust: offlineIsDelivered(rustOffline),
+    upstream: offlineIsDelivered(upstreamOffline),
+  };
+  return {
+    match: records.match && subscriptions.match && offlineSubscriber.rust && offlineSubscriber.upstream,
+    records,
+    subscriptions,
+    offlineSubscriber,
+  };
 }
 
 const rustBroker = await startBroker();
@@ -184,6 +339,9 @@ await runRust(rustBroker.port);
 await sleep(300);
 const rustRecords = summarize(rustBroker.records);
 const rustSubscriptions = [...rustBroker.subscriptions];
+// A brand-new subscriber must receive the retained offline state after the
+// client stopped. Read it before closing the broker.
+const rustRetained = await readRetained(rustBroker.port, "z2m/#");
 rustBroker.close();
 
 const upstreamBroker = await startBroker();
@@ -191,12 +349,24 @@ await runUpstream(upstreamBroker.port);
 await sleep(300);
 const upstreamRecords = summarize(upstreamBroker.records);
 const upstreamSubscriptions = [...upstreamBroker.subscriptions];
+const upstreamRetained = await readRetained(upstreamBroker.port, "z2m/#");
 upstreamBroker.close();
 
-const comparison = compare(rustRecords, upstreamRecords);
+const comparison = compare(
+  rustRecords,
+  upstreamRecords,
+  rustRetained,
+  upstreamRetained,
+  rustSubscriptions,
+  upstreamSubscriptions,
+);
 const transcript = {
-  rust: { records: rustRecords, subscriptions: rustSubscriptions },
-  upstream: { records: upstreamRecords, subscriptions: upstreamSubscriptions },
+  rust: { records: rustRecords, subscriptions: rustSubscriptions, retainedToNewSubscriber: rustRetained },
+  upstream: {
+    records: upstreamRecords,
+    subscriptions: upstreamSubscriptions,
+    retainedToNewSubscriber: upstreamRetained,
+  },
   comparison,
 };
 mkdirSync(join(root, "docs/fixtures"), { recursive: true });
@@ -207,8 +377,13 @@ for (const record of rustRecords) console.log(`  rust ^ ${record.topic} qos=${re
 console.log(`upstream records: ${upstreamRecords.length}`);
 for (const record of upstreamRecords) console.log(`  up   ^ ${record.topic} qos=${record.qos} retain=${record.retain} ${record.payload}`);
 console.log(`subscriptions rust=${JSON.stringify(rustSubscriptions)} upstream=${JSON.stringify(upstreamSubscriptions)}`);
+console.log(
+  `new-subscriber offline rust=${comparison.offlineSubscriber.rust} upstream=${comparison.offlineSubscriber.upstream}`,
+);
 if (!comparison.match) {
   console.log("MISMATCH", JSON.stringify(comparison, null, 2));
   process.exit(1);
 }
-console.log("OK: rust and upstream broker traffic match");
+console.log(
+  `OK: ${rustRecords.length} publishes and ${rustSubscriptions.length} subscription(s) match element-wise; retained offline received by a new subscriber`,
+);

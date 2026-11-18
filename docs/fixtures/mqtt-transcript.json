@@ -40,6 +40,20 @@
     ],
     "subscriptions": [
       "z2m/#"
+    ],
+    "retainedToNewSubscriber": [
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"offline\"}",
+        "qos": 0,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/state",
+        "payload": "{\"state\":\"ON\"}",
+        "qos": 0,
+        "retain": true
+      }
     ]
   },
   "upstream": {
@@ -83,11 +97,42 @@
     ],
     "subscriptions": [
       "z2m/#"
+    ],
+    "retainedToNewSubscriber": [
+      {
+        "topic": "z2m/bridge/state",
+        "payload": "{\"state\":\"offline\"}",
+        "qos": 0,
+        "retain": true
+      },
+      {
+        "topic": "z2m/device/state",
+        "payload": "{\"state\":\"ON\"}",
+        "qos": 0,
+        "retain": true
+      }
     ]
   },
   "comparison": {
     "match": true,
-    "missing": [],
-    "extra": []
+    "records": {
+      "match": true,
+      "rustCount": 6,
+      "upstreamCount": 6,
+      "firstMismatch": null
+    },
+    "subscriptions": {
+      "match": true,
+      "rust": [
+        "z2m/#"
+      ],
+      "upstream": [
+        "z2m/#"
+      ]
+    },
+    "offlineSubscriber": {
+      "rust": true,
+      "upstream": true
+    }
   }
 }

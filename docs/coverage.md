@@ -121,7 +121,7 @@ Error/retry/cancellation/persistence/reconnect specifically:
 | Workspace tests | `cargo test --workspace` | 78 suites / 1568 passed, 0 failed, 12 ignored (final run on `6dbbd7c`) |
 | Map checker | `node tools/docs/check-parity-maps.mjs` | `OK: 11 maps checked, 0 errors` |
 | Node oracle | `node tools/oracle/generate.mjs` | regenerates 8 committed fixture sets |
-| Model/ MQTT transcripts | `node tools/oracle/model-transcript.mjs`, `node tools/oracle/mqtt-transcript.mjs` | both report match |
+| Model/ MQTT transcripts | `node tools/oracle/model-transcript.mjs`, `node tools/oracle/mqtt-transcript.mjs` | both report match; MQTT compares publishes/subscriptions element-wise (order + duplicates) and asserts a new subscriber receives retained `bridge/state offline` |
 | Broker integrations | `cargo test -p z2m-rs --test mqtt_reconnect --test mqtt_broker` | reconnect green; real broker ignored unless `MQTT_TEST_SERVER` |
 | Fuzz/live oracle | `node tools/oracle/fuzz-corpus.mjs` (live), `cargo test -p zigbee-apiarist --test fuzz_boundaries` (offline replay) | 120-case corpus, 3 tests green |
 | HIL | packaged install/reboot, crash recovery, coordinator start | `docs/hil/2026-11-17-*` and `docs/hil/2026-11-18-*`, separate from the software gate |
