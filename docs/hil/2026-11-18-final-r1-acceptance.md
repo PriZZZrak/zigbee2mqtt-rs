@@ -95,7 +95,10 @@ database.db        rewritten by the Rust port (7442 bytes); Node reopened it and
 state.json         44136fa3… (`{}`, 2 bytes)
 ```
 
-`configuration.yaml` is byte-identical. **Follow-up:** the `state.json` reset
+`configuration.yaml` is byte-identical. **Follow-up (2026-11-19):** the
+database writer and YAML writer were aligned with the upstream formats
+(`database-format-parity-plan.md`); the format differences below are fixed in
+the current tree and covered by Node golden tests. The `state.json` reset
 was traced to `Controller::stop` pruning the cache without a herdsman
 controller and fixed; the repeat run with a non-empty state file
 ([2026-11-18-cp12-repeat.md](2026-11-18-cp12-repeat.md)) keeps the same 3 keys

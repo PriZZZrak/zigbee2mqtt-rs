@@ -65,8 +65,10 @@ pub fn write_if_changed(file: impl AsRef<Path>, content: &Value) -> Result<(), Y
     let file = file.as_ref();
     let before = read_if_exists(file, None)?;
     if &before != content {
-        let serialized = serde_yaml_ng::to_string(content)
-            .map_err(|error| YAMLFileException::new(error.to_string(), file))?;
+        // Match upstream `js-yaml.dump(content)` byte-for-byte (sequence
+        // indentation, scalar quoting and folding) instead of the different
+        // `serde_yaml_ng` emitter.
+        let serialized = crate::util::yaml_dump::dump(content);
         // Rollback-safe: write a sibling temp file and rename it over the
         // target, so a crash mid-write cannot truncate the configuration.
         let temporary = file.with_extension("yaml.tmp");

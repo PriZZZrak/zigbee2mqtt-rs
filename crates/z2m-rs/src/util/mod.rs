@@ -12,4 +12,5 @@ pub mod stringify;
 pub mod system;
 pub mod utils;
 pub mod yaml;
+pub mod yaml_dump;
 pub mod process;

@@ -4,7 +4,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use tokio::sync::Mutex;
 
 use crate::adapter::events::ZclPayload;
@@ -456,27 +456,44 @@ impl Endpoint {
             .unwrap()
             .iter()
             .map(|entry| {
-                json!({
-                    "cluster": entry.cluster,
-                    "attrId": entry.attr_id,
-                    "minRepIntval": entry.min_rep_intval,
-                    "maxRepIntval": entry.max_rep_intval,
-                    "repChange": entry.rep_change,
-                    "manufacturerCode": entry.manufacturer_code,
-                })
+                let mut map = Map::new();
+                map.insert("cluster".to_string(), json!(entry.cluster));
+                map.insert("attrId".to_string(), json!(entry.attr_id));
+                map.insert("minRepIntval".to_string(), json!(entry.min_rep_intval));
+                map.insert("maxRepIntval".to_string(), json!(entry.max_rep_intval));
+                map.insert("repChange".to_string(), json_number(entry.rep_change));
+                // Upstream keeps `manufacturerCode` in the object even when it
+                // is `undefined`; `JSON.stringify` then drops it. Omit it.
+                if let Some(code) = entry.manufacturer_code {
+                    map.insert("manufacturerCode".to_string(), json!(code));
+                }
+                Value::Object(map)
             })
             .collect::<Vec<_>>();
-        json!({
-            "profId": *self.profile_id.lock().unwrap(),
-            "epId": self.ID,
-            "devId": *self.device_id.lock().unwrap(),
-            "inClusterList": *self.input_clusters.lock().unwrap(),
-            "outClusterList": *self.output_clusters.lock().unwrap(),
-            "clusters": self.clusters.lock().unwrap().clone(),
-            "binds": binds,
-            "configuredReportings": reportings,
-            "meta": self.meta.lock().unwrap().clone(),
-        })
+        let mut record = Map::new();
+        if let Some(prof_id) = *self.profile_id.lock().unwrap() {
+            record.insert("profId".to_string(), json!(prof_id));
+        }
+        record.insert("epId".to_string(), json!(self.ID));
+        if let Some(dev_id) = *self.device_id.lock().unwrap() {
+            record.insert("devId".to_string(), json!(dev_id));
+        }
+        record.insert(
+            "inClusterList".to_string(),
+            json!(*self.input_clusters.lock().unwrap()),
+        );
+        record.insert(
+            "outClusterList".to_string(),
+            json!(*self.output_clusters.lock().unwrap()),
+        );
+        record.insert(
+            "clusters".to_string(),
+            self.clusters.lock().unwrap().clone(),
+        );
+        record.insert("binds".to_string(), json!(binds));
+        record.insert("configuredReportings".to_string(), json!(reportings));
+        record.insert("meta".to_string(), self.meta.lock().unwrap().clone());
+        Value::Object(record)
     }
 
     /// Upstream `create(id, profileID, deviceID, inputClusters, outputClusters, ...)`.
@@ -2334,18 +2351,40 @@ fn bind_from_value(value: &Value) -> Option<BindInternal> {
 }
 
 fn bind_to_value(bind: &BindInternal) -> Value {
-    // Upstream database shape: endpoint binds keep type/endpointID/deviceIeeeAddr,
-    // group binds keep type/groupID. The cluster is not persisted.
+    // Upstream `addBindingInternal` (`endpoint.js:469-481`) persists:
+    //   endpoint: {cluster, type, deviceIeeeAddress, endpointID}
+    //   group:    {cluster, groupID, type}
+    let mut map = Map::new();
+    map.insert("cluster".to_string(), json!(bind.cluster));
     if bind.r#type == "endpoint" {
-        json!({
-            "type": "endpoint",
-            "endpointID": bind.endpoint_id,
-            "deviceIeeeAddr": bind.device_ieee_address,
-        })
+        map.insert("type".to_string(), json!("endpoint"));
+        if let Some(address) = &bind.device_ieee_address {
+            map.insert("deviceIeeeAddress".to_string(), json!(address));
+        }
+        if let Some(endpoint_id) = bind.endpoint_id {
+            map.insert("endpointID".to_string(), json!(endpoint_id));
+        }
     } else {
-        json!({
-            "type": "group",
-            "groupID": bind.group_id,
-        })
+        if let Some(group_id) = bind.group_id {
+            map.insert("groupID".to_string(), json!(group_id));
+        }
+        map.insert("type".to_string(), json!("group"));
     }
+    Value::Object(map)
+}
+
+/// `JSON.stringify` prints integral numbers without a fractional part
+/// (`0`, not `0.0`). `repChange` is an `f64` in the model.
+fn json_number(value: f64) -> Value {
+    if value == 0.0 {
+        return json!(0);
+    }
+    if value.is_finite() && value.fract() == 0.0 && value.abs() <= 9_007_199_254_740_992.0 {
+        return if value < 0.0 {
+            json!(value as i64)
+        } else {
+            json!(value as u64)
+        };
+    }
+    json!(value)
 }

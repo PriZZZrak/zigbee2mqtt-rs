@@ -133,6 +133,18 @@ impl Group {
         )
     }
 
+    /// Test/embedding hook: load a group from a database entry.
+    #[doc(hidden)]
+    pub fn test_from_database_entry(entry: &Value) -> Arc<Group> {
+        Self::from_database_entry(entry)
+    }
+
+    /// Test/embedding hook: the exact database record this group would write.
+    #[doc(hidden)]
+    pub fn test_database_record(&self) -> Value {
+        self.to_database_record()
+    }
+
     /// Upstream `toDatabaseRecord()`.
     fn to_database_record(&self) -> Value {
         let mut members = Vec::new();

@@ -177,7 +177,12 @@ impl Database {
         );
         let mut lines = String::new();
         for (_, entry) in &self.entries {
-            lines.push_str(&serde_json::to_string(entry).unwrap_or_default());
+            // `JSON.stringify` prints integral numbers without a fractional
+            // part (an `f64` 0.0 becomes `0`). Normalize before serializing so
+            // a Rust-written line is byte-identical to the Node writer.
+            let mut normalized = entry.clone();
+            normalize_js_numbers(&mut normalized);
+            lines.push_str(&serde_json::to_string(&normalized).unwrap_or_default());
             lines.push('\n');
         }
 
@@ -245,6 +250,41 @@ impl Database {
     /// Not upstream: convenience used by tooling/tests.
     pub fn path(&self) -> &Path {
         &self.path
+    }
+}
+
+/// Match `JSON.stringify` number formatting for values produced as `f64`
+/// (integral values lose the `.0` suffix; `-0` becomes `0`).
+fn normalize_js_numbers(value: &mut Value) {
+    match value {
+        Value::Number(number) if number.is_f64() => {
+            let Some(value_f64) = number.as_f64() else {
+                return;
+            };
+            if value_f64 == 0.0 {
+                *value = Value::from(0);
+            } else if value_f64.is_finite()
+                && value_f64.fract() == 0.0
+                && value_f64.abs() <= 9_007_199_254_740_992.0
+            {
+                *value = if value_f64 < 0.0 {
+                    Value::from(value_f64 as i64)
+                } else {
+                    Value::from(value_f64 as u64)
+                };
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                normalize_js_numbers(item);
+            }
+        }
+        Value::Object(map) => {
+            for item in map.values_mut() {
+                normalize_js_numbers(item);
+            }
+        }
+        _ => {}
     }
 }
 

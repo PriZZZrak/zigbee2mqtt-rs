@@ -1127,34 +1127,110 @@ impl Device {
             endpoint_map.insert(endpoint.ID.to_string(), endpoint.to_database_record());
         }
         let interview_state = self.interview_state();
-        json!({
-            "id": self.id,
-            "type": self.r#type().as_str(),
-            "ieeeAddr": self.ieee_addr(),
-            "nwkAddr": self.network_address(),
-            "manufId": self.manufacturer_id(),
-            "manufName": self.manufacturer_name(),
-            "powerSource": self.power_source(),
-            "modelId": self.model_id(),
-            "epList": ep_list,
-            "endpoints": Value::Object(endpoint_map),
-            "appVersion": self.application_version(),
-            "stackVersion": self.stack_version(),
-            "hwVersion": self.hardware_version(),
-            "dateCode": self.date_code(),
-            "swBuildId": self.software_build_id(),
-            "zclVersion": self.zcl_version(),
-            "interviewCompleted": interview_state == InterviewState::Successful,
-            "interviewState": if interview_state == InterviewState::InProgress {
+        // Upstream `toDatabaseEntry()` returns every property, and
+        // `JSON.stringify` drops the ones whose value is `undefined`. Build the
+        // map explicitly so absent optional fields are omitted (not `null`),
+        // and keep the upstream property order for byte-identical output.
+        let mut entry = Map::new();
+        entry.insert("id".to_string(), json!(self.id));
+        entry.insert("type".to_string(), json!(self.r#type().as_str()));
+        entry.insert("ieeeAddr".to_string(), json!(self.ieee_addr()));
+        entry.insert("nwkAddr".to_string(), json!(self.network_address()));
+        insert_some(
+            &mut entry,
+            "manufId",
+            self.manufacturer_id().map(Value::from),
+        );
+        insert_some(
+            &mut entry,
+            "manufName",
+            self.manufacturer_name().map(Value::from),
+        );
+        insert_some(
+            &mut entry,
+            "powerSource",
+            self.power_source_for_database().map(Value::from),
+        );
+        insert_some(&mut entry, "modelId", self.model_id().map(Value::from));
+        entry.insert("epList".to_string(), json!(ep_list));
+        entry.insert("endpoints".to_string(), Value::Object(endpoint_map));
+        insert_some(
+            &mut entry,
+            "appVersion",
+            self.application_version().map(Value::from),
+        );
+        insert_some(
+            &mut entry,
+            "stackVersion",
+            self.stack_version().map(Value::from),
+        );
+        insert_some(
+            &mut entry,
+            "hwVersion",
+            self.hardware_version().map(Value::from),
+        );
+        insert_some(&mut entry, "dateCode", self.date_code().map(Value::from));
+        insert_some(
+            &mut entry,
+            "swBuildId",
+            self.software_build_id().map(Value::from),
+        );
+        insert_some(
+            &mut entry,
+            "zclVersion",
+            self.zcl_version().map(Value::from),
+        );
+        entry.insert(
+            "interviewCompleted".to_string(),
+            json!(interview_state == InterviewState::Successful),
+        );
+        entry.insert(
+            "interviewState".to_string(),
+            json!(if interview_state == InterviewState::InProgress {
                 InterviewState::Pending.as_str()
             } else {
                 interview_state.as_str()
-            },
-            "meta": self.meta.lock().unwrap().clone(),
-            "lastSeen": self.last_seen(),
-            "checkinInterval": self.checkin_interval(),
-            "gpSecurityKey": self.gp_security_key(),
-        })
+            }),
+        );
+        entry.insert("meta".to_string(), self.meta.lock().unwrap().clone());
+        insert_some(&mut entry, "lastSeen", self.last_seen().map(Value::from));
+        insert_some(
+            &mut entry,
+            "checkinInterval",
+            self.checkin_interval().map(Value::from),
+        );
+        insert_some(
+            &mut entry,
+            "gpSecurityKey",
+            self.gp_security_key().map(|key| json!(key)),
+        );
+        Value::Object(entry)
+    }
+
+    /// Upstream `get powerSource()` (`device.js:166-168`): code 0 (and an
+    /// unknown code) is observable as `undefined`, which `JSON.stringify`
+    /// omits. The internal genBasic value keeps the numeric code.
+    fn power_source_for_database(&self) -> Option<String> {
+        let gen_basic = self.gen_basic.lock().unwrap();
+        let code = match gen_basic.get("powerSource")? {
+            Value::Number(number) => number.as_u64()? as u8,
+            Value::String(name) => crate::zspec::zcl::definition::consts::power_sources()
+                .iter()
+                .find_map(|(code, candidate)| (*candidate == name).then_some(*code))?,
+            _ => return None,
+        };
+        if code == 0 {
+            return None;
+        }
+        crate::zspec::zcl::definition::consts::power_sources()
+            .get(&code)
+            .map(|name| (*name).to_string())
+    }
+
+    /// Test/embedding hook: the exact database entry this device would write.
+    #[doc(hidden)]
+    pub fn test_database_entry(&self) -> Value {
+        self.to_database_entry()
     }
 
     pub fn save(&self, write_database: bool) {
@@ -2375,6 +2451,12 @@ impl Device {
 
     fn arc_self(self: &Arc<Self>) -> Arc<Self> {
         self.clone()
+    }
+}
+
+fn insert_some(map: &mut Map<String, Value>, key: &str, value: Option<Value>) {
+    if let Some(value) = value {
+        map.insert(key.to_string(), value);
     }
 }
 

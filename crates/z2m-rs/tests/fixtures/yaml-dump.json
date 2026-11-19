@@ -1,0 +1,70 @@
+{
+  "homeassistant": {
+    "enabled": false
+  },
+  "mqtt": {
+    "base_topic": "zigbee2mqtt",
+    "server": "mqtt://localhost"
+  },
+  "advanced": {
+    "log_output": [
+      "console",
+      "file"
+    ],
+    "log_level": "warning",
+    "log_directory": "/tmp/log/zigbee2mqtt/%TIMESTAMP%",
+    "last_seen": "ISO_8601",
+    "nested": {
+      "deeper": [
+        1,
+        2,
+        {
+          "three": "four"
+        }
+      ]
+    }
+  },
+  "frontend": {
+    "enabled": true,
+    "port": 8080,
+    "host": "127.0.0.1"
+  },
+  "devices": {
+    "0x00124b0000000001": {
+      "friendly_name": "Test lamp"
+    },
+    "0x00124b0000000002": {
+      "friendly_name": "Test sensor"
+    }
+  },
+  "groups": {
+    "1": {
+      "friendly_name": "Test group"
+    }
+  },
+  "empty_map": {},
+  "empty_list": [],
+  "null_value": null,
+  "scalars": {
+    "empty": "",
+    "yes": "yes",
+    "no": "no",
+    "on": "on",
+    "off": "off",
+    "y": "y",
+    "n": "n",
+    "number": "123",
+    "hex": "0x10",
+    "date": "2026-01-01",
+    "time": "12:34:56",
+    "exponent": "1e3",
+    "colon": "a: b",
+    "hash": "a # b",
+    "url": "http://localhost/a#b",
+    "quote": "a'b",
+    "double_quote": "a\"b",
+    "tab": "a\tb",
+    "multiline": "line1\nline2",
+    "long": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word"
+  }
+}

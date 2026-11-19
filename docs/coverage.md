@@ -39,7 +39,7 @@ Artifacts (not committed):
 | Linker | `/tmp/opencode/zigcc-cov` (Zig cc wrapper; forwards `-u` to `-Wl,-u`) |
 | Included crates | `zigbee-apiarist`, `zigbee-converters`, `z2m-rs` |
 | Excluded from report | `tests/`, `examples/`, `benches/`, registry/rustlib, `target/`, external C/asm |
-| Excluded from execution | 12 `#[ignore]` tests: 11 HIL ZNP (`hil_znp.rs`, requires `Z2M_SERIAL_PORT`) and 1 real-broker test (`mqtt_broker.rs`, requires `MQTT_TEST_SERVER`); 7 further markers live in upstream stub-file modules that cargo does not collect as test targets |
+| Excluded from execution | 14 `#[ignore]` tests: 11 HIL ZNP (`hil_znp.rs`, requires `Z2M_SERIAL_PORT`), 1 real-broker test (`mqtt_broker.rs`, requires `MQTT_TEST_SERVER`) and 2 real-database tests (`database_roundtrip.rs`, require `Z2M_NODE_DB`); 7 further markers live in upstream stub-file modules that cargo does not collect as test targets |
 
 ## Result
 
@@ -85,6 +85,11 @@ own row. The stable run stays the primary software gate (it is the pinned
 toolchain); the nightly run adds the branch metric the audit asked for. The
 nightly toolchain is not committed or required to build the project.
 
+The percentages above were measured on `6dbbd7c`; the 2026-11-19 database/YAML
+format change adds tests (workspace 1577 passed) but does not re-measure
+coverage. The stable/nightly numbers are therefore historical for that code
+baseline, not a claim for the format-parity commit.
+
 The overall percentage is intentionally **not** the acceptance criterion. CP-06
 closed every `code`/`slice` row and CP-07 closed every adapter row with named
 tests; coverage is supporting evidence, not a replacement for those scenarios.
@@ -118,7 +123,10 @@ Error/retry/cancellation/persistence/reconnect specifically:
 |---|---|---|
 | Format | `cargo fmt --all -- --check` | **fails on 134 pre-existing files** (repo-wide drift); every Rust file changed for this audit passes `rustfmt --check`, repo-wide reformat is a separate change |
 | Lints | `cargo clippy --workspace --all-targets` | exit 0 (warnings only) |
-| Workspace tests | `cargo test --workspace` | 78 suites / 1568 passed, 0 failed, 12 ignored (final run on `6dbbd7c`) |
+| Workspace tests | `cargo test --workspace` | 80 suites / 1577 passed, 0 failed, 14 ignored (format-parity tree, 2026-11-19) |
+| DB format | `cargo test -p zigbee-apiarist --test database_roundtrip -- --include-ignored` (with `Z2M_NODE_DB`) | 8 passed; Node golden, real Node DB and Node rewrite are byte-identical |
+| YAML format | `cargo test -p z2m-rs --test yaml_dump` | 3 passed; `js-yaml.dump` golden is byte-identical and idempotent |
+| DB oracle | `node tools/oracle/db-roundtrip.mjs <database.db>` | `OK: 7081 bytes preserved through Node -> Rust -> Node` |
 | Map checker | `node tools/docs/check-parity-maps.mjs` | `OK: 11 maps checked, 0 errors` |
 | Node oracle | `node tools/oracle/generate.mjs` | regenerates 8 committed fixture sets |
 | Model/ MQTT transcripts | `node tools/oracle/model-transcript.mjs`, `node tools/oracle/mqtt-transcript.mjs` | both report match; MQTT compares publishes/subscriptions element-wise (order + duplicates) and asserts a new subscriber receives retained `bridge/state offline` |
