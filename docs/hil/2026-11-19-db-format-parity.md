@@ -85,7 +85,9 @@ kill -INT <rust pid>          -> "Stopped Zigbee2MQTT"
 zigbee2mqtt/bridge/state      -> {"state":"online"}
 zigbee2mqtt/bridge/devices    -> Coordinator + 3 devices
 configuration.yaml            unchanged (1756e7f2…)
-database.db                   unchanged (a39ff2c6…, canonical, clusters restored)
+database.db                   a39ff2c6… immediately after Rust stop; Node then
+                              rewrote runtime lastSeen values (088a5321…), keeping
+                              the canonical field/bind shape and all clusters
 state.json                    unchanged (8295ef…)
 ```
 
