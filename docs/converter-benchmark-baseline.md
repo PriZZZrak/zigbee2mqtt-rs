@@ -175,7 +175,7 @@ Profiles and summaries:
   `blockingUpperBoundMs` is the relevant upper bound. Event-loop/queue latency
   during startup, interview and persistence must be measured in the bridge
   integration run (CP-05/CP-12), not inferred from this harness.
-- p99 spikes on the router (10–100 ms in heavy cases) coincide with background
+- p99 spikes on the router (10–140 ms in heavy cases) coincide with background
   Node service load; p50/p95 medians are the stable comparison points.
 
 ## Acceptance criteria for the Rust runtime
