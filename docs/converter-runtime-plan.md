@@ -1,8 +1,9 @@
 # Converter runtime plan (post-R1)
 
-Status: proposed for external audit. Date: 2026-11-20.
+Status: proposed for external audit; Node.js baseline measured 2026-11-20.
 Scope: external converters first, then the full upstream device database.
-This document is a plan, not an implementation claim.
+This document is a plan, not an implementation claim. The measured baseline is
+[`converter-benchmark-baseline.md`](converter-benchmark-baseline.md).
 
 ## 1. Position relative to R1
 
