@@ -32,8 +32,8 @@ Artifacts (not committed):
 
 | Item | Value |
 |---|---|
-| Date | 2026-11-18 |
-| Commit | `6dbbd7c` (`fix(audit): close CP-02…CP-06 gaps found in the re-review`) |
+| Date | 2026-11-20 |
+| Code revision | `aa21502` (R1 final tree; docs/tag commit follows) |
 | Toolchain | `rustc 1.99.1 (58cf8f9c3 2026-10-13)` |
 | Coverage tool | rustup `llvm-tools-preview` 1.99.1 (`llvm-cov`, `llvm-profdata`) |
 | Linker | `/tmp/opencode/zigcc-cov` (Zig cc wrapper; forwards `-u` to `-Wl,-u`) |
@@ -44,14 +44,14 @@ Artifacts (not committed):
 ## Result
 
 ```text
-TOTAL  regions 73.17%   functions 74.75% (2573/3442)   lines 72.94% (25628/35134)
+TOTAL  regions 73.33%   functions 75.06% (2609/3476)   lines 73.11% (26007/35573)
 ```
 
 | Crate | Lines | Functions |
 |---|---:|---:|
-| `zigbee-apiarist` | 67.85% (13215/19477) | 71.24% (1251/1756) |
+| `zigbee-apiarist` | 68.07% (13345/19605) | 71.57% (1264/1766) |
 | `zigbee-converters` | 79.81% (336/421) | 78.18% (43/55) |
-| `z2m-rs` | 79.27% (12074/15231) | 78.47% (1276/1626) |
+| `z2m-rs` | 79.29% (12323/15542) | 78.73% (1299/1650) |
 
 ## Branch coverage (nightly)
 
@@ -67,28 +67,23 @@ CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=/tmp/opencode/zigcc-cov \
 
 | Item | Value |
 |---|---|
-| Date | 2026-11-18 |
-| Commit | `6dbbd7c` |
+| Date | 2026-11-20 |
+| Code revision | `aa21502` |
 | Toolchain | `rustc 1.102.0-nightly (59cbdee2e 2026-11-17)` |
 | Tool | rustup nightly `llvm-tools-preview` (`llvm-cov`, `llvm-profdata`) |
-| Result | `TOTAL regions 71.69% functions 74.10% (2586/3490) lines 71.76% (24038/33499) branches 73.11% (3470/4746)` |
+| Result | `TOTAL regions 71.85% functions 74.40% (2622/3524) lines 71.94% (24405/33925) branches 72.56% (3593/4952)` |
 
 | Crate | Lines | Functions | Branches |
 |---|---:|---:|---:|
-| `zigbee-apiarist` | 66.61% (12450/18692) | 70.04% (1258/1796) | 78.40% (1695/2162) |
+| `zigbee-apiarist` | 66.83% (12581/18825) | 70.38% (1271/1806) | 78.34% (1725/2202) |
 | `zigbee-converters` | 79.46% (321/404) | 77.19% (44/57) | 63.75% (51/80) |
-| `z2m-rs` | 78.24% (11263/14396) | 78.53% (1280/1630) | 68.85% (1724/2504) |
+| `z2m-rs` | 78.28% (11499/14689) | 78.78% (1303/1654) | 68.05% (1817/2670) |
 
 The absolute values differ slightly from the stable run because the compiler
 and coverage mapping differ between toolchains; use each table only within its
 own row. The stable run stays the primary software gate (it is the pinned
 toolchain); the nightly run adds the branch metric the audit asked for. The
 nightly toolchain is not committed or required to build the project.
-
-The percentages above were measured on `6dbbd7c`; the 2026-11-19 database/YAML
-format change adds tests (workspace 1577 passed) but does not re-measure
-coverage. The stable/nightly numbers are therefore historical for that code
-baseline, not a claim for the format-parity commit.
 
 The overall percentage is intentionally **not** the acceptance criterion. CP-06
 closed every `code`/`slice` row and CP-07 closed every adapter row with named
@@ -123,7 +118,7 @@ Error/retry/cancellation/persistence/reconnect specifically:
 |---|---|---|
 | Format | `cargo fmt --all -- --check` | **fails on 134 pre-existing files** (repo-wide drift); every Rust file changed for this audit passes `rustfmt --check`, repo-wide reformat is a separate change |
 | Lints | `cargo clippy --workspace --all-targets` | exit 0 (warnings only) |
-| Workspace tests | `cargo test --workspace` | 80 suites / 1577 passed, 0 failed, 14 ignored (format-parity tree, 2026-11-19) |
+| Workspace tests | `cargo test --workspace` | 80 suites / 1577 passed, 0 failed, 14 ignored (R1 final tree, 2026-11-20) |
 | DB format | `cargo test -p zigbee-apiarist --test database_roundtrip -- --include-ignored` (with `Z2M_NODE_DB`) | 8 passed; Node golden, real Node DB and Node rewrite are byte-identical |
 | YAML format | `cargo test -p z2m-rs --test yaml_dump` | 3 passed; `js-yaml.dump` golden is byte-identical and idempotent |
 | DB oracle | `node tools/oracle/db-roundtrip.mjs <database.db>` | `OK: 7081 bytes preserved through Node -> Rust -> Node` |

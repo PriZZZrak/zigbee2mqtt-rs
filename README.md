@@ -1,151 +1,113 @@
 # zigbee2mqtt-rs
 
-Чистый Rust-мост Zigbee → MQTT для embedded ARM / OpenWrt, цель — заменить
-Zigbee2MQTT без изменения MQTT-потребителей, сущностей Home Assistant и
-операционных ожиданий.
+Rust-реализация Zigbee2MQTT для embedded ARM / OpenWrt. Цель — заменить
+Node.js-мост, сохранив MQTT-контракты, сущности Home Assistant, API Windfront,
+формат данных и операционные ожидания.
 
-> **Статус: чистый старт (2026-11-06).** В `main` начинается новая реализация.
-> Первая Rust-попытка отправлена в архив. Тестовый роутер сейчас работает на
-> оригинальном Node.js Zigbee2MQTT; Rust-бинарник на нём не развёрнут.
+Текущий статус: **R1 (ядро) закрыт**. Тестовый роутер пока работает на
+оригинальном Node.js Zigbee2MQTT; Rust-бинарник проверен через HIL, но
+постоянным сервисом не развёрнут.
 
-## Решение по R1
+- R1 final tag: `r1-2026-11-20`
+- R1 acceptance: [`docs/test-coverage-audit.md`](docs/test-coverage-audit.md)
+  (CP-01…CP-12, все `CLOSED`)
+- HIL: [`docs/hil/2026-11-18-final-r1-acceptance.md`](docs/hil/2026-11-18-final-r1-acceptance.md),
+  [`docs/hil/2026-11-18-cp12-repeat.md`](docs/hil/2026-11-18-cp12-repeat.md),
+  [`docs/hil/2026-11-19-db-format-parity.md`](docs/hil/2026-11-19-db-format-parity.md)
+- Следующий этап: [`docs/converter-runtime-plan.md`](docs/converter-runtime-plan.md)
+  (внешние конвертеры и полная база устройств)
 
-R1 — это **milestone ядра**, а не каталога устройств:
+## Что входит в R1
 
-- ZNP / координатор и Zigbee stack;
-- MQTT bridge API;
-- Home Assistant discovery;
-- HTTP/WebSocket backend для Windfront;
-- хранение, state cache, импорт/миграции и операции.
-
-R1 сознательно исключает `zigbee-herdsman-converters`, JavaScript-движки
-(Boa), vendor-specific quirk’и и полный каталог устройств. Ядро должно быть
-**полностью рабочим** — без заглушек, неограниченных ожиданий и дедлоков.
-
-- Железо: Routerich AX3000 v1, OpenWrt 24.10.8 (aarch64), SONOFF Dongle-P
-  (TI CC2652P / Z-Stack).
-- Ограничение: **pure Rust, без C-зависимостей**.
-- Разработка ведётся напрямую в `main`.
-
-## Что случилось с v1
-
-Первая реализация встраивала **Boa** для исполнения upstream-пакета
-конвертеров. На x86 она работала, на 2-ядерном роутере — нет:
-
-- модули конвертеров переоценивались на каждое устройство/сессию, а не один
-  раз на пакет;
-- генерация определений/exposes ждалась event loop’ом моста;
-- process-wide Boa-lock и запись БД могли блокировать MQTT/фронтенд на
-  десятки секунд и приводить к дедлоку после interview/удаления.
-
-Node не виснет здесь потому, что `require` кэширует модули, V8/JIT исполняет
-их один раз, поиск определений идёт в памяти, а I/O асинхронный. Архив
-сохранён как доказательство:
-
-- ветка: [`archive/boa-js-host-20261106`](https://github.com/PriZZZrak/zigbee2mqtt-rs/tree/archive/boa-js-host-20261106) (коммит `502601f`);
-- тег: `archive-boa-js-host-20261106`;
-- внутри: предыдущий код, parity inventory, HIL-доказательства, OpenWrt-пакет
-  и исходный `AGENTS.md`.
-
-Не копируй converter-host из v1. Правила для переписывания — в
-[`AGENTS.md`](AGENTS.md).
-
-## Объём R1
-
-«100% рабочее» означает, что следующие поверхности завершены:
-
-- **ZNP/координатор**: serial transport, ZNP framing, сопоставление
-  SREQ/SRSP, старт/резюм без перезаписи NV, параметры сети, permit join,
-  reconnect, определение возможностей прошивки.
+- **ZNP / Z-Stack**: serial/TCP transport, UNPI framing, SREQ/SRSP matching,
+  timeouts, start/resume без перезаписи NV, network parameters, permit join,
+  soft reset/reconnect, firmware capabilities, backup/restore paths
+  (destructive restore запрещён на живой сети).
 - **Zigbee stack**: ZDO announce/address/descriptors/interview/bind; ZCL
   read/write/report/configure-reporting, default responses, группы,
-  кодеры/декодеры стандартных кластеров. Generic state/commands устройств —
-  **pending Q1**.
-- **MQTT**: `bridge/state`, `info`, `devices`, `converters`, `groups`,
-  `health`, `logging`; `bridge/request/*` для `options`, `permit_join`,
-  `device/rename`, `device/remove` (leave + block), `device/interview`,
-  `health_check`, `networkmap`, `restart`; device `set`/`get`; транзакции,
-  retained/QoS, reconnect.
-- **Состояние/хранение**: round-trip `database.db` NDJSON,
-  `configuration.yaml`, `state.json`, optimistic state, availability,
-  last seen; восстановление после restart, kill/respawn и reboot.
-- **Home Assistant**: bridge entities, device-registry discovery, очистка при
-  rename/remove. Per-device cluster discovery — **pending Q1**.
-- **Frontend**: немодифицированный Windfront через HTTP/WebSocket, включая
-  ответы bridge, replay состояния и диспетчеризацию команд через
-  WebSocket-шину.
-- **Операции**: CLI, логирование, сервис OpenWrt, сборка aarch64 musl,
-  инструменты импорта/миграции, rollback-safe persistence.
+  стандартные кластеры; controller model (Device/Endpoint/Group).
+- **MQTT bridge**: `bridge/state`, `info`, `devices`, `groups`, `health`,
+  `logging`, `definitions`; `bridge/request/*` для `options`, `permit_join`,
+  `device/rename`, `device/remove`, `device/interview`, `health_check`,
+  `networkmap`, `restart`; device `set`/`get`, транзакции, retained/QoS,
+  reconnect и offline-state.
+- **Home Assistant**: bridge entities, device-registry discovery, cleanup при
+  rename/remove, availability. Per-device cluster discovery появляется вместе
+  с конвертерами.
+- **Frontend**: HTTP/WebSocket API и раздача Windfront из отдельного пакета
+  (`ZIGBEE2MQTT_FRONTEND_ASSETS`), SPA fallback, TLS, auth.
+- **Storage**: канонический `database.db` (NDJSON) и `configuration.yaml`
+  (js-yaml-совместимый вывод), `state.json`, optimistic state, availability,
+  last seen, restart/kill/reboot recovery.
+- **Operations**: CLI, логирование, OpenWrt service, aarch64 musl,
+  rollback-safe запись, импорт/миграции.
 
-### Вне R1
+R1 **не включает** каталог устройств и `zigbee-herdsman-converters`,
+пользовательский JS, OTA, сцены, другие адаптеры (ember/deconz/zigate/zboss/
+zoh/ezsp), CC2531-приёмку и live-HA. Это задача следующего этапа.
 
-- `zigbee-herdsman-converters`, Boa/JS, vendor-specific exposes/quirk’и.
-- Полный каталог устройств и per-model конфигурация.
-- Адаптеры кроме Z-Stack (ember, deconz, zigate, zboss, zoh, ezsp).
-- Приёмка CC2531 (R1 использует Dongle-P; CC2531 остаётся обязательным для
-  полного Stage 1 позже).
-- OTA-прошивка, сцены, полный функционал Windfront, проверка live HA.
+## Проверки
 
-## Решения и открытые вопросы
+Финальные software gates на R1-ревизии:
 
-Зафиксировано (2026-11-06):
-
-- **Q2:** для приёмки R1 достаточно HIL только с координатором Dongle-P;
-  реальное устройство не требуется.
-- **Q3:** список поверхностей MQTT/HA/Windfront/хранения выше — это и есть
-  определение «100% рабочее» для R1.
-
-Открыто:
-
-- **Q1:** входит ли в R1 generic state/commands стандартных ZCL-кластеров для
-  произвольных устройств, или слой устройств полностью вне R1? Пользователь
-  пока не определился. Device state/commands и per-device discovery остаются
-  заблокированными до ответа; остальное ядро можно делать.
-
-Отслеживается в [`AGENTS.md`](AGENTS.md) §5.
-
-## Работа с архивом
-
-```bash
-# посмотреть без переключения
-git show archive/boa-js-host-20261106:AGENTS.md
-git show archive/boa-js-host-20261106:docs/parity/README.md
-
-# переключиться на архивную реализацию
-git checkout archive/boa-js-host-20261106
-
-# вернуться в main
-git checkout main
+```text
+cargo test --workspace                 80 suites, 1577 passed, 0 failed, 14 ignored
+cargo clippy --workspace --all-targets exit 0 (warnings only)
+cargo fmt --all -- --check             fails on 134 pre-existing files; all changed files formatted
+node tools/docs/check-parity-maps.mjs  OK: 11 maps, 0 errors
+model transcript                       16/16 match
+MQTT transcript                        publishes/subscriptions match element-wise; offline retained received by a new subscriber
+DB oracle                              Node -> Rust -> Node, 7081 bytes preserved
+YAML/DB tests                          8 database + 3 YAML passed
+fuzz_boundaries                        3 passed
 ```
 
-На роутере сейчас Node.js-версия. Для тестов Rust на железе нужны явная
-пересборка, redeploy и согласование.
+Coverage: stable regions 73.33%, functions 75.06% (2609/3476), lines 73.11%;
+nightly branches 72.56% (3593/4952). Точные команды и per-crate таблицы —
+[`docs/coverage.md`](docs/coverage.md).
 
-## Принципы разработки
+## Сборка
 
-Полные правила: [`AGENTS.md`](AGENTS.md). Кратко:
-
-- измеряй на реальном роутере до выбора архитектуры;
-- никакого JS/интерпретатора конвертеров в мосту;
-- никакой повторной оценки модулей на устройство;
-- никакого process-wide lock, которого ждёт event loop;
-- ограничивай любое ожидание; ответ — до тяжёлой работы;
-- один event loop моста; тяжёлая работа — через worker’ы/каналы;
-- никаких заявлений о parity без исходников, тестов и железных доказательств.
-
-## Сборка (когда появится код)
+Требуется stable Rust, `cargo-zigbuild` и Zig для aarch64 musl.
 
 ```bash
 cargo build --release
-cargo build --release --target aarch64-unknown-linux-musl
-cargo test
+cargo test --workspace
+cargo clippy --workspace --all-targets
+
+# aarch64 musl (пример)
+PATH="/path/to/zig:$PATH" CC=zigcc CXX=zigcc \
+  cargo zigbuild --release -p z2m-rs --target aarch64-unknown-linux-musl
 ```
 
-Ожидаемый бинарник для роутера — статический aarch64 musl. Нативные/C-
-зависимости не допускаются.
+Бинарник не требует Node.js. Внешние конвертеры (следующий этап) будут
+исполняться встроенным JS-runtime; план и границы — в
+[`docs/converter-runtime-plan.md`](docs/converter-runtime-plan.md).
+
+## HIL
+
+Аппаратная приёмка R1: Routerich AX3000 v1, OpenWrt 24.10.8 (aarch64),
+SONOFF Dongle-P (CC2652P, Z-Stack3x0 20250321), живая сеть из 3 устройств.
+Проверены resume без commissioning, MQTT bridge API, permit join, networkmap,
+Windfront, HA bridge entities, сохранение `database.db`/`configuration.yaml`/
+`state.json`, interview и отклик во время записи.
+
+`state.json` после неудачного старта больше не очищается; формат БД/конфига
+приведён к upstream и проверен побайтово (см. HIL 2026-11-19).
+
+## Архив первой попытки
+
+Первая реализация с Boa и converter-host отправлена в архив:
+
+- ветка `archive/boa-js-host-20261106` (commit `502601f`);
+- тег `archive-boa-js-host-20261106`.
+
+Причина: per-device Boa-контексты, повторная загрузка модулей и синхронное
+ожидание в event loop давали 6–9 с на definitions и 30–40 с до первой
+команды на роутере. Архив используется как evidence, не как архитектура.
 
 ## Лицензия
 
-В архивной реализации учитывались GPL-3.0-последствия upstream-экосистемы.
-Лицензирование и атрибуция для переписывания должны быть подтверждены до
-распространения бинарников или скопированных fixtures.
+Код проекта — MIT. Upstream Zigbee2MQTT/zigbee-herdsman-converters имеют
+собственные лицензии; атрибуция и условия распространения бинарников и
+пакета конвертеров должны быть подтверждены до релиза.

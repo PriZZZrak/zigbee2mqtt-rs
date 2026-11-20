@@ -21,7 +21,7 @@ upstream-сценариев нельзя использовать как про�
 ## Статус выполнения плана (2026-11-18)
 
 Повторная проверка `9229287` (2026-11-18) выявила семь задач; все они закрыты
-на ревизии `6dbbd7c` и подтверждены новым HIL/гейтами (см. ниже). Отметки
+на ревизии `aa21502` (R1 final tree) и подтверждены новым HIL/гейтами (см. ниже). Отметки
 `CLOSED` и протоколы в §4 обновлены по этим доказательствам.
 
 - [x] **CP-01** — достоверность карт и статусов (CLOSED)
@@ -80,7 +80,7 @@ upstream-сценариев нельзя использовать как про�
 (`docs/hil/2026-11-18-cp12-repeat.md`). CP-05: отмена при живом MQTT и трёх
 расширениях, закрытие соединения/listeners/таймера, повторный старт. CP-01/06:
 checker считает классы построчно, генератор карты идемпотентен, lifecycle
-21-31 размечен. CP-11: stable+branch coverage и все гейты на `6dbbd7c`.
+21-31 размечен. CP-11: stable+branch coverage и все гейты на `aa21502` (2026-11-20).
 CP-12: повторный HIL (interview 29.4 с при health ~1.05 с, две записи конфига
 при health ~1.06 с, state сохранён через `kill -9`/respawn/stop).
 
@@ -676,16 +676,17 @@ Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
 
 - [x] Получить отчёт покрытия строк/функций/ветвей с перечнем crates и
   исключений. → `docs/coverage.md`; stable `tools/coverage.sh` →
-  `target/coverage/summary.txt` + `lcov.info`: regions 73.17%, functions
-  74.75% (2573/3442), lines 72.94% (25628/35134); crates `zigbee-apiarist`,
+  `target/coverage/summary.txt` + `lcov.info`: regions 73.33%, functions
+  75.06% (2609/3476), lines 73.11% (26007/35573); crates `zigbee-apiarist`,
   `zigbee-converters`, `z2m-rs`; tests/examples/registry/HIL excluded.
   Ветви: nightly `-Zcoverage-options=branch` → `target/coverage-branch/`:
-  branches 73.11% (3470/4746), при lines 71.76% и functions 74.10%
+  branches 72.56% (3593/4952), при lines 71.94% и functions 74.40%
   (`rustc 1.102.0-nightly`).
 - [x] Указать toolchain, инструмент, commit, команды и ignored tests. →
-  stable `rustc 1.99.1 (58cf8f9c3)`, rustup llvm-tools, commit `6dbbd7c`;
-  nightly `rustc 1.102.0-nightly (59cbdee2e)` для ветвей; 12 ignored
-  (11 HIL ZNP + 1 real broker; ещё 7 маркеров в stub-модулях cargo не собирает).
+  stable `rustc 1.99.1 (58cf8f9c3)`, rustup llvm-tools, commit `aa21502`;
+  nightly `rustc 1.102.0-nightly (59cbdee2e)` для ветвей; 14 ignored
+  (11 HIL ZNP + 1 real broker + 2 real database; ещё 7 маркеров в
+  stub-модулях cargo не собирает).
 - [x] Список непокрытых критических ветвей. → таблица в `docs/coverage.md`
   (transport, runtime_adapter, controller/model, mqtt reconnect, touchlink/GP)
   с указанием, где они покрыты HIL/сценарными тестами.
@@ -706,17 +707,18 @@ Parity: UNPI accept/reject + parsed fields vs pinned Node; Rust-only
 Статус: CLOSED
 Отчёт: target/coverage/summary.txt + lcov.info (stable),
   target/coverage-branch/summary.txt + lcov.info (nightly branch)
-Метрики stable: regions 73.17%, functions 74.75% (2573/3442),
-  lines 72.94% (25628/35134)
-Метрики branch (nightly): branches 73.11% (3470/4746), lines 71.76%,
-  functions 74.10% (2586/3490)
+Метрики stable: regions 73.33%, functions 75.06% (2609/3476),
+  lines 73.11% (26007/35573)
+Метрики branch (nightly): branches 72.56% (3593/4952), lines 71.94%,
+  functions 74.40% (2622/3524)
 Crates: zigbee-apiarist, zigbee-converters, z2m-rs
-Toolchain/commit: rustc 1.99.1 stable + 1.102.0-nightly, commit 6dbbd7c
+Toolchain/commit: rustc 1.99.1 stable + 1.102.0-nightly, commit aa21502
 Ignored: 12 (11 HIL ZNP + 1 real broker)
 Gates: workspace tests, clippy, map checker, Node oracle/transcripts, broker
   reconnect, fuzz offline+live; HIL отдельно
-Прогон (6dbbd7c): cargo test --workspace -> 78 suites, 1568 passed, 0 failed,
-  12 ignored; cargo clippy --workspace --all-targets -> exit 0 (warnings only);
+Прогон (aa21502, 2026-11-20): cargo test --workspace -> 80 suites,
+  1577 passed, 0 failed, 14 ignored; cargo clippy --workspace --all-targets ->
+  exit 0 (warnings only);
   cargo fmt --all -- --check -> 134 pre-existing files (all changed files clean);
   map checker -> OK 11 maps, 0 errors; model transcript -> 16/16 match; MQTT
   transcript -> match incl. offline qos0; fuzz_boundaries -> 3 passed
