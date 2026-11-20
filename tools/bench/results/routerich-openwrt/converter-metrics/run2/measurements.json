@@ -1,0 +1,2426 @@
+[
+  {
+    "id": "package-load",
+    "kind": "package",
+    "harnessTotalMs": 2509.046886,
+    "converterOnlyMs": 2509.046886,
+    "stats": {
+      "count": 1,
+      "meanMs": 2509.046886,
+      "p50Ms": 2509.046886,
+      "p95Ms": 2509.046886,
+      "p99Ms": 2509.046886,
+      "minMs": 2509.046886,
+      "maxMs": 2509.046886,
+      "totalMs": 2509.046886,
+      "opsPerSecond": 0.39855771750612073
+    },
+    "converterStats": {
+      "count": 1,
+      "meanMs": 2509.046886,
+      "p50Ms": 2509.046886,
+      "p95Ms": 2509.046886,
+      "p99Ms": 2509.046886,
+      "minMs": 2509.046886,
+      "maxMs": 2509.046886,
+      "totalMs": 2509.046886,
+      "opsPerSecond": 0.39855771750612073
+    },
+    "overheadStats": {
+      "count": 1,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": null,
+    "memory": {
+      "rssBefore": null,
+      "rssAfter": 52543488,
+      "maxRssBytes": 53338112,
+      "rssDelta": null
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 2509.046886,
+      "measured": false,
+      "note": "cold package load"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false
+  },
+  {
+    "id": "prepare-ikea-modern-extend",
+    "kind": "prepare",
+    "harnessTotalMs": 0.5088034099999732,
+    "converterOnlyMs": 0.5088034099999732,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.5088034099999732,
+      "p50Ms": 0.11425899999994726,
+      "p95Ms": 1.3469560000003185,
+      "p99Ms": 2.8551070000003165,
+      "minMs": 0.09748599999966245,
+      "maxMs": 26.572111000000405,
+      "totalMs": 50.880340999997316,
+      "opsPerSecond": 1965.395632863492
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.5088034099999732,
+      "p50Ms": 0.11425899999994726,
+      "p95Ms": 1.3469560000003185,
+      "p99Ms": 2.8551070000003165,
+      "minMs": 0.09748599999966245,
+      "maxMs": 26.572111000000405,
+      "totalMs": 50.880340999997316,
+      "opsPerSecond": 1965.395632863492
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 66.943,
+      "systemMs": 0.04,
+      "totalMs": 66.983
+    },
+    "memory": {
+      "rssBefore": 54829056,
+      "rssAfter": 53964800,
+      "maxRssBytes": 54829056,
+      "rssDelta": -733184
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 26.572111000000405,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 24.405408999999963
+    }
+  },
+  {
+    "id": "prepare-danfoss-thermostat",
+    "kind": "prepare",
+    "harnessTotalMs": 0.4900778800000808,
+    "converterOnlyMs": 0.4900778800000808,
+    "stats": {
+      "count": 50,
+      "meanMs": 0.4900778800000808,
+      "p50Ms": 0.31977400000050693,
+      "p95Ms": 0.4821990000000369,
+      "p99Ms": 6.706774999999652,
+      "minMs": 0.3139259999998103,
+      "maxMs": 6.706774999999652,
+      "totalMs": 24.50389400000404,
+      "opsPerSecond": 2040.492013228255
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.4900778800000808,
+      "p50Ms": 0.31977400000050693,
+      "p95Ms": 0.4821990000000369,
+      "p99Ms": 6.706774999999652,
+      "minMs": 0.3139259999998103,
+      "maxMs": 6.706774999999652,
+      "totalMs": 24.50389400000404,
+      "opsPerSecond": 2040.492013228255
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 14.284,
+      "systemMs": 9.05,
+      "totalMs": 23.334
+    },
+    "memory": {
+      "rssBefore": 54145024,
+      "rssAfter": 54407168,
+      "maxRssBytes": 54829056,
+      "rssDelta": 262144
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 6.706774999999652,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 152.48060200000054,
+      "prepareMs": 1.3898129999997764
+    }
+  },
+  {
+    "id": "prepare-tuya-sensor",
+    "kind": "prepare",
+    "harnessTotalMs": 0.46684589999993475,
+    "converterOnlyMs": 0.46684589999993475,
+    "stats": {
+      "count": 50,
+      "meanMs": 0.46684589999993475,
+      "p50Ms": 0.19020200000068144,
+      "p95Ms": 1.586631999999554,
+      "p99Ms": 6.644913000000088,
+      "minMs": 0.13372600000002421,
+      "maxMs": 6.644913000000088,
+      "totalMs": 23.34229499999674,
+      "opsPerSecond": 2142.034448626709
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.46684589999993475,
+      "p50Ms": 0.19020200000068144,
+      "p95Ms": 1.586631999999554,
+      "p99Ms": 6.644913000000088,
+      "minMs": 0.13372600000002421,
+      "maxMs": 6.644913000000088,
+      "totalMs": 23.34229499999674,
+      "opsPerSecond": 2142.034448626709
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 21.802,
+      "systemMs": 0,
+      "totalMs": 21.802
+    },
+    "memory": {
+      "rssBefore": 55107584,
+      "rssAfter": 55107584,
+      "maxRssBytes": 56889344,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 6.644913000000088,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 194.6171919999997,
+      "prepareMs": 3.650308999999652
+    }
+  },
+  {
+    "id": "fz-ikea-onoff",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 0.9323537100000431,
+    "converterOnlyMs": 0.07309076000001369,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.9323537100000431,
+      "p50Ms": 0.5574489999999059,
+      "p95Ms": 2.7622379999993427,
+      "p99Ms": 5.404830000000402,
+      "minMs": 0.3330070000001797,
+      "maxMs": 7.57099400000061,
+      "totalMs": 93.2353710000043,
+      "opsPerSecond": 1072.5543206128862
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.07309076000001369,
+      "p50Ms": 0.07055599999966944,
+      "p95Ms": 0.12433800000053452,
+      "p99Ms": 0.1947409999993397,
+      "minMs": 0.04316500000004453,
+      "maxMs": 0.29969100000016624,
+      "totalMs": 7.309076000001369,
+      "opsPerSecond": 13681.619947580415
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.8592629500000294,
+      "p50Ms": 0.48219999999946594,
+      "p95Ms": 2.7158419999996113,
+      "p99Ms": 5.323655000000144,
+      "minMs": 0.2887640000008105,
+      "maxMs": 7.4965140000003885,
+      "totalMs": 85.92629500000294,
+      "opsPerSecond": 1163.7881046773468
+    },
+    "cpu": {
+      "userMs": 78.194,
+      "systemMs": 0.693,
+      "totalMs": 78.887
+    },
+    "memory": {
+      "rssBefore": 55238656,
+      "rssAfter": 55238656,
+      "maxRssBytes": 56889344,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 7.57099400000061,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.43218699999943055
+    }
+  },
+  {
+    "id": "fz-ikea-brightness",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 0.5590530699999726,
+    "converterOnlyMs": 0.06190034999996897,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.5590530699999726,
+      "p50Ms": 0.35355100000015227,
+      "p95Ms": 1.6260269999993398,
+      "p99Ms": 2.8706499999998414,
+      "minMs": 0.333929999999782,
+      "maxMs": 2.911044999999831,
+      "totalMs": 55.905306999997265,
+      "opsPerSecond": 1788.738947449209
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.06190034999996897,
+      "p50Ms": 0.042856000000938366,
+      "p95Ms": 0.09217700000044715,
+      "p99Ms": 0.148576999999932,
+      "minMs": 0.039317999999184394,
+      "maxMs": 0.6006139999999505,
+      "totalMs": 6.190034999996897,
+      "opsPerSecond": 16154.997508099734
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.49715272000000366,
+      "p50Ms": 0.31323300000076415,
+      "p95Ms": 1.3011750000005122,
+      "p99Ms": 2.7220729999999094,
+      "minMs": 0.2943809999997029,
+      "maxMs": 2.826945999999225,
+      "totalMs": 49.71527200000037,
+      "opsPerSecond": 2011.4543474689078
+    },
+    "cpu": {
+      "userMs": 49.593,
+      "systemMs": 0.341,
+      "totalMs": 49.934
+    },
+    "memory": {
+      "rssBefore": 55238656,
+      "rssAfter": 55238656,
+      "maxRssBytes": 56889344,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 2.911044999999831,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.25260200000047917
+    }
+  },
+  {
+    "id": "fz-ikea-color-temp",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 1.2935019800000191,
+    "converterOnlyMs": 0.520934950000019,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.2935019800000191,
+      "p50Ms": 0.7324160000007396,
+      "p95Ms": 1.956572000000051,
+      "p99Ms": 9.028285999999753,
+      "minMs": 0.5011270000004515,
+      "maxMs": 31.283841999999822,
+      "totalMs": 129.3501980000019,
+      "opsPerSecond": 773.0950670829164
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.520934950000019,
+      "p50Ms": 0.2177480000000287,
+      "p95Ms": 0.35747599999922386,
+      "p99Ms": 0.514976999999817,
+      "minMs": 0.14926800000012008,
+      "maxMs": 30.636217999999644,
+      "totalMs": 52.093495000001894,
+      "opsPerSecond": 1919.6254733915696
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.7725670300000002,
+      "p50Ms": 0.5142839999989519,
+      "p95Ms": 1.5122289999999339,
+      "p99Ms": 7.235601000001225,
+      "minMs": 0.3510120000000825,
+      "maxMs": 8.513308999999936,
+      "totalMs": 77.25670300000002,
+      "opsPerSecond": 1294.386067704701
+    },
+    "cpu": {
+      "userMs": 77.29,
+      "systemMs": 0.037,
+      "totalMs": 77.327
+    },
+    "memory": {
+      "rssBefore": 55238656,
+      "rssAfter": 55238656,
+      "maxRssBytes": 56889344,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 31.283841999999822,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.20828400000027614
+    }
+  },
+  {
+    "id": "fz-ikea-color-xy",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 1.385903969999963,
+    "converterOnlyMs": 0.2321240900000521,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.385903969999963,
+      "p50Ms": 0.6633979999996882,
+      "p95Ms": 4.962257000000136,
+      "p99Ms": 10.759262999999919,
+      "minMs": 0.45396100000016304,
+      "maxMs": 22.74945100000059,
+      "totalMs": 138.5903969999963,
+      "opsPerSecond": 721.5507146573991
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.2321240900000521,
+      "p50Ms": 0.15788599999996222,
+      "p95Ms": 0.7134109999997236,
+      "p99Ms": 1.5730130000001736,
+      "minMs": 0.10887299999922107,
+      "maxMs": 2.8554149999999936,
+      "totalMs": 23.21240900000521,
+      "opsPerSecond": 4308.040582947576
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 1.1537798799999108,
+      "p50Ms": 0.4914309999994657,
+      "p95Ms": 3.8724419999998645,
+      "p99Ms": 10.571445999999924,
+      "minMs": 0.33377699999982724,
+      "maxMs": 22.569406000000527,
+      "totalMs": 115.37798799999109,
+      "opsPerSecond": 866.7164485482944
+    },
+    "cpu": {
+      "userMs": 145.26,
+      "systemMs": 0,
+      "totalMs": 145.26
+    },
+    "memory": {
+      "rssBefore": 55238656,
+      "rssAfter": 55517184,
+      "maxRssBytes": 56889344,
+      "rssDelta": 278528
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 22.74945100000059,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.2512939999996888
+    }
+  },
+  {
+    "id": "set-ikea-onoff",
+    "kind": "set",
+    "harnessTotalMs": 1.49005108999997,
+    "converterOnlyMs": 0.7688446100000056,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.49005108999997,
+      "p50Ms": 0.8289789999998902,
+      "p95Ms": 2.926049000000603,
+      "p99Ms": 13.462255000000368,
+      "minMs": 0.5482929999998305,
+      "maxMs": 28.381416000000172,
+      "totalMs": 149.005108999997,
+      "opsPerSecond": 671.1179279094519
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.7688446100000056,
+      "p50Ms": 0.43210999999973865,
+      "p95Ms": 2.086373999999523,
+      "p99Ms": 7.314928999999211,
+      "minMs": 0.2909959999997227,
+      "maxMs": 12.548098999999638,
+      "totalMs": 76.88446100000056,
+      "opsPerSecond": 1300.6529368788742
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.7212064799999643,
+      "p50Ms": 0.3696319999999105,
+      "p95Ms": 0.9141560000007303,
+      "p99Ms": 5.903032000001076,
+      "minMs": 0.2544499999994514,
+      "maxMs": 23.344218000000183,
+      "totalMs": 72.12064799999644,
+      "opsPerSecond": 1386.565467354161
+    },
+    "cpu": {
+      "userMs": 89.83,
+      "systemMs": 0,
+      "totalMs": 89.83
+    },
+    "memory": {
+      "rssBefore": 55517184,
+      "rssAfter": 55517184,
+      "maxRssBytes": 56889344,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 28.381416000000172,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.20297500000015134
+    }
+  },
+  {
+    "id": "set-ikea-brightness",
+    "kind": "set",
+    "harnessTotalMs": 1.1951371400000153,
+    "converterOnlyMs": 0.7004688800000349,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.1951371400000153,
+      "p50Ms": 0.7403410000006261,
+      "p95Ms": 3.507195999999567,
+      "p99Ms": 5.318577999999434,
+      "minMs": 0.5796080000000075,
+      "maxMs": 5.697443000000021,
+      "totalMs": 119.51371400000153,
+      "opsPerSecond": 836.7240599685382
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.7004688800000349,
+      "p50Ms": 0.42064399999981106,
+      "p95Ms": 2.526409000000058,
+      "p99Ms": 4.199986999999965,
+      "minMs": 0.3437030000004597,
+      "maxMs": 5.446532999999363,
+      "totalMs": 70.04688800000349,
+      "opsPerSecond": 1427.6151711407224
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.4946682599999804,
+      "p50Ms": 0.28253400000085094,
+      "p95Ms": 1.4252069999993182,
+      "p99Ms": 3.2025039999998626,
+      "minMs": 0.23529000000053202,
+      "maxMs": 4.751356999999189,
+      "totalMs": 49.466825999998036,
+      "opsPerSecond": 2021.5568308345469
+    },
+    "cpu": {
+      "userMs": 114.239,
+      "systemMs": 2.028,
+      "totalMs": 116.267
+    },
+    "memory": {
+      "rssBefore": 55517184,
+      "rssAfter": 55644160,
+      "maxRssBytes": 56889344,
+      "rssDelta": 126976
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 5.697443000000021,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.22274900000047637
+    }
+  },
+  {
+    "id": "set-ikea-color-temp",
+    "kind": "set",
+    "harnessTotalMs": 1.4614200099999652,
+    "converterOnlyMs": 0.6451041300000179,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.4614200099999652,
+      "p50Ms": 0.8631409999998141,
+      "p95Ms": 4.213606000000254,
+      "p99Ms": 8.091278999999304,
+      "minMs": 0.6049990000001344,
+      "maxMs": 9.887579999999616,
+      "totalMs": 146.14200099999653,
+      "opsPerSecond": 684.2659831926236
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.6451041300000179,
+      "p50Ms": 0.4818139999997584,
+      "p95Ms": 1.609099000000242,
+      "p99Ms": 2.8321020000003045,
+      "minMs": 0.3312370000003284,
+      "maxMs": 2.9519790000003923,
+      "totalMs": 64.51041300000179,
+      "opsPerSecond": 1550.137339843061
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.8163158799999474,
+      "p50Ms": 0.3728630000005069,
+      "p95Ms": 3.586062000000311,
+      "p99Ms": 6.482179999999062,
+      "minMs": 0.273761999999806,
+      "maxMs": 9.463087999999516,
+      "totalMs": 81.63158799999474,
+      "opsPerSecond": 1225.0159827836064
+    },
+    "cpu": {
+      "userMs": 131.62,
+      "systemMs": 19.896,
+      "totalMs": 151.516
+    },
+    "memory": {
+      "rssBefore": 55644160,
+      "rssAfter": 56131584,
+      "maxRssBytes": 56889344,
+      "rssDelta": 487424
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 9.887579999999616,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.5454460000000836
+    }
+  },
+  {
+    "id": "get-ikea-onoff",
+    "kind": "get",
+    "harnessTotalMs": 0.2265258399999675,
+    "converterOnlyMs": 0.06477489999999307,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.2265258399999675,
+      "p50Ms": 0.1600399999997535,
+      "p95Ms": 0.37586499999997613,
+      "p99Ms": 1.8236150000002453,
+      "minMs": 0.15365399999973306,
+      "maxMs": 2.0251280000002225,
+      "totalMs": 22.65258399999675,
+      "opsPerSecond": 4414.507413371222
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.06477489999999307,
+      "p50Ms": 0.03585500000008324,
+      "p95Ms": 0.09917899999982183,
+      "p99Ms": 0.30769299999974464,
+      "minMs": 0.033316000000013446,
+      "maxMs": 1.8894020000007004,
+      "totalMs": 6.477489999999307,
+      "opsPerSecond": 15438.07863848662
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.16175093999997445,
+      "p50Ms": 0.12410799999997835,
+      "p95Ms": 0.25660400000015215,
+      "p99Ms": 0.4577319999998508,
+      "minMs": 0.11933800000042538,
+      "maxMs": 1.7143570000007458,
+      "totalMs": 16.175093999997443,
+      "opsPerSecond": 6182.344288077448
+    },
+    "cpu": {
+      "userMs": 26.575,
+      "systemMs": 2.06,
+      "totalMs": 28.635
+    },
+    "memory": {
+      "rssBefore": 55918592,
+      "rssAfter": 55623680,
+      "maxRssBytes": 56889344,
+      "rssDelta": -294912
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 2.0251280000002225,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.23575200000050245
+    }
+  },
+  {
+    "id": "set-ikea-brightness-host-delay",
+    "kind": "set",
+    "harnessTotalMs": 3.9012338999999883,
+    "converterOnlyMs": 3.510004000000026,
+    "stats": {
+      "count": 20,
+      "meanMs": 3.9012338999999883,
+      "p50Ms": 3.2164300000004005,
+      "p95Ms": 5.687824999999975,
+      "p99Ms": 10.849669999999605,
+      "minMs": 2.1747809999997116,
+      "maxMs": 10.849669999999605,
+      "totalMs": 78.02467799999977,
+      "opsPerSecond": 256.32915780825215
+    },
+    "converterStats": {
+      "count": 20,
+      "meanMs": 3.510004000000026,
+      "p50Ms": 2.8919630000000325,
+      "p95Ms": 4.615168000000267,
+      "p99Ms": 10.13564199999928,
+      "minMs": 1.888017000000218,
+      "maxMs": 10.13564199999928,
+      "totalMs": 70.20008000000053,
+      "opsPerSecond": 284.89996022796345
+    },
+    "overheadStats": {
+      "count": 20,
+      "meanMs": 0.39122989999996205,
+      "p50Ms": 0.32308199999988574,
+      "p95Ms": 0.7140280000003258,
+      "p99Ms": 1.1815299999998388,
+      "minMs": 0.27522399999998015,
+      "maxMs": 1.1815299999998388,
+      "totalMs": 7.824597999999241,
+      "opsPerSecond": 2556.041856719277
+    },
+    "cpu": {
+      "userMs": 39.716,
+      "systemMs": 0.015,
+      "totalMs": 39.731
+    },
+    "memory": {
+      "rssBefore": 55623680,
+      "rssAfter": 55623680,
+      "maxRssBytes": 56889344,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 10.849669999999605,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 57.98114200000418,
+    "stateDrift": false,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 609.1165119999996,
+      "prepareMs": 0.23305900000013935
+    }
+  },
+  {
+    "id": "fz-lumi-occupancy",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 0.8966962099999728,
+    "converterOnlyMs": 0.21552681999999548,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.8966962099999728,
+      "p50Ms": 0.5228240000005826,
+      "p95Ms": 1.8008409999993091,
+      "p99Ms": 8.283096999999543,
+      "minMs": 0.41541200000028766,
+      "maxMs": 9.11538500000006,
+      "totalMs": 89.66962099999728,
+      "opsPerSecond": 1115.2048919667345
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.21552681999999548,
+      "p50Ms": 0.15142300000024989,
+      "p95Ms": 0.5470619999996416,
+      "p99Ms": 0.9031520000007731,
+      "minMs": 0.11602899999979854,
+      "maxMs": 1.4153580000001966,
+      "totalMs": 21.55268199999955,
+      "opsPerSecond": 4639.793785293268
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.6811693899999773,
+      "p50Ms": 0.3737090000013268,
+      "p95Ms": 1.4808359999997265,
+      "p99Ms": 8.103128999999171,
+      "minMs": 0.29684400000041933,
+      "maxMs": 8.727364000000307,
+      "totalMs": 68.11693899999773,
+      "opsPerSecond": 1468.0636192416594
+    },
+    "cpu": {
+      "userMs": 66.82,
+      "systemMs": 3.387,
+      "totalMs": 70.207
+    },
+    "memory": {
+      "rssBefore": 57618432,
+      "rssAfter": 57880576,
+      "maxRssBytes": 60243968,
+      "rssDelta": 262144
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 9.11538500000006,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "lumi.js",
+      "index": 59,
+      "source": "package",
+      "model": "RTCGQ01LM",
+      "vendor": "Xiaomi",
+      "loadMs": 801.5694629999998,
+      "prepareMs": 0.934544000000642
+    }
+  },
+  {
+    "id": "fz-lumi-occupancy-clear",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 0.4880211799999961,
+    "converterOnlyMs": 0.01969581999998809,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.4880211799999961,
+      "p50Ms": 0.35601300000053016,
+      "p95Ms": 1.099355000000287,
+      "p99Ms": 2.148235999999997,
+      "minMs": 0.2023589999998876,
+      "maxMs": 7.164197999999487,
+      "totalMs": 48.80211799999961,
+      "opsPerSecond": 2049.0913939432057
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.01969581999998809,
+      "p50Ms": 0.02031299999998737,
+      "p95Ms": 0.02631400000063877,
+      "p99Ms": 0.029314999999769498,
+      "minMs": 0.006924999999682768,
+      "maxMs": 0.2507559999994555,
+      "totalMs": 1.969581999998809,
+      "opsPerSecond": 50772.19430318742
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.468325360000008,
+      "p50Ms": 0.3357770000002347,
+      "p95Ms": 1.0762720000002446,
+      "p99Ms": 2.1219209999999293,
+      "minMs": 0.19512599999961822,
+      "maxMs": 7.136883999999554,
+      "totalMs": 46.8325360000008,
+      "opsPerSecond": 2135.2676694680445
+    },
+    "cpu": {
+      "userMs": 37.688,
+      "systemMs": 0.749,
+      "totalMs": 38.437
+    },
+    "memory": {
+      "rssBefore": 57880576,
+      "rssAfter": 57880576,
+      "maxRssBytes": 60243968,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 7.164197999999487,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "lumi.js",
+      "index": 59,
+      "source": "package",
+      "model": "RTCGQ01LM",
+      "vendor": "Xiaomi",
+      "loadMs": 801.5694629999998,
+      "prepareMs": 0.31569500000023254
+    }
+  },
+  {
+    "id": "fz-l101-thermostat",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 0.6733134900000004,
+    "converterOnlyMs": 0.09632436000008965,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.6733134900000004,
+      "p50Ms": 0.43541800000002695,
+      "p95Ms": 1.303715000000011,
+      "p99Ms": 2.6222790000001623,
+      "minMs": 0.35878300000058516,
+      "maxMs": 7.700026999999864,
+      "totalMs": 67.33134900000005,
+      "opsPerSecond": 1485.1922839092372
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.09632436000008965,
+      "p50Ms": 0.06832400000075722,
+      "p95Ms": 0.19104799999968236,
+      "p99Ms": 0.41925999999966734,
+      "minMs": 0.05778300000110903,
+      "maxMs": 0.4322629999996934,
+      "totalMs": 9.632436000008965,
+      "opsPerSecond": 10381.589869884101
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.5769891299999108,
+      "p50Ms": 0.36347699999987526,
+      "p95Ms": 1.0504199999986668,
+      "p99Ms": 2.515328000000409,
+      "minMs": 0.29692100000102073,
+      "maxMs": 7.639780999999857,
+      "totalMs": 57.69891299999108,
+      "opsPerSecond": 1733.134903252258
+    },
+    "cpu": {
+      "userMs": 49.985,
+      "systemMs": 22.96,
+      "totalMs": 72.945
+    },
+    "memory": {
+      "rssBefore": 58236928,
+      "rssAfter": 58355712,
+      "maxRssBytes": 60243968,
+      "rssDelta": 118784
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 7.700026999999864,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 148.5789219999997,
+      "prepareMs": 1.1719890000003943
+    }
+  },
+  {
+    "id": "set-l101-setpoint",
+    "kind": "set",
+    "harnessTotalMs": 0.4065236300000197,
+    "converterOnlyMs": 0.08558779000001777,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.4065236300000197,
+      "p50Ms": 0.2209020000000237,
+      "p95Ms": 0.8307489999997415,
+      "p99Ms": 4.20106399999986,
+      "minMs": 0.21428500000001804,
+      "maxMs": 5.210702999999739,
+      "totalMs": 40.65236300000197,
+      "opsPerSecond": 2459.8816063901418
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.08558779000001777,
+      "p50Ms": 0.058092000000215194,
+      "p95Ms": 0.19728099999974802,
+      "p99Ms": 0.333161000000473,
+      "minMs": 0.05370599999969272,
+      "maxMs": 0.36324599999989005,
+      "totalMs": 8.558779000001778,
+      "opsPerSecond": 11683.909585698992
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.3209358400000019,
+      "p50Ms": 0.16334899999947083,
+      "p95Ms": 0.6810949999990044,
+      "p99Ms": 3.961541999999099,
+      "minMs": 0.1579620000002251,
+      "maxMs": 5.04573900000014,
+      "totalMs": 32.09358400000019,
+      "opsPerSecond": 3115.8875867525235
+    },
+    "cpu": {
+      "userMs": 33.311,
+      "systemMs": 0,
+      "totalMs": 33.311
+    },
+    "memory": {
+      "rssBefore": 58355712,
+      "rssAfter": 58355712,
+      "maxRssBytes": 60243968,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 5.210702999999739,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 148.5789219999997,
+      "prepareMs": 0.3055389999999534
+    }
+  },
+  {
+    "id": "get-l101-sensor-type",
+    "kind": "get",
+    "harnessTotalMs": 0.36536866000001283,
+    "converterOnlyMs": 0.12059746000004452,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.36536866000001283,
+      "p50Ms": 0.20974500000011176,
+      "p95Ms": 0.8642179999997097,
+      "p99Ms": 1.6205639999998311,
+      "minMs": 0.2009729999999763,
+      "maxMs": 2.261418999999478,
+      "totalMs": 36.53686600000128,
+      "opsPerSecond": 2736.961621174528
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.12059746000004452,
+      "p50Ms": 0.06147699999928591,
+      "p95Ms": 0.2611429999997199,
+      "p99Ms": 0.42233699999997043,
+      "minMs": 0.057937999999921885,
+      "maxMs": 2.099224000000504,
+      "totalMs": 12.059746000004452,
+      "opsPerSecond": 8292.048605332408
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.2447711999999683,
+      "p50Ms": 0.14911499999925582,
+      "p95Ms": 0.5901490000005651,
+      "p99Ms": 1.1897619999999733,
+      "minMs": 0.14257400000042253,
+      "maxMs": 1.466218000000481,
+      "totalMs": 24.47711999999683,
+      "opsPerSecond": 4085.4479611985785
+    },
+    "cpu": {
+      "userMs": 33.654,
+      "systemMs": 0,
+      "totalMs": 33.654
+    },
+    "memory": {
+      "rssBefore": 58355712,
+      "rssAfter": 58355712,
+      "maxRssBytes": 60243968,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 2.261418999999478,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 148.5789219999997,
+      "prepareMs": 0.20320600000013656
+    }
+  },
+  {
+    "id": "fz-tuya-dp-temperature",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 1.0409249699999783,
+    "converterOnlyMs": 0.1378695900000548,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.0409249699999783,
+      "p50Ms": 0.6823260000001028,
+      "p95Ms": 3.7668770000000222,
+      "p99Ms": 5.856098000000202,
+      "minMs": 0.4428039999993416,
+      "maxMs": 6.822881000000052,
+      "totalMs": 104.09249699999782,
+      "opsPerSecond": 960.684034700427
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.1378695900000548,
+      "p50Ms": 0.11664600000040082,
+      "p95Ms": 0.2786080000005313,
+      "p99Ms": 0.43711099999927683,
+      "minMs": 0.07247899999947549,
+      "maxMs": 0.6190800000003946,
+      "totalMs": 13.786959000005481,
+      "opsPerSecond": 7253.231114994992
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.9030553799999234,
+      "p50Ms": 0.5648359999995591,
+      "p95Ms": 3.488268999999491,
+      "p99Ms": 5.727066000000377,
+      "minMs": 0.3703249999998661,
+      "maxMs": 6.584743000000344,
+      "totalMs": 90.30553799999234,
+      "opsPerSecond": 1107.3517993991518
+    },
+    "cpu": {
+      "userMs": 76.426,
+      "systemMs": 0,
+      "totalMs": 76.426
+    },
+    "memory": {
+      "rssBefore": 58355712,
+      "rssAfter": 58355712,
+      "maxRssBytes": 60243968,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 6.822881000000052,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 194.6171919999997,
+      "prepareMs": 0.2497560000001613
+    }
+  },
+  {
+    "id": "fz-tuya-dp-multi",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 1.0568197900000542,
+    "converterOnlyMs": 0.16158947999990234,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.0568197900000542,
+      "p50Ms": 0.8376740000003338,
+      "p95Ms": 1.5423900000005233,
+      "p99Ms": 2.2794229999999516,
+      "minMs": 0.5315970000010566,
+      "maxMs": 12.391367999998693,
+      "totalMs": 105.68197900000541,
+      "opsPerSecond": 946.2351192344239
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.16158947999990234,
+      "p50Ms": 0.14180600000054255,
+      "p95Ms": 0.2555260000008275,
+      "p99Ms": 0.5544479999989562,
+      "minMs": 0.09125399999902584,
+      "maxMs": 0.7411879999999655,
+      "totalMs": 16.158947999990232,
+      "opsPerSecond": 6188.521678518951
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.8952303100001519,
+      "p50Ms": 0.6776350000000093,
+      "p95Ms": 1.292327000000114,
+      "p99Ms": 2.1333859999995184,
+      "minMs": 0.4374950000019453,
+      "maxMs": 12.166924999999537,
+      "totalMs": 89.52303100001518,
+      "opsPerSecond": 1117.0309906060156
+    },
+    "cpu": {
+      "userMs": 78.949,
+      "systemMs": 9.562,
+      "totalMs": 88.511
+    },
+    "memory": {
+      "rssBefore": 58355712,
+      "rssAfter": 58355712,
+      "maxRssBytes": 60243968,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 12.391367999998693,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 194.6171919999997,
+      "prepareMs": 0.2789169999996375
+    }
+  },
+  {
+    "id": "set-tuya-temperature-unit",
+    "kind": "set",
+    "harnessTotalMs": 0.8384429900000759,
+    "converterOnlyMs": 0.44497425000001384,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.8384429900000759,
+      "p50Ms": 0.5559869999997318,
+      "p95Ms": 1.758060000000114,
+      "p99Ms": 4.39157300000079,
+      "minMs": 0.41487400000005437,
+      "maxMs": 4.900316999999632,
+      "totalMs": 83.8442990000076,
+      "opsPerSecond": 1192.68693510087
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.44497425000001384,
+      "p50Ms": 0.25660400000015215,
+      "p95Ms": 1.0431880000014644,
+      "p99Ms": 3.4406399999988935,
+      "minMs": 0.19843500000024505,
+      "maxMs": 4.456897000000026,
+      "totalMs": 44.497425000001385,
+      "opsPerSecond": 2247.32105284737
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.3934687400000621,
+      "p50Ms": 0.2769160000007105,
+      "p95Ms": 0.6458559999991849,
+      "p99Ms": 0.8800700000010693,
+      "minMs": 0.21489999999903375,
+      "maxMs": 4.074800000000323,
+      "totalMs": 39.34687400000621,
+      "opsPerSecond": 2541.4979599137714
+    },
+    "cpu": {
+      "userMs": 73.986,
+      "systemMs": 0.018,
+      "totalMs": 74.004
+    },
+    "memory": {
+      "rssBefore": 58355712,
+      "rssAfter": 58355712,
+      "maxRssBytes": 60243968,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 4.900316999999632,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 194.6171919999997,
+      "prepareMs": 0.2513710000002902
+    }
+  },
+  {
+    "id": "fz-ts0002-ep2-onoff",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 0.7572101499998826,
+    "converterOnlyMs": 0.08319247000023097,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.7572101499998826,
+      "p50Ms": 0.36093799999980547,
+      "p95Ms": 2.1352329999990616,
+      "p99Ms": 5.866946999998618,
+      "minMs": 0.3356230000008509,
+      "maxMs": 14.15173700000014,
+      "totalMs": 75.72101499998826,
+      "opsPerSecond": 1320.6373422228362
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.08319247000023097,
+      "p50Ms": 0.06032299999969837,
+      "p95Ms": 0.16696500000034575,
+      "p99Ms": 0.20836100000087754,
+      "minMs": 0.05555300000196439,
+      "maxMs": 0.5289800000009564,
+      "totalMs": 8.319247000023097,
+      "opsPerSecond": 12020.318665826651
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.6740176799996516,
+      "p50Ms": 0.30161500000031083,
+      "p95Ms": 1.6244119999992108,
+      "p99Ms": 5.772691999996823,
+      "minMs": 0.2779160000009142,
+      "maxMs": 14.048249999999825,
+      "totalMs": 67.40176799996516,
+      "opsPerSecond": 1483.6406071729705
+    },
+    "cpu": {
+      "userMs": 68.398,
+      "systemMs": 0.08,
+      "totalMs": 68.478
+    },
+    "memory": {
+      "rssBefore": 69001216,
+      "rssAfter": 69656576,
+      "maxRssBytes": 77074432,
+      "rssDelta": 655360
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 14.15173700000014,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "tuya.js",
+      "index": 172,
+      "source": "package",
+      "model": "_TZ3000_h1ipgkwn",
+      "vendor": "Tuya",
+      "loadMs": 1849.0728760000002,
+      "prepareMs": 0.8375969999997324
+    }
+  },
+  {
+    "id": "set-ts0002-ep2-onoff",
+    "kind": "set",
+    "harnessTotalMs": 0.4056750699999793,
+    "converterOnlyMs": 0.0826109799999358,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.4056750699999793,
+      "p50Ms": 0.2335979999988922,
+      "p95Ms": 0.7268770000009681,
+      "p99Ms": 1.9641129999999976,
+      "minMs": 0.2031280000010156,
+      "maxMs": 2.37036900000021,
+      "totalMs": 40.56750699999793,
+      "opsPerSecond": 2465.0269980850708
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.0826109799999358,
+      "p50Ms": 0.051398000001427135,
+      "p95Ms": 0.17735200000061013,
+      "p99Ms": 0.2443700000003446,
+      "minMs": 0.041164000000208034,
+      "maxMs": 0.4290320000000065,
+      "totalMs": 8.26109799999358,
+      "opsPerSecond": 12104.928424778123
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.3230640900000435,
+      "p50Ms": 0.18527800000083516,
+      "p95Ms": 0.5803010000017821,
+      "p99Ms": 1.8008409999983996,
+      "minMs": 0.1598870000016177,
+      "maxMs": 2.2558010000011564,
+      "totalMs": 32.30640900000435,
+      "opsPerSecond": 3095.3610474004254
+    },
+    "cpu": {
+      "userMs": 40.153,
+      "systemMs": 2.051,
+      "totalMs": 42.204
+    },
+    "memory": {
+      "rssBefore": 69787648,
+      "rssAfter": 69787648,
+      "maxRssBytes": 77074432,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 2.37036900000021,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "tuya.js",
+      "index": 172,
+      "source": "package",
+      "model": "_TZ3000_h1ipgkwn",
+      "vendor": "Tuya",
+      "loadMs": 1849.0728760000002,
+      "prepareMs": 0.14703699999881792
+    }
+  },
+  {
+    "id": "fz-danfoss-temperature",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 1.7104615599999853,
+    "converterOnlyMs": 0.27184655000046404,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.7104615599999853,
+      "p50Ms": 1.0005610000007437,
+      "p95Ms": 5.28056800000013,
+      "p99Ms": 8.925414000001183,
+      "minMs": 0.6626300000007177,
+      "maxMs": 13.770101000000068,
+      "totalMs": 171.04615599999852,
+      "opsPerSecond": 584.6375173728012
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.27184655000046404,
+      "p50Ms": 0.21420699999544013,
+      "p95Ms": 0.534748000000036,
+      "p99Ms": 1.363578000004054,
+      "minMs": 0.17212000000108674,
+      "maxMs": 1.477679999999964,
+      "totalMs": 27.184655000046405,
+      "opsPerSecond": 3678.5458561026176
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 1.4386150099995212,
+      "p50Ms": 0.7657329999965441,
+      "p95Ms": 4.470900000000256,
+      "p99Ms": 8.679504000001543,
+      "minMs": 0.48866500000258384,
+      "maxMs": 13.484801999995398,
+      "totalMs": 143.8615009999521,
+      "opsPerSecond": 695.1130031656857
+    },
+    "cpu": {
+      "userMs": 203.052,
+      "systemMs": 17.082,
+      "totalMs": 220.134
+    },
+    "memory": {
+      "rssBefore": 69787648,
+      "rssAfter": 70377472,
+      "maxRssBytes": 77074432,
+      "rssDelta": 589824
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 13.770101000000068,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 152.48060200000054,
+      "prepareMs": 1.034415000000081
+    }
+  },
+  {
+    "id": "get-danfoss-schedule",
+    "kind": "get",
+    "harnessTotalMs": 0.43150459999993473,
+    "converterOnlyMs": 0.09839950999992653,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.43150459999993473,
+      "p50Ms": 0.23113499999999476,
+      "p95Ms": 1.1272850000004837,
+      "p99Ms": 2.547951999998986,
+      "minMs": 0.1968959999994695,
+      "maxMs": 3.821351999999024,
+      "totalMs": 43.15045999999347,
+      "opsPerSecond": 2317.4723977453573
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.09839950999992653,
+      "p50Ms": 0.05216699999982666,
+      "p95Ms": 0.1999729999988631,
+      "p99Ms": 0.47812100000010105,
+      "minMs": 0.04239499999857799,
+      "maxMs": 1.4983799999990879,
+      "totalMs": 9.839950999992652,
+      "opsPerSecond": 10162.65223272704
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.3331050900000082,
+      "p50Ms": 0.17219699999986915,
+      "p95Ms": 0.9579350000003615,
+      "p99Ms": 2.322971999999936,
+      "minMs": 0.15419199999996636,
+      "maxMs": 2.433614999998099,
+      "totalMs": 33.31050900000082,
+      "opsPerSecond": 3002.0555975292223
+    },
+    "cpu": {
+      "userMs": 43.113,
+      "systemMs": 0,
+      "totalMs": 43.113
+    },
+    "memory": {
+      "rssBefore": 70078464,
+      "rssAfter": 69931008,
+      "maxRssBytes": 77074432,
+      "rssDelta": -147456
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 3.821351999999024,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 152.48060200000054,
+      "prepareMs": 0.6133860000009008
+    }
+  },
+  {
+    "id": "configure-l101z",
+    "kind": "configure",
+    "harnessTotalMs": 1.0612686800001392,
+    "converterOnlyMs": 0.686499899999726,
+    "stats": {
+      "count": 50,
+      "meanMs": 1.0612686800001392,
+      "p50Ms": 0.8212079999993875,
+      "p95Ms": 2.6999920000016573,
+      "p99Ms": 3.282600000000457,
+      "minMs": 0.6205410000002303,
+      "maxMs": 3.282600000000457,
+      "totalMs": 53.063434000006964,
+      "opsPerSecond": 942.2684555242587
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.686499899999726,
+      "p50Ms": 0.4958179999994172,
+      "p95Ms": 2.243336999999883,
+      "p99Ms": 2.9138139999995474,
+      "minMs": 0.39017599999897357,
+      "maxMs": 2.9138139999995474,
+      "totalMs": 34.3249949999863,
+      "opsPerSecond": 1456.664451080618
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.37476878000041325,
+      "p50Ms": 0.3206190000018978,
+      "p95Ms": 0.9918670000006387,
+      "p99Ms": 1.2633200000018405,
+      "minMs": 0.2295189999986178,
+      "maxMs": 1.2633200000018405,
+      "totalMs": 18.738439000020662,
+      "opsPerSecond": 2668.3119122113035
+    },
+    "cpu": {
+      "userMs": 35.384,
+      "systemMs": 10.062,
+      "totalMs": 45.446
+    },
+    "memory": {
+      "rssBefore": 69931008,
+      "rssAfter": 69931008,
+      "maxRssBytes": 77074432,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 3.282600000000457,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 148.5789219999997,
+      "prepareMs": 1.7443640000001324
+    }
+  },
+  {
+    "id": "configure-danfoss",
+    "kind": "configure",
+    "harnessTotalMs": 8.158542259999885,
+    "converterOnlyMs": 7.684212979999939,
+    "stats": {
+      "count": 50,
+      "meanMs": 8.158542259999885,
+      "p50Ms": 6.66499499999918,
+      "p95Ms": 15.468761999998605,
+      "p99Ms": 32.28617300000042,
+      "minMs": 3.6413830000001326,
+      "maxMs": 32.28617300000042,
+      "totalMs": 407.9271129999943,
+      "opsPerSecond": 122.57091624110973
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 7.684212979999939,
+      "p50Ms": 6.13755300000048,
+      "p95Ms": 15.040038999999524,
+      "p99Ms": 31.961937000000034,
+      "minMs": 3.347155000001294,
+      "maxMs": 31.961937000000034,
+      "totalMs": 384.2106489999969,
+      "opsPerSecond": 130.13694474668347
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.4743292799999472,
+      "p50Ms": 0.3336230000004434,
+      "p95Ms": 1.010562999998001,
+      "p99Ms": 2.120998000000327,
+      "minMs": 0.28853499999786436,
+      "maxMs": 2.120998000000327,
+      "totalMs": 23.71646399999736,
+      "opsPerSecond": 2108.2400816582763
+    },
+    "cpu": {
+      "userMs": 379.539,
+      "systemMs": 16.26,
+      "totalMs": 395.799
+    },
+    "memory": {
+      "rssBefore": 71069696,
+      "rssAfter": 72896512,
+      "maxRssBytes": 77074432,
+      "rssDelta": 1826816
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 32.28617300000042,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 152.48060200000054,
+      "prepareMs": 0.5129759999999806
+    }
+  },
+  {
+    "id": "onEvent-daewoo-start",
+    "kind": "onEvent",
+    "harnessTotalMs": 0.3900356800000009,
+    "converterOnlyMs": 0.057854720000068485,
+    "stats": {
+      "count": 50,
+      "meanMs": 0.3900356800000009,
+      "p50Ms": 0.18943200000103388,
+      "p95Ms": 1.1488289999997505,
+      "p99Ms": 4.043716000000131,
+      "minMs": 0.1623490000001766,
+      "maxMs": 4.043716000000131,
+      "totalMs": 19.501784000000043,
+      "opsPerSecond": 2563.868003050382
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.057854720000068485,
+      "p50Ms": 0.04270300000098359,
+      "p95Ms": 0.13403400000061083,
+      "p99Ms": 0.18189200000051642,
+      "minMs": 0.03262399999948684,
+      "maxMs": 0.18189200000051642,
+      "totalMs": 2.892736000003424,
+      "opsPerSecond": 17284.674439679533
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.33218095999993236,
+      "p50Ms": 0.14557500000046275,
+      "p95Ms": 1.0167179999989457,
+      "p99Ms": 3.9596180000007735,
+      "minMs": 0.12849499999902037,
+      "maxMs": 3.9596180000007735,
+      "totalMs": 16.60904799999662,
+      "opsPerSecond": 3010.4073394218726
+    },
+    "cpu": {
+      "userMs": 17.548,
+      "systemMs": 10.422,
+      "totalMs": 27.97
+    },
+    "memory": {
+      "rssBefore": 73404416,
+      "rssAfter": 72757248,
+      "maxRssBytes": 77074432,
+      "rssDelta": -647168
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 4.043716000000131,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "daewoo.js",
+      "index": 0,
+      "source": "package",
+      "model": "WKE502Z",
+      "vendor": "DAEWOO",
+      "loadMs": 15.309567999998762,
+      "prepareMs": 1.2983280000007653
+    }
+  },
+  {
+    "id": "onEvent-daewoo-announce",
+    "kind": "onEvent",
+    "harnessTotalMs": 0.5375975800001106,
+    "converterOnlyMs": 0.21790285999992193,
+    "stats": {
+      "count": 50,
+      "meanMs": 0.5375975800001106,
+      "p50Ms": 0.38263499999993655,
+      "p95Ms": 1.3419549999998708,
+      "p99Ms": 2.139234000000215,
+      "minMs": 0.3148490000003221,
+      "maxMs": 2.139234000000215,
+      "totalMs": 26.87987900000553,
+      "opsPerSecond": 1860.127420960106
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.21790285999992193,
+      "p50Ms": 0.18281500000011874,
+      "p95Ms": 0.366861999998946,
+      "p99Ms": 0.8459060000004683,
+      "minMs": 0.14480600000024424,
+      "maxMs": 0.8459060000004683,
+      "totalMs": 10.895142999996096,
+      "opsPerSecond": 4589.200894381828
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.31969472000018867,
+      "p50Ms": 0.1969730000018899,
+      "p95Ms": 1.0707329999986541,
+      "p99Ms": 1.81830600000103,
+      "minMs": 0.16796599999906903,
+      "maxMs": 1.81830600000103,
+      "totalMs": 15.984736000009434,
+      "opsPerSecond": 3127.984096826528
+    },
+    "cpu": {
+      "userMs": 44.771,
+      "systemMs": 0.014,
+      "totalMs": 44.785
+    },
+    "memory": {
+      "rssBefore": 72757248,
+      "rssAfter": 72986624,
+      "maxRssBytes": 77074432,
+      "rssDelta": 229376
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 2.139234000000215,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "daewoo.js",
+      "index": 0,
+      "source": "package",
+      "model": "WKE502Z",
+      "vendor": "DAEWOO",
+      "loadMs": 15.309567999998762,
+      "prepareMs": 0.279685999999856
+    }
+  },
+  {
+    "id": "prepare-external-l101",
+    "kind": "prepare",
+    "harnessTotalMs": 0.1381734600001437,
+    "converterOnlyMs": 0.1381734600001437,
+    "stats": {
+      "count": 50,
+      "meanMs": 0.1381734600001437,
+      "p50Ms": 0.1175680000014836,
+      "p95Ms": 0.18966399999953865,
+      "p99Ms": 0.8186690000002272,
+      "minMs": 0.1142600000002858,
+      "maxMs": 0.8186690000002272,
+      "totalMs": 6.908673000007184,
+      "opsPerSecond": 7237.2798654601265
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.1381734600001437,
+      "p50Ms": 0.1175680000014836,
+      "p95Ms": 0.18966399999953865,
+      "p99Ms": 0.8186690000002272,
+      "minMs": 0.1142600000002858,
+      "maxMs": 0.8186690000002272,
+      "totalMs": 6.908673000007184,
+      "opsPerSecond": 7237.2798654601265
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 6.416,
+      "systemMs": 0.608,
+      "totalMs": 7.024
+    },
+    "memory": {
+      "rssBefore": 74489856,
+      "rssAfter": 76062720,
+      "maxRssBytes": 77074432,
+      "rssDelta": 1572864
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.8186690000002272,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 52.83791499999825,
+      "prepareMs": 0.4928939999990689
+    }
+  },
+  {
+    "id": "fz-external-l101-temp",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 1.1040802299999632,
+    "converterOnlyMs": 0.21630712000007407,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.1040802299999632,
+      "p50Ms": 0.48604599999998754,
+      "p95Ms": 4.431275000000824,
+      "p99Ms": 11.149899000000005,
+      "minMs": 0.37463299999944866,
+      "maxMs": 21.156278999998904,
+      "totalMs": 110.40802299999632,
+      "opsPerSecond": 905.7312800538357
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.21630712000007407,
+      "p50Ms": 0.08186700000078417,
+      "p95Ms": 0.10010200000033365,
+      "p99Ms": 3.6845480000010866,
+      "minMs": 0.06009199999971315,
+      "maxMs": 9.750314999999318,
+      "totalMs": 21.630712000007406,
+      "opsPerSecond": 4623.056328426256
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.8877731099998891,
+      "p50Ms": 0.4034859999992477,
+      "p95Ms": 4.351332000000184,
+      "p99Ms": 11.048104999998031,
+      "minMs": 0.3101539999988745,
+      "maxMs": 11.405963999999585,
+      "totalMs": 88.77731099998891,
+      "opsPerSecond": 1126.4139324969246
+    },
+    "cpu": {
+      "userMs": 179.543,
+      "systemMs": 0,
+      "totalMs": 179.543
+    },
+    "memory": {
+      "rssBefore": 74817536,
+      "rssAfter": 75481088,
+      "maxRssBytes": 77074432,
+      "rssDelta": 663552
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 21.156278999998904,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.2589880000014091,
+      "prepareMs": 13.83650200000011
+    }
+  },
+  {
+    "id": "set-external-l101-mode",
+    "kind": "set",
+    "harnessTotalMs": 0.9847130300000572,
+    "converterOnlyMs": 0.3592555299999549,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.9847130300000572,
+      "p50Ms": 0.36955500000112806,
+      "p95Ms": 1.6529569999984233,
+      "p99Ms": 22.52570200000082,
+      "minMs": 0.22805799999878218,
+      "maxMs": 26.85895299999902,
+      "totalMs": 98.47130300000572,
+      "opsPerSecond": 1015.524289345437
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.3592555299999549,
+      "p50Ms": 0.10648799999944458,
+      "p95Ms": 0.25991199999953096,
+      "p99Ms": 1.2186930000007123,
+      "minMs": 0.062399999998888234,
+      "maxMs": 22.262251000000106,
+      "totalMs": 35.92555299999549,
+      "opsPerSecond": 2783.534048870801
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.6254575000001023,
+      "p50Ms": 0.24113799999940966,
+      "p95Ms": 1.136519000001499,
+      "p99Ms": 3.5864460000011604,
+      "minMs": 0.16534999999930733,
+      "maxMs": 26.72930499999893,
+      "totalMs": 62.54575000001023,
+      "opsPerSecond": 1598.8296566910406
+    },
+    "cpu": {
+      "userMs": 64.509,
+      "systemMs": 7.117,
+      "totalMs": 71.626
+    },
+    "memory": {
+      "rssBefore": 75612160,
+      "rssAfter": 75743232,
+      "maxRssBytes": 77074432,
+      "rssDelta": 131072
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 26.85895299999902,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.23275099999955273,
+      "prepareMs": 0.4543459999986226
+    }
+  },
+  {
+    "id": "get-external-l101-sensor",
+    "kind": "get",
+    "harnessTotalMs": 1.0727577399999064,
+    "converterOnlyMs": 0.3058998399999291,
+    "stats": {
+      "count": 100,
+      "meanMs": 1.0727577399999064,
+      "p50Ms": 0.39079099999980826,
+      "p95Ms": 2.723920000000362,
+      "p99Ms": 13.8480440000003,
+      "minMs": 0.25444900000002235,
+      "maxMs": 13.976384999999937,
+      "totalMs": 107.27577399999063,
+      "opsPerSecond": 932.1769144262593
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.3058998399999291,
+      "p50Ms": 0.11941500000102678,
+      "p95Ms": 0.20966799999951036,
+      "p99Ms": 7.418494000001374,
+      "minMs": 0.07648100000005797,
+      "maxMs": 10.395862999999736,
+      "totalMs": 30.58998399999291,
+      "opsPerSecond": 3269.0438805075273
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.7668578999999772,
+      "p50Ms": 0.2659910000002128,
+      "p95Ms": 0.8228240000007645,
+      "p99Ms": 11.339179000000513,
+      "minMs": 0.17796799999996438,
+      "maxMs": 13.701544999999896,
+      "totalMs": 76.68578999999772,
+      "opsPerSecond": 1304.0225575038473
+    },
+    "cpu": {
+      "userMs": 105.647,
+      "systemMs": 20.015,
+      "totalMs": 125.662
+    },
+    "memory": {
+      "rssBefore": 75743232,
+      "rssAfter": 77783040,
+      "maxRssBytes": 77783040,
+      "rssDelta": 2039808
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 13.976384999999937,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.2819939999990311,
+      "prepareMs": 0.6086150000010093
+    }
+  },
+  {
+    "id": "configure-external-l101",
+    "kind": "configure",
+    "harnessTotalMs": 1.245330666666814,
+    "converterOnlyMs": 0.7557708333333721,
+    "stats": {
+      "count": 30,
+      "meanMs": 1.245330666666814,
+      "p50Ms": 0.5892260000000533,
+      "p95Ms": 3.2424360000004526,
+      "p99Ms": 12.063437999999223,
+      "minMs": 0.5055900000006659,
+      "maxMs": 12.063437999999223,
+      "totalMs": 37.35992000000442,
+      "opsPerSecond": 802.99957815746
+    },
+    "converterStats": {
+      "count": 30,
+      "meanMs": 0.7557708333333721,
+      "p50Ms": 0.2802250000004278,
+      "p95Ms": 2.823561000001064,
+      "p99Ms": 11.756745999999112,
+      "minMs": 0.23744500000066182,
+      "maxMs": 11.756745999999112,
+      "totalMs": 22.673125000001164,
+      "opsPerSecond": 1323.15241061823
+    },
+    "overheadStats": {
+      "count": 30,
+      "meanMs": 0.48955983333344194,
+      "p50Ms": 0.3048460000009072,
+      "p95Ms": 2.794399999998859,
+      "p99Ms": 2.9432830000005197,
+      "minMs": 0.2646049999984825,
+      "maxMs": 2.9432830000005197,
+      "totalMs": 14.686795000003258,
+      "opsPerSecond": 2042.6512387483685
+    },
+    "cpu": {
+      "userMs": 41.614,
+      "systemMs": 0.012,
+      "totalMs": 41.626
+    },
+    "memory": {
+      "rssBefore": 77783040,
+      "rssAfter": 76009472,
+      "maxRssBytes": 78438400,
+      "rssDelta": -1773568
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 12.063437999999223,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.2591419999989739,
+      "prepareMs": 0.34762600000067323
+    }
+  },
+  {
+    "id": "prepare-heavy-yokis-81-extends",
+    "kind": "prepare",
+    "harnessTotalMs": 3.9994660999998812,
+    "converterOnlyMs": 3.9994660999998812,
+    "stats": {
+      "count": 10,
+      "meanMs": 3.9994660999998812,
+      "p50Ms": 1.0709630000001198,
+      "p95Ms": 26.811709999999948,
+      "p99Ms": 26.811709999999948,
+      "minMs": 0.7377250000008644,
+      "maxMs": 26.811709999999948,
+      "totalMs": 39.994660999998814,
+      "opsPerSecond": 250.0333732044959
+    },
+    "converterStats": {
+      "count": 10,
+      "meanMs": 3.9994660999998812,
+      "p50Ms": 1.0709630000001198,
+      "p95Ms": 26.811709999999948,
+      "p99Ms": 26.811709999999948,
+      "minMs": 0.7377250000008644,
+      "maxMs": 26.811709999999948,
+      "totalMs": 39.994660999998814,
+      "opsPerSecond": 250.0333732044959
+    },
+    "overheadStats": {
+      "count": 10,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 40.465,
+      "systemMs": 0.158,
+      "totalMs": 40.623
+    },
+    "memory": {
+      "rssBefore": 76660736,
+      "rssAfter": 72368128,
+      "maxRssBytes": 78438400,
+      "rssDelta": -4292608
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 26.811709999999948,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "yokis.js",
+      "index": 3,
+      "source": "package",
+      "model": "MTV300E-UP",
+      "vendor": "YOKIS",
+      "loadMs": 141.28761399999894,
+      "prepareMs": 1.238004999999248
+    }
+  },
+  {
+    "id": "prepare-heavy-icon2-thermostat",
+    "kind": "prepare",
+    "harnessTotalMs": 1.2350587999999334,
+    "converterOnlyMs": 1.2350587999999334,
+    "stats": {
+      "count": 10,
+      "meanMs": 1.2350587999999334,
+      "p50Ms": 0.6977920000008453,
+      "p95Ms": 4.8025999999990745,
+      "p99Ms": 4.8025999999990745,
+      "minMs": 0.6578589999990072,
+      "maxMs": 4.8025999999990745,
+      "totalMs": 12.350587999999334,
+      "opsPerSecond": 809.6780493366421
+    },
+    "converterStats": {
+      "count": 10,
+      "meanMs": 1.2350587999999334,
+      "p50Ms": 0.6977920000008453,
+      "p95Ms": 4.8025999999990745,
+      "p99Ms": 4.8025999999990745,
+      "minMs": 0.6578589999990072,
+      "maxMs": 4.8025999999990745,
+      "totalMs": 12.350587999999334,
+      "opsPerSecond": 809.6780493366421
+    },
+    "overheadStats": {
+      "count": 10,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 18.067,
+      "systemMs": 0.747,
+      "totalMs": 18.814
+    },
+    "memory": {
+      "rssBefore": 72347648,
+      "rssAfter": 72871936,
+      "maxRssBytes": 78438400,
+      "rssDelta": 524288
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 4.8025999999990745,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 3,
+      "source": "package",
+      "model": "Icon2",
+      "vendor": "Danfoss",
+      "loadMs": 152.48060200000054,
+      "prepareMs": 1.6637289999998757
+    }
+  },
+  {
+    "id": "fz-tuya-m9pro-multi-dp",
+    "kind": "fromZigbee",
+    "harnessTotalMs": 0.9443967799999701,
+    "converterOnlyMs": 0.18518147999995563,
+    "stats": {
+      "count": 100,
+      "meanMs": 0.9443967799999701,
+      "p50Ms": 0.7683479999996052,
+      "p95Ms": 2.0389780000004976,
+      "p99Ms": 2.7131479999989097,
+      "minMs": 0.5318270000007033,
+      "maxMs": 4.398651999999856,
+      "totalMs": 94.439677999997,
+      "opsPerSecond": 1058.8769690638205
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.18518147999995563,
+      "p50Ms": 0.16211699999985285,
+      "p95Ms": 0.39071399999920686,
+      "p99Ms": 0.7351089999992837,
+      "minMs": 0.1120279999995546,
+      "maxMs": 0.8742210000000341,
+      "totalMs": 18.518147999995563,
+      "opsPerSecond": 5400.108045363066
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.7592153000000144,
+      "p50Ms": 0.596612000001187,
+      "p95Ms": 1.7895300000000134,
+      "p99Ms": 2.218177000000651,
+      "minMs": 0.4185680000027787,
+      "maxMs": 4.0079380000006495,
+      "totalMs": 75.92153000000144,
+      "opsPerSecond": 1317.149430471147
+    },
+    "cpu": {
+      "userMs": 108.895,
+      "systemMs": 0.171,
+      "totalMs": 109.066
+    },
+    "memory": {
+      "rssBefore": 72540160,
+      "rssAfter": 72335360,
+      "maxRssBytes": 78438400,
+      "rssDelta": -204800
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 4.398651999999856,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "definition": {
+      "file": "tuya.js",
+      "index": 516,
+      "source": "package",
+      "model": "M9Pro",
+      "vendor": "Tuya",
+      "loadMs": 1849.0728760000002,
+      "prepareMs": 1.2310040000011213
+    }
+  }
+]

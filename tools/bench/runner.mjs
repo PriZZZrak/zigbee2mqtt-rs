@@ -16,28 +16,14 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Session } from "node:inspector";
 
-import { createDeviceAndEndpoint, MockHost, normalizeValue } from "./mocks.mjs";
+import { invokeConverter, makeEndpoint } from "./call.mjs";
+import { installFixedClock } from "./clock.mjs";
+import { MockHost } from "./mocks.mjs";
 import { scenarios } from "./scenarios.mjs";
+import { canonicalJson, stats } from "./stats.mjs";
 import { createUpstream } from "./upstream.mjs";
 
-// Deterministic clock: some modernExtend configure paths embed the current
-// time (genTime via customTimeResponse/writeTimeDaily), which would otherwise
-// make the golden corpus change on every run.
-const FIXED_NOW_MS = Date.UTC(2026, 10, 20, 12, 0, 0);
-const RealDate = Date;
-class FixedDate extends RealDate {
-  constructor(...args) {
-    if (args.length === 0) {
-      super(FIXED_NOW_MS);
-    } else {
-      super(...args);
-    }
-  }
-  static now() {
-    return FIXED_NOW_MS;
-  }
-}
-globalThis.Date = FixedDate;
+installFixedClock();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -49,6 +35,9 @@ function arg(name, fallback) {
 const quick = process.argv.includes("--quick");
 const overrideIterations = Number(arg("--iterations", "0")) || 0;
 const profile = process.argv.includes("--profile");
+const generateGolden = process.argv.includes("--generate-golden");
+const verifyGolden = process.argv.includes("--verify-golden");
+const force = process.argv.includes("--force");
 const filter = arg("--filter", "");
 const label = arg("--label", `${process.platform}-${process.arch}`);
 const packageRoot = resolve(
@@ -65,29 +54,6 @@ if (!existsSync(packageRoot)) {
 }
 
 const upstream = createUpstream({ packageRoot, externalPath });
-
-function percentile(values, fraction) {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(fraction * sorted.length) - 1));
-  return sorted[index];
-}
-
-function stats(values) {
-  if (values.length === 0) return { count: 0 };
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return {
-    count: values.length,
-    meanMs: total / values.length,
-    p50Ms: percentile(values, 0.5),
-    p95Ms: percentile(values, 0.95),
-    p99Ms: percentile(values, 0.99),
-    minMs: Math.min(...values),
-    maxMs: Math.max(...values),
-    totalMs: total,
-    opsPerSecond: total > 0 ? (values.length * 1000) / total : 0,
-  };
-}
 
 function profileSession() {
   if (!profile) return null;
@@ -114,58 +80,13 @@ async function stopProfile(profiler, id) {
   writeFileSync(join(dir, `${id}.cpuprofile`), JSON.stringify(data));
 }
 
-function clone(value) {
-  return value === undefined ? undefined : structuredClone(value);
-}
-
-function logger() {
-  const noop = () => {};
-  return { debug: noop, info: noop, warn: noop, error: noop };
-}
-
-function makeMeta(scenario, device, endpoint, definition, state, options, published) {
-  return {
-    device,
-    logger: logger(),
-    state: clone(state ?? {}),
-    deviceExposesChanged: () => {},
-    endpoint_name: scenario.endpointName,
-    options: clone(options ?? {}),
-    message: clone(scenario.message ?? {}),
-    membersState: {},
-    mapped: definition,
-    publish: async (payload) => published.push(normalizeValue(payload)),
-  };
-}
-
-function makeEndpoint(device, scenario, host) {
-  const { device: built, endpoint } = createDeviceAndEndpoint(
-    {
-      ...scenario,
-      device: scenario.device
-        ? {
-            ...scenario.device,
-            endpoints:
-              scenario.device.endpoints ??
-              [{ id: 1, inputClusters: [], outputClusters: [] }],
-          }
-        : { endpoints: [{ id: 1, inputClusters: [], outputClusters: [] }] },
-    },
-    host,
-    upstream.zcl(),
-  );
-  // Device constructor in mocks creates endpoints; ensure the selected one is
-  // present even for endpointId=2.
-  return { device: built, endpoint };
-}
-
 function createScenarioContext(scenario) {
   const host = new MockHost({
     delayMs: scenario.hostDelayMs ?? 0,
     readValues: scenario.readValues ?? {},
     zcl: upstream.zcl(),
   });
-  const { device, endpoint } = makeEndpoint(deviceSpec(scenario), scenario, host);
+  const { device, endpoint } = makeEndpoint(scenario, host, upstream.zcl());
   return { host, device, endpoint };
 }
 
@@ -185,7 +106,6 @@ function resetScenarioContext(context, scenario) {
 }
 
 async function callOnce(scenario, prepared, iteration) {
-  const definition = prepared.definition;
   const context = scenario.__context;
   if (context) resetScenarioContext(context, scenario);
   const host = context?.host ?? new MockHost({
@@ -193,130 +113,28 @@ async function callOnce(scenario, prepared, iteration) {
     readValues: scenario.readValues ?? {},
     zcl: upstream.zcl(),
   });
-  const { device, endpoint } = context ?? makeEndpoint(deviceSpec(scenario), scenario, host);
-  const state = { ...(scenario.state ?? {}) };
-  const options = { ...(scenario.options ?? {}) };
-  const published = [];
-  const meta = makeMeta(scenario, device, endpoint, definition, state, options, published);
-
-  if (scenario.kind === "fromZigbee") {
-    const type = scenario.msg.type ?? "attributeReport";
-    const converters = definition.fromZigbee.filter((candidate) => {
-      const types = Array.isArray(candidate.type) ? candidate.type : [candidate.type];
-      return candidate.cluster === scenario.msg.cluster && types.includes(type);
-    });
-    if (converters.length === 0) {
-      throw new Error(
-        `no fromZigbee converter for ${definition.model}:${scenario.msg.cluster}/${type}`,
-      );
-    }
-    const msg = {
-      ...clone(scenario.msg),
-      device,
-      endpoint,
-      meta: {
-        ...(scenario.msg.meta ?? {}),
-        zclTransactionSequenceNumber:
-          (scenario.msg.meta?.zclTransactionSequenceNumber ?? 1) + iteration,
-      },
-    };
-    const publish = async (payload) => {
-      upstream.pkg.postProcessConvertedFromZigbeeMessage(definition, payload, options, device);
-      published.push(normalizeValue(payload));
-    };
-    const convertMeta = {
-      device,
-      logger: logger(),
-      state: clone(state),
-      deviceExposesChanged: () => {},
-    };
-    let merged = {};
-    for (const converter of converters) {
-      const converted = await converter.convert(definition, msg, publish, options, convertMeta);
-      if (converted) merged = { ...merged, ...converted };
-    }
-    if (Object.keys(merged).length > 0) await publish(merged);
-    return {
-      result: normalizeValue(Object.keys(merged).length > 0 ? merged : null),
-      published,
-      calls: host.calls,
-      waitMs: host.waitMs,
-    };
-  }
-
-  if (scenario.kind === "set" || scenario.kind === "get") {
-    const converters = definition.toZigbee.filter((candidate) => {
-      const keys = Array.isArray(candidate.key) ? candidate.key : [candidate.key];
-      return keys.includes(scenario.key);
-    });
-    const converter =
-      converters.find((candidate) => candidate.key !== undefined) ??
-      definition.toZigbee.find((candidate) => candidate.key === undefined);
-    if (!converter) {
-      throw new Error(`no toZigbee converter for ${definition.model}:${scenario.key}`);
-    }
-    const result =
-      scenario.kind === "set"
-        ? await converter.convertSet(endpoint, scenario.key, scenario.value, meta)
-        : await converter.convertGet(endpoint, scenario.key, meta);
-    return {
-      result: normalizeValue(result ?? null),
-      published,
-      calls: host.calls,
-      waitMs: host.waitMs,
-    };
-  }
-
-  if (scenario.kind === "configure") {
-    if (!definition.configure) throw new Error(`no configure for ${definition.model}`);
-    const coordinatorDevice = {
-      ...device,
-      ieeeAddr: "0x00124b0000000000",
-      networkAddress: 0,
-    };
-    const coordinatorEndpoint = makeEndpoint(
-      {
-        ...scenario,
-        device: { endpoints: [{ id: 1, inputClusters: [], outputClusters: [] }] },
-      },
-      scenario,
-      host,
-    ).endpoint;
-    coordinatorEndpoint.deviceIeeeAddress = coordinatorDevice.ieeeAddr;
-    await definition.configure(device, coordinatorEndpoint, definition);
-    return { result: null, published, calls: host.calls, waitMs: host.waitMs };
-  }
-
-  if (scenario.kind === "onEvent") {
-    if (!definition.onEvent) throw new Error(`no onEvent for ${definition.model}`);
-    const event = {
-      type: scenario.eventType,
-      data: {
-        device,
-        state: clone(state),
-        options: clone(options),
-        deviceExposesChanged: () => {},
-      },
-    };
-    if (scenario.eventType === "deviceInterview") event.data.status = "successful";
-    await definition.onEvent(event);
-    return { result: null, published, calls: host.calls, waitMs: host.waitMs };
-  }
-
-  throw new Error(`unknown scenario kind ${scenario.kind}`);
+  const { device, endpoint } = context ?? makeEndpoint(scenario, host, upstream.zcl());
+  return invokeConverter({
+    upstream,
+    scenario,
+    prepared,
+    host,
+    device,
+    endpoint,
+    iteration,
+  });
 }
 
-function deviceSpec(scenario) {
-  return {
-    ...scenario,
-    device: scenario.device
-      ? {
-          ...scenario.device,
-          endpoints:
-            scenario.device.endpoints ?? [{ id: 1, inputClusters: [], outputClusters: [] }],
-        }
-      : { endpoints: [{ id: 1, inputClusters: [], outputClusters: [] }] },
-  };
+// The upstream transaction store is keyed by `ieeeAddr-endpoint` and is not
+// cleared by clearGlobalStore(). With the frozen benchmark clock its entries
+// never expire, so every scenario needs its own transaction-id range to avoid
+// false duplicate detection between scenarios.
+const scenarioSequenceBase = new Map(
+  scenarios.map((scenario, index) => [scenario.id, (index + 1) * 10000]),
+);
+
+function sequenceBase(scenario) {
+  return scenarioSequenceBase.get(scenario.id) ?? 1;
 }
 
 async function runScenario(scenario) {
@@ -332,6 +150,8 @@ async function runScenario(scenario) {
       scenario,
       cold: { loadMs: elapsed, reportedLoadMs: loadMs },
       stats: stats([elapsed]),
+      converterStats: stats([elapsed]),
+      overheadStats: stats([0]),
       cpu: null,
       memory: {
         rssBefore: null,
@@ -376,6 +196,8 @@ async function runScenario(scenario) {
         prepareMs,
       },
       stats: stats(timings),
+      converterStats: stats(timings),
+      overheadStats: stats(timings.map(() => 0)),
       cpu: { userMs: cpu.user / 1000, systemMs: cpu.system / 1000, totalMs: (cpu.user + cpu.system) / 1000 },
       memory: {
         rssBefore,
@@ -401,26 +223,33 @@ async function runScenario(scenario) {
   const warmup = Math.min(10, Math.max(1, Math.floor(iterations / 5)));
   let sample = null;
   for (let index = 0; index < warmup; index++) {
-    sample = await callOnce(scenario, prepared, index);
+    sample = await callOnce(scenario, prepared, sequenceBase(scenario) + index);
   }
 
   upstream.clearStore();
   const timings = [];
+  const converterTimings = [];
   const cpuBefore = process.cpuUsage();
   const rssBefore = process.memoryUsage().rss;
   const profiler = profileSession();
   await startProfile(profiler);
   let hostWaitMs = 0;
   let stateDrift = false;
+  let driftBaseline = null;
   for (let index = 0; index < iterations; index++) {
     const started = performance.now();
-    const current = await callOnce(scenario, prepared, 1000 + index);
-    timings.push(performance.now() - started);
+    const current = await callOnce(scenario, prepared, sequenceBase(scenario) + 1000 + index);
+    const totalMs = performance.now() - started;
+    timings.push(totalMs);
+    converterTimings.push(current.converterMs);
     hostWaitMs += current.waitMs;
-    if (!stateDrift && sample && JSON.stringify(current.result) !== JSON.stringify(sample.result)) {
+    // Compare measured calls with each other; a one-call warmup can legitimately
+    // differ from later calls because converters cache per-device state.
+    driftBaseline = driftBaseline ?? current;
+    if (!stateDrift && JSON.stringify(current.result) !== JSON.stringify(driftBaseline.result)) {
       stateDrift = true;
     }
-    if (!stateDrift && sample && JSON.stringify(current.published) !== JSON.stringify(sample.published)) {
+    if (!stateDrift && JSON.stringify(current.published) !== JSON.stringify(driftBaseline.published)) {
       stateDrift = true;
     }
     sample = sample ?? current;
@@ -442,7 +271,10 @@ async function runScenario(scenario) {
       loadMs: prepared.loadMs,
       prepareMs: prepared.prepareMs,
     },
+    // `stats` is the legacy harness-total metric kept for comparability.
     stats: stats(timings),
+    converterStats: stats(converterTimings),
+    overheadStats: stats(timings.map((value, index) => value - converterTimings[index])),
     cpu: {
       userMs: cpu.user / 1000,
       systemMs: cpu.system / 1000,
@@ -492,7 +324,48 @@ const manifest = {
   command: process.argv.join(" "),
 };
 
-const selected = scenarios.filter((scenario) => !filter || scenario.id.includes(filter));
+if (generateGolden && verifyGolden) {
+  console.error("--generate-golden and --verify-golden are mutually exclusive");
+  process.exit(1);
+}
+
+let goldenReference = null;
+if (verifyGolden) {
+  const goldenPath = join(outDir, "golden.json");
+  if (!existsSync(goldenPath)) {
+    console.error(`golden file not found: ${goldenPath}`);
+    process.exit(1);
+  }
+  goldenReference = JSON.parse(readFileSync(goldenPath, "utf8"));
+  if (!Array.isArray(goldenReference) || goldenReference.length === 0) {
+    console.error(`golden file is empty or malformed: ${goldenPath}`);
+    process.exit(1);
+  }
+}
+
+if (generateGolden && existsSync(join(outDir, "golden.json")) && !force) {
+  console.error(
+    `refusing to overwrite existing golden file: ${join(outDir, "golden.json")} (pass --force)`,
+  );
+  process.exit(1);
+}
+
+let selected;
+if (verifyGolden) {
+  selected = [];
+  for (const entry of goldenReference) {
+    if (filter && !entry.id.includes(filter)) continue;
+    const scenario = scenarios.find((candidate) => candidate.id === entry.id);
+    if (!scenario) {
+      console.error(`golden case has no matching scenario: ${entry.id}`);
+      process.exitCode = 1;
+      continue;
+    }
+    selected.push(scenario);
+  }
+} else {
+  selected = scenarios.filter((scenario) => !filter || scenario.id.includes(filter));
+}
 if (selected.length === 0) {
   console.error(`no scenarios match '${filter}'`);
   process.exit(1);
@@ -523,13 +396,21 @@ for (const scenario of selected) {
         options: scenario.options,
         state: scenario.state,
       },
+      // Mean aliases with the audit-requested names; `stats`/`converterStats`
+      // retain the full p50/p95/p99 distributions.
+      harnessTotalMs: rest.stats?.meanMs ?? null,
+      converterOnlyMs: rest.converterStats?.meanMs ?? null,
       ...rest,
     };
     cases.push(record);
     measurements.push({
       id: scenario.id,
       kind: scenario.kind,
+      harnessTotalMs: rest.stats?.meanMs ?? null,
+      converterOnlyMs: rest.converterStats?.meanMs ?? null,
       stats: rest.stats,
+      converterStats: rest.converterStats,
+      overheadStats: rest.overheadStats,
       cpu: rest.cpu,
       memory: rest.memory,
       eventLoop: rest.eventLoop,
@@ -554,8 +435,74 @@ const golden = cases.map((entry) => ({
   expectedHostCalls: entry.expectedHostCalls,
   error: entry.error,
 }));
-writeFileSync(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-writeFileSync(join(outDir, "cases.json"), `${JSON.stringify(cases, null, 2)}\n`);
-writeFileSync(join(outDir, "golden.json"), `${JSON.stringify(golden, null, 2)}\n`);
-writeFileSync(join(outDir, "measurements.json"), `${JSON.stringify(measurements, null, 2)}\n`);
-console.log(`wrote ${outDir}/manifest.json, cases.json, golden.json, measurements.json`);
+const failedCases = cases.filter((entry) => entry.error);
+if (failedCases.length > 0) {
+  process.exitCode = 1;
+}
+
+function serializable(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function describeMismatch(reference, actual) {
+  const keys = new Set([...Object.keys(reference), ...Object.keys(actual)]);
+  for (const key of keys) {
+    const left = canonicalJson(reference[key]);
+    const right = canonicalJson(actual[key]);
+    if (left !== right) {
+      const clip = (text) => (text === undefined ? "undefined" : text.slice(0, 300));
+      return `${key}: expected ${clip(left)} actual ${clip(right)}`;
+    }
+  }
+  return "unknown difference";
+}
+
+if (verifyGolden) {
+  const actualById = new Map(golden.map((entry) => [entry.id, serializable(entry)]));
+  const driftById = new Map(cases.map((entry) => [entry.id, Boolean(entry.stateDrift)]));
+  let mismatches = 0;
+  let checked = 0;
+  for (const reference of goldenReference) {
+    if (filter && !reference.id.includes(filter)) continue;
+    checked += 1;
+    const actual = actualById.get(reference.id);
+    if (!actual) {
+      console.error(`FAIL ${reference.id}: scenario did not run`);
+      mismatches += 1;
+      continue;
+    }
+    if (driftById.get(reference.id)) {
+      console.error(`FAIL ${reference.id}: state drift during repeated calls`);
+      mismatches += 1;
+    }
+    if (canonicalJson(actual) !== canonicalJson(serializable(reference))) {
+      console.error(`FAIL ${reference.id}: ${describeMismatch(serializable(reference), actual)}`);
+      mismatches += 1;
+    }
+  }
+  if (mismatches > 0 || failedCases.length > 0) {
+    console.error(
+      `golden verify FAILED: ${mismatches} mismatch(es), ${failedCases.length} scenario error(s) of ${checked} checked`,
+    );
+    process.exitCode = 1;
+  } else {
+    console.log(`golden verify OK: ${checked} case(s) match ${join(outDir, "golden.json")}`);
+  }
+} else if (generateGolden) {
+  if (failedCases.length > 0) {
+    console.error(`golden generation FAILED: ${failedCases.length} scenario error(s); file not written`);
+    process.exitCode = 1;
+  } else {
+    writeFileSync(join(outDir, "golden.json"), `${JSON.stringify(golden, null, 2)}\n`);
+    console.log(`wrote ${outDir}/golden.json (${golden.length} cases)`);
+  }
+} else {
+  writeFileSync(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(join(outDir, "cases.json"), `${JSON.stringify(cases, null, 2)}\n`);
+  writeFileSync(join(outDir, "measurements.json"), `${JSON.stringify(measurements, null, 2)}\n`);
+  console.log(`wrote ${outDir}/manifest.json, cases.json, measurements.json`);
+  if (failedCases.length > 0) {
+    console.error(`${failedCases.length} scenario error(s)`);
+    process.exitCode = 1;
+  }
+}

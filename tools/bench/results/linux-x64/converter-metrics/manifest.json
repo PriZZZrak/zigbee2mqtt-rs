@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-11-20T12:00:00.000Z",
+  "label": "linux-x64",
+  "node": "v24.22.2",
+  "platform": "linux",
+  "arch": "x64",
+  "hostname": "ad299e4a8521",
+  "converterVersion": "26.125.0",
+  "converterRoot": "/config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/zigbee-herdsman-converters",
+  "upstreamZigbee2mqtt": "3c841fdfd66c92239921ef84fde8f039c64e1662",
+  "upstreamConverters": "3c841fdfd66c92239921ef84fde8f039c64e1662",
+  "externalConverter": {
+    "path": "/config/workspace/zigbee2mqtt-rs/tools/bench/fixtures/external/L101Ze_z2m.js",
+    "sha256": "25393d405e551804858a046dc251ec4aa7907ecce7ddf3ba16aea919c6814907"
+  },
+  "command": "/config/.local/node-v24.22.2-linux-x64/bin/node /config/workspace/zigbee2mqtt-rs/tools/bench/runner.mjs --out tools/bench/results/linux-x64/converter-metrics --label linux-x64"
+}

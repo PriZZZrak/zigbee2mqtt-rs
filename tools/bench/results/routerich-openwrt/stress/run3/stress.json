@@ -1,0 +1,477 @@
+{
+  "manifest": {
+    "generatedAt": "2026-11-20T12:00:00.000Z",
+    "label": "routerich-openwrt-run3",
+    "benchmark": "concurrency-stress",
+    "node": "v22.23.4",
+    "platform": "linux",
+    "arch": "arm64",
+    "converterVersion": "26.125.0",
+    "converterRoot": "/opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters",
+    "upstreamZigbee2mqtt": null,
+    "upstreamConverters": null,
+    "externalConverter": {
+      "path": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+      "sha256": "25393d405e551804858a046dc251ec4aa7907ecce7ddf3ba16aea919c6814907"
+    },
+    "fixedClock": "2026-11-20T12:00:00Z",
+    "command": "/usr/bin/node /tmp/z2m-bench/stress.mjs --package /opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters --external /tmp/z2m-bench/fixtures/external/L101Ze_z2m.js --out /tmp/z2m-bench/stress-router3 --label routerich-openwrt-run3"
+  },
+  "results": [
+    {
+      "name": "reports-1-device-c1",
+      "kind": "report",
+      "devices": 1,
+      "concurrency": 1,
+      "operations": 2000,
+      "hostDelayMs": 0,
+      "wallMs": 1287.0331649999998,
+      "throughputOpsPerSec": 1553.9615096088066,
+      "queueWaitMs": {
+        "count": 2000,
+        "meanMs": 668.1949953450007,
+        "p50Ms": 687.4884520000005,
+        "p95Ms": 1233.5049899999995,
+        "p99Ms": 1278.4679180000003,
+        "minMs": 8.133598000000347,
+        "maxMs": 1289.4664729999995,
+        "totalMs": 1336389.9906900015,
+        "opsPerSecond": 1.4965691257290583
+      },
+      "serviceMs": {
+        "count": 2000,
+        "meanMs": 0.6303897134999825,
+        "p50Ms": 0.3626299999996263,
+        "p95Ms": 1.4890699999996286,
+        "p99Ms": 5.055049999999937,
+        "minMs": 0.24906300000020565,
+        "maxMs": 20.84758899999997,
+        "totalMs": 1260.779426999965,
+        "opsPerSecond": 1586.3203008943576
+      },
+      "latencyMs": {
+        "count": 2000,
+        "meanMs": 668.8253850585004,
+        "p50Ms": 687.7569810000005,
+        "p95Ms": 1233.8239169999997,
+        "p99Ms": 1278.748219,
+        "minMs": 8.925030000000334,
+        "maxMs": 1289.7245389999998,
+        "totalMs": 1337650.7701170007,
+        "opsPerSecond": 1.4951585605748692
+      },
+      "converterMs": {
+        "count": 2000,
+        "meanMs": 0.07709290450001163,
+        "p50Ms": 0.04878099999950791,
+        "p95Ms": 0.11633699999947567,
+        "p99Ms": 0.4080260000000635,
+        "minMs": 0.03608700000040699,
+        "maxMs": 12.799781000000621,
+        "totalMs": 154.18580900002326,
+        "opsPerSecond": 12971.362364481276
+      },
+      "cpu": {
+        "userMs": 1041.227,
+        "systemMs": 72.008,
+        "totalMs": 1113.235
+      },
+      "memory": {
+        "rssBefore": 53358592,
+        "rssAfter": 53747712,
+        "maxRssBytes": 54710272,
+        "rssDelta": 389120
+      }
+    },
+    {
+      "name": "reports-16-devices-c8",
+      "kind": "report",
+      "devices": 16,
+      "concurrency": 8,
+      "operations": 4000,
+      "hostDelayMs": 0,
+      "wallMs": 3150.5061800000003,
+      "throughputOpsPerSec": 1269.6372492118076,
+      "queueWaitMs": {
+        "count": 4000,
+        "meanMs": 1699.3945765622523,
+        "p50Ms": 1802.1748009999992,
+        "p95Ms": 3046.72797,
+        "p99Ms": 3125.323955,
+        "minMs": 8.49530600000071,
+        "maxMs": 3150.876735,
+        "totalMs": 6797578.306249009,
+        "opsPerSecond": 0.5884448578286774
+      },
+      "serviceMs": {
+        "count": 4000,
+        "meanMs": 6.284771514000012,
+        "p50Ms": 4.704267999999502,
+        "p95Ms": 14.54014400000051,
+        "p99Ms": 33.46270700000059,
+        "minMs": 0.5235179999999673,
+        "maxMs": 88.20326499999828,
+        "totalMs": 25139.08605600005,
+        "opsPerSecond": 159.11477414451602
+      },
+      "latencyMs": {
+        "count": 4000,
+        "meanMs": 1705.6793480762487,
+        "p50Ms": 1807.5715519999994,
+        "p95Ms": 3049.9857950000005,
+        "p99Ms": 3128.8943980000004,
+        "minMs": 13.990466999999626,
+        "maxMs": 3151.400253,
+        "totalMs": 6822717.392304995,
+        "opsPerSecond": 0.5862766651468522
+      },
+      "converterMs": {
+        "count": 4000,
+        "meanMs": 1.7873065325000193,
+        "p50Ms": 1.0368779999989783,
+        "p95Ms": 4.913707000001523,
+        "p99Ms": 12.6333539999996,
+        "minMs": 0.05593799999951443,
+        "maxMs": 79.92447600000196,
+        "totalMs": 7149.226130000077,
+        "opsPerSecond": 559.5011162417878
+      },
+      "cpu": {
+        "userMs": 2602.694,
+        "systemMs": 237.295,
+        "totalMs": 2839.989
+      },
+      "memory": {
+        "rssBefore": 68116480,
+        "rssAfter": 68870144,
+        "maxRssBytes": 74260480,
+        "rssDelta": 753664
+      }
+    },
+    {
+      "name": "sets-16-devices-c1",
+      "kind": "set",
+      "devices": 16,
+      "concurrency": 1,
+      "operations": 1000,
+      "hostDelayMs": 1,
+      "wallMs": 2776.2492199999997,
+      "throughputOpsPerSec": 360.19821015924504,
+      "queueWaitMs": {
+        "count": 1000,
+        "meanMs": 1432.6724618640017,
+        "p50Ms": 1496.272543000001,
+        "p95Ms": 2660.3400149999998,
+        "p99Ms": 2752.9553969999997,
+        "minMs": 2.435540000000401,
+        "maxMs": 2775.327679,
+        "totalMs": 1432672.4618640016,
+        "opsPerSecond": 0.6979962459102019
+      },
+      "serviceMs": {
+        "count": 1000,
+        "meanMs": 2.749185224999981,
+        "p50Ms": 2.2405670000007376,
+        "p95Ms": 5.369744000001447,
+        "p99Ms": 12.136612000000241,
+        "minMs": 0.7804290000003675,
+        "maxMs": 54.571515999999974,
+        "totalMs": 2749.185224999981,
+        "opsPerSecond": 363.74413440986206
+      },
+      "latencyMs": {
+        "count": 1000,
+        "meanMs": 1435.421647089,
+        "p50Ms": 1498.4366289999998,
+        "p95Ms": 2662.746394,
+        "p99Ms": 2755.720867,
+        "minMs": 4.630557999998928,
+        "maxMs": 2777.621722,
+        "totalMs": 1435421.647089,
+        "opsPerSecond": 0.6966594115589488
+      },
+      "converterMs": {
+        "count": 1000,
+        "meanMs": 2.32069745999999,
+        "p50Ms": 1.8898630000003322,
+        "p95Ms": 4.0384070000000065,
+        "p99Ms": 11.832151000000522,
+        "minMs": 0.5364429999990534,
+        "maxMs": 54.175952999999936,
+        "totalMs": 2320.6974599999903,
+        "opsPerSecond": 430.90494010365495
+      },
+      "cpu": {
+        "userMs": 1425.26,
+        "systemMs": 114.19,
+        "totalMs": 1539.45
+      },
+      "memory": {
+        "rssBefore": 68849664,
+        "rssAfter": 69398528,
+        "maxRssBytes": 74260480,
+        "rssDelta": 548864
+      }
+    },
+    {
+      "name": "sets-16-devices-c8",
+      "kind": "set",
+      "devices": 16,
+      "concurrency": 8,
+      "operations": 1000,
+      "hostDelayMs": 1,
+      "wallMs": 1332.7796670000007,
+      "throughputOpsPerSec": 750.3115666904899,
+      "queueWaitMs": {
+        "count": 1000,
+        "meanMs": 620.2841922120001,
+        "p50Ms": 647.9045750000005,
+        "p95Ms": 1191.0634629999986,
+        "p99Ms": 1305.3791880000008,
+        "minMs": 1.4523669999998674,
+        "maxMs": 1326.6034870000021,
+        "totalMs": 620284.1922120001,
+        "opsPerSecond": 1.6121642507668823
+      },
+      "serviceMs": {
+        "count": 1000,
+        "meanMs": 10.612672001999977,
+        "p50Ms": 7.895924000000377,
+        "p95Ms": 24.163196999999855,
+        "p99Ms": 48.70456800000102,
+        "minMs": 4.483288999999786,
+        "maxMs": 112.57359200000064,
+        "totalMs": 10612.672001999978,
+        "opsPerSecond": 94.2269769396009
+      },
+      "latencyMs": {
+        "count": 1000,
+        "meanMs": 630.8968642140004,
+        "p50Ms": 655.3663880000004,
+        "p95Ms": 1206.3699559999986,
+        "p99Ms": 1318.5402139999987,
+        "minMs": 6.102084000000104,
+        "maxMs": 1333.1988499999989,
+        "totalMs": 630896.8642140004,
+        "opsPerSecond": 1.5850451265847467
+      },
+      "converterMs": {
+        "count": 1000,
+        "meanMs": 10.162623354000052,
+        "p50Ms": 7.544219000001249,
+        "p95Ms": 23.304133999999976,
+        "p99Ms": 48.29207899999892,
+        "minMs": 3.0864739999997255,
+        "maxMs": 112.34006999999838,
+        "totalMs": 10162.623354000052,
+        "opsPerSecond": 98.39978961794306
+      },
+      "cpu": {
+        "userMs": 896.989,
+        "systemMs": 103.219,
+        "totalMs": 1000.208
+      },
+      "memory": {
+        "rssBefore": 69398528,
+        "rssAfter": 70004736,
+        "maxRssBytes": 74260480,
+        "rssDelta": 606208
+      }
+    },
+    {
+      "name": "mixed-32-devices-c16",
+      "kind": "mixed",
+      "devices": 32,
+      "concurrency": 16,
+      "operations": 3000,
+      "hostDelayMs": 1,
+      "wallMs": 3257.418246000001,
+      "throughputOpsPerSec": 920.9747638897455,
+      "queueWaitMs": {
+        "count": 3000,
+        "meanMs": 1458.8984457659985,
+        "p50Ms": 1416.5880469999975,
+        "p95Ms": 2839.197927999998,
+        "p99Ms": 3082.258647999999,
+        "minMs": 4.830915999998979,
+        "maxMs": 3231.552694000002,
+        "totalMs": 4376695.337297996,
+        "opsPerSecond": 0.6854486704692782
+      },
+      "serviceMs": {
+        "count": 3000,
+        "meanMs": 17.25199125700008,
+        "p50Ms": 15.790999000000738,
+        "p95Ms": 56.02665299999717,
+        "p99Ms": 93.45528700000068,
+        "minMs": 0.28884300000208896,
+        "maxMs": 150.21728000000076,
+        "totalMs": 51755.97377100024,
+        "opsPerSecond": 57.96432337016431
+      },
+      "latencyMs": {
+        "count": 3000,
+        "meanMs": 1476.1504370230032,
+        "p50Ms": 1425.9816580000006,
+        "p95Ms": 2854.673386000002,
+        "p99Ms": 3189.3640849999974,
+        "minMs": 26.990836000000854,
+        "maxMs": 3259.0761280000006,
+        "totalMs": 4428451.31106901,
+        "opsPerSecond": 0.6774377291902104
+      },
+      "converterMs": {
+        "count": 3000,
+        "meanMs": 16.584650545999967,
+        "p50Ms": 15.37458599999809,
+        "p95Ms": 55.56730500000049,
+        "p99Ms": 93.03341100000034,
+        "minMs": 0.046549999999115244,
+        "maxMs": 149.98745300000155,
+        "totalMs": 49753.9516379999,
+        "opsPerSecond": 60.29671817481792
+      },
+      "cpu": {
+        "userMs": 2912.074,
+        "systemMs": 260.494,
+        "totalMs": 3172.568
+      },
+      "memory": {
+        "rssBefore": 69668864,
+        "rssAfter": 70877184,
+        "maxRssBytes": 74842112,
+        "rssDelta": 1208320
+      }
+    },
+    {
+      "name": "queue-backlog-sets-c4",
+      "kind": "set",
+      "devices": 32,
+      "concurrency": 4,
+      "operations": 2000,
+      "hostDelayMs": 5,
+      "wallMs": 3497.627467000002,
+      "throughputOpsPerSec": 571.8161865064055,
+      "queueWaitMs": {
+        "count": 2000,
+        "meanMs": 1761.9989427104983,
+        "p50Ms": 1768.9182120000005,
+        "p95Ms": 3304.706600999998,
+        "p99Ms": 3437.377436999999,
+        "minMs": 3.3607740000006743,
+        "maxMs": 3488.3923579999973,
+        "totalMs": 3523997.8854209967,
+        "opsPerSecond": 0.5675372304490099
+      },
+      "serviceMs": {
+        "count": 2000,
+        "meanMs": 6.980522542000043,
+        "p50Ms": 6.065844000000652,
+        "p95Ms": 10.83674500000052,
+        "p99Ms": 29.177159000002575,
+        "minMs": 4.576313000001392,
+        "maxMs": 65.4555020000007,
+        "totalMs": 13961.045084000085,
+        "opsPerSecond": 143.2557511251131
+      },
+      "latencyMs": {
+        "count": 2000,
+        "meanMs": 1768.979465252501,
+        "p50Ms": 1775.0458410000028,
+        "p95Ms": 3311.27865,
+        "p99Ms": 3443.5226860000002,
+        "minMs": 9.402458000000479,
+        "maxMs": 3497.984479999999,
+        "totalMs": 3537958.9305050024,
+        "opsPerSecond": 0.565297686967362
+      },
+      "converterMs": {
+        "count": 2000,
+        "meanMs": 6.635263694999948,
+        "p50Ms": 5.806162999997468,
+        "p95Ms": 10.16480600000068,
+        "p99Ms": 26.49217199999839,
+        "minMs": 4.383186999999452,
+        "maxMs": 65.06609600000229,
+        "totalMs": 13270.527389999897,
+        "opsPerSecond": 150.70991085909023
+      },
+      "cpu": {
+        "userMs": 1199.307,
+        "systemMs": 63.116,
+        "totalMs": 1262.423
+      },
+      "memory": {
+        "rssBefore": 70311936,
+        "rssAfter": 70422528,
+        "maxRssBytes": 74842112,
+        "rssDelta": 110592
+      }
+    },
+    {
+      "name": "pending-sets-c64-delay20",
+      "kind": "set",
+      "devices": 32,
+      "concurrency": 64,
+      "operations": 200,
+      "hostDelayMs": 20,
+      "wallMs": 131.2777900000001,
+      "throughputOpsPerSec": 1523.4869508391316,
+      "queueWaitMs": {
+        "count": 200,
+        "meanMs": 52.030216944999935,
+        "p50Ms": 46.79793100000097,
+        "p95Ms": 107.6366479999997,
+        "p99Ms": 110.2700079999995,
+        "minMs": 0.4801980000011099,
+        "maxMs": 111.26810599999953,
+        "totalMs": 10406.043388999988,
+        "opsPerSecond": 19.219600814985633
+      },
+      "serviceMs": {
+        "count": 200,
+        "meanMs": 35.18208368000007,
+        "p50Ms": 36.55318199999965,
+        "p95Ms": 42.00379299999986,
+        "p99Ms": 46.95296999999846,
+        "minMs": 19.796784000001935,
+        "maxMs": 47.52480699999796,
+        "totalMs": 7036.416736000014,
+        "opsPerSecond": 28.42355811257618
+      },
+      "latencyMs": {
+        "count": 200,
+        "meanMs": 87.21230062500001,
+        "p50Ms": 93.75090099999943,
+        "p95Ms": 128.19177800000034,
+        "p99Ms": 130.06679200000144,
+        "minMs": 32.84531900000002,
+        "maxMs": 131.51508100000137,
+        "totalMs": 17442.460125,
+        "opsPerSecond": 11.466272450486683
+      },
+      "converterMs": {
+        "count": 200,
+        "meanMs": 34.95863324000002,
+        "p50Ms": 36.31858399999692,
+        "p95Ms": 41.77335099999982,
+        "p99Ms": 46.785234999999375,
+        "minMs": 19.606197000000975,
+        "maxMs": 47.33968299999833,
+        "totalMs": 6991.7266480000035,
+        "opsPerSecond": 28.60523731390591
+      },
+      "cpu": {
+        "userMs": 116.523,
+        "systemMs": 0.017,
+        "totalMs": 116.54
+      },
+      "memory": {
+        "rssBefore": 70422528,
+        "rssAfter": 70422528,
+        "maxRssBytes": 74842112,
+        "rssDelta": 0
+      }
+    }
+  ]
+}

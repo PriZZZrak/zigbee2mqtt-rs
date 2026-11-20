@@ -162,7 +162,10 @@ Boa, Kataan and the future Rust host. Functional equality is a prerequisite.
 Proposed provisional gates (replace with the measured baseline after the
 spike; the Node baseline is in `converter-benchmark-baseline.md`):
 
-- per-scenario Rust p95 ≤ 2× Node p95 on Routerich (median of three runs);
+- per-scenario Rust **converter-only** p95 ≤ 2× Node `converterStats.p95` on
+  Routerich (median of three runs); harness-total numbers are not the gate;
+- the converter-level corpus must pass; the separate MQTT/ZNP integration
+  benchmark is a later stage, and stress results are informational;
 - cold package/definition work must not block `bridge/state online`; if on the
   request path, ≤ 2× Node cold load;
 - worker RSS ≤ 1.5× Node harness maxRSS (target ≤ 110 MB) and bounded;

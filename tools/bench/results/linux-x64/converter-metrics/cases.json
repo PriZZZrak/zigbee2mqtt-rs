@@ -1,0 +1,5790 @@
+[
+  {
+    "id": "package-load",
+    "kind": "package",
+    "description": "Cold require of the converter package root and zigbee-herdsman.",
+    "input": {},
+    "harnessTotalMs": 704.510711,
+    "converterOnlyMs": 704.510711,
+    "cold": {
+      "loadMs": 704.510711,
+      "reportedLoadMs": 704.474284
+    },
+    "stats": {
+      "count": 1,
+      "meanMs": 704.510711,
+      "p50Ms": 704.510711,
+      "p95Ms": 704.510711,
+      "p99Ms": 704.510711,
+      "minMs": 704.510711,
+      "maxMs": 704.510711,
+      "totalMs": 704.510711,
+      "opsPerSecond": 1.4194248354018282
+    },
+    "converterStats": {
+      "count": 1,
+      "meanMs": 704.510711,
+      "p50Ms": 704.510711,
+      "p95Ms": 704.510711,
+      "p99Ms": 704.510711,
+      "minMs": 704.510711,
+      "maxMs": 704.510711,
+      "totalMs": 704.510711,
+      "opsPerSecond": 1.4194248354018282
+    },
+    "overheadStats": {
+      "count": 1,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": null,
+    "memory": {
+      "rssBefore": null,
+      "rssAfter": 89763840,
+      "maxRssBytes": 89763840,
+      "rssDelta": null
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 704.510711,
+      "measured": false,
+      "note": "cold package load"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": null,
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-ikea-modern-extend",
+    "kind": "prepare",
+    "description": "prepareDefinition for a modernExtend light (merge extends/exposes/options).",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      }
+    },
+    "harnessTotalMs": 0.009541629999995393,
+    "converterOnlyMs": 0.009541629999995393,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.5005680000000439
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.009541629999995393,
+      "p50Ms": 0.006709999999998217,
+      "p95Ms": 0.023715000000038344,
+      "p99Ms": 0.03916700000002038,
+      "minMs": 0.006405999999969936,
+      "maxMs": 0.04993799999999737,
+      "totalMs": 0.9541629999995394,
+      "opsPerSecond": 104803.89618969534
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.009541629999995393,
+      "p50Ms": 0.006709999999998217,
+      "p95Ms": 0.023715000000038344,
+      "p99Ms": 0.03916700000002038,
+      "minMs": 0.006405999999969936,
+      "maxMs": 0.04993799999999737,
+      "totalMs": 0.9541629999995394,
+      "opsPerSecond": 104803.89618969534
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 1.578,
+      "systemMs": 0.066,
+      "totalMs": 1.644
+    },
+    "memory": {
+      "rssBefore": 94240768,
+      "rssAfter": 94240768,
+      "maxRssBytes": 94240768,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.04993799999999737,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "zigbeeModel": [
+        "TRADFRI bulb E27 WS opal 980lm",
+        "TRADFRI bulb E26 WS opal 980lm",
+        "TRADFRI bulb E27 WS�opal 980lm"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-danfoss-thermostat",
+    "kind": "prepare",
+    "description": "prepareDefinition for a thermostat with large exposes/options and onEvent.",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      }
+    },
+    "harnessTotalMs": 0.027324720000019623,
+    "converterOnlyMs": 0.027324720000019623,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 131.56796300000008,
+      "prepareMs": 0.2236520000001292
+    },
+    "stats": {
+      "count": 50,
+      "meanMs": 0.027324720000019623,
+      "p50Ms": 0.02345700000000761,
+      "p95Ms": 0.061237000000119224,
+      "p99Ms": 0.06224599999995917,
+      "minMs": 0.021813999999949374,
+      "maxMs": 0.06224599999995917,
+      "totalMs": 1.3662360000009812,
+      "opsPerSecond": 36596.89833964563
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.027324720000019623,
+      "p50Ms": 0.02345700000000761,
+      "p95Ms": 0.061237000000119224,
+      "p99Ms": 0.06224599999995917,
+      "minMs": 0.021813999999949374,
+      "maxMs": 0.06224599999995917,
+      "totalMs": 1.3662360000009812,
+      "opsPerSecond": 36596.89833964563
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 2.917,
+      "systemMs": 0.011,
+      "totalMs": 2.928
+    },
+    "memory": {
+      "rssBefore": 95289344,
+      "rssAfter": 96075776,
+      "maxRssBytes": 96075776,
+      "rssDelta": 786432
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06224599999995917,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "zigbeeModel": [
+        "eTRV0100",
+        "eTRV0101",
+        "eTRV0103",
+        "TRV001",
+        "TRV003",
+        "eT093WRO",
+        "eT093WRG"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-tuya-sensor",
+    "kind": "prepare",
+    "description": "prepareDefinition for a modernExtend Tuya datapoint device.",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      }
+    },
+    "harnessTotalMs": 0.010924000000004526,
+    "converterOnlyMs": 0.010924000000004526,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 66.32590400000004,
+      "prepareMs": 0.16461499999991247
+    },
+    "stats": {
+      "count": 50,
+      "meanMs": 0.010924000000004526,
+      "p50Ms": 0.008137999999917156,
+      "p95Ms": 0.02205399999979818,
+      "p99Ms": 0.024343000000044412,
+      "minMs": 0.007644000000027518,
+      "maxMs": 0.024343000000044412,
+      "totalMs": 0.5462000000002263,
+      "opsPerSecond": 91541.55986814223
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.010924000000004526,
+      "p50Ms": 0.008137999999917156,
+      "p95Ms": 0.02205399999979818,
+      "p99Ms": 0.024343000000044412,
+      "minMs": 0.007644000000027518,
+      "maxMs": 0.024343000000044412,
+      "totalMs": 0.5462000000002263,
+      "opsPerSecond": 91541.55986814223
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 0.723,
+      "systemMs": 0.018,
+      "totalMs": 0.741
+    },
+    "memory": {
+      "rssBefore": 96993280,
+      "rssAfter": 97124352,
+      "maxRssBytes": 97124352,
+      "rssDelta": 131072
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.024343000000044412,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "zigbeeModel": null
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-onoff",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "genOnOff",
+        "type": "attributeReport",
+        "data": {
+          "onOff": 1
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.030057619999995497,
+    "converterOnlyMs": 0.004687120000007781,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.029921999999942273
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.030057619999995497,
+      "p50Ms": 0.024802000000136104,
+      "p95Ms": 0.05594699999983277,
+      "p99Ms": 0.0755580000000009,
+      "minMs": 0.019630000000006476,
+      "maxMs": 0.07700900000008915,
+      "totalMs": 3.0057619999995495,
+      "opsPerSecond": 33269.43384074154
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.004687120000007781,
+      "p50Ms": 0.0035109999998894637,
+      "p95Ms": 0.007468000000244501,
+      "p99Ms": 0.015086999999994077,
+      "minMs": 0.0017980000002353336,
+      "maxMs": 0.054210000000239233,
+      "totalMs": 0.46871200000077806,
+      "opsPerSecond": 213350.6289573
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.025370499999987715,
+      "p50Ms": 0.02101800000014009,
+      "p95Ms": 0.04904300000021067,
+      "p99Ms": 0.06613700000002609,
+      "minMs": 0.015019999999822176,
+      "maxMs": 0.07391700000016499,
+      "totalMs": 2.5370499999987715,
+      "opsPerSecond": 39415.85699928989
+    },
+    "cpu": {
+      "userMs": 3.332,
+      "systemMs": 1.169,
+      "totalMs": 4.501
+    },
+    "memory": {
+      "rssBefore": 97386496,
+      "rssAfter": 98959360,
+      "maxRssBytes": 98959360,
+      "rssDelta": 1572864
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.07700900000008915,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": "ON"
+      },
+      "published": [
+        {
+          "state": "ON"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-brightness",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "genLevelCtrl",
+        "type": "attributeReport",
+        "data": {
+          "currentLevel": 128
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.021164280000009514,
+    "converterOnlyMs": 0.002545950000005632,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.04385900000011134
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.021164280000009514,
+      "p50Ms": 0.01944099999991522,
+      "p95Ms": 0.027520000000095024,
+      "p99Ms": 0.04205200000001241,
+      "minMs": 0.0178089999999429,
+      "maxMs": 0.09848799999986113,
+      "totalMs": 2.116428000000951,
+      "opsPerSecond": 47249.422139546
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.002545950000005632,
+      "p50Ms": 0.002023999999892112,
+      "p95Ms": 0.0038749999998799467,
+      "p99Ms": 0.006440000000111468,
+      "minMs": 0.0018759999998110288,
+      "maxMs": 0.008972999999969034,
+      "totalMs": 0.25459500000056323,
+      "opsPerSecond": 392780.69090036635
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.01861833000000388,
+      "p50Ms": 0.01731200000017452,
+      "p95Ms": 0.02398999999991247,
+      "p99Ms": 0.035781999999926484,
+      "minMs": 0.014157999999952153,
+      "maxMs": 0.09630199999969591,
+      "totalMs": 1.861833000000388,
+      "opsPerSecond": 53710.51001887879
+    },
+    "cpu": {
+      "userMs": 2.458,
+      "systemMs": 0,
+      "totalMs": 2.458
+    },
+    "memory": {
+      "rssBefore": 99483648,
+      "rssAfter": 100663296,
+      "maxRssBytes": 100663296,
+      "rssDelta": 1179648
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.09848799999986113,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "brightness": 128
+      },
+      "published": [
+        {
+          "brightness": 128
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-color-temp",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "lightingColorCtrl",
+        "type": "attributeReport",
+        "data": {
+          "colorTemperature": 250
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.031436530000003134,
+    "converterOnlyMs": 0.009500049999981003,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.020328000000063184
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.031436530000003134,
+      "p50Ms": 0.026969000000008236,
+      "p95Ms": 0.050838000000112515,
+      "p99Ms": 0.05548799999996845,
+      "minMs": 0.024759000000130982,
+      "maxMs": 0.06374099999993632,
+      "totalMs": 3.143653000000313,
+      "opsPerSecond": 31810.126626567893
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.009500049999981003,
+      "p50Ms": 0.008401000000048953,
+      "p95Ms": 0.02046099999984108,
+      "p99Ms": 0.028284999999868887,
+      "minMs": 0.006221999999979744,
+      "maxMs": 0.028663000000051397,
+      "totalMs": 0.9500049999981002,
+      "opsPerSecond": 105262.60388124271
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.02193648000002213,
+      "p50Ms": 0.01933699999995042,
+      "p95Ms": 0.039031999999906475,
+      "p99Ms": 0.04360399999995934,
+      "minMs": 0.01661699999999655,
+      "maxMs": 0.044108999999934895,
+      "totalMs": 2.193648000002213,
+      "opsPerSecond": 45586.16514586621
+    },
+    "cpu": {
+      "userMs": 4.064,
+      "systemMs": 0.258,
+      "totalMs": 4.322
+    },
+    "memory": {
+      "rssBefore": 100925440,
+      "rssAfter": 102367232,
+      "maxRssBytes": 102367232,
+      "rssDelta": 1441792
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06374099999993632,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "color_temp": 250,
+        "color_mode": "color_temp"
+      },
+      "published": [
+        {
+          "color_temp": 250,
+          "color_mode": "color_temp"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-color-xy",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "lightingColorCtrl",
+        "type": "attributeReport",
+        "data": {
+          "currentX": 24939,
+          "currentY": 60778
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.02868147000001045,
+    "converterOnlyMs": 0.00712188000001106,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.02873900000008689
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.02868147000001045,
+      "p50Ms": 0.025519999999914944,
+      "p95Ms": 0.04538900000011381,
+      "p99Ms": 0.06211200000007011,
+      "minMs": 0.02310999999986052,
+      "maxMs": 0.06409899999994195,
+      "totalMs": 2.868147000001045,
+      "opsPerSecond": 34865.7164364182
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.00712188000001106,
+      "p50Ms": 0.00669900000002599,
+      "p95Ms": 0.01164599999992788,
+      "p99Ms": 0.023201999999855616,
+      "minMs": 0.004719000000022788,
+      "maxMs": 0.03452700000002551,
+      "totalMs": 0.712188000001106,
+      "opsPerSecond": 140412.36302752182
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.02155958999999939,
+      "p50Ms": 0.019405000000006112,
+      "p95Ms": 0.032565000000204236,
+      "p99Ms": 0.04325599999992846,
+      "minMs": 0.01674800000000687,
+      "maxMs": 0.05579099999999926,
+      "totalMs": 2.155958999999939,
+      "opsPerSecond": 46383.07129217338
+    },
+    "cpu": {
+      "userMs": 3.218,
+      "systemMs": 0.49,
+      "totalMs": 3.708
+    },
+    "memory": {
+      "rssBefore": 102629376,
+      "rssAfter": 104071168,
+      "maxRssBytes": 104071168,
+      "rssDelta": 1441792
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06409899999994195,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "color": {
+          "x": 0.3805,
+          "y": 0.9274
+        },
+        "color_mode": "xy"
+      },
+      "published": [
+        {
+          "color": {
+            "x": 0.3805,
+            "y": 0.9274
+          },
+          "color_mode": "xy"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-ikea-onoff",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "state",
+      "value": "ON",
+      "message": {
+        "state": "ON"
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.05230968000000303,
+    "converterOnlyMs": 0.031002609999989092,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.08236899999997149
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.05230968000000303,
+      "p50Ms": 0.04288100000007944,
+      "p95Ms": 0.10037799999986419,
+      "p99Ms": 0.19133899999997084,
+      "minMs": 0.019800000000032014,
+      "maxMs": 0.233560000000125,
+      "totalMs": 5.230968000000303,
+      "opsPerSecond": 19116.920615839023
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.031002609999989092,
+      "p50Ms": 0.023202999999966778,
+      "p95Ms": 0.06623000000013235,
+      "p99Ms": 0.07638699999984055,
+      "minMs": 0.010292999999819585,
+      "maxMs": 0.20514800000000832,
+      "totalMs": 3.100260999998909,
+      "opsPerSecond": 32255.34882386844
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.021307070000013938,
+      "p50Ms": 0.016202999999904932,
+      "p95Ms": 0.043611999999939144,
+      "p99Ms": 0.057649999999966894,
+      "minMs": 0.009507000000212429,
+      "maxMs": 0.12328800000000228,
+      "totalMs": 2.1307070000013937,
+      "opsPerSecond": 46932.77865043603
+    },
+    "cpu": {
+      "userMs": 12.069,
+      "systemMs": 2.903,
+      "totalMs": 14.972
+    },
+    "memory": {
+      "rssBefore": 104464384,
+      "rssAfter": 107741184,
+      "maxRssBytes": 107741184,
+      "rssDelta": 3276800
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.233560000000125,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "genOnOff",
+        "command": "on",
+        "payload": {},
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "set-ikea-brightness",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "brightness",
+      "value": 128,
+      "message": {
+        "brightness": 128
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.026253079999992223,
+    "converterOnlyMs": 0.01509688999998616,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.044340000000147484
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.026253079999992223,
+      "p50Ms": 0.021786000000020067,
+      "p95Ms": 0.05039299999998548,
+      "p99Ms": 0.0658739999998943,
+      "minMs": 0.019107999999960157,
+      "maxMs": 0.0661240000001726,
+      "totalMs": 2.6253079999992224,
+      "opsPerSecond": 38090.76877837938
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.01509688999998616,
+      "p50Ms": 0.01209999999991851,
+      "p95Ms": 0.028381999999965046,
+      "p99Ms": 0.0455019999999422,
+      "minMs": 0.01027099999987513,
+      "maxMs": 0.05600200000003497,
+      "totalMs": 1.509688999998616,
+      "opsPerSecond": 66238.80812544284
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.011156190000006063,
+      "p50Ms": 0.009521999999833497,
+      "p95Ms": 0.019582000000127664,
+      "p99Ms": 0.026391999999987092,
+      "minMs": 0.00872199999980694,
+      "maxMs": 0.02962100000013379,
+      "totalMs": 1.1156190000006063,
+      "opsPerSecond": 89636.33641946368
+    },
+    "cpu": {
+      "userMs": 2.748,
+      "systemMs": 1.417,
+      "totalMs": 4.165
+    },
+    "memory": {
+      "rssBefore": 107741184,
+      "rssAfter": 107741184,
+      "maxRssBytes": 107741184,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.0661240000001726,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "brightness": 128,
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "genLevelCtrl",
+        "command": "moveToLevelWithOnOff",
+        "payload": {
+          "level": 128,
+          "transtime": 0,
+          "optionsMask": 0,
+          "optionsOverride": 0
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "set-ikea-color-temp",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "color_temp",
+      "value": 250,
+      "message": {
+        "color_temp": 250
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.025659169999998996,
+    "converterOnlyMs": 0.013377100000006976,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.036249999999881766
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.025659169999998996,
+      "p50Ms": 0.0224230000001171,
+      "p95Ms": 0.04624100000000908,
+      "p99Ms": 0.05880099999990307,
+      "minMs": 0.02171900000007554,
+      "maxMs": 0.07411899999988236,
+      "totalMs": 2.5659169999998994,
+      "opsPerSecond": 38972.421945060545
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.013377100000006976,
+      "p50Ms": 0.011526000000003478,
+      "p95Ms": 0.02352999999993699,
+      "p99Ms": 0.036315999999942505,
+      "minMs": 0.011028000000123939,
+      "maxMs": 0.047309000000041124,
+      "totalMs": 1.3377100000006976,
+      "opsPerSecond": 74754.6179664859
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.012282069999992018,
+      "p50Ms": 0.010854999999764914,
+      "p95Ms": 0.02102599999989252,
+      "p99Ms": 0.039986999999882755,
+      "minMs": 0.01044200000001183,
+      "maxMs": 0.04305199999976139,
+      "totalMs": 1.2282069999992018,
+      "opsPerSecond": 81419.5001331738
+    },
+    "cpu": {
+      "userMs": 3.123,
+      "systemMs": 0,
+      "totalMs": 3.123
+    },
+    "memory": {
+      "rssBefore": 107741184,
+      "rssAfter": 107741184,
+      "maxRssBytes": 107741184,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.07411899999988236,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "color_mode": "color_temp",
+          "color_temp": 250
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "lightingColorCtrl",
+        "command": "moveToColorTemp",
+        "payload": {
+          "colortemp": 250,
+          "transtime": 0,
+          "optionsMask": 0,
+          "optionsOverride": 0
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "get-ikea-onoff",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "state",
+      "message": {},
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.016342880000013337,
+    "converterOnlyMs": 0.0036065200000052755,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.027381000000104905
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.016342880000013337,
+      "p50Ms": 0.015692000000171902,
+      "p95Ms": 0.036469999999781066,
+      "p99Ms": 0.05660299999999552,
+      "minMs": 0.007841000000098575,
+      "maxMs": 0.05724000000009255,
+      "totalMs": 1.6342880000013338,
+      "opsPerSecond": 61188.725610124035
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.0036065200000052755,
+      "p50Ms": 0.003946999999925538,
+      "p95Ms": 0.005393000000140091,
+      "p99Ms": 0.01114400000005844,
+      "minMs": 0.0020139999999173597,
+      "maxMs": 0.01368200000001707,
+      "totalMs": 0.36065200000052755,
+      "opsPerSecond": 277275.60085582145
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.012736360000008062,
+      "p50Ms": 0.011713999999983571,
+      "p95Ms": 0.028189999999995052,
+      "p99Ms": 0.05070099999988997,
+      "minMs": 0.005809999999883075,
+      "maxMs": 0.0519289999999728,
+      "totalMs": 1.2736360000008062,
+      "opsPerSecond": 78515.36859819973
+    },
+    "cpu": {
+      "userMs": 2.032,
+      "systemMs": 0,
+      "totalMs": 2.032
+    },
+    "memory": {
+      "rssBefore": 107741184,
+      "rssAfter": 107741184,
+      "maxRssBytes": 107741184,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.05724000000009255,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "genOnOff",
+        "attributes": [
+          "onOff"
+        ],
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "set-ikea-brightness-host-delay",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "brightness",
+      "value": 128,
+      "message": {
+        "brightness": 128
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 2.2183283500000015,
+    "converterOnlyMs": 2.1949160499999723,
+    "definition": {
+      "file": "ikea.js",
+      "index": 0,
+      "source": "package",
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "loadMs": 154.123961,
+      "prepareMs": 0.029548999999860825
+    },
+    "stats": {
+      "count": 20,
+      "meanMs": 2.2183283500000015,
+      "p50Ms": 2.16251299999999,
+      "p95Ms": 2.2306690000000344,
+      "p99Ms": 3.2318629999999757,
+      "minMs": 2.1218650000000707,
+      "maxMs": 3.2318629999999757,
+      "totalMs": 44.36656700000003,
+      "opsPerSecond": 450.78989320945175
+    },
+    "converterStats": {
+      "count": 20,
+      "meanMs": 2.1949160499999723,
+      "p50Ms": 2.139028000000053,
+      "p95Ms": 2.2094039999999495,
+      "p99Ms": 3.211072999999942,
+      "minMs": 2.1005749999999352,
+      "maxMs": 3.211072999999942,
+      "totalMs": 43.89832099999944,
+      "opsPerSecond": 455.59829042209276
+    },
+    "overheadStats": {
+      "count": 20,
+      "meanMs": 0.02341230000002952,
+      "p50Ms": 0.02159099999994396,
+      "p95Ms": 0.02746200000024146,
+      "p99Ms": 0.046932999999853564,
+      "minMs": 0.020748000000139655,
+      "maxMs": 0.046932999999853564,
+      "totalMs": 0.46824600000059036,
+      "opsPerSecond": 42712.591244719195
+    },
+    "cpu": {
+      "userMs": 2.122,
+      "systemMs": 0.024,
+      "totalMs": 2.146
+    },
+    "memory": {
+      "rssBefore": 107929600,
+      "rssAfter": 107929600,
+      "maxRssBytes": 108175360,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 3.2318629999999757,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 43.428531000000476,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "brightness": 128,
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "genLevelCtrl",
+        "command": "moveToLevelWithOnOff",
+        "payload": {
+          "level": 128,
+          "transtime": 0,
+          "optionsMask": 0,
+          "optionsOverride": 0
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "fz-lumi-occupancy",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lumi.js",
+        "model": "RTCGQ01LM"
+      },
+      "device": {
+        "modelID": "RTCGQ01LM",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "msOccupancySensing",
+        "type": "attributeReport",
+        "data": {
+          "occupancy": 1
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.024360809999996035,
+    "converterOnlyMs": 0.006263659999997344,
+    "definition": {
+      "file": "lumi.js",
+      "index": 59,
+      "source": "package",
+      "model": "RTCGQ01LM",
+      "vendor": "Xiaomi",
+      "loadMs": 180.179979,
+      "prepareMs": 0.04769200000009732
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.024360809999996035,
+      "p50Ms": 0.01876300000003539,
+      "p95Ms": 0.04856700000004821,
+      "p99Ms": 0.05666499999983898,
+      "minMs": 0.017614000000094165,
+      "maxMs": 0.061745999999857304,
+      "totalMs": 2.4360809999996036,
+      "opsPerSecond": 41049.538172177476
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.006263659999997344,
+      "p50Ms": 0.004606999999850814,
+      "p95Ms": 0.014912999999978638,
+      "p99Ms": 0.024603000000070097,
+      "minMs": 0.004352999999809981,
+      "maxMs": 0.025095999999848573,
+      "totalMs": 0.6263659999997344,
+      "opsPerSecond": 159651.06662884384
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.01809714999999869,
+      "p50Ms": 0.014120999999931882,
+      "p95Ms": 0.03807699999970282,
+      "p99Ms": 0.04342899999983274,
+      "minMs": 0.013253999999960797,
+      "maxMs": 0.048780999999735286,
+      "totalMs": 1.8097149999998692,
+      "opsPerSecond": 55257.319522691265
+    },
+    "cpu": {
+      "userMs": 3.149,
+      "systemMs": 0.009,
+      "totalMs": 3.158
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.061745999999857304,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "occupancy": true
+      },
+      "published": [
+        {
+          "occupancy": true
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-lumi-occupancy-clear",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lumi.js",
+        "model": "RTCGQ01LM"
+      },
+      "device": {
+        "modelID": "RTCGQ01LM",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "msOccupancySensing",
+        "type": "attributeReport",
+        "data": {
+          "occupancy": 0
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.01151667999999745,
+    "converterOnlyMs": 0.0007139499999948384,
+    "definition": {
+      "file": "lumi.js",
+      "index": 59,
+      "source": "package",
+      "model": "RTCGQ01LM",
+      "vendor": "Xiaomi",
+      "loadMs": 180.179979,
+      "prepareMs": 0.019943000000012034
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.01151667999999745,
+      "p50Ms": 0.010729000000083033,
+      "p95Ms": 0.018640000000004875,
+      "p99Ms": 0.021210999999993874,
+      "minMs": 0.010359999999991487,
+      "maxMs": 0.028599999999869397,
+      "totalMs": 1.151667999999745,
+      "opsPerSecond": 86830.57964623671
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.0007139499999948384,
+      "p50Ms": 0.0005719999999200809,
+      "p95Ms": 0.0007110000001375738,
+      "p99Ms": 0.0023719999999229913,
+      "minMs": 0.0005229999999301072,
+      "maxMs": 0.011619999999993524,
+      "totalMs": 0.07139499999948384,
+      "opsPerSecond": 1400658.3094155467
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.010802730000002612,
+      "p50Ms": 0.01013199999988501,
+      "p95Ms": 0.016268000000081884,
+      "p99Ms": 0.019907999999986714,
+      "minMs": 0.0098089999999047,
+      "maxMs": 0.020618999999896914,
+      "totalMs": 1.0802730000002612,
+      "opsPerSecond": 92569.19315763314
+    },
+    "cpu": {
+      "userMs": 1.266,
+      "systemMs": 0,
+      "totalMs": 1.266
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.028599999999869397,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-l101-thermostat",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "hvacThermostat",
+        "type": "attributeReport",
+        "data": {
+          "localTemp": 2150,
+          "occupiedHeatingSetpoint": 2000
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1,
+          "manufacturerCode": 30583
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.021272230000004128,
+    "converterOnlyMs": 0.003938629999991008,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 88.33748300000002,
+      "prepareMs": 0.05886099999997896
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.021272230000004128,
+      "p50Ms": 0.01838899999984278,
+      "p95Ms": 0.03519200000005185,
+      "p99Ms": 0.054615000000012515,
+      "minMs": 0.017471000000114145,
+      "maxMs": 0.06404999999995198,
+      "totalMs": 2.127223000000413,
+      "opsPerSecond": 47009.64590923499
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.003938629999991008,
+      "p50Ms": 0.0032259999998132116,
+      "p95Ms": 0.0060489999998480926,
+      "p99Ms": 0.013952999999901294,
+      "minMs": 0.0030180000001109875,
+      "maxMs": 0.023580000000038126,
+      "totalMs": 0.3938629999991008,
+      "opsPerSecond": 253895.39002198304
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.01733360000001312,
+      "p50Ms": 0.01512500000012551,
+      "p95Ms": 0.027114999999866995,
+      "p99Ms": 0.04156800000009753,
+      "minMs": 0.014263999999911903,
+      "maxMs": 0.05778000000009342,
+      "totalMs": 1.733360000001312,
+      "opsPerSecond": 57691.4201319543
+    },
+    "cpu": {
+      "userMs": 2.974,
+      "systemMs": 0.008,
+      "totalMs": 2.982
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06404999999995198,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "local_temperature_l1": 21.5,
+        "occupied_heating_setpoint_l1": 20
+      },
+      "published": [
+        {
+          "local_temperature_l1": 21.5,
+          "occupied_heating_setpoint_l1": 20
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-l101-setpoint",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "occupied_heating_setpoint",
+      "value": 21.5,
+      "message": {
+        "occupied_heating_setpoint": 21.5
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.014821790000009969,
+    "converterOnlyMs": 0.0035624699999925722,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 88.33748300000002,
+      "prepareMs": 0.030280000000175278
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.014821790000009969,
+      "p50Ms": 0.01178000000004431,
+      "p95Ms": 0.02621499999986554,
+      "p99Ms": 0.05611799999996947,
+      "minMs": 0.010594999999966603,
+      "maxMs": 0.06010199999991528,
+      "totalMs": 1.482179000000997,
+      "opsPerSecond": 67468.23426855511
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.0035624699999925722,
+      "p50Ms": 0.0028959999999642605,
+      "p95Ms": 0.006343999999899097,
+      "p99Ms": 0.012856000000056156,
+      "minMs": 0.0026800000000548607,
+      "maxMs": 0.01985700000000179,
+      "totalMs": 0.35624699999925724,
+      "opsPerSecond": 280704.11821070354
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.011259320000017397,
+      "p50Ms": 0.008917999999994208,
+      "p95Ms": 0.02001099999984035,
+      "p99Ms": 0.04024499999991349,
+      "minMs": 0.007914999999911743,
+      "maxMs": 0.051806999999826076,
+      "totalMs": 1.1259320000017397,
+      "opsPerSecond": 88815.31033832015
+    },
+    "cpu": {
+      "userMs": 3.092,
+      "systemMs": 0,
+      "totalMs": 3.092
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06010199999991528,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "occupied_heating_setpoint": 21.5
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "write",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": {
+          "occupiedHeatingSetpoint": 2150
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "get-l101-sensor-type",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "sensor_type",
+      "message": {
+        "sensor_type": "10 кОм"
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.01297984999999926,
+    "converterOnlyMs": 0.0033820099999957165,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 88.33748300000002,
+      "prepareMs": 0.039240999999947235
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.01297984999999926,
+      "p50Ms": 0.010320000000092477,
+      "p95Ms": 0.03084099999978207,
+      "p99Ms": 0.043553999999858206,
+      "minMs": 0.009504999999990105,
+      "maxMs": 0.04494299999987561,
+      "totalMs": 1.297984999999926,
+      "opsPerSecond": 77042.492786901
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.0033820099999957165,
+      "p50Ms": 0.0028629999999338906,
+      "p95Ms": 0.005292000000054031,
+      "p99Ms": 0.012897000000066328,
+      "minMs": 0.0026000000000294676,
+      "maxMs": 0.01974500000005719,
+      "totalMs": 0.33820099999957165,
+      "opsPerSecond": 295682.153512635
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.009597840000003544,
+      "p50Ms": 0.007434000000102969,
+      "p95Ms": 0.025033999999777734,
+      "p99Ms": 0.032357000000047265,
+      "minMs": 0.006904999999960637,
+      "maxMs": 0.037030999999842606,
+      "totalMs": 0.9597840000003544,
+      "opsPerSecond": 104190.10944125248
+    },
+    "cpu": {
+      "userMs": 1.704,
+      "systemMs": 0,
+      "totalMs": 1.704
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.04494299999987561,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          30464
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      }
+    ]
+  },
+  {
+    "id": "fz-tuya-dp-temperature",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      },
+      "device": {
+        "modelID": "ZWSH16",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "manuSpecificTuya",
+        "type": "commandDataReport",
+        "data": {
+          "dpValues": [
+            {
+              "dp": 1,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                215
+              ]
+            }
+          ]
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 11
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.025171960000016043,
+    "converterOnlyMs": 0.005618959999976596,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 66.32590400000004,
+      "prepareMs": 0.1272599999999784
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.025171960000016043,
+      "p50Ms": 0.02215699999987919,
+      "p95Ms": 0.041357999999945605,
+      "p99Ms": 0.05966200000011668,
+      "minMs": 0.02098599999999351,
+      "maxMs": 0.06296900000006644,
+      "totalMs": 2.5171960000016043,
+      "opsPerSecond": 39726.7435670231
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.005618959999976596,
+      "p50Ms": 0.00451599999996688,
+      "p95Ms": 0.012182000000166227,
+      "p99Ms": 0.027210000000195578,
+      "minMs": 0.004079000000047017,
+      "maxMs": 0.030850999999984197,
+      "totalMs": 0.5618959999976596,
+      "opsPerSecond": 177968.876803566
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.019553000000039445,
+      "p50Ms": 0.017644000000245796,
+      "p95Ms": 0.02881100000013248,
+      "p99Ms": 0.04107500000009168,
+      "minMs": 0.01657799999998133,
+      "maxMs": 0.05680800000004638,
+      "totalMs": 1.9553000000039447,
+      "opsPerSecond": 51143.047102643206
+    },
+    "cpu": {
+      "userMs": 2.993,
+      "systemMs": 0,
+      "totalMs": 2.993
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06296900000006644,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "temperature": 21.5
+      },
+      "published": [
+        {
+          "temperature": 21.5
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-tuya-dp-multi",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      },
+      "device": {
+        "modelID": "ZWSH16",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "manuSpecificTuya",
+        "type": "commandDataResponse",
+        "data": {
+          "dpValues": [
+            {
+              "dp": 1,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                220
+              ]
+            },
+            {
+              "dp": 2,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                44
+              ]
+            },
+            {
+              "dp": 4,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                88
+              ]
+            }
+          ]
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 12
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.03177393999999822,
+    "converterOnlyMs": 0.006384479999999257,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 66.32590400000004,
+      "prepareMs": 0.03684100000009494
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.03177393999999822,
+      "p50Ms": 0.026184000000057495,
+      "p95Ms": 0.05561400000010508,
+      "p99Ms": 0.07289399999990565,
+      "minMs": 0.023749000000179876,
+      "maxMs": 0.12474599999995917,
+      "totalMs": 3.177393999999822,
+      "opsPerSecond": 31472.33235790261
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.006384479999999257,
+      "p50Ms": 0.005051999999977852,
+      "p95Ms": 0.013979999999946813,
+      "p99Ms": 0.032570000000077926,
+      "minMs": 0.003963999999996304,
+      "maxMs": 0.03592600000024504,
+      "totalMs": 0.6384479999999257,
+      "opsPerSecond": 156629.82733129658
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.025389459999998962,
+      "p50Ms": 0.021143000000165557,
+      "p95Ms": 0.04168299999992087,
+      "p99Ms": 0.051942999999937456,
+      "minMs": 0.019780999999966298,
+      "maxMs": 0.09217599999988124,
+      "totalMs": 2.5389459999998962,
+      "opsPerSecond": 39386.422554872806
+    },
+    "cpu": {
+      "userMs": 6.243,
+      "systemMs": 0,
+      "totalMs": 6.243
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.12474599999995917,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "temperature": 22,
+        "humidity": 44,
+        "battery": 88
+      },
+      "published": [
+        {
+          "temperature": 22,
+          "humidity": 44,
+          "battery": 88
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-tuya-temperature-unit",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      },
+      "device": {
+        "modelID": "ZWSH16",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "temperature_unit",
+      "value": "fahrenheit",
+      "message": {
+        "temperature_unit": "fahrenheit"
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.026223030000001018,
+    "converterOnlyMs": 0.013906670000012581,
+    "definition": {
+      "file": "avatto.js",
+      "index": 0,
+      "source": "package",
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "loadMs": 66.32590400000004,
+      "prepareMs": 0.06254800000010619
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.026223030000001018,
+      "p50Ms": 0.02056199999992714,
+      "p95Ms": 0.045713000000205284,
+      "p99Ms": 0.06679600000006758,
+      "minMs": 0.01643100000001141,
+      "maxMs": 0.08172500000000582,
+      "totalMs": 2.6223030000001017,
+      "opsPerSecond": 38134.4184863443
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.013906670000012581,
+      "p50Ms": 0.01054100000010294,
+      "p95Ms": 0.02726499999994303,
+      "p99Ms": 0.03795300000001589,
+      "minMs": 0.00811399999997775,
+      "maxMs": 0.04793300000005729,
+      "totalMs": 1.3906670000012582,
+      "opsPerSecond": 71907.94057808917
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.012316359999988435,
+      "p50Ms": 0.009725000000116779,
+      "p95Ms": 0.018863000000010288,
+      "p99Ms": 0.025736999999935506,
+      "minMs": 0.008317000000033659,
+      "maxMs": 0.05265099999996892,
+      "totalMs": 1.2316359999988435,
+      "opsPerSecond": 81192.81995662184
+    },
+    "cpu": {
+      "userMs": 3.973,
+      "systemMs": 0,
+      "totalMs": 3.973
+    },
+    "memory": {
+      "rssBefore": 109633536,
+      "rssAfter": 109633536,
+      "maxRssBytes": 109633536,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.08172500000000582,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "temperature_unit": "fahrenheit"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "manuSpecificTuya",
+        "command": "dataRequest",
+        "payload": {
+          "seq": 1,
+          "dpValues": [
+            {
+              "dp": 9,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        "options": {
+          "disableDefaultResponse": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "fz-ts0002-ep2-onoff",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "tuya.js",
+        "model": "TS0002"
+      },
+      "device": {
+        "modelID": "TS0002",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 2,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 2,
+      "msg": {
+        "cluster": "genOnOff",
+        "type": "attributeReport",
+        "data": {
+          "onOff": 1
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.024232560000009472,
+    "converterOnlyMs": 0.004958270000001903,
+    "definition": {
+      "file": "tuya.js",
+      "index": 172,
+      "source": "package",
+      "model": "_TZ3000_h1ipgkwn",
+      "vendor": "Tuya",
+      "loadMs": 615.765513,
+      "prepareMs": 0.050679999999829306
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.024232560000009472,
+      "p50Ms": 0.020825999999942724,
+      "p95Ms": 0.04814299999998184,
+      "p99Ms": 0.0534099999999853,
+      "minMs": 0.01904000000013184,
+      "maxMs": 0.05837999999994281,
+      "totalMs": 2.423256000000947,
+      "opsPerSecond": 41266.791457427906
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.004958270000001903,
+      "p50Ms": 0.003885000000082073,
+      "p95Ms": 0.0064649999994799145,
+      "p99Ms": 0.026155000000471773,
+      "minMs": 0.002243999999791413,
+      "maxMs": 0.04242699999940669,
+      "totalMs": 0.4958270000001903,
+      "opsPerSecond": 201683.24839099447
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.019274290000007566,
+      "p50Ms": 0.01696399999991627,
+      "p95Ms": 0.04112500000064756,
+      "p99Ms": 0.04554600000028586,
+      "minMs": 0.013964999999643624,
+      "maxMs": 0.04833699999971941,
+      "totalMs": 1.9274290000007568,
+      "opsPerSecond": 51882.58555825441
+    },
+    "cpu": {
+      "userMs": 1.767,
+      "systemMs": 0.914,
+      "totalMs": 2.681
+    },
+    "memory": {
+      "rssBefore": 120745984,
+      "rssAfter": 122318848,
+      "maxRssBytes": 122318848,
+      "rssDelta": 1572864
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.05837999999994281,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state_l2": "ON"
+      },
+      "published": [
+        {
+          "state_l2": "ON"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-ts0002-ep2-onoff",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "tuya.js",
+        "model": "TS0002"
+      },
+      "device": {
+        "modelID": "TS0002",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 2,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 2,
+      "key": "state",
+      "value": "ON",
+      "message": {
+        "state": "ON",
+        "state_l2": "ON"
+      },
+      "endpointName": "l2",
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.015064889999966908,
+    "converterOnlyMs": 0.003929890000008527,
+    "definition": {
+      "file": "tuya.js",
+      "index": 172,
+      "source": "package",
+      "model": "_TZ3000_h1ipgkwn",
+      "vendor": "Tuya",
+      "loadMs": 615.765513,
+      "prepareMs": 0.019855999999890628
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.015064889999966908,
+      "p50Ms": 0.013766000000032363,
+      "p95Ms": 0.021063000000140164,
+      "p99Ms": 0.03127199999971708,
+      "minMs": 0.013058000000000902,
+      "maxMs": 0.03848299999981464,
+      "totalMs": 1.5064889999966908,
+      "opsPerSecond": 66379.50891126298
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.003929890000008527,
+      "p50Ms": 0.003885000000082073,
+      "p95Ms": 0.006331000000045606,
+      "p99Ms": 0.011891999999988911,
+      "minMs": 0.002250000000003638,
+      "maxMs": 0.015109999999822321,
+      "totalMs": 0.3929890000008527,
+      "opsPerSecond": 254460.04849953312
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.011134999999958381,
+      "p50Ms": 0.009786999999960244,
+      "p95Ms": 0.01453799999990224,
+      "p99Ms": 0.025826000000051863,
+      "minMs": 0.009237999999641033,
+      "maxMs": 0.0336050000000796,
+      "totalMs": 1.1134999999958382,
+      "opsPerSecond": 89806.91513280086
+    },
+    "cpu": {
+      "userMs": 1.718,
+      "systemMs": 0.059,
+      "totalMs": 1.777
+    },
+    "memory": {
+      "rssBefore": 122580992,
+      "rssAfter": 123498496,
+      "maxRssBytes": 123498496,
+      "rssDelta": 917504
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.03848299999981464,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 2,
+        "cluster": "genOnOff",
+        "command": "on",
+        "payload": {},
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "fz-danfoss-temperature",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      },
+      "device": {
+        "modelID": "014G2461",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "hvacThermostat",
+        "type": "attributeReport",
+        "data": {
+          "localTemp": 2100,
+          "occupiedHeatingSetpoint": 2000
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 21
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.12030714999997599,
+    "converterOnlyMs": 0.018501549999973575,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 131.56796300000008,
+      "prepareMs": 0.0917250000002241
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.12030714999997599,
+      "p50Ms": 0.053655000000162545,
+      "p95Ms": 0.11169900000004418,
+      "p99Ms": 0.14005800000040836,
+      "minMs": 0.030974999999671127,
+      "maxMs": 6.110828000000311,
+      "totalMs": 12.030714999997599,
+      "opsPerSecond": 8312.057928395774
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.018501549999973575,
+      "p50Ms": 0.015199999999822467,
+      "p95Ms": 0.03662900000017544,
+      "p99Ms": 0.05257600000140883,
+      "minMs": 0.008638000001155888,
+      "maxMs": 0.0951479999989715,
+      "totalMs": 1.8501549999973577,
+      "opsPerSecond": 54049.52558036641
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.10180560000000241,
+      "p50Ms": 0.03597100000069986,
+      "p95Ms": 0.07627300000103787,
+      "p99Ms": 0.0901280000002771,
+      "minMs": 0.022307000000182597,
+      "maxMs": 6.0980960000024425,
+      "totalMs": 10.180560000000241,
+      "opsPerSecond": 9822.642369378269
+    },
+    "cpu": {
+      "userMs": 24.261,
+      "systemMs": 2.584,
+      "totalMs": 26.845
+    },
+    "memory": {
+      "rssBefore": 124153856,
+      "rssAfter": 126775296,
+      "maxRssBytes": 126775296,
+      "rssDelta": 2621440
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 6.110828000000311,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "local_temperature": 21,
+        "occupied_heating_setpoint": 20,
+        "occupied_heating_setpoint_scheduled": 20
+      },
+      "published": [
+        {
+          "local_temperature": 21,
+          "occupied_heating_setpoint": 20,
+          "occupied_heating_setpoint_scheduled": 20
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "get-danfoss-schedule",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      },
+      "device": {
+        "modelID": "014G2461",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "weekly_schedule",
+      "message": {
+        "weekly_schedule": {}
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.014110329999989518,
+    "converterOnlyMs": 0.00321538999999575,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 131.56796300000008,
+      "prepareMs": 0.05319099999996979
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.014110329999989518,
+      "p50Ms": 0.011246999999912077,
+      "p95Ms": 0.02470500000026732,
+      "p99Ms": 0.034998000000086904,
+      "minMs": 0.009559000000081141,
+      "maxMs": 0.06321800000023359,
+      "totalMs": 1.4110329999989517,
+      "opsPerSecond": 70870.06469733472
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.00321538999999575,
+      "p50Ms": 0.0023139999998420535,
+      "p95Ms": 0.005933000000368338,
+      "p99Ms": 0.017043000000285247,
+      "minMs": 0.002047999999831518,
+      "maxMs": 0.01806300000043848,
+      "totalMs": 0.321538999999575,
+      "opsPerSecond": 311004.2638688687
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.010894939999993768,
+      "p50Ms": 0.008913000000120519,
+      "p95Ms": 0.019021999999495165,
+      "p99Ms": 0.022674000000279193,
+      "minMs": 0.007359000000178639,
+      "maxMs": 0.059298000000126194,
+      "totalMs": 1.0894939999993767,
+      "opsPerSecond": 91785.72805362601
+    },
+    "cpu": {
+      "userMs": 1.925,
+      "systemMs": 0.207,
+      "totalMs": 2.132
+    },
+    "memory": {
+      "rssBefore": 126775296,
+      "rssAfter": 126775296,
+      "maxRssBytes": 126775296,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06321800000023359,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "command": "getWeeklySchedule",
+        "payload": {
+          "daystoreturn": 255,
+          "modetoreturn": 3
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "configure-l101z",
+    "kind": "configure",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 2,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 3,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.035370439999996964,
+    "converterOnlyMs": 0.02529749999998785,
+    "definition": {
+      "file": "lytko.js",
+      "index": 0,
+      "source": "package",
+      "model": "L101Z-SBI",
+      "vendor": "Lytko",
+      "loadMs": 88.33748300000002,
+      "prepareMs": 0.03422899999986839
+    },
+    "stats": {
+      "count": 50,
+      "meanMs": 0.035370439999996964,
+      "p50Ms": 0.03074800000013056,
+      "p95Ms": 0.07656700000006822,
+      "p99Ms": 0.08344699999997829,
+      "minMs": 0.02918299999964802,
+      "maxMs": 0.08344699999997829,
+      "totalMs": 1.768521999999848,
+      "opsPerSecond": 28272.195652643448
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.02529749999998785,
+      "p50Ms": 0.021453999999721418,
+      "p95Ms": 0.056833000000096945,
+      "p99Ms": 0.07053799999994226,
+      "minMs": 0.02000399999997171,
+      "maxMs": 0.07053799999994226,
+      "totalMs": 1.2648749999993925,
+      "opsPerSecond": 39529.59778636151
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.010072940000009111,
+      "p50Ms": 0.009144999999989523,
+      "p95Ms": 0.014822000000094704,
+      "p99Ms": 0.026613999999881344,
+      "minMs": 0.008753999999498774,
+      "maxMs": 0.026613999999881344,
+      "totalMs": 0.5036470000004556,
+      "opsPerSecond": 99275.88171865368
+    },
+    "cpu": {
+      "userMs": 2.228,
+      "systemMs": 0.069,
+      "totalMs": 2.297
+    },
+    "memory": {
+      "rssBefore": 126775296,
+      "rssAfter": 126775296,
+      "maxRssBytes": 126775296,
+      "rssDelta": 0
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.08344699999997829,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "bind",
+        "endpoint": 2,
+        "cluster": "msTemperatureMeasurement",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 2,
+        "cluster": "msRelativeHumidity",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 2,
+        "cluster": "msRelativeHumidity",
+        "attributes": [
+          "measuredValue"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 2,
+        "cluster": "msTemperatureMeasurement",
+        "attributes": [
+          "measuredValue"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "localTemp",
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "localTemp",
+            "minimumReportInterval": 60,
+            "maximumReportInterval": 120,
+            "reportableChange": 50
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "occupiedHeatingSetpoint",
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "occupiedHeatingSetpoint",
+            "minimumReportInterval": 1,
+            "maximumReportInterval": 120,
+            "reportableChange": 50
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "systemMode",
+            "minimumReportInterval": 10,
+            "maximumReportInterval": 3600,
+            "reportableChange": null
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "systemMode",
+            "minimumReportInterval": 1,
+            "maximumReportInterval": 120,
+            "reportableChange": 1
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "runningMode",
+            "minimumReportInterval": 10,
+            "maximumReportInterval": 3600,
+            "reportableChange": null
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "runningMode",
+            "minimumReportInterval": 1,
+            "maximumReportInterval": 120,
+            "reportableChange": 1
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "localTemp",
+          "occupiedHeatingSetpoint",
+          "systemMode",
+          "runningMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          30464,
+          30465
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "keypadLockout"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          30464,
+          30465
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      }
+    ]
+  },
+  {
+    "id": "configure-danfoss",
+    "kind": "configure",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      },
+      "device": {
+        "modelID": "014G2461",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.3620242199999848,
+    "converterOnlyMs": 0.3397704400000475,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 1,
+      "source": "package",
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "loadMs": 131.56796300000008,
+      "prepareMs": 0.04919900000004418
+    },
+    "stats": {
+      "count": 50,
+      "meanMs": 0.3620242199999848,
+      "p50Ms": 0.31185699999969074,
+      "p95Ms": 0.5836060000001453,
+      "p99Ms": 0.6521450000000186,
+      "minMs": 0.19226700000035635,
+      "maxMs": 0.6521450000000186,
+      "totalMs": 18.10121099999924,
+      "opsPerSecond": 2762.2461281735295
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.3397704400000475,
+      "p50Ms": 0.2943939999995564,
+      "p95Ms": 0.5572799999999916,
+      "p99Ms": 0.6170570000003863,
+      "minMs": 0.17772700000023178,
+      "maxMs": 0.6170570000003863,
+      "totalMs": 16.988522000002376,
+      "opsPerSecond": 2943.1636254167965
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.022253779999937252,
+      "p50Ms": 0.019043000000237953,
+      "p95Ms": 0.0350879999996323,
+      "p99Ms": 0.0899650000001202,
+      "minMs": 0.013114999999743304,
+      "maxMs": 0.0899650000001202,
+      "totalMs": 1.1126889999968625,
+      "opsPerSecond": 44936.18612221473
+    },
+    "cpu": {
+      "userMs": 27.906,
+      "systemMs": 3.502,
+      "totalMs": 31.408
+    },
+    "memory": {
+      "rssBefore": 132587520,
+      "rssAfter": 140451840,
+      "maxRssBytes": 140451840,
+      "rssDelta": 7864320
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.6521450000000186,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "haDiagnostic",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "haDiagnostic",
+        "items": [
+          {
+            "attribute": "danfossSystemStatusCode",
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 1
+          }
+        ],
+        "options": {
+          "manufacturerCode": 4678
+        }
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "haDiagnostic",
+        "attributes": [
+          "danfossSystemStatusCode"
+        ],
+        "options": {
+          "manufacturerCode": 4678
+        }
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "hvacThermostat"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "hvacUserInterfaceCfg"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "haDiagnostic"
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10,
+            "attribute": "localTemp"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "localTemp"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10,
+            "attribute": "occupiedHeatingSetpoint"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "occupiedHeatingSetpoint"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 0,
+            "attribute": "systemMode"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "systemMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 0,
+            "attribute": "pIHeatingDemand"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "pIHeatingDemand"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "maxHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "minHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "programingOperMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "systemMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "keypadLockout"
+        ],
+        "options": {}
+      },
+      {
+        "op": "write",
+        "endpoint": 1,
+        "cluster": "genTime",
+        "attributes": {
+          "time": 848491200,
+          "timeStatus": 2,
+          "timeZone": 14400,
+          "dstStart": 4294967295,
+          "dstEnd": 4294967295,
+          "dstShift": 0
+        },
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "absMaxHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "absMinHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossHeatingSystemMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "genPowerCfg",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "genPowerCfg",
+        "items": [
+          {
+            "minimumReportInterval": 3600,
+            "maximumReportInterval": 65000,
+            "reportableChange": 10,
+            "attribute": "batteryPercentageRemaining"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "genPowerCfg",
+        "attributes": [
+          "batteryPercentageRemaining"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "keypadLockout"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossMountedModeActive"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossMountedModeControl"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossThermostatOrientation"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "danfossViewingDirection"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossHeatAvailable"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossHeatRequired"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossExternalMeasuredRoomSensor"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossRadiatorCovered"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossWindowOpenFeatureEnable"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossWindowOpenInternal"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossWindowOpenExternal"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossDayOfWeek"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAlgorithmScaleFactor"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossLoadBalancingEnable"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossLoadRoomMean"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossLoadEstimate"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossPreheatStatus"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossPreheatTime"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAdaptionRunStatus"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAdaptionRunSettings"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAdaptionRunControl"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossRegulationSetpointOffset"
+        ],
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "onEvent-daewoo-start",
+    "kind": "onEvent",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "daewoo.js",
+        "model": "WKE502Z"
+      },
+      "device": {
+        "modelID": "WKE502Z",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "eventType": "start",
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.014727720000046247,
+    "converterOnlyMs": 0.004743279999984224,
+    "definition": {
+      "file": "daewoo.js",
+      "index": 0,
+      "source": "package",
+      "model": "WKE502Z",
+      "vendor": "DAEWOO",
+      "loadMs": 83.24964999999975,
+      "prepareMs": 0.08361100000001898
+    },
+    "stats": {
+      "count": 50,
+      "meanMs": 0.014727720000046247,
+      "p50Ms": 0.013343999999960943,
+      "p95Ms": 0.026735000000371656,
+      "p99Ms": 0.036845000000539585,
+      "minMs": 0.011601000000155182,
+      "maxMs": 0.036845000000539585,
+      "totalMs": 0.7363860000023124,
+      "opsPerSecond": 67899.17244467302
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.004743279999984224,
+      "p50Ms": 0.0039029999998092535,
+      "p95Ms": 0.00694999999996071,
+      "p99Ms": 0.027202000000215776,
+      "minMs": 0.0023860000001150183,
+      "maxMs": 0.027202000000215776,
+      "totalMs": 0.23716399999921123,
+      "opsPerSecond": 210824.57708659954
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.009984440000062022,
+      "p50Ms": 0.009381999999277468,
+      "p95Ms": 0.017980000000534346,
+      "p99Ms": 0.020059000000401284,
+      "minMs": 0.0078080000002955785,
+      "maxMs": 0.020059000000401284,
+      "totalMs": 0.49922200000310113,
+      "opsPerSecond": 100155.84249029371
+    },
+    "cpu": {
+      "userMs": 0.817,
+      "systemMs": 0.007,
+      "totalMs": 0.824
+    },
+    "memory": {
+      "rssBefore": 140713984,
+      "rssAfter": 141238272,
+      "maxRssBytes": 141238272,
+      "rssDelta": 524288
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.036845000000539585,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "addCustomCluster",
+        "name": "genBasic"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "genGroups"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "genOnOff"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "genLevelCtrl"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "manuSpecificTuya2"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "manuSpecificTuya3"
+      }
+    ]
+  },
+  {
+    "id": "onEvent-daewoo-announce",
+    "kind": "onEvent",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "daewoo.js",
+        "model": "WKE502Z"
+      },
+      "device": {
+        "modelID": "WKE502Z",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "eventType": "deviceAnnounce",
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.022617479999917124,
+    "converterOnlyMs": 0.011212020000057237,
+    "definition": {
+      "file": "daewoo.js",
+      "index": 0,
+      "source": "package",
+      "model": "WKE502Z",
+      "vendor": "DAEWOO",
+      "loadMs": 83.24964999999975,
+      "prepareMs": 0.025698999999804073
+    },
+    "stats": {
+      "count": 50,
+      "meanMs": 0.022617479999917124,
+      "p50Ms": 0.020610999999917112,
+      "p95Ms": 0.03531399999974383,
+      "p99Ms": 0.06159200000001874,
+      "minMs": 0.019006999999874097,
+      "maxMs": 0.06159200000001874,
+      "totalMs": 1.1308739999958561,
+      "opsPerSecond": 44213.590550479734
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.011212020000057237,
+      "p50Ms": 0.010076999999910186,
+      "p95Ms": 0.018744999999398715,
+      "p99Ms": 0.02505899999960093,
+      "minMs": 0.009582000000591506,
+      "maxMs": 0.02505899999960093,
+      "totalMs": 0.5606010000028618,
+      "opsPerSecond": 89189.99430922305
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0.011405459999859886,
+      "p50Ms": 0.010648999999830266,
+      "p95Ms": 0.016569000000345113,
+      "p99Ms": 0.036533000000417815,
+      "minMs": 0.008998999999676016,
+      "maxMs": 0.036533000000417815,
+      "totalMs": 0.5702729999929943,
+      "opsPerSecond": 87677.30543198476
+    },
+    "cpu": {
+      "userMs": 1.245,
+      "systemMs": 0.078,
+      "totalMs": 1.323
+    },
+    "memory": {
+      "rssBefore": 141500416,
+      "rssAfter": 142286848,
+      "maxRssBytes": 142286848,
+      "rssDelta": 786432
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.06159200000001874,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "manuSpecificTuya",
+        "command": "dataRequest",
+        "payload": {
+          "seq": 1,
+          "dpValues": [
+            {
+              "dp": 101,
+              "datatype": 1,
+              "data": [
+                1
+              ]
+            }
+          ]
+        },
+        "options": {
+          "disableDefaultResponse": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "prepare-external-l101",
+    "kind": "prepare",
+    "description": "prepareDefinition for the real L101Ze_z2m.js external converter.",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      }
+    },
+    "harnessTotalMs": 0.014781540000003588,
+    "converterOnlyMs": 0.014781540000003588,
+    "definition": {
+      "file": "/config/workspace/zigbee2mqtt-rs/tools/bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 13.117045999999391,
+      "prepareMs": 0.04643599999963044
+    },
+    "stats": {
+      "count": 50,
+      "meanMs": 0.014781540000003588,
+      "p50Ms": 0.012283999999453954,
+      "p95Ms": 0.023727999999209715,
+      "p99Ms": 0.030258999999205116,
+      "minMs": 0.011695000000145228,
+      "maxMs": 0.030258999999205116,
+      "totalMs": 0.7390770000001794,
+      "opsPerSecond": 67651.94966152088
+    },
+    "converterStats": {
+      "count": 50,
+      "meanMs": 0.014781540000003588,
+      "p50Ms": 0.012283999999453954,
+      "p95Ms": 0.023727999999209715,
+      "p99Ms": 0.030258999999205116,
+      "minMs": 0.011695000000145228,
+      "maxMs": 0.030258999999205116,
+      "totalMs": 0.7390770000001794,
+      "opsPerSecond": 67651.94966152088
+    },
+    "overheadStats": {
+      "count": 50,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 0.883,
+      "systemMs": 0.306,
+      "totalMs": 1.189
+    },
+    "memory": {
+      "rssBefore": 142680064,
+      "rssAfter": 143204352,
+      "maxRssBytes": 143204352,
+      "rssDelta": 524288
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.030258999999205116,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "zigbeeModel": [
+        "L101Ze.v2"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-external-l101-temp",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "hvacThermostat",
+        "type": "attributeReport",
+        "data": {
+          "localTemp": 2150,
+          "occupiedHeatingSetpoint": 2000
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 31,
+          "manufacturerCode": 30583
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.03984376000003067,
+    "converterOnlyMs": 0.005717850000046383,
+    "definition": {
+      "file": "/config/workspace/zigbee2mqtt-rs/tools/bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.03104799999982788,
+      "prepareMs": 0.1332780000002458
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.03984376000003067,
+      "p50Ms": 0.0376670000005106,
+      "p95Ms": 0.05024100000082399,
+      "p99Ms": 0.10544399999980669,
+      "minMs": 0.02320199999940087,
+      "maxMs": 0.1714830000000802,
+      "totalMs": 3.984376000003067,
+      "opsPerSecond": 25098.032916552813
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.005717850000046383,
+      "p50Ms": 0.005315000000337022,
+      "p95Ms": 0.007978999999977532,
+      "p99Ms": 0.009363999999550288,
+      "minMs": 0.0030900000001565786,
+      "maxMs": 0.014318000000457687,
+      "totalMs": 0.5717850000046383,
+      "opsPerSecond": 174890.91179234994
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.034125909999984286,
+      "p50Ms": 0.031219000000419328,
+      "p95Ms": 0.044829000000390806,
+      "p99Ms": 0.09904799999912939,
+      "minMs": 0.01828500000101485,
+      "maxMs": 0.16569600000002538,
+      "totalMs": 3.4125909999984287,
+      "opsPerSecond": 29303.24788409922
+    },
+    "cpu": {
+      "userMs": 9.466,
+      "systemMs": 1.793,
+      "totalMs": 11.259
+    },
+    "memory": {
+      "rssBefore": 143990784,
+      "rssAfter": 145956864,
+      "maxRssBytes": 145956864,
+      "rssDelta": 1966080
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.1714830000000802,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "local_temperature": 21.5,
+        "occupied_heating_setpoint": 20
+      },
+      "published": [
+        {
+          "local_temperature": 21.5,
+          "occupied_heating_setpoint": 20
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-external-l101-mode",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "system_mode",
+      "value": "heat",
+      "message": {
+        "system_mode": "heat"
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.023553429999938088,
+    "converterOnlyMs": 0.006302969999969718,
+    "definition": {
+      "file": "/config/workspace/zigbee2mqtt-rs/tools/bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.054442999999992026,
+      "prepareMs": 0.15724300000056246
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.023553429999938088,
+      "p50Ms": 0.020956999999725667,
+      "p95Ms": 0.034594999999171705,
+      "p99Ms": 0.04683500000010099,
+      "minMs": 0.01976100000047154,
+      "maxMs": 0.05849899999975605,
+      "totalMs": 2.355342999993809,
+      "opsPerSecond": 42456.6613016715
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.006302969999969718,
+      "p50Ms": 0.006172999999762396,
+      "p95Ms": 0.010623999999552325,
+      "p99Ms": 0.016782000000603148,
+      "minMs": 0.0038279999998849235,
+      "maxMs": 0.019324999999298598,
+      "totalMs": 0.6302969999969719,
+      "opsPerSecond": 158655.36405929335
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.01725045999996837,
+      "p50Ms": 0.01477199999953882,
+      "p95Ms": 0.027289999999993597,
+      "p99Ms": 0.03241600000001199,
+      "minMs": 0.01368200000069919,
+      "maxMs": 0.05248299999948358,
+      "totalMs": 1.725045999996837,
+      "opsPerSecond": 57969.46864036284
+    },
+    "cpu": {
+      "userMs": 2.698,
+      "systemMs": 0.005,
+      "totalMs": 2.703
+    },
+    "memory": {
+      "rssBefore": 146219008,
+      "rssAfter": 147136512,
+      "maxRssBytes": 147136512,
+      "rssDelta": 917504
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.05849899999975605,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "state": {
+          "system_mode": "heat"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "write",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": {
+          "systemMode": 4
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "get-external-l101-sensor",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "sensor_type",
+      "message": {
+        "sensor_type": "10 кОм"
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.021288589999976466,
+    "converterOnlyMs": 0.005385070000002088,
+    "definition": {
+      "file": "/config/workspace/zigbee2mqtt-rs/tools/bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.035120000000461005,
+      "prepareMs": 0.07985099999950762
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.021288589999976466,
+      "p50Ms": 0.0190840000004755,
+      "p95Ms": 0.029915000000073633,
+      "p99Ms": 0.034791000000041095,
+      "minMs": 0.016375999999581836,
+      "maxMs": 0.03857299999981478,
+      "totalMs": 2.1288589999976466,
+      "opsPerSecond": 46973.519617837796
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.005385070000002088,
+      "p50Ms": 0.005397000000812113,
+      "p95Ms": 0.010029000000031374,
+      "p99Ms": 0.015427000000272528,
+      "minMs": 0.0031810000000405125,
+      "maxMs": 0.015938000000460306,
+      "totalMs": 0.5385070000002088,
+      "opsPerSecond": 185698.60744607076
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.01590351999997438,
+      "p50Ms": 0.013799000000290107,
+      "p95Ms": 0.025080999999772757,
+      "p99Ms": 0.029600000000755244,
+      "minMs": 0.012681999999585969,
+      "maxMs": 0.031324999999014835,
+      "totalMs": 1.5903519999974378,
+      "opsPerSecond": 62879.161342998974
+    },
+    "cpu": {
+      "userMs": 1.329,
+      "systemMs": 0.97,
+      "totalMs": 2.299
+    },
+    "memory": {
+      "rssBefore": 147267584,
+      "rssAfter": 148054016,
+      "maxRssBytes": 148054016,
+      "rssDelta": 786432
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.03857299999981478,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          65280
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      }
+    ]
+  },
+  {
+    "id": "configure-external-l101",
+    "kind": "configure",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.046302133333301757,
+    "converterOnlyMs": 0.02362503333327671,
+    "definition": {
+      "file": "/config/workspace/zigbee2mqtt-rs/tools/bench/fixtures/external/L101Ze_z2m.js",
+      "source": "external",
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "loadMs": 0.029511000000638887,
+      "prepareMs": 0.08879900000010821
+    },
+    "stats": {
+      "count": 30,
+      "meanMs": 0.046302133333301757,
+      "p50Ms": 0.04497999999966851,
+      "p95Ms": 0.06855100000029779,
+      "p99Ms": 0.08141199999954551,
+      "minMs": 0.03634000000056403,
+      "maxMs": 0.08141199999954551,
+      "totalMs": 1.3890639999990526,
+      "opsPerSecond": 21597.27701532864
+    },
+    "converterStats": {
+      "count": 30,
+      "meanMs": 0.02362503333327671,
+      "p50Ms": 0.020830000000387372,
+      "p95Ms": 0.03278599999975995,
+      "p99Ms": 0.04980900000009569,
+      "minMs": 0.018459999999322463,
+      "maxMs": 0.04980900000009569,
+      "totalMs": 0.7087509999983013,
+      "opsPerSecond": 42327.98260612247
+    },
+    "overheadStats": {
+      "count": 30,
+      "meanMs": 0.022677100000025045,
+      "p50Ms": 0.01824300000043877,
+      "p95Ms": 0.038096000000223285,
+      "p99Ms": 0.04637099999945349,
+      "minMs": 0.01585599999907572,
+      "maxMs": 0.04637099999945349,
+      "totalMs": 0.6803130000007513,
+      "opsPerSecond": 44097.34930828438
+    },
+    "cpu": {
+      "userMs": 1.545,
+      "systemMs": 0.004,
+      "totalMs": 1.549
+    },
+    "memory": {
+      "rssBefore": 148447232,
+      "rssAfter": 148971520,
+      "maxRssBytes": 148971520,
+      "rssDelta": 524288
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.08141199999954551,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "haElectricalMeasurement",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "seMetering",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "localTemp",
+          "occupiedHeatingSetpoint",
+          "systemMode",
+          "runningState"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          65280,
+          65281,
+          65282,
+          65285
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "haElectricalMeasurement",
+        "attributes": [
+          1288,
+          1295,
+          2048
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "seMetering",
+        "attributes": [
+          "currentSummDelivered"
+        ],
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "prepare-heavy-yokis-81-extends",
+    "kind": "prepare",
+    "description": "Top static-complexity definition from heavy-scan.mjs (81 extends).",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "yokis.js",
+        "model": "MTV300E-UP"
+      }
+    },
+    "harnessTotalMs": 0.06669279999996433,
+    "converterOnlyMs": 0.06669279999996433,
+    "definition": {
+      "file": "yokis.js",
+      "index": 3,
+      "source": "package",
+      "model": "MTV300E-UP",
+      "vendor": "YOKIS",
+      "loadMs": 219.17332299999998,
+      "prepareMs": 0.0912239999997837
+    },
+    "stats": {
+      "count": 10,
+      "meanMs": 0.06669279999996433,
+      "p50Ms": 0.05697500000042055,
+      "p95Ms": 0.11230599999998958,
+      "p99Ms": 0.11230599999998958,
+      "minMs": 0.056330000000343716,
+      "maxMs": 0.11230599999998958,
+      "totalMs": 0.6669279999996434,
+      "opsPerSecond": 14994.122304064827
+    },
+    "converterStats": {
+      "count": 10,
+      "meanMs": 0.06669279999996433,
+      "p50Ms": 0.05697500000042055,
+      "p95Ms": 0.11230599999998958,
+      "p99Ms": 0.11230599999998958,
+      "minMs": 0.056330000000343716,
+      "maxMs": 0.11230599999998958,
+      "totalMs": 0.6669279999996434,
+      "opsPerSecond": 14994.122304064827
+    },
+    "overheadStats": {
+      "count": 10,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 0.12,
+      "systemMs": 0.709,
+      "totalMs": 0.829
+    },
+    "memory": {
+      "rssBefore": 150151168,
+      "rssAfter": 150675456,
+      "maxRssBytes": 150675456,
+      "rssDelta": 524288
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.11230599999998958,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "model": "MTV300E-UP",
+      "vendor": "YOKIS",
+      "zigbeeModel": [
+        "MTV300E-UP"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-heavy-icon2-thermostat",
+    "kind": "prepare",
+    "description": "Heavy thermostat definition: 9 fromZigbee, 22 toZigbee, configure.",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "Icon2"
+      }
+    },
+    "harnessTotalMs": 0.42588699999996604,
+    "converterOnlyMs": 0.42588699999996604,
+    "definition": {
+      "file": "danfoss.js",
+      "index": 3,
+      "source": "package",
+      "model": "Icon2",
+      "vendor": "Danfoss",
+      "loadMs": 131.56796300000008,
+      "prepareMs": 0.07928999999967346
+    },
+    "stats": {
+      "count": 10,
+      "meanMs": 0.42588699999996604,
+      "p50Ms": 0.07850200000029872,
+      "p95Ms": 3.49130200000036,
+      "p99Ms": 3.49130200000036,
+      "minMs": 0.052145999999993364,
+      "maxMs": 3.49130200000036,
+      "totalMs": 4.258869999999661,
+      "opsPerSecond": 2348.0406774568833
+    },
+    "converterStats": {
+      "count": 10,
+      "meanMs": 0.42588699999996604,
+      "p50Ms": 0.07850200000029872,
+      "p95Ms": 3.49130200000036,
+      "p99Ms": 3.49130200000036,
+      "minMs": 0.052145999999993364,
+      "maxMs": 3.49130200000036,
+      "totalMs": 4.258869999999661,
+      "opsPerSecond": 2348.0406774568833
+    },
+    "overheadStats": {
+      "count": 10,
+      "meanMs": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "p99Ms": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "totalMs": 0,
+      "opsPerSecond": 0
+    },
+    "cpu": {
+      "userMs": 11.234,
+      "systemMs": 1.574,
+      "totalMs": 12.808
+    },
+    "memory": {
+      "rssBefore": 150806528,
+      "rssAfter": 154738688,
+      "maxRssBytes": 154738688,
+      "rssDelta": 3932160
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 3.49130200000036,
+      "measured": false,
+      "note": "prepareDefinition batch"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "model": "Icon2",
+      "vendor": "Danfoss",
+      "zigbeeModel": null
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-tuya-m9pro-multi-dp",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "tuya.js",
+        "model": "M9Pro"
+      },
+      "device": {
+        "modelID": "M9Pro",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "manuSpecificTuya",
+        "type": "commandDataReport",
+        "data": {
+          "dpValues": [
+            {
+              "dp": 1,
+              "datatype": 4,
+              "data": [
+                1
+              ]
+            },
+            {
+              "dp": 2,
+              "datatype": 4,
+              "data": [
+                2
+              ]
+            },
+            {
+              "dp": 18,
+              "datatype": 4,
+              "data": [
+                3
+              ]
+            },
+            {
+              "dp": 20,
+              "datatype": 4,
+              "data": [
+                3
+              ]
+            }
+          ]
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 41
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "harnessTotalMs": 0.03054424999998446,
+    "converterOnlyMs": 0.007608660000032614,
+    "definition": {
+      "file": "tuya.js",
+      "index": 516,
+      "source": "package",
+      "model": "M9Pro",
+      "vendor": "Tuya",
+      "loadMs": 615.765513,
+      "prepareMs": 0.09826100000009319
+    },
+    "stats": {
+      "count": 100,
+      "meanMs": 0.03054424999998446,
+      "p50Ms": 0.02539600000000064,
+      "p95Ms": 0.056794000000081724,
+      "p99Ms": 0.0781650000008085,
+      "minMs": 0.024303000000145403,
+      "maxMs": 0.07972200000040175,
+      "totalMs": 3.054424999998446,
+      "opsPerSecond": 32739.38630022046
+    },
+    "converterStats": {
+      "count": 100,
+      "meanMs": 0.007608660000032614,
+      "p50Ms": 0.006274999999732245,
+      "p95Ms": 0.012496000001192442,
+      "p99Ms": 0.03680499999973108,
+      "minMs": 0.005586000000221247,
+      "maxMs": 0.03965299999981653,
+      "totalMs": 0.7608660000032614,
+      "opsPerSecond": 131429.1872676284
+    },
+    "overheadStats": {
+      "count": 100,
+      "meanMs": 0.022935589999951843,
+      "p50Ms": 0.019288999999844236,
+      "p95Ms": 0.03896199999962846,
+      "p99Ms": 0.06982400000106281,
+      "minMs": 0.018334000000322703,
+      "maxMs": 0.07110000000102445,
+      "totalMs": 2.2935589999951844,
+      "opsPerSecond": 43600.36083667783
+    },
+    "cpu": {
+      "userMs": 6.384,
+      "systemMs": 0,
+      "totalMs": 6.384
+    },
+    "memory": {
+      "rssBefore": 155131904,
+      "rssAfter": 155262976,
+      "maxRssBytes": 155262976,
+      "rssDelta": 131072
+    },
+    "eventLoop": {
+      "blockingUpperBoundMs": 0.07972200000040175,
+      "measured": false,
+      "note": "isolated converter call; use the bridge integration run for event-loop delay"
+    },
+    "hostWaitMs": 0,
+    "stateDrift": false,
+    "expected": {
+      "result": {
+        "action": "scene_2",
+        "mode_l1": "curtain",
+        "mode_l3": "curtain"
+      },
+      "published": [
+        {
+          "action": "scene_2",
+          "mode_l1": "curtain",
+          "mode_l3": "curtain"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  }
+]

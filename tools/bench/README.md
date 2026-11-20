@@ -5,6 +5,13 @@ This harness measures the **original upstream** `zigbee2mqtt` +
 converter logic. It exists to establish the performance and functional baseline
 for a future Rust converter runtime.
 
+**Scope:** this is a **converter-level** benchmark. It exercises the real
+converter callbacks with a mocked Zigbee/host boundary; it does **not** include
+MQTT, the ZNP/serial transport, the Zigbee network, Home Assistant or the
+bridge event loop. A full `MQTT -> bridge -> ZNP -> device` integration
+benchmark is a separate next-stage deliverable and must not be inferred from
+these numbers.
+
 ## Upstream path
 
 Pinned source: zigbee2mqtt `3c841fdf` (2.14.3), converters `26.125.0`.
@@ -37,8 +44,14 @@ the future Rust runtime.
 ## Run
 
 ```bash
-# x86 diagnostic, full corpus
-node tools/bench/runner.mjs --out tools/bench/corpus
+# x86 diagnostic measurement (writes manifest/cases/measurements, NOT golden)
+node tools/bench/runner.mjs --out /tmp/bench-measure
+
+# deliberate golden generation (refuses to overwrite without --force)
+node tools/bench/runner.mjs --generate-golden --out /tmp/bench-golden
+
+# verify a corpus without writing anything (nonzero exit on mismatch)
+node tools/bench/runner.mjs --verify-golden --out tools/bench/corpus
 
 # one scenario / higher iteration count / CPU profile
 node tools/bench/runner.mjs --filter configure-danfoss --iterations 200 \
@@ -52,6 +65,9 @@ node tools/bench/heavy-scan.mjs
 
 # parse a V8 CPU profile into a top-self-time summary
 node tools/bench/profile.mjs <profile.cpuprofile> 20
+
+# concurrency/stress benchmark (separate results, never mixed with baseline)
+node tools/bench/stress.mjs --out /tmp/bench-stress --label linux-x64
 ```
 
 On the Routerich AX3000, use the installed package and a staged external file:
@@ -67,10 +83,29 @@ The benchmark does not open the serial port and does not touch the running
 Zigbee2MQTT service. It was run with `nice -n 19` while the service stayed
 running (the service was not stopped).
 
+Golden modes:
+
+- **`--generate-golden`** writes only `golden.json`; it exits nonzero if any
+  scenario errors and refuses to overwrite an existing file unless `--force`
+  is passed.
+- **`--verify-golden`** runs every golden case, compares expected payloads,
+  expected host calls, inputs and errors, and writes nothing. It exits nonzero
+  on any mismatch, scenario error, missing case or state drift.
+- A normal measurement run never writes `golden.json`.
+
 ## Measurement semantics
 
-- **totalMs/p50/p95/p99** — one converter call (including JS and mocked host
-  calls), measured with `performance.now()` around repeated calls.
+- **`stats` = harness-total (legacy)** — `totalMs/p50/p95/p99` around the whole
+  `callOnce()`, including harness context reset, `structuredClone`, meta
+  construction and result normalization. Kept unchanged for comparability with
+  the original baseline.
+- **`converterStats` = converter-only** — p50/p95/p99 around only the upstream
+  converter callback (`convert`, `convertSet`/`convertGet`, `configure`,
+  `onEvent`), excluding harness overhead. Host mock delay is inside this span
+  and is also reported separately as `hostWaitMs`.
+- **`overheadStats`** — per-iteration difference `harness-total - converter-only`.
+- **`harnessTotalMs` / `converterOnlyMs`** — batch means with the audit names;
+  the `stats`/`converterStats` objects keep the full distributions.
 - **cpu** — `process.cpuUsage()` over the measured batch (user + system).
 - **hostWaitMs** — time spent in the explicit mock host delay; subtract it to
   approximate active JS/host-boundary time.
@@ -91,6 +126,8 @@ running (the service was not stopped).
   uses 30–50; the host-delay scenario uses 20.
 - **router runs** — three full runs; table uses median p50/p95 and max p99.
   p99 is retained as an outlier signal, not smoothed away.
+- **stress harness** — separate `stress.mjs`; see below. Its throughput and
+  latency numbers are not comparable with the single-call tables.
 
 ## Corpus layout
 
@@ -107,6 +144,38 @@ running (the service was not stopped).
 `tools/bench/results/routerich-openwrt/` — three router runs, cold-load
 distribution, CPU profiles and summaries. `tools/bench/results/linux-x64/`
 holds the x86 CPU profile summaries.
+
+Post-audit additions (existing files above are preserved unchanged):
+
+- `tools/bench/results/*/converter-metrics/` — new runs that include
+  `converterStats`/`overheadStats` alongside the legacy `stats`.
+- `tools/bench/results/*/stress/` — concurrency/stress results, one
+  `stress.json` per run.
+
+## Concurrency / stress benchmark
+
+`tools/bench/stress.mjs` models multiple devices, a bounded dispatch queue,
+concurrent reports and sets, and pending host Promises:
+
+| Workload | Shape |
+|---|---|
+| `reports-1-device-c1` | 2,000 reports, one device, queue depth 1 |
+| `reports-16-devices-c8` | 4,000 reports, 16 devices, concurrency 8 |
+| `sets-16-devices-c1` | 1,000 sets, 16 devices, 1 ms host delay, serial |
+| `sets-16-devices-c8` | same, concurrency 8 |
+| `mixed-32-devices-c16` | 3,000 mixed reports/sets, 32 devices, 1 ms delay |
+| `queue-backlog-sets-c4` | 2,000 sets queued up front, 5 ms delay, concurrency 4 |
+| `pending-sets-c64-delay20` | 200 sets, 20 ms delay, concurrency 64 (many in-flight Promises) |
+
+All operations are enqueued before workers start, so `queueWaitMs` measures
+backlog time and `latencyMs` measures submit-to-complete. `serviceMs` is
+execution time after a worker picks the operation. Results report throughput
+(completed ops / wall time) and p50/p95/p99 for queue wait, service and
+end-to-end latency, plus CPU and RSS. The workload is deterministic (fixed
+device assignment and transaction-id sequence); only timing varies.
+
+The stress run does not replace or extend the single-call tables: keep its
+output in `stress/` and compare stress-to-stress only.
 
 ## Scenario coverage
 
@@ -135,8 +204,12 @@ holds the x86 CPU profile summaries.
   as observed.
 - The harness itself (mock construction, `structuredClone`, JSON normalization)
   contributes measurable overhead for sub-millisecond scenarios; CPU profiles
-  show it explicitly. The future Rust harness must use the same golden inputs
-  and expected calls, and should report its own harness overhead separately.
+  show it explicitly, and `overheadStats` quantifies it. The future Rust
+  harness must use the same golden inputs and expected calls, and should report
+  its own harness overhead separately.
+- The stress benchmark is still converter-level: host I/O is a `setTimeout`
+  mock, not ZNP/MQTT. It models queueing and pending Promises, not network or
+  serial latency.
 - No WAN/Zigbee network latency is included; host I/O is deterministic or an
   explicit `hostDelayMs`.
 - No secrets from `ref/configuration.yaml` are used; device/endpoint data are

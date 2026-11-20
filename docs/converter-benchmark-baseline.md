@@ -1,10 +1,29 @@
 # Node.js converter performance baseline (2026-11-20)
 
 This report records the **upstream Node.js baseline** for the post-R1
-converter runtime. It does not implement or tune the Rust runtime. The
+converter runtime. It does not implement or tune the Rust runtime. It was
+extended after the 2026-11-21 external audit with converter-only timing,
+explicit golden generation/verification, scope clarification and a separate
+concurrency/stress benchmark; the original corpus and results are preserved. The
 benchmark harness and golden corpus are in [`tools/bench/`](../tools/bench/);
 methodology and scenario rationale are in
 [`tools/bench/README.md`](../tools/bench/README.md).
+
+## Scope: converter level, not integration
+
+This benchmark is deliberately **converter-level**. It calls the real upstream
+`fromZigbee`/`toZigbee`/`configure`/`onEvent`/`prepareDefinition` code with a
+mocked Zigbee/host boundary. It does **not** include:
+
+- MQTT publish/subscribe, transactions or reconnect;
+- the ZNP serial transport, request matching or coordinator firmware;
+- the Zigbee radio/network, interview or device latency;
+- the bridge event loop, Home Assistant discovery or Windfront;
+- the Rust bridge or its storage.
+
+A full `MQTT -> bridge -> ZNP -> device` integration benchmark is a separate
+next-stage task. Its results must not be inferred from these numbers, and its
+latency/throughput must not be compared directly with this baseline.
 
 ## Environment and pins
 
@@ -30,9 +49,13 @@ upstream converter functions with deterministic mocks.
   semantics; global store is cleared between scenarios.
 - 37 scenarios; 100 iterations for short operations (20% warmup), 30–50 for
   configure/onEvent, 20 for the host-delay scenario.
-- Total time is `performance.now()` around one converter call. CPU is
-  `process.cpuUsage()` over the batch. `hostWaitMs` is explicit mock I/O wait.
-  RSS/maxRSS from `process.memoryUsage()`/`resourceUsage()`.
+- **Harness total** (`stats`, legacy) is `performance.now()` around the whole
+  `callOnce()`, including context reset, cloning, meta and normalization.
+- **Converter only** (`converterStats`) times only the upstream converter
+  callback; host mock delay is included there and also reported as
+  `hostWaitMs`. `overheadStats` is the per-iteration difference.
+- CPU is `process.cpuUsage()` over the batch. RSS/maxRSS from
+  `process.memoryUsage()`/`resourceUsage()`.
 - Cold load is measured in fresh processes; device-file load is the first
   require in a process.
 - The harness installs a fixed clock (`2026-11-20T12:00:00Z`) so configure
@@ -100,6 +123,25 @@ This is the main cold-start risk: the Node package root alone costs ~2.6 s on
 the router, and `tuya.js` adds ~2.3 s. Warm converter calls are sub-millisecond
 to a few milliseconds.
 
+## Golden corpus: generation vs verification
+
+The corpus is split into two explicit modes so a normal measurement run can
+never rewrite the reference:
+
+- `--generate-golden` writes only `golden.json`, refuses to overwrite an
+  existing file without `--force`, and exits nonzero if any scenario errors.
+- `--verify-golden` reads the reference, runs every case and compares inputs,
+  expected payloads, expected host calls and errors. It writes nothing and
+  exits nonzero on mismatch, missing case, scenario error or state drift.
+- A normal measurement run writes `manifest.json`, `cases.json` and
+  `measurements.json` only.
+
+The corpus is made deterministic by a fixed clock
+(`2026-11-20T12:00:00Z`) and per-scenario transaction-id ranges. The upstream
+transaction store is keyed by `ieeeAddr-endpoint` and is not cleared by
+`clearGlobalStore()`; with a frozen clock its entries never expire, so shared
+transaction ids across scenarios would cause false duplicate suppression.
+
 ## Scenario results
 
 Full machine-readable data:
@@ -147,6 +189,35 @@ and [`tools/bench/corpus/measurements.json`](../tools/bench/corpus/measurements.
 The cold package-root load is reported in the separate table above (fresh
 processes); it is not part of the per-converter table.
 
+## Converter-only vs harness-total (post-audit)
+
+The original baseline table above times the whole `callOnce()` (legacy
+`stats`). The new `converterStats` span times only the upstream converter
+callback, and `overheadStats` is the difference. Router medians of three runs
+(`tools/bench/results/routerich-openwrt/converter-metrics/run{1,2,3}`):
+
+| Scenario | converter p50 | converter p95 | harness total p50 | harness total p95 | overhead p50 |
+|---|---:|---:|---:|---:|---:|
+| `configure-danfoss` | 6.723 ms | 15.552 ms | 7.325 ms | 20.893 ms | 0.335 ms |
+| `configure-l101z` | 0.526 ms | 2.029 ms | 0.855 ms | 2.585 ms | 0.322 ms |
+| `fz-tuya-m9pro-multi-dp` | 0.162 ms | 0.380 ms | 0.768 ms | 2.039 ms | 0.597 ms |
+| `fz-ikea-color-xy` | 0.165 ms | 0.417 ms | 0.760 ms | 4.249 ms | 0.584 ms |
+| `fz-ikea-onoff` | 0.070 ms | 0.124 ms | 0.557 ms | 1.511 ms | 0.482 ms |
+| `set-ikea-onoff` | 0.432 ms | 1.412 ms | 0.825 ms | 2.926 ms | 0.370 ms |
+| `set-ikea-brightness-host-delay` | 2.964 ms | 4.600 ms | 3.302 ms | 5.023 ms | 0.323 ms |
+| `prepare-heavy-yokis-81-extends` | 0.896 ms | 3.838 ms | 0.896 ms | 3.838 ms | 0 ms |
+| `prepare-heavy-icon2-thermostat` | 0.698 ms | 4.803 ms | 0.698 ms | 4.803 ms | 0 ms |
+| `fz-external-l101-temp` | 0.081 ms | 0.100 ms | 0.475 ms | 4.431 ms | 0.394 ms |
+
+The harness component is 0.3–0.6 ms for fast conversions, which is larger than
+the converter itself. In the JSON, `harnessTotalMs` and `converterOnlyMs` are
+the batch means, while `stats`/`converterStats` carry p50/p95/p99. That confirms the audit finding: the original
+sub-millisecond table is dominated by mocks/cloning/normalization, while
+`converterStats` is the correct input for the Rust runtime comparison.
+`prepare*` scenarios measure `prepareDefinition` itself, so converter-only and
+total are identical by construction. Full per-scenario data:
+[`results/routerich-openwrt/converter-metrics/`](../tools/bench/results/routerich-openwrt/converter-metrics/).
+
 ## Heavy operations and profiles
 
 Router CPU profiles (500 configure calls, 1,000 Tuya calls):
@@ -165,6 +236,38 @@ Router CPU profiles (500 configure calls, 1,000 Tuya calls):
 Profiles and summaries:
 [`tools/bench/results/routerich-openwrt/profiles/`](../tools/bench/results/routerich-openwrt/profiles/),
 [`tools/bench/results/linux-x64/profiles/`](../tools/bench/results/linux-x64/profiles/).
+
+## Concurrency and stress results
+
+Separate harness: `tools/bench/stress.mjs`. All operations are submitted
+up front, then processed by a bounded worker pool. `queueWait` is backlog time
+(submit to worker start), `service` is execution after the worker picks the
+operation, and end-to-end latency is their sum. Router medians of three runs
+(`tools/bench/results/routerich-openwrt/stress/run{1,2,3}`), load average
+2.72–3.07, Node service running:
+
+| Workload | Throughput ops/s (median) | E2E p50 | E2E p95 | E2E p99 | Service p95 | Queue p95 |
+|---|---:|---:|---:|---:|---:|---:|
+| `reports-1-device-c1` | 1,554 | 695.6 ms | 1,233.8 ms | 1,278.7 ms | 1.5 ms | 1,233.5 ms |
+| `reports-16-devices-c8` | 1,270 | 1,807.6 ms | 3,050.0 ms | 3,128.9 ms | 14.5 ms | 3,046.7 ms |
+| `sets-16-devices-c1` | 360 | 1,470.5 ms | 2,662.7 ms | 2,755.7 ms | 6.0 ms | 2,660.3 ms |
+| `sets-16-devices-c8` | 816 | 594.5 ms | 1,050.6 ms | 1,151.4 ms | 24.2 ms | 1,007.8 ms |
+| `mixed-32-devices-c16` | 921 | 1,498.4 ms | 2,937.0 ms | 3,189.4 ms | 56.0 ms | 2,903.1 ms |
+| `queue-backlog-sets-c4` | 572 | 1,775.0 ms | 3,311.3 ms | 3,443.5 ms | 10.8 ms | 3,304.7 ms |
+| `pending-sets-c64-delay20` | 1,429 | 99.0 ms | 137.1 ms | 140.0 ms | 45.7 ms | 116.7 ms |
+
+Throughput ranges across the three runs: `reports-1-device` 1,478–1,619;
+`reports-16-devices` 1,170–1,290; `sets-16-c1` 344–363; `sets-16-c8` 750–871;
+`mixed-32` 861–944; `queue-backlog` 504–593; `pending-c64` 1,257–1,523. CPU
+totals were 1.1–1.6 s for 2,000 reports, i.e. the router is CPU-bound on
+conversion, not waiting on the mock host.
+
+The large end-to-end p95 values are the deliberate backlog (all operations
+queued at once); the meaningful converter-side latency is `service p95`.
+For x86 context (`tools/bench/results/linux-x64/stress/run1.json`):
+`reports-1-device` 50,874 ops/s, service p95 0.04 ms; `sets-16-c8`
+6,389 ops/s; `queue-backlog` 764 ops/s. These numbers are not comparable with
+the single-call baseline and are not used for Rust acceptance.
 
 ## Memory and event loop
 
@@ -186,11 +289,15 @@ corpus and the same golden inputs/host calls.
 1. **Functional:** all 37 `golden.json` cases produce the same normalized
    payloads, state and host-call sequence; no converter exception/timeout;
    `stateDrift=false`.
-2. **Steady state:** for every computationally significant scenario, Rust
-   **p95 ≤ 2× Node p95** on Routerich (median of three runs), excluding
-   explicit host wait. Baseline examples: `fz-*` p95 1–4 ms, `set-*` p95 1–4 ms,
-   `configure-danfoss` p95 ~29–38 ms (last run round, load average 2.3–3.3),
-   `onEvent` p95 ~0.6–2.2 ms.
+2. **Steady state (converter-only):** for every computationally significant
+   scenario, Rust **p95 ≤ 2× Node `converterStats.p95`** on Routerich (median
+   of three runs), excluding explicit host wait. Use the new
+   `converter-metrics` runs, not the legacy harness-total table. Examples:
+   `fz-ikea-onoff` converter p95 0.12 ms, `fz-tuya-m9pro-multi-dp` 0.38 ms,
+   `set-ikea-onoff` 1.41 ms, `configure-danfoss` 15.6 ms, `onEvent`
+   0.6–2.2 ms.
+   The legacy harness-total p95 is retained only for historical comparison and
+   must not be used as the gate.
 3. **Cold use:** package/definition preparation may run in the background; it
    must not block `bridge/state online` or MQTT/frontend. If measured on the
    request path, Rust first use ≤ 2× Node cold load (root ~2.6 s, largest
@@ -199,18 +306,24 @@ corpus and the same golden inputs/host calls.
    ≤ 110 MB; router baseline 74 MB) and no unbounded growth across scenarios.
 5. **Responsiveness:** no single conversion blocks the bridge event loop
    > 50 ms p99; command/health request latency stays within the existing R1
-   HIL bounds during conversion/warmup.
-6. **Engine decision:** Boa/Kataan/other may be selected only after running
+   HIL bounds during conversion/warmup. The stress benchmark is not an
+   event-loop measurement; use the bridge integration run for that.
+6. **Stress (informational, not a hard gate yet):** record converter worker
+   throughput and service p95 on the same stress workloads; compare
+   stress-to-stress only. End-to-end p95 includes queue backlog and is not a
+   converter latency claim.
+7. **Engine decision:** Boa/Kataan/other may be selected only after running
    this corpus and the functional differential. Claims from engine benchmarks
    are not acceptance evidence.
 
 ## Gaps and caveats
 
 - The Routerich Node service was not stopped; background load causes p99
-  variance. The three timing runs reported here ran at load average 2.3–3.3
-  and were `nice -n 19`; earlier rounds at lower load produced p95 values
-  about 30–40% lower for `configure-danfoss`, so treat p95 as an upper
-  envelope rather than a best case.
+  variance. The original three timing runs ran at load average 2.3–3.3, the
+  post-audit `converter-metrics` runs at 1.85–2.18 and the stress runs at
+  2.72–3.07; all were `nice -n 19`. Earlier rounds at lower load produced p95 values about
+  30–40% lower for `configure-danfoss`, so treat p95 as an upper envelope
+  rather than a best case.
 - Node versions differ (x86 v24, router v22); the pinned converter package and
   scenario corpus are identical. The router's opkg installation carries no git
   metadata, so its manifest records `null` for upstream SHAs; its
@@ -224,6 +337,11 @@ corpus and the same golden inputs/host calls.
 - 37 scenarios cover the requested categories and the statically heaviest
   definitions found by `heavy-scan.mjs`; they do not execute all 4,619
   definitions. Full-catalog loading remains a separate cold-start measurement.
+- The stress latency numbers include the deliberately unbounded backlog
+  (all operations are enqueued before workers start). Read `serviceMs` for
+  converter execution latency and `queueWaitMs` for dispatch backlog.
+- The converter-level harness excludes MQTT/ZNP/network; see the scope section.
+  Integration latency belongs to the separate next-stage benchmark.
 - No secrets from `ref/configuration.yaml`; device data are synthetic. The
   external fixture is the user's `L101Ze_z2m.js`, identified by hash in the
   manifest.
