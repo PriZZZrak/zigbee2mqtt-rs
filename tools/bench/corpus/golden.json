@@ -2513,7 +2513,7 @@
         "endpoint": 1,
         "cluster": "genTime",
         "attributes": {
-          "time": 848513672,
+          "time": 848491200,
           "timeStatus": 2,
           "timeZone": 14400,
           "dstStart": 4294967295,

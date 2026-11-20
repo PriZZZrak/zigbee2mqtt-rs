@@ -4,24 +4,24 @@
     "kind": "package",
     "stats": {
       "count": 1,
-      "meanMs": 3666.4676839999997,
-      "p50Ms": 3666.4676839999997,
-      "p95Ms": 3666.4676839999997,
-      "p99Ms": 3666.4676839999997,
-      "minMs": 3666.4676839999997,
-      "maxMs": 3666.4676839999997,
-      "totalMs": 3666.4676839999997,
-      "opsPerSecond": 0.27274207389413885
+      "meanMs": 4009.275968,
+      "p50Ms": 4009.275968,
+      "p95Ms": 4009.275968,
+      "p99Ms": 4009.275968,
+      "minMs": 4009.275968,
+      "maxMs": 4009.275968,
+      "totalMs": 4009.275968,
+      "opsPerSecond": 0.2494215933204626
     },
     "cpu": null,
     "memory": {
       "rssBefore": null,
-      "rssAfter": 52539392,
-      "maxRssBytes": 53317632,
+      "rssAfter": 52273152,
+      "maxRssBytes": 53104640,
       "rssDelta": null
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 3666.4676839999997,
+      "blockingUpperBoundMs": 4009.275968,
       "measured": false,
       "note": "cold package load"
     },
@@ -33,28 +33,28 @@
     "kind": "prepare",
     "stats": {
       "count": 100,
-      "meanMs": 0.5765195900000435,
-      "p50Ms": 0.12464600000021164,
-      "p95Ms": 0.47657800000069983,
-      "p99Ms": 10.625510000000759,
-      "minMs": 0.09648500000002969,
-      "maxMs": 29.936055999999553,
-      "totalMs": 57.651959000004354,
-      "opsPerSecond": 1734.546435794011
+      "meanMs": 0.5285591300000305,
+      "p50Ms": 0.1301100000000588,
+      "p95Ms": 1.162905000000137,
+      "p99Ms": 10.74474999999984,
+      "minMs": 0.11518200000045908,
+      "maxMs": 16.7076160000006,
+      "totalMs": 52.855913000003056,
+      "opsPerSecond": 1891.9359126384634
     },
     "cpu": {
-      "userMs": 71.58,
-      "systemMs": 3.308,
-      "totalMs": 74.888
+      "userMs": 65.504,
+      "systemMs": 6.104,
+      "totalMs": 71.608
     },
     "memory": {
-      "rssBefore": 54812672,
-      "rssAfter": 53997568,
-      "maxRssBytes": 54812672,
-      "rssDelta": -815104
+      "rssBefore": 54730752,
+      "rssAfter": 55123968,
+      "maxRssBytes": 55123968,
+      "rssDelta": 393216
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 29.936055999999553,
+      "blockingUpperBoundMs": 16.7076160000006,
       "measured": false,
       "note": "prepareDefinition batch"
     },
@@ -66,8 +66,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 9.110987000000023
+      "loadMs": 760.8445320000001,
+      "prepareMs": 18.179213999999774
     }
   },
   {
@@ -75,28 +75,28 @@
     "kind": "prepare",
     "stats": {
       "count": 50,
-      "meanMs": 0.6000583399999232,
-      "p50Ms": 0.36408900000060385,
-      "p95Ms": 0.9105289999997694,
-      "p99Ms": 5.695154999999431,
-      "minMs": 0.31284499999947,
-      "maxMs": 5.695154999999431,
-      "totalMs": 30.00291699999616,
-      "opsPerSecond": 1666.5046268669944
+      "meanMs": 0.6107442400000036,
+      "p50Ms": 0.49173700000028475,
+      "p95Ms": 1.0347960000008243,
+      "p99Ms": 3.1735579999995025,
+      "minMs": 0.31238500000017666,
+      "maxMs": 3.1735579999995025,
+      "totalMs": 30.53721200000018,
+      "opsPerSecond": 1637.346592085738
     },
     "cpu": {
-      "userMs": 28.313,
-      "systemMs": 0.491,
-      "totalMs": 28.804
+      "userMs": 26.515,
+      "systemMs": 0,
+      "totalMs": 26.515
     },
     "memory": {
-      "rssBefore": 54083584,
-      "rssAfter": 54607872,
-      "maxRssBytes": 54812672,
-      "rssDelta": 524288
+      "rssBefore": 54480896,
+      "rssAfter": 54480896,
+      "maxRssBytes": 56041472,
+      "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 5.695154999999431,
+      "blockingUpperBoundMs": 3.1735579999995025,
       "measured": false,
       "note": "prepareDefinition batch"
     },
@@ -108,8 +108,8 @@
       "source": "package",
       "model": "014G2461",
       "vendor": "Danfoss",
-      "loadMs": 215.2015309999997,
-      "prepareMs": 8.68834599999991
+      "loadMs": 209.23180499999944,
+      "prepareMs": 1.4013489999997546
     }
   },
   {
@@ -117,28 +117,28 @@
     "kind": "prepare",
     "stats": {
       "count": 50,
-      "meanMs": 0.2477740800000174,
-      "p50Ms": 0.2285170000004655,
-      "p95Ms": 0.541747000000214,
-      "p99Ms": 0.6855509999995775,
-      "minMs": 0.11772099999961938,
-      "maxMs": 0.6855509999995775,
-      "totalMs": 12.388704000000871,
-      "opsPerSecond": 4035.934670809512
+      "meanMs": 0.41257038000003377,
+      "p50Ms": 0.1497300000000905,
+      "p95Ms": 0.5892229999999472,
+      "p99Ms": 8.31160600000021,
+      "minMs": 0.11795300000085263,
+      "maxMs": 8.31160600000021,
+      "totalMs": 20.62851900000169,
+      "opsPerSecond": 2423.8288749665408
     },
     "cpu": {
-      "userMs": 16.783,
-      "systemMs": 1.578,
-      "totalMs": 18.361
+      "userMs": 20.373,
+      "systemMs": 0.044,
+      "totalMs": 20.417
     },
     "memory": {
-      "rssBefore": 55324672,
-      "rssAfter": 55324672,
-      "maxRssBytes": 57278464,
+      "rssBefore": 55107584,
+      "rssAfter": 55107584,
+      "maxRssBytes": 57065472,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 0.6855509999995775,
+      "blockingUpperBoundMs": 8.31160600000021,
       "measured": false,
       "note": "prepareDefinition batch"
     },
@@ -150,8 +150,8 @@
       "source": "package",
       "model": "ZWSH16",
       "vendor": "AVATTO",
-      "loadMs": 285.884043,
-      "prepareMs": 2.8084520000002158
+      "loadMs": 363.18994099999964,
+      "prepareMs": 2.570332000000235
     }
   },
   {
@@ -159,28 +159,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.6714949400000478,
-      "p50Ms": 0.4758080000001428,
-      "p95Ms": 1.5802309999999125,
-      "p99Ms": 4.583654000000024,
-      "minMs": 0.28168400000049587,
-      "maxMs": 6.336772999999994,
-      "totalMs": 67.14949400000478,
-      "opsPerSecond": 1489.2144980272358
+      "meanMs": 1.2801983700000072,
+      "p50Ms": 0.501893999999993,
+      "p95Ms": 1.6475630000004458,
+      "p99Ms": 15.67566799999986,
+      "minMs": 0.28491699999995035,
+      "maxMs": 56.730571000000054,
+      "totalMs": 128.01983700000073,
+      "opsPerSecond": 781.1289433214903
     },
     "cpu": {
-      "userMs": 60.894,
-      "systemMs": 0,
-      "totalMs": 60.894
+      "userMs": 63.088,
+      "systemMs": 1.185,
+      "totalMs": 64.273
     },
     "memory": {
-      "rssBefore": 55324672,
-      "rssAfter": 55324672,
-      "maxRssBytes": 57278464,
+      "rssBefore": 55107584,
+      "rssAfter": 55107584,
+      "maxRssBytes": 57065472,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 6.336772999999994,
+      "blockingUpperBoundMs": 56.730571000000054,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -192,8 +192,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.2578319999993255
+      "loadMs": 760.8445320000001,
+      "prepareMs": 3.989761000000726
     }
   },
   {
@@ -201,28 +201,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.5746605899999849,
-      "p50Ms": 0.33715899999970134,
-      "p95Ms": 1.5412989999995261,
-      "p99Ms": 2.678421999999955,
-      "minMs": 0.28368399999999383,
-      "maxMs": 4.104921999999533,
-      "totalMs": 57.466058999998495,
-      "opsPerSecond": 1740.1576119914996
+      "meanMs": 0.47615921999999045,
+      "p50Ms": 0.3106930000003558,
+      "p95Ms": 1.150362999999743,
+      "p99Ms": 1.315096999999696,
+      "minMs": 0.28568600000016886,
+      "maxMs": 1.4829839999993055,
+      "totalMs": 47.615921999999046,
+      "opsPerSecond": 2100.1378488481646
     },
     "cpu": {
-      "userMs": 47.763,
-      "systemMs": 0,
-      "totalMs": 47.763
+      "userMs": 34.606,
+      "systemMs": 10.598,
+      "totalMs": 45.204
     },
     "memory": {
-      "rssBefore": 55324672,
-      "rssAfter": 55324672,
-      "maxRssBytes": 57278464,
+      "rssBefore": 55238656,
+      "rssAfter": 55238656,
+      "maxRssBytes": 57065472,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 4.104921999999533,
+      "blockingUpperBoundMs": 1.4829839999993055,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -234,8 +234,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 1.3158579999999347
+      "loadMs": 760.8445320000001,
+      "prepareMs": 0.24613899999985733
     }
   },
   {
@@ -243,28 +243,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.8355756599999858,
-      "p50Ms": 0.6460039999992659,
-      "p95Ms": 1.5902329999998983,
-      "p99Ms": 2.4106629999996585,
-      "minMs": 0.4548800000002302,
-      "maxMs": 3.21378199999981,
-      "totalMs": 83.55756599999859,
-      "opsPerSecond": 1196.779714717895
+      "meanMs": 0.7413459299999977,
+      "p50Ms": 0.6042269999998098,
+      "p95Ms": 1.370187000000442,
+      "p99Ms": 2.9422700000004625,
+      "minMs": 0.45672900000045047,
+      "maxMs": 3.620592000000215,
+      "totalMs": 74.13459299999977,
+      "opsPerSecond": 1348.8979429616659
     },
     "cpu": {
-      "userMs": 64.169,
-      "systemMs": 9.243,
-      "totalMs": 73.412
+      "userMs": 66.527,
+      "systemMs": 1.926,
+      "totalMs": 68.453
     },
     "memory": {
-      "rssBefore": 55455744,
-      "rssAfter": 55455744,
-      "maxRssBytes": 57278464,
+      "rssBefore": 55238656,
+      "rssAfter": 55238656,
+      "maxRssBytes": 57065472,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 3.21378199999981,
+      "blockingUpperBoundMs": 3.620592000000215,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -276,8 +276,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.20505000000048312
+      "loadMs": 760.8445320000001,
+      "prepareMs": 0.1983570000002146
     }
   },
   {
@@ -285,28 +285,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 1.109748569999956,
-      "p50Ms": 0.8231230000001233,
-      "p95Ms": 2.875930999999582,
-      "p99Ms": 4.963900000000649,
-      "minMs": 0.41833200000019133,
-      "maxMs": 5.483718999999837,
-      "totalMs": 110.97485699999561,
-      "opsPerSecond": 901.1050133635582
+      "meanMs": 1.2255894600000192,
+      "p50Ms": 0.6696279999996477,
+      "p95Ms": 4.528433999999834,
+      "p99Ms": 8.728170000000318,
+      "minMs": 0.4248749999997017,
+      "maxMs": 12.652378000000681,
+      "totalMs": 122.55894600000192,
+      "opsPerSecond": 815.933909875485
     },
     "cpu": {
-      "userMs": 90.022,
-      "systemMs": 50.243,
-      "totalMs": 140.265
+      "userMs": 96.932,
+      "systemMs": 39.502,
+      "totalMs": 136.434
     },
     "memory": {
-      "rssBefore": 55455744,
-      "rssAfter": 56336384,
-      "maxRssBytes": 57278464,
-      "rssDelta": 880640
+      "rssBefore": 55238656,
+      "rssAfter": 55377920,
+      "maxRssBytes": 57065472,
+      "rssDelta": 139264
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 5.483718999999837,
+      "blockingUpperBoundMs": 12.652378000000681,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -318,8 +318,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.20635799999945448
+      "loadMs": 760.8445320000001,
+      "prepareMs": 0.2059739999995145
     }
   },
   {
@@ -327,28 +327,28 @@
     "kind": "set",
     "stats": {
       "count": 100,
-      "meanMs": 1.1645595200000298,
-      "p50Ms": 0.761953999999605,
-      "p95Ms": 1.9297769999993761,
-      "p99Ms": 10.58088300000054,
-      "minMs": 0.506893000000673,
-      "maxMs": 14.289170000000013,
-      "totalMs": 116.45595200000298,
-      "opsPerSecond": 858.6937660343667
+      "meanMs": 0.9511657999999624,
+      "p50Ms": 0.5939940000007482,
+      "p95Ms": 1.7712870000013936,
+      "p99Ms": 7.429387000000133,
+      "minMs": 0.5004319999989093,
+      "maxMs": 11.969438000000082,
+      "totalMs": 95.11657999999625,
+      "opsPerSecond": 1051.341417027441
     },
     "cpu": {
-      "userMs": 78.44,
-      "systemMs": 3.011,
-      "totalMs": 81.451
+      "userMs": 68.792,
+      "systemMs": 7.487,
+      "totalMs": 76.279
     },
     "memory": {
-      "rssBefore": 55619584,
-      "rssAfter": 55619584,
-      "maxRssBytes": 57278464,
+      "rssBefore": 55377920,
+      "rssAfter": 55377920,
+      "maxRssBytes": 57065472,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 14.289170000000013,
+      "blockingUpperBoundMs": 11.969438000000082,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -360,8 +360,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.2318249999998443
+      "loadMs": 760.8445320000001,
+      "prepareMs": 1.7780579999998736
     }
   },
   {
@@ -369,28 +369,28 @@
     "kind": "set",
     "stats": {
       "count": 100,
-      "meanMs": 0.9946366699999635,
-      "p50Ms": 0.8010409999997137,
-      "p95Ms": 2.2868650000000343,
-      "p99Ms": 3.5984150000003865,
-      "minMs": 0.5619059999999081,
-      "maxMs": 4.549183999999514,
-      "totalMs": 99.46366699999635,
-      "opsPerSecond": 1005.3922504184736
+      "meanMs": 1.025519619999941,
+      "p50Ms": 0.8135870000005525,
+      "p95Ms": 2.6622779999997874,
+      "p99Ms": 3.345369999999093,
+      "minMs": 0.5603700000010576,
+      "maxMs": 4.223358000001099,
+      "totalMs": 102.55196199999409,
+      "opsPerSecond": 975.1154249004594
     },
     "cpu": {
-      "userMs": 83.317,
-      "systemMs": 7.654,
-      "totalMs": 90.971
+      "userMs": 88.146,
+      "systemMs": 0.025,
+      "totalMs": 88.171
     },
     "memory": {
-      "rssBefore": 55619584,
-      "rssAfter": 55750656,
-      "maxRssBytes": 57278464,
-      "rssDelta": 131072
+      "rssBefore": 55508992,
+      "rssAfter": 55508992,
+      "maxRssBytes": 57065472,
+      "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 4.549183999999514,
+      "blockingUpperBoundMs": 4.223358000001099,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -402,8 +402,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.2615249999998923
+      "loadMs": 760.8445320000001,
+      "prepareMs": 0.21313000000009197
     }
   },
   {
@@ -411,28 +411,28 @@
     "kind": "set",
     "stats": {
       "count": 100,
-      "meanMs": 1.729638689999956,
-      "p50Ms": 0.8593629999995755,
-      "p95Ms": 5.668994999999995,
-      "p99Ms": 18.789574000000357,
-      "minMs": 0.5930670000007012,
-      "maxMs": 22.876260000000002,
-      "totalMs": 172.9638689999956,
-      "opsPerSecond": 578.1554296753303
+      "meanMs": 1.6801423999998952,
+      "p50Ms": 0.8091240000012476,
+      "p95Ms": 5.061950999999681,
+      "p99Ms": 12.717854999998963,
+      "minMs": 0.5811439999997674,
+      "maxMs": 31.607707000001028,
+      "totalMs": 168.0142399999895,
+      "opsPerSecond": 595.1876459995667
     },
     "cpu": {
-      "userMs": 131.808,
-      "systemMs": 13.502,
-      "totalMs": 145.31
+      "userMs": 139.543,
+      "systemMs": 0,
+      "totalMs": 139.543
     },
     "memory": {
-      "rssBefore": 55750656,
-      "rssAfter": 56135680,
-      "maxRssBytes": 57278464,
-      "rssDelta": 385024
+      "rssBefore": 55508992,
+      "rssAfter": 55824384,
+      "maxRssBytes": 57065472,
+      "rssDelta": 315392
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 22.876260000000002,
+      "blockingUpperBoundMs": 31.607707000001028,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -444,8 +444,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.20512700000017503
+      "loadMs": 760.8445320000001,
+      "prepareMs": 0.2022820000001957
     }
   },
   {
@@ -453,28 +453,28 @@
     "kind": "get",
     "stats": {
       "count": 100,
-      "meanMs": 0.308113419999936,
-      "p50Ms": 0.2293630000003759,
-      "p95Ms": 0.7274849999994331,
-      "p99Ms": 1.4282709999988583,
-      "minMs": 0.1426499999997759,
-      "maxMs": 2.5873219999994035,
-      "totalMs": 30.8113419999936,
-      "opsPerSecond": 3245.5580805282925
+      "meanMs": 0.4456816500000059,
+      "p50Ms": 0.3044610000015382,
+      "p95Ms": 1.309865000001082,
+      "p99Ms": 3.150552000000971,
+      "minMs": 0.15111500000057276,
+      "maxMs": 3.570580000001428,
+      "totalMs": 44.56816500000059,
+      "opsPerSecond": 2243.7540338490194
     },
     "cpu": {
-      "userMs": 42.381,
-      "systemMs": 1.221,
-      "totalMs": 43.602
+      "userMs": 41.065,
+      "systemMs": 0,
+      "totalMs": 41.065
     },
     "memory": {
-      "rssBefore": 56254464,
-      "rssAfter": 55799808,
-      "maxRssBytes": 57278464,
-      "rssDelta": -454656
+      "rssBefore": 55824384,
+      "rssAfter": 56086528,
+      "maxRssBytes": 57065472,
+      "rssDelta": 262144
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 2.5873219999994035,
+      "blockingUpperBoundMs": 3.570580000001428,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -486,8 +486,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.23690399999941292
+      "loadMs": 760.8445320000001,
+      "prepareMs": 0.2402910000000702
     }
   },
   {
@@ -495,32 +495,32 @@
     "kind": "set",
     "stats": {
       "count": 20,
-      "meanMs": 4.462986250000085,
-      "p50Ms": 3.5435550000001967,
-      "p95Ms": 8.980262999999468,
-      "p99Ms": 9.169463000000178,
-      "minMs": 2.3118700000013632,
-      "maxMs": 9.169463000000178,
-      "totalMs": 89.25972500000171,
-      "opsPerSecond": 224.06522090449658
+      "meanMs": 4.308213700000306,
+      "p50Ms": 3.749163000000408,
+      "p95Ms": 6.647806999999375,
+      "p99Ms": 9.546297000000777,
+      "minMs": 2.2121660000011616,
+      "maxMs": 9.546297000000777,
+      "totalMs": 86.16427400000612,
+      "opsPerSecond": 232.11476255226825
     },
     "cpu": {
-      "userMs": 37.343,
-      "systemMs": 0.354,
-      "totalMs": 37.697
+      "userMs": 36.886,
+      "systemMs": 0,
+      "totalMs": 36.886
     },
     "memory": {
-      "rssBefore": 55799808,
-      "rssAfter": 55930880,
-      "maxRssBytes": 57278464,
+      "rssBefore": 55586816,
+      "rssAfter": 55717888,
+      "maxRssBytes": 57065472,
       "rssDelta": 131072
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 9.169463000000178,
+      "blockingUpperBoundMs": 9.546297000000777,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
-    "hostWaitMs": 70.0767509999987,
+    "hostWaitMs": 60.604379999997036,
     "stateDrift": false,
     "definition": {
       "file": "ikea.js",
@@ -528,8 +528,8 @@
       "source": "package",
       "model": "LED1545G12",
       "vendor": "IKEA",
-      "loadMs": 810.2016559999993,
-      "prepareMs": 0.24652200000127777
+      "loadMs": 760.8445320000001,
+      "prepareMs": 0.24590700000044308
     }
   },
   {
@@ -537,28 +537,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.7796882199999527,
-      "p50Ms": 0.4545720000005531,
-      "p95Ms": 2.0675800000008167,
-      "p99Ms": 7.2613060000003316,
-      "minMs": 0.38517099999990023,
-      "maxMs": 9.009884999999485,
-      "totalMs": 77.96882199999527,
-      "opsPerSecond": 1282.5639458809069
+      "meanMs": 0.6735683000000062,
+      "p50Ms": 0.4197969999986526,
+      "p95Ms": 1.5597730000008596,
+      "p99Ms": 2.5748710000007122,
+      "minMs": 0.3931749999992462,
+      "maxMs": 8.711320000000342,
+      "totalMs": 67.35683000000063,
+      "opsPerSecond": 1484.630437625985
     },
     "cpu": {
-      "userMs": 62.805,
-      "systemMs": 0.194,
-      "totalMs": 62.999
+      "userMs": 61.003,
+      "systemMs": 0.667,
+      "totalMs": 61.67
     },
     "memory": {
-      "rssBefore": 57786368,
-      "rssAfter": 57917440,
-      "maxRssBytes": 60743680,
+      "rssBefore": 57724928,
+      "rssAfter": 57856000,
+      "maxRssBytes": 60239872,
       "rssDelta": 131072
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 9.009884999999485,
+      "blockingUpperBoundMs": 8.711320000000342,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -570,8 +570,8 @@
       "source": "package",
       "model": "RTCGQ01LM",
       "vendor": "Xiaomi",
-      "loadMs": 974.0681569999997,
-      "prepareMs": 0.5312059999996563
+      "loadMs": 988.8106879999996,
+      "prepareMs": 1.3093260000005102
     }
   },
   {
@@ -579,28 +579,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.34882719000006546,
-      "p50Ms": 0.21043599999939033,
-      "p95Ms": 0.8021180000014283,
-      "p99Ms": 1.1253510000005917,
-      "minMs": 0.186122000000978,
-      "maxMs": 1.6895650000005844,
-      "totalMs": 34.882719000006546,
-      "opsPerSecond": 2866.749005431063
+      "meanMs": 0.4305448000000615,
+      "p50Ms": 0.3459320000001753,
+      "p95Ms": 0.9016860000010638,
+      "p99Ms": 1.7494349999997212,
+      "minMs": 0.19174000000020897,
+      "maxMs": 3.185869000000821,
+      "totalMs": 43.05448000000615,
+      "opsPerSecond": 2322.638666173316
     },
     "cpu": {
-      "userMs": 33.244,
-      "systemMs": 0.012,
-      "totalMs": 33.256
+      "userMs": 38.73,
+      "systemMs": 0,
+      "totalMs": 38.73
     },
     "memory": {
-      "rssBefore": 57917440,
-      "rssAfter": 57917440,
-      "maxRssBytes": 60743680,
+      "rssBefore": 57856000,
+      "rssAfter": 57856000,
+      "maxRssBytes": 60239872,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 1.6895650000005844,
+      "blockingUpperBoundMs": 3.185869000000821,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -612,8 +612,8 @@
       "source": "package",
       "model": "RTCGQ01LM",
       "vendor": "Xiaomi",
-      "loadMs": 974.0681569999997,
-      "prepareMs": 0.23259500000131084
+      "loadMs": 988.8106879999996,
+      "prepareMs": 0.1520380000001751
     }
   },
   {
@@ -621,28 +621,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.9753428100000383,
-      "p50Ms": 0.6169969999991736,
-      "p95Ms": 2.808530000000246,
-      "p99Ms": 7.83598400000119,
-      "minMs": 0.327925999999934,
-      "maxMs": 9.965656000000308,
-      "totalMs": 97.53428100000383,
-      "opsPerSecond": 1025.2805370041747
+      "meanMs": 0.8089712900001177,
+      "p50Ms": 0.41664200000013807,
+      "p95Ms": 2.3054969999993773,
+      "p99Ms": 6.755833999999595,
+      "minMs": 0.3270810000012716,
+      "maxMs": 11.43576800000119,
+      "totalMs": 80.89712900001177,
+      "opsPerSecond": 1236.1378115159741
     },
     "cpu": {
-      "userMs": 85.063,
-      "systemMs": 0.854,
-      "totalMs": 85.917
+      "userMs": 75.637,
+      "systemMs": 0,
+      "totalMs": 75.637
     },
     "memory": {
-      "rssBefore": 58376192,
-      "rssAfter": 58507264,
-      "maxRssBytes": 60743680,
-      "rssDelta": 131072
+      "rssBefore": 58060800,
+      "rssAfter": 58445824,
+      "maxRssBytes": 60239872,
+      "rssDelta": 385024
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 9.965656000000308,
+      "blockingUpperBoundMs": 11.43576800000119,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -654,8 +654,8 @@
       "source": "package",
       "model": "L101Z-SBI",
       "vendor": "Lytko",
-      "loadMs": 87.35110700000041,
-      "prepareMs": 0.644771999999648
+      "loadMs": 124.54558999999972,
+      "prepareMs": 0.630617999999231
     }
   },
   {
@@ -663,28 +663,28 @@
     "kind": "set",
     "stats": {
       "count": 100,
-      "meanMs": 0.8833165400000508,
-      "p50Ms": 0.4051760000002105,
-      "p95Ms": 1.3486359999988053,
-      "p99Ms": 6.0708620000004885,
-      "minMs": 0.22097700000085752,
-      "maxMs": 26.892468000000008,
-      "totalMs": 88.33165400000507,
-      "opsPerSecond": 1132.0969943571333
+      "meanMs": 0.3874033499999678,
+      "p50Ms": 0.20651299999917683,
+      "p95Ms": 1.286627999999837,
+      "p99Ms": 1.8911630000002333,
+      "minMs": 0.19343300000036834,
+      "maxMs": 2.081362999999328,
+      "totalMs": 38.740334999996776,
+      "opsPerSecond": 2581.2889847237593
     },
     "cpu": {
-      "userMs": 48.548,
+      "userMs": 35.851,
       "systemMs": 0,
-      "totalMs": 48.548
+      "totalMs": 35.851
     },
     "memory": {
-      "rssBefore": 58507264,
-      "rssAfter": 58507264,
-      "maxRssBytes": 60743680,
+      "rssBefore": 58445824,
+      "rssAfter": 58445824,
+      "maxRssBytes": 60239872,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 26.892468000000008,
+      "blockingUpperBoundMs": 2.081362999999328,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -696,8 +696,8 @@
       "source": "package",
       "model": "L101Z-SBI",
       "vendor": "Lytko",
-      "loadMs": 87.35110700000041,
-      "prepareMs": 0.4776549999987765
+      "loadMs": 124.54558999999972,
+      "prepareMs": 0.3407770000012533
     }
   },
   {
@@ -705,28 +705,28 @@
     "kind": "get",
     "stats": {
       "count": 100,
-      "meanMs": 0.4879295399999137,
-      "p50Ms": 0.38001599999915925,
-      "p95Ms": 1.3620240000000194,
-      "p99Ms": 2.0278790000011213,
-      "minMs": 0.16211599999951432,
-      "maxMs": 3.4107530000001134,
-      "totalMs": 48.79295399999137,
-      "opsPerSecond": 2049.476242000386
+      "meanMs": 0.6106964599999265,
+      "p50Ms": 0.3626280000007682,
+      "p95Ms": 2.756454999998823,
+      "p99Ms": 4.272985999999946,
+      "minMs": 0.17542800000046554,
+      "maxMs": 9.009547999999995,
+      "totalMs": 61.069645999992645,
+      "opsPerSecond": 1637.474695694356
     },
     "cpu": {
-      "userMs": 62.769,
-      "systemMs": 6.382,
-      "totalMs": 69.151
+      "userMs": 60.584,
+      "systemMs": 4.797,
+      "totalMs": 65.381
     },
     "memory": {
-      "rssBefore": 58507264,
-      "rssAfter": 58494976,
-      "maxRssBytes": 60743680,
-      "rssDelta": -12288
+      "rssBefore": 58445824,
+      "rssAfter": 58695680,
+      "maxRssBytes": 60239872,
+      "rssDelta": 249856
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 3.4107530000001134,
+      "blockingUpperBoundMs": 9.009547999999995,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -738,8 +738,8 @@
       "source": "package",
       "model": "L101Z-SBI",
       "vendor": "Lytko",
-      "loadMs": 87.35110700000041,
-      "prepareMs": 0.24652200000127777
+      "loadMs": 124.54558999999972,
+      "prepareMs": 0.20312799999919662
     }
   },
   {
@@ -747,28 +747,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.5975223299999379,
-      "p50Ms": 0.4191789999986213,
-      "p95Ms": 1.2678469999991648,
-      "p99Ms": 1.6045440000016242,
-      "minMs": 0.40025100000093516,
-      "maxMs": 2.587244999998802,
-      "totalMs": 59.752232999993794,
-      "opsPerSecond": 1673.5776217770872
+      "meanMs": 0.6652715699999134,
+      "p50Ms": 0.597686999999496,
+      "p95Ms": 1.4609780000009778,
+      "p99Ms": 2.0904430000009597,
+      "minMs": 0.4046390000003157,
+      "maxMs": 2.6101870000002236,
+      "totalMs": 66.52715699999135,
+      "opsPerSecond": 1503.145550019716
     },
     "cpu": {
-      "userMs": 57.267,
-      "systemMs": 0.305,
-      "totalMs": 57.572
+      "userMs": 62.149,
+      "systemMs": 0,
+      "totalMs": 62.149
     },
     "memory": {
-      "rssBefore": 58494976,
-      "rssAfter": 58494976,
-      "maxRssBytes": 60743680,
+      "rssBefore": 58560512,
+      "rssAfter": 58560512,
+      "maxRssBytes": 60239872,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 2.587244999998802,
+      "blockingUpperBoundMs": 2.6101870000002236,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -780,8 +780,8 @@
       "source": "package",
       "model": "ZWSH16",
       "vendor": "AVATTO",
-      "loadMs": 285.884043,
-      "prepareMs": 0.27322000000094704
+      "loadMs": 363.18994099999964,
+      "prepareMs": 0.33808399999907124
     }
   },
   {
@@ -789,28 +789,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 1.0494908000000578,
-      "p50Ms": 0.7488740000007965,
-      "p95Ms": 2.8495399999992514,
-      "p99Ms": 8.889317000001029,
-      "minMs": 0.484349000000293,
-      "maxMs": 11.163640000000669,
-      "totalMs": 104.94908000000578,
-      "opsPerSecond": 952.8430358798238
+      "meanMs": 0.9061391999999978,
+      "p50Ms": 0.7423390000003565,
+      "p95Ms": 2.153920000000653,
+      "p99Ms": 4.252596000000267,
+      "minMs": 0.4811969999991561,
+      "maxMs": 7.354290999999648,
+      "totalMs": 90.61391999999978,
+      "opsPerSecond": 1103.5832022276516
     },
     "cpu": {
-      "userMs": 67.053,
-      "systemMs": 9.345,
-      "totalMs": 76.398
+      "userMs": 74.621,
+      "systemMs": 0,
+      "totalMs": 74.621
     },
     "memory": {
-      "rssBefore": 58494976,
-      "rssAfter": 58494976,
-      "maxRssBytes": 60743680,
+      "rssBefore": 58560512,
+      "rssAfter": 58560512,
+      "maxRssBytes": 60239872,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 11.163640000000669,
+      "blockingUpperBoundMs": 7.354290999999648,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -822,8 +822,8 @@
       "source": "package",
       "model": "ZWSH16",
       "vendor": "AVATTO",
-      "loadMs": 285.884043,
-      "prepareMs": 0.40502200000082667
+      "loadMs": 363.18994099999964,
+      "prepareMs": 0.31677099999978964
     }
   },
   {
@@ -831,28 +831,28 @@
     "kind": "set",
     "stats": {
       "count": 100,
-      "meanMs": 0.6717357599999013,
-      "p50Ms": 0.46065100000123493,
-      "p95Ms": 1.6274730000004638,
-      "p99Ms": 2.357418999999936,
-      "minMs": 0.3776300000008632,
-      "maxMs": 2.522383000001355,
-      "totalMs": 67.17357599999013,
-      "opsPerSecond": 1488.6806085776152
+      "meanMs": 0.7416883499999494,
+      "p50Ms": 0.48242799999934505,
+      "p95Ms": 2.029657999999472,
+      "p99Ms": 4.248672000001534,
+      "minMs": 0.37878599999930884,
+      "maxMs": 5.229300000000876,
+      "totalMs": 74.16883499999494,
+      "opsPerSecond": 1348.2751886288468
     },
     "cpu": {
-      "userMs": 55.059,
-      "systemMs": 9.314,
-      "totalMs": 64.373
+      "userMs": 61.916,
+      "systemMs": 0,
+      "totalMs": 61.916
     },
     "memory": {
-      "rssBefore": 58494976,
-      "rssAfter": 58494976,
-      "maxRssBytes": 60743680,
+      "rssBefore": 58560512,
+      "rssAfter": 58560512,
+      "maxRssBytes": 60239872,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 2.522383000001355,
+      "blockingUpperBoundMs": 5.229300000000876,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -864,8 +864,8 @@
       "source": "package",
       "model": "ZWSH16",
       "vendor": "AVATTO",
-      "loadMs": 285.884043,
-      "prepareMs": 0.27506699999867124
+      "loadMs": 363.18994099999964,
+      "prepareMs": 0.23575000000164437
     }
   },
   {
@@ -873,28 +873,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 0.6150335599999743,
-      "p50Ms": 0.452263999999559,
-      "p95Ms": 1.0743390000006912,
-      "p99Ms": 3.738140999999814,
-      "minMs": 0.2898399999994581,
-      "maxMs": 9.603106999999,
-      "totalMs": 61.50335599999744,
-      "opsPerSecond": 1625.9275347511796
+      "meanMs": 0.641504940000068,
+      "p50Ms": 0.5103580000013608,
+      "p95Ms": 0.9888609999998152,
+      "p99Ms": 5.205063999999766,
+      "minMs": 0.29314999999951397,
+      "maxMs": 10.096279999999751,
+      "totalMs": 64.1504940000068,
+      "opsPerSecond": 1558.8344495053989
     },
     "cpu": {
-      "userMs": 60.356,
-      "systemMs": 2.288,
-      "totalMs": 62.644
+      "userMs": 61.353,
+      "systemMs": 1.904,
+      "totalMs": 63.257
     },
     "memory": {
-      "rssBefore": 69021696,
-      "rssAfter": 69677056,
-      "maxRssBytes": 77254656,
-      "rssDelta": 655360
+      "rssBefore": 69033984,
+      "rssAfter": 69558272,
+      "maxRssBytes": 77090816,
+      "rssDelta": 524288
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 9.603106999999,
+      "blockingUpperBoundMs": 10.096279999999751,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -906,8 +906,8 @@
       "source": "package",
       "model": "_TZ3000_h1ipgkwn",
       "vendor": "Tuya",
-      "loadMs": 2173.6521279999997,
-      "prepareMs": 1.2764640000004874
+      "loadMs": 2396.5565619999998,
+      "prepareMs": 0.7639589999998861
     }
   },
   {
@@ -915,28 +915,28 @@
     "kind": "set",
     "stats": {
       "count": 100,
-      "meanMs": 0.49189512999995716,
-      "p50Ms": 0.18242900000041118,
-      "p95Ms": 1.3203990000001795,
-      "p99Ms": 2.2371599999987666,
-      "minMs": 0.1701180000000022,
-      "maxMs": 7.344633000000613,
-      "totalMs": 49.18951299999571,
-      "opsPerSecond": 2032.953650100352
+      "meanMs": 0.5248989999999867,
+      "p50Ms": 0.360859000000346,
+      "p95Ms": 1.5577720000001136,
+      "p99Ms": 2.0223490000007587,
+      "minMs": 0.17158099999869592,
+      "maxMs": 6.64457499999844,
+      "totalMs": 52.48989999999867,
+      "opsPerSecond": 1905.1284151808736
     },
     "cpu": {
-      "userMs": 34.993,
-      "systemMs": 10.187,
-      "totalMs": 45.18
+      "userMs": 39.918,
+      "systemMs": 5.8,
+      "totalMs": 45.718
     },
     "memory": {
-      "rssBefore": 69677056,
-      "rssAfter": 69808128,
-      "maxRssBytes": 77254656,
+      "rssBefore": 69558272,
+      "rssAfter": 69689344,
+      "maxRssBytes": 77090816,
       "rssDelta": 131072
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 7.344633000000613,
+      "blockingUpperBoundMs": 6.64457499999844,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -948,8 +948,8 @@
       "source": "package",
       "model": "_TZ3000_h1ipgkwn",
       "vendor": "Tuya",
-      "loadMs": 2173.6521279999997,
-      "prepareMs": 0.1454199999989214
+      "loadMs": 2396.5565619999998,
+      "prepareMs": 0.16188700000020617
     }
   },
   {
@@ -957,28 +957,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 1.0313756699999976,
-      "p50Ms": 0.7601849999991828,
-      "p95Ms": 2.3251039999995555,
-      "p99Ms": 3.6606600000013714,
-      "minMs": 0.48280999999951746,
-      "maxMs": 4.658902999999555,
-      "totalMs": 103.13756699999976,
-      "opsPerSecond": 969.5788150596982
+      "meanMs": 1.604256620000051,
+      "p50Ms": 0.7412609999992128,
+      "p95Ms": 2.332503000001452,
+      "p99Ms": 13.503973999999289,
+      "minMs": 0.4962779999987106,
+      "maxMs": 55.19880499999999,
+      "totalMs": 160.4256620000051,
+      "opsPerSecond": 623.3416696139101
     },
     "cpu": {
-      "userMs": 118.78,
-      "systemMs": 11.796,
-      "totalMs": 130.576
+      "userMs": 118.7,
+      "systemMs": 34.302,
+      "totalMs": 153.002
     },
     "memory": {
-      "rssBefore": 69808128,
-      "rssAfter": 70172672,
-      "maxRssBytes": 77254656,
-      "rssDelta": 364544
+      "rssBefore": 69689344,
+      "rssAfter": 69656576,
+      "maxRssBytes": 77090816,
+      "rssDelta": -32768
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 4.658902999999555,
+      "blockingUpperBoundMs": 55.19880499999999,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -990,8 +990,8 @@
       "source": "package",
       "model": "014G2461",
       "vendor": "Danfoss",
-      "loadMs": 215.2015309999997,
-      "prepareMs": 1.0736460000007355
+      "loadMs": 209.23180499999944,
+      "prepareMs": 1.094349000000875
     }
   },
   {
@@ -999,28 +999,28 @@
     "kind": "get",
     "stats": {
       "count": 100,
-      "meanMs": 0.6026336299999093,
-      "p50Ms": 0.3603949999996985,
-      "p95Ms": 1.7961300000006304,
-      "p99Ms": 5.291134000000966,
-      "minMs": 0.16804099999899336,
-      "maxMs": 8.511763999998948,
-      "totalMs": 60.26336299999093,
-      "opsPerSecond": 1659.382998589293
+      "meanMs": 0.6901539499999672,
+      "p50Ms": 0.43241499999930966,
+      "p95Ms": 1.2848579999990761,
+      "p99Ms": 3.937363999999434,
+      "minMs": 0.3503180000006978,
+      "maxMs": 5.885156000000279,
+      "totalMs": 69.01539499999672,
+      "opsPerSecond": 1448.9520780110693
     },
     "cpu": {
-      "userMs": 64.14,
-      "systemMs": 0.03,
-      "totalMs": 64.17
+      "userMs": 45.573,
+      "systemMs": 18.849,
+      "totalMs": 64.422
     },
     "memory": {
-      "rssBefore": 70270976,
-      "rssAfter": 69873664,
-      "maxRssBytes": 77254656,
-      "rssDelta": -397312
+      "rssBefore": 69656576,
+      "rssAfter": 69652480,
+      "maxRssBytes": 77090816,
+      "rssDelta": -4096
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 8.511763999998948,
+      "blockingUpperBoundMs": 5.885156000000279,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1032,8 +1032,8 @@
       "source": "package",
       "model": "014G2461",
       "vendor": "Danfoss",
-      "loadMs": 215.2015309999997,
-      "prepareMs": 0.4737310000000434
+      "loadMs": 209.23180499999944,
+      "prepareMs": 0.49843199999850185
     }
   },
   {
@@ -1041,28 +1041,28 @@
     "kind": "configure",
     "stats": {
       "count": 50,
-      "meanMs": 0.8965582000000358,
-      "p50Ms": 0.6619300000002113,
-      "p95Ms": 2.5039170000000013,
-      "p99Ms": 3.0766719999992347,
-      "minMs": 0.5874510000012378,
-      "maxMs": 3.0766719999992347,
-      "totalMs": 44.82791000000179,
-      "opsPerSecond": 1115.3765589338873
+      "meanMs": 1.0419329599998672,
+      "p50Ms": 0.8469030000014754,
+      "p95Ms": 1.7268140000014682,
+      "p99Ms": 2.7582239999992453,
+      "minMs": 0.8192029999991064,
+      "maxMs": 2.7582239999992453,
+      "totalMs": 52.096647999993365,
+      "opsPerSecond": 959.7546467866102
     },
     "cpu": {
-      "userMs": 39.401,
+      "userMs": 48.608,
       "systemMs": 0,
-      "totalMs": 39.401
+      "totalMs": 48.608
     },
     "memory": {
-      "rssBefore": 69873664,
-      "rssAfter": 69873664,
-      "maxRssBytes": 77254656,
+      "rssBefore": 69652480,
+      "rssAfter": 69652480,
+      "maxRssBytes": 77090816,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 3.0766719999992347,
+      "blockingUpperBoundMs": 2.7582239999992453,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1074,8 +1074,8 @@
       "source": "package",
       "model": "L101Z-SBI",
       "vendor": "Lytko",
-      "loadMs": 87.35110700000041,
-      "prepareMs": 0.5732170000010228
+      "loadMs": 124.54558999999972,
+      "prepareMs": 0.678937999999107
     }
   },
   {
@@ -1083,28 +1083,28 @@
     "kind": "configure",
     "stats": {
       "count": 50,
-      "meanMs": 7.151614460000055,
-      "p50Ms": 6.2906849999999395,
-      "p95Ms": 14.480986000000485,
-      "p99Ms": 19.53614000000016,
-      "minMs": 3.6065699999999197,
-      "maxMs": 19.53614000000016,
-      "totalMs": 357.58072300000276,
-      "opsPerSecond": 139.8285667653276
+      "meanMs": 11.260243479999954,
+      "p50Ms": 6.142835000000559,
+      "p95Ms": 29.21965199999977,
+      "p99Ms": 138.92985899999985,
+      "minMs": 3.633904000000257,
+      "maxMs": 138.92985899999985,
+      "totalMs": 563.0121739999977,
+      "opsPerSecond": 88.80802637848504
     },
     "cpu": {
-      "userMs": 340.101,
-      "systemMs": 49.036,
-      "totalMs": 389.137
+      "userMs": 476.071,
+      "systemMs": 16.832,
+      "totalMs": 492.903
     },
     "memory": {
-      "rssBefore": 71798784,
-      "rssAfter": 72658944,
-      "maxRssBytes": 77254656,
-      "rssDelta": 860160
+      "rssBefore": 71618560,
+      "rssAfter": 72765440,
+      "maxRssBytes": 77090816,
+      "rssDelta": 1146880
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 19.53614000000016,
+      "blockingUpperBoundMs": 138.92985899999985,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1116,8 +1116,8 @@
       "source": "package",
       "model": "014G2461",
       "vendor": "Danfoss",
-      "loadMs": 215.2015309999997,
-      "prepareMs": 0.45872699999927136
+      "loadMs": 209.23180499999944,
+      "prepareMs": 0.5398259999983566
     }
   },
   {
@@ -1125,28 +1125,28 @@
     "kind": "onEvent",
     "stats": {
       "count": 50,
-      "meanMs": 0.311284940000005,
-      "p50Ms": 0.19458600000143633,
-      "p95Ms": 0.8176600000006147,
-      "p99Ms": 1.5084439999991446,
-      "minMs": 0.1352629999983037,
-      "maxMs": 1.5084439999991446,
-      "totalMs": 15.56424700000025,
-      "opsPerSecond": 3212.49078095453
+      "meanMs": 0.4413451800000257,
+      "p50Ms": 0.2566790000000765,
+      "p95Ms": 1.0374890000002779,
+      "p99Ms": 1.557463999999527,
+      "minMs": 0.18604600000071514,
+      "maxMs": 1.557463999999527,
+      "totalMs": 22.067259000001286,
+      "opsPerSecond": 2265.8002065411515
     },
     "cpu": {
-      "userMs": 12.694,
-      "systemMs": 8.08,
-      "totalMs": 20.774
+      "userMs": 13.028,
+      "systemMs": 8.507,
+      "totalMs": 21.535
     },
     "memory": {
-      "rssBefore": 73150464,
-      "rssAfter": 73281536,
-      "maxRssBytes": 77254656,
-      "rssDelta": 131072
+      "rssBefore": 74076160,
+      "rssAfter": 74076160,
+      "maxRssBytes": 77090816,
+      "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 1.5084439999991446,
+      "blockingUpperBoundMs": 1.557463999999527,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1158,8 +1158,8 @@
       "source": "package",
       "model": "WKE502Z",
       "vendor": "DAEWOO",
-      "loadMs": 15.140916000000288,
-      "prepareMs": 6.013772000000245
+      "loadMs": 14.777444000001196,
+      "prepareMs": 2.401136000000406
     }
   },
   {
@@ -1167,28 +1167,28 @@
     "kind": "onEvent",
     "stats": {
       "count": 50,
-      "meanMs": 0.5466406600000119,
-      "p50Ms": 0.3605490000009013,
-      "p95Ms": 1.4789760000003298,
-      "p99Ms": 2.1316719999995257,
-      "minMs": 0.2669109999987995,
-      "maxMs": 2.1316719999995257,
-      "totalMs": 27.332033000000592,
-      "opsPerSecond": 1829.3553209158981
+      "meanMs": 0.5246982000002026,
+      "p50Ms": 0.4340310000006866,
+      "p95Ms": 0.9052250000004278,
+      "p99Ms": 2.6064170000008744,
+      "minMs": 0.29568899999867426,
+      "maxMs": 2.6064170000008744,
+      "totalMs": 26.23491000001013,
+      "opsPerSecond": 1905.857500558633
     },
     "cpu": {
-      "userMs": 39.327,
-      "systemMs": 0.027,
-      "totalMs": 39.354
+      "userMs": 26.437,
+      "systemMs": 0.855,
+      "totalMs": 27.292
     },
     "memory": {
-      "rssBefore": 72814592,
-      "rssAfter": 72900608,
-      "maxRssBytes": 77254656,
-      "rssDelta": 86016
+      "rssBefore": 74076160,
+      "rssAfter": 74076160,
+      "maxRssBytes": 77090816,
+      "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 2.1316719999995257,
+      "blockingUpperBoundMs": 2.6064170000008744,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1200,8 +1200,8 @@
       "source": "package",
       "model": "WKE502Z",
       "vendor": "DAEWOO",
-      "loadMs": 15.140916000000288,
-      "prepareMs": 0.29491799999959767
+      "loadMs": 14.777444000001196,
+      "prepareMs": 0.31915699999990466
     }
   },
   {
@@ -1209,28 +1209,28 @@
     "kind": "prepare",
     "stats": {
       "count": 50,
-      "meanMs": 0.22338201999999,
-      "p50Ms": 0.11633599999913713,
-      "p95Ms": 0.34454600000026403,
-      "p99Ms": 4.4633169999997335,
-      "minMs": 0.1127969999997731,
-      "maxMs": 4.4633169999997335,
-      "totalMs": 11.1691009999995,
-      "opsPerSecond": 4476.636033643374
+      "meanMs": 0.4306392800001413,
+      "p50Ms": 0.13372499999968568,
+      "p95Ms": 0.562062999999398,
+      "p99Ms": 12.91251899999952,
+      "minMs": 0.11995200000092154,
+      "maxMs": 12.91251899999952,
+      "totalMs": 21.531964000007065,
+      "opsPerSecond": 2322.129091428148
     },
     "cpu": {
-      "userMs": 12.982,
-      "systemMs": 0.806,
-      "totalMs": 13.788
+      "userMs": 13.006,
+      "systemMs": 10.145,
+      "totalMs": 23.151
     },
     "memory": {
-      "rssBefore": 74412032,
-      "rssAfter": 74543104,
-      "maxRssBytes": 77254656,
-      "rssDelta": 131072
+      "rssBefore": 74731520,
+      "rssAfter": 75517952,
+      "maxRssBytes": 77090816,
+      "rssDelta": 786432
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 4.4633169999997335,
+      "blockingUpperBoundMs": 12.91251899999952,
       "measured": false,
       "note": "prepareDefinition batch"
     },
@@ -1241,8 +1241,8 @@
       "source": "external",
       "model": "L101Ze.v2",
       "vendor": "Lytko",
-      "loadMs": 44.362951000000976,
-      "prepareMs": 4.73738400000002
+      "loadMs": 56.758192000001145,
+      "prepareMs": 0.41033299999980954
     }
   },
   {
@@ -1250,28 +1250,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 1.3094117999998889,
-      "p50Ms": 0.5108930000005785,
-      "p95Ms": 2.7589790000001813,
-      "p99Ms": 5.336221999999907,
-      "minMs": 0.3422369999989314,
-      "maxMs": 58.02043000000049,
-      "totalMs": 130.9411799999889,
-      "opsPerSecond": 763.7016865130472
+      "meanMs": 1.9044559100000333,
+      "p50Ms": 0.5265920000001643,
+      "p95Ms": 3.6426749999991443,
+      "p99Ms": 19.000033000000258,
+      "minMs": 0.337852999999086,
+      "maxMs": 85.51188199999888,
+      "totalMs": 190.44559100000333,
+      "opsPerSecond": 525.0843533573757
     },
     "cpu": {
-      "userMs": 125.506,
-      "systemMs": 18.151,
-      "totalMs": 143.657
+      "userMs": 187.488,
+      "systemMs": 6.719,
+      "totalMs": 194.207
     },
     "memory": {
-      "rssBefore": 74674176,
-      "rssAfter": 75354112,
-      "maxRssBytes": 77295616,
-      "rssDelta": 679936
+      "rssBefore": 75780096,
+      "rssAfter": 75304960,
+      "maxRssBytes": 77352960,
+      "rssDelta": -475136
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 58.02043000000049,
+      "blockingUpperBoundMs": 85.51188199999888,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1282,8 +1282,8 @@
       "source": "external",
       "model": "L101Ze.v2",
       "vendor": "Lytko",
-      "loadMs": 0.2594470000003639,
-      "prepareMs": 1.4453520000006392
+      "loadMs": 0.21328399999947578,
+      "prepareMs": 1.2922440000002098
     }
   },
   {
@@ -1291,28 +1291,28 @@
     "kind": "set",
     "stats": {
       "count": 100,
-      "meanMs": 1.044091030000036,
-      "p50Ms": 0.2903779999996914,
-      "p95Ms": 3.6653540000006615,
-      "p99Ms": 6.76303100000041,
-      "minMs": 0.18827699999928882,
-      "maxMs": 31.233986999999615,
-      "totalMs": 104.4091030000036,
-      "opsPerSecond": 957.7708947465678
+      "meanMs": 0.5529882499999803,
+      "p50Ms": 0.2803779999994731,
+      "p95Ms": 0.6940950000007433,
+      "p99Ms": 8.815962000000582,
+      "minMs": 0.17573600000105216,
+      "maxMs": 14.006482999999207,
+      "totalMs": 55.29882499999803,
+      "opsPerSecond": 1808.3566875065349
     },
     "cpu": {
-      "userMs": 140.619,
-      "systemMs": 12.546,
-      "totalMs": 153.165
+      "userMs": 53.432,
+      "systemMs": 0,
+      "totalMs": 53.432
     },
     "memory": {
-      "rssBefore": 75485184,
-      "rssAfter": 76369920,
-      "maxRssBytes": 77295616,
-      "rssDelta": 884736
+      "rssBefore": 75304960,
+      "rssAfter": 75030528,
+      "maxRssBytes": 77352960,
+      "rssDelta": -274432
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 31.233986999999615,
+      "blockingUpperBoundMs": 14.006482999999207,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1323,8 +1323,8 @@
       "source": "external",
       "model": "L101Ze.v2",
       "vendor": "Lytko",
-      "loadMs": 0.22443899999962014,
-      "prepareMs": 7.58007600000019
+      "loadMs": 0.23228799999924377,
+      "prepareMs": 2.4109840000000986
     }
   },
   {
@@ -1332,28 +1332,28 @@
     "kind": "get",
     "stats": {
       "count": 100,
-      "meanMs": 0.8611603300000388,
-      "p50Ms": 0.3693199999997887,
-      "p95Ms": 2.888780000001134,
-      "p99Ms": 12.142570999998497,
-      "minMs": 0.1941240000014659,
-      "maxMs": 13.749499999999898,
-      "totalMs": 86.11603300000388,
-      "opsPerSecond": 1161.2239500163168
+      "meanMs": 0.8383308100000068,
+      "p50Ms": 0.2632190000003902,
+      "p95Ms": 2.6711259999992762,
+      "p99Ms": 11.69213900000068,
+      "minMs": 0.1655030000001716,
+      "maxMs": 30.411102000000028,
+      "totalMs": 83.83308100000067,
+      "opsPerSecond": 1192.8465327428344
     },
     "cpu": {
-      "userMs": 95.973,
-      "systemMs": 8.543,
-      "totalMs": 104.516
+      "userMs": 109.445,
+      "systemMs": 6.357,
+      "totalMs": 115.802
     },
     "memory": {
-      "rssBefore": 76369920,
-      "rssAfter": 76632064,
-      "maxRssBytes": 77295616,
-      "rssDelta": 262144
+      "rssBefore": 75161600,
+      "rssAfter": 76341248,
+      "maxRssBytes": 77352960,
+      "rssDelta": 1179648
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 13.749499999999898,
+      "blockingUpperBoundMs": 30.411102000000028,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1364,8 +1364,8 @@
       "source": "external",
       "model": "L101Ze.v2",
       "vendor": "Lytko",
-      "loadMs": 0.25937100000010105,
-      "prepareMs": 0.5987609999992856
+      "loadMs": 0.38394200000038836,
+      "prepareMs": 0.6152300000012474
     }
   },
   {
@@ -1373,28 +1373,28 @@
     "kind": "configure",
     "stats": {
       "count": 30,
-      "meanMs": 0.7279337000000548,
-      "p50Ms": 0.5402849999991304,
-      "p95Ms": 1.9086950000000797,
-      "p99Ms": 2.1282109999992826,
-      "minMs": 0.44387800000004063,
-      "maxMs": 2.1282109999992826,
-      "totalMs": 21.838011000001643,
-      "opsPerSecond": 1373.7514831363417
+      "meanMs": 0.8567668666665365,
+      "p50Ms": 0.4521119999990333,
+      "p95Ms": 4.09878899999967,
+      "p99Ms": 5.781284000000596,
+      "minMs": 0.37847900000087975,
+      "maxMs": 5.781284000000596,
+      "totalMs": 25.703005999996094,
+      "opsPerSecond": 1167.1786560686544
     },
     "cpu": {
-      "userMs": 25.574,
-      "systemMs": 9.949,
-      "totalMs": 35.523
+      "userMs": 36.26,
+      "systemMs": 1.035,
+      "totalMs": 37.295
     },
     "memory": {
-      "rssBefore": 77418496,
-      "rssAfter": 77561856,
-      "maxRssBytes": 77811712,
-      "rssDelta": 143360
+      "rssBefore": 74817536,
+      "rssAfter": 74817536,
+      "maxRssBytes": 78176256,
+      "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 2.1282109999992826,
+      "blockingUpperBoundMs": 5.781284000000596,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1405,8 +1405,8 @@
       "source": "external",
       "model": "L101Ze.v2",
       "vendor": "Lytko",
-      "loadMs": 0.25883299999986775,
-      "prepareMs": 0.48881099999925937
+      "loadMs": 0.23190400000021327,
+      "prepareMs": 0.3100000000013097
     }
   },
   {
@@ -1414,28 +1414,28 @@
     "kind": "prepare",
     "stats": {
       "count": 10,
-      "meanMs": 1.5651271000002454,
-      "p50Ms": 0.9600030000001425,
-      "p95Ms": 6.39232500000071,
-      "p99Ms": 6.39232500000071,
-      "minMs": 0.6070710000003601,
-      "maxMs": 6.39232500000071,
-      "totalMs": 15.651271000002453,
-      "opsPerSecond": 638.925746030366
+      "meanMs": 3.930862199999865,
+      "p50Ms": 0.8235899999999674,
+      "p95Ms": 17.519280000000435,
+      "p99Ms": 17.519280000000435,
+      "minMs": 0.6664729999993142,
+      "maxMs": 17.519280000000435,
+      "totalMs": 39.30862199999865,
+      "opsPerSecond": 254.39711420055232
     },
     "cpu": {
-      "userMs": 21.539,
-      "systemMs": 0.02,
-      "totalMs": 21.559
+      "userMs": 18.424,
+      "systemMs": 0.126,
+      "totalMs": 18.55
     },
     "memory": {
-      "rssBefore": 76091392,
-      "rssAfter": 72200192,
-      "maxRssBytes": 79527936,
-      "rssDelta": -3891200
+      "rssBefore": 72003584,
+      "rssAfter": 71868416,
+      "maxRssBytes": 78176256,
+      "rssDelta": -135168
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 6.39232500000071,
+      "blockingUpperBoundMs": 17.519280000000435,
       "measured": false,
       "note": "prepareDefinition batch"
     },
@@ -1447,8 +1447,8 @@
       "source": "package",
       "model": "MTV300E-UP",
       "vendor": "YOKIS",
-      "loadMs": 121.23558500000036,
-      "prepareMs": 4.7349990000002435
+      "loadMs": 113.95103199999903,
+      "prepareMs": 1.4274320000004082
     }
   },
   {
@@ -1456,28 +1456,28 @@
     "kind": "prepare",
     "stats": {
       "count": 10,
-      "meanMs": 1.5643653999995877,
-      "p50Ms": 0.7491049999989627,
-      "p95Ms": 6.607146999998804,
-      "p99Ms": 6.607146999998804,
-      "minMs": 0.5975299999990966,
-      "maxMs": 6.607146999998804,
-      "totalMs": 15.643653999995877,
-      "opsPerSecond": 639.2368432594224
+      "meanMs": 0.8537047999998322,
+      "p50Ms": 0.8272049999995943,
+      "p95Ms": 1.00655899999947,
+      "p99Ms": 1.00655899999947,
+      "minMs": 0.7341830000004848,
+      "maxMs": 1.00655899999947,
+      "totalMs": 8.537047999998322,
+      "opsPerSecond": 1171.3650901344313
     },
     "cpu": {
-      "userMs": 13.739,
+      "userMs": 8.086,
       "systemMs": 0,
-      "totalMs": 13.739
+      "totalMs": 8.086
     },
     "memory": {
-      "rssBefore": 72200192,
-      "rssAfter": 72200192,
-      "maxRssBytes": 79527936,
+      "rssBefore": 71868416,
+      "rssAfter": 71868416,
+      "maxRssBytes": 78176256,
       "rssDelta": 0
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 6.607146999998804,
+      "blockingUpperBoundMs": 1.00655899999947,
       "measured": false,
       "note": "prepareDefinition batch"
     },
@@ -1489,8 +1489,8 @@
       "source": "package",
       "model": "Icon2",
       "vendor": "Danfoss",
-      "loadMs": 215.2015309999997,
-      "prepareMs": 0.8302789999997913
+      "loadMs": 209.23180499999944,
+      "prepareMs": 0.9502359999987675
     }
   },
   {
@@ -1498,28 +1498,28 @@
     "kind": "fromZigbee",
     "stats": {
       "count": 100,
-      "meanMs": 1.025902060000044,
-      "p50Ms": 0.7526450000004843,
-      "p95Ms": 2.788985999999568,
-      "p99Ms": 4.58303800000067,
-      "minMs": 0.49665900000036345,
-      "maxMs": 6.014310000000478,
-      "totalMs": 102.5902060000044,
-      "opsPerSecond": 974.7519173516009
+      "meanMs": 1.610872219999892,
+      "p50Ms": 0.7637279999999009,
+      "p95Ms": 3.718539999999848,
+      "p99Ms": 26.200054999999338,
+      "minMs": 0.6335429999999178,
+      "maxMs": 27.462138000000778,
+      "totalMs": 161.0872219999892,
+      "opsPerSecond": 620.7817029708707
     },
     "cpu": {
-      "userMs": 90.501,
-      "systemMs": 0.858,
-      "totalMs": 91.359
+      "userMs": 102.528,
+      "systemMs": 0,
+      "totalMs": 102.528
     },
     "memory": {
-      "rssBefore": 72200192,
-      "rssAfter": 72437760,
-      "maxRssBytes": 79527936,
-      "rssDelta": 237568
+      "rssBefore": 71868416,
+      "rssAfter": 72261632,
+      "maxRssBytes": 78176256,
+      "rssDelta": 393216
     },
     "eventLoop": {
-      "blockingUpperBoundMs": 6.014310000000478,
+      "blockingUpperBoundMs": 27.462138000000778,
       "measured": false,
       "note": "isolated converter call; use the bridge integration run for event-loop delay"
     },
@@ -1531,8 +1531,8 @@
       "source": "package",
       "model": "M9Pro",
       "vendor": "Tuya",
-      "loadMs": 2173.6521279999997,
-      "prepareMs": 0.6032240000004094
+      "loadMs": 2396.5565619999998,
+      "prepareMs": 0.7634200000011333
     }
   }
 ]

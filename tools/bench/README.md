@@ -81,6 +81,9 @@ running (the service was not stopped).
   `process.resourceUsage().maxRSS`.
 - **cold load** — package root in fresh processes (`cold-load.mjs`) and first
   device-file require in a scenario. Device-file loads are cached per process.
+- **fixed clock** — `Date` is frozen at `2026-11-20T12:00:00Z` so converters
+  that embed `genTime` produce a stable golden payload; the corpus is
+  byte-identical across runs and between x86 and the router.
 - **batch isolation** — one device/endpoint per scenario; `meta`, binds,
   reportings and recorded calls are reset per iteration; the converter module
   cache (upstream `require` semantics) is shared; `clearGlobalStore()` runs

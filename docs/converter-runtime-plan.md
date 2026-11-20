@@ -123,12 +123,12 @@ Node service left running):
 - first device-file load: 0.075 s (`lytko.js`) to **1.93 s** (`tuya.js`),
   0.69 s for `ikea.js`, 0.89 s for `lumi.js`;
 - warm `fromZigbee`/`set`/`get`: p50 **0.2–0.9 ms**, p95 **0.5–4.3 ms**;
-- `configure-danfoss` (54 sequential host calls): p50 **~7–8 ms**, p95
-  **~18–23 ms**, p99 up to 76 ms;
+- `configure-danfoss` (54 sequential host calls): p50 **6–9 ms**, p95
+  **29–38 ms** at load average 2.3–3.3, p99 up to 139 ms;
 - heavy `prepareDefinition` (81-extend yokis / Icon2): p50 0.6–0.8 ms,
   p95 5–8 ms;
 - external `L101Ze_z2m.js`: prepare p50 0.12 ms; conversions 0.3–0.6 ms;
-- harness maxRSS on the router: **51–75 MB**; x86 86–144 MB.
+- harness maxRSS on the router: **51–74 MB**; x86 86–141 MB.
 
 The cold root/device-file times are large enough that a runtime must not load
 them on the bridge request path. The measured acceptance target is in the
