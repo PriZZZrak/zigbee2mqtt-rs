@@ -185,7 +185,7 @@ corpus and the same golden inputs/host calls.
 2. **Steady state:** for every computationally significant scenario, Rust
    **p95 ≤ 2× Node p95** on Routerich (median of three runs), excluding
    explicit host wait. Baseline examples: `fz-*` p95 1–4 ms, `set-*` p95 1–4 ms,
-   `configure-danfoss` p95 ~18–23 ms, `onEvent` p95 ~1–3 ms.
+   `configure-danfoss` p95 ~18–23 ms, `onEvent` p95 ~0.4–3.3 ms.
 3. **Cold use:** package/definition preparation may run in the background; it
    must not block `bridge/state online` or MQTT/frontend. If measured on the
    request path, Rust first use ≤ 2× Node cold load (root ~2.6 s, largest
