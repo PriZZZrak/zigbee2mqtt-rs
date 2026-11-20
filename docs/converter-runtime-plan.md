@@ -110,6 +110,31 @@ Rules:
 - **Bytecode (engine permitting)**: precompile shared + device files at
   artifact build to remove parser cost on the router.
 
+## 5a. Measured Node baseline (2026-11-20)
+
+The complete report is [`converter-benchmark-baseline.md`](converter-benchmark-baseline.md);
+the harness and corpus are in [`../tools/bench/`](../tools/bench/).
+
+Key measured facts on Routerich AX3000 (Node v22.23.4, converters 26.125.0,
+Node service left running):
+
+- package root cold load: **2.54–3.66 s** (median 2.56 s in fresh processes);
+- first device-file load: 0.075 s (`lytko.js`) to **1.93 s** (`tuya.js`),
+  0.69 s for `ikea.js`, 0.89 s for `lumi.js`;
+- warm `fromZigbee`/`set`/`get`: p50 **0.2–0.9 ms**, p95 **0.5–4.3 ms**;
+- `configure-danfoss` (54 sequential host calls): p50 **~7–8 ms**, p95
+  **~18–23 ms**, p99 up to 76 ms;
+- heavy `prepareDefinition` (81-extend yokis / Icon2): p50 0.6–0.8 ms,
+  p95 5–8 ms;
+- external `L101Ze_z2m.js`: prepare p50 0.12 ms; conversions 0.3–0.6 ms;
+- harness maxRSS on the router: **51–75 MB**; x86 86–144 MB.
+
+The cold root/device-file times are large enough that a runtime must not load
+them on the bridge request path. The measured acceptance target is in the
+baseline report: per-scenario Rust p95 ≤ 2× Node p95 on the same corpus,
+functional equality first, and no bridge stall > 50 ms p99. These are proposed
+thresholds, finalized after the engine spike.
+
 ## 6. Engine choice
 
 Engine is treated as a replaceable component behind a small host boundary.
@@ -128,16 +153,22 @@ it passes the converter corpus and is materially faster; it is the only
 pure-Rust candidate with serializable bytecode/snapshot. Do not ship two
 engines in production.
 
-### Spike gates (Routerich AX3000, aarch64)
+### Spike gates
 
-- shared modules init ≤ 300 ms;
-- average device file ≤ 200 ms; `tuya.js` ≤ 1.5 s (background);
-- `fromZigbee` p95 ≤ 2 ms; `convertSet` p95 ≤ 5 ms;
-- worker RSS ≤ 40 MB for 20 devices, ≤ 80 MB for 100;
-- no JS work before `bridge/state online`; no bridge stall > 10 ms.
+Use the same `tools/bench/corpus/golden.json` and host-call expectations for
+Boa, Kataan and the future Rust host. Functional equality is a prerequisite.
 
-If Boa misses the gates, run Kataan with the same corpus. If both miss, return
-to the user with measurements and discuss a C engine or Node sidecar.
+Proposed provisional gates (replace with the measured baseline after the
+spike; the Node baseline is in `converter-benchmark-baseline.md`):
+
+- per-scenario Rust p95 ≤ 2× Node p95 on Routerich (median of three runs);
+- cold package/definition work must not block `bridge/state online`; if on the
+  request path, ≤ 2× Node cold load;
+- worker RSS ≤ 1.5× Node harness maxRSS (target ≤ 110 MB) and bounded;
+- no conversion blocks the bridge event loop > 50 ms p99.
+
+If Boa misses the gates, run Kataan with the same corpus and golden calls. If
+both miss, return with measurements and discuss a C engine or Node sidecar.
 
 ## 7. Host API and module loader
 

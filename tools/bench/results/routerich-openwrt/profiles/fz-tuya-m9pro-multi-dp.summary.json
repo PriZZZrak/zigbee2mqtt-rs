@@ -1,0 +1,106 @@
+{
+  "file": "tools/bench/results/routerich-openwrt/profiles/fz-tuya-m9pro-multi-dp.cpuprofile",
+  "totalMs": 2027.333,
+  "top": [
+    {
+      "function": "post node:inspector",
+      "selfMs": 643.158,
+      "percent": 31.72433931672794
+    },
+    {
+      "function": "structuredClone node:internal/worker/js_transferable",
+      "selfMs": 498.527,
+      "percent": 24.59028684483506
+    },
+    {
+      "function": "structuredClone ",
+      "selfMs": 191.176,
+      "percent": 9.42992591744918
+    },
+    {
+      "function": "callOnce file:///tmp/z2m-bench/runner.mjs",
+      "selfMs": 131.593,
+      "percent": 6.490941547343233
+    },
+    {
+      "function": "runScenario file:///tmp/z2m-bench/runner.mjs",
+      "selfMs": 117.784,
+      "percent": 5.80980036333449
+    },
+    {
+      "function": "hasAlreadyProcessedMessage file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 57.065,
+      "percent": 2.8147817847388663
+    },
+    {
+      "function": "(program) ",
+      "selfMs": 56.535,
+      "percent": 2.788639064228718
+    },
+    {
+      "function": "(anonymous) node:internal/webidl",
+      "selfMs": 49.486,
+      "percent": 2.440940881443749
+    },
+    {
+      "function": "convert file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/tuya.js",
+      "selfMs": 46.219,
+      "percent": 2.279793206148176
+    },
+    {
+      "function": "(garbage collector) ",
+      "selfMs": 39.572,
+      "percent": 1.9519240302407153
+    },
+    {
+      "function": "from file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/tuya.js",
+      "selfMs": 38.716,
+      "percent": 1.9097010703224382
+    },
+    {
+      "function": "clone file:///tmp/z2m-bench/runner.mjs",
+      "selfMs": 34.983,
+      "percent": 1.725567531333037
+    },
+    {
+      "function": "postProcessConvertedFromZigbeeMessage file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/index.js",
+      "selfMs": 28.322,
+      "percent": 1.3970077929970064
+    },
+    {
+      "function": "publish file:///tmp/z2m-bench/runner.mjs",
+      "selfMs": 19.043,
+      "percent": 0.9393128805183953
+    },
+    {
+      "function": "makeMeta file:///tmp/z2m-bench/runner.mjs",
+      "selfMs": 17.14,
+      "percent": 0.8454457161206373
+    },
+    {
+      "function": "wrappedFn node:internal/errors",
+      "selfMs": 10.18,
+      "percent": 0.5021375373458628
+    },
+    {
+      "function": "normalizeValue file:///tmp/z2m-bench/mocks.mjs",
+      "selfMs": 7.069,
+      "percent": 0.34868470054006917
+    },
+    {
+      "function": "(anonymous) file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/tuya.js",
+      "selfMs": 6.611,
+      "percent": 0.3260934439482808
+    },
+    {
+      "function": "(anonymous) file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/index.js",
+      "selfMs": 6.411,
+      "percent": 0.3162282663972816
+    },
+    {
+      "function": "now ",
+      "selfMs": 5.951,
+      "percent": 0.29353835802998324
+    }
+  ]
+}

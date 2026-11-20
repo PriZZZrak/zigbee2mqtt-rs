@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-11-20T18:08:43.304Z",
+  "label": "routerich-openwrt-run1",
+  "node": "v22.23.4",
+  "platform": "linux",
+  "arch": "arm64",
+  "hostname": null,
+  "converterVersion": "26.125.0",
+  "converterRoot": "/opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters",
+  "upstreamZigbee2mqtt": null,
+  "upstreamConverters": null,
+  "externalConverter": {
+    "path": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+    "sha256": "25393d405e551804858a046dc251ec4aa7907ecce7ddf3ba16aea919c6814907"
+  },
+  "command": "/usr/bin/node /tmp/z2m-bench/runner.mjs --package /opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters --external /tmp/z2m-bench/fixtures/external/L101Ze_z2m.js --out /tmp/z2m-bench/corpus-router1 --label routerich-openwrt-run1"
+}

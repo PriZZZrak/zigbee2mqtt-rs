@@ -16,6 +16,8 @@ Node.js-мост, сохранив MQTT-контракты, сущности Hom
   [`docs/hil/2026-11-19-db-format-parity.md`](docs/hil/2026-11-19-db-format-parity.md)
 - Следующий этап: [`docs/converter-runtime-plan.md`](docs/converter-runtime-plan.md)
   (внешние конвертеры и полная база устройств)
+- Node.js baseline конвертеров: [`docs/converter-benchmark-baseline.md`](docs/converter-benchmark-baseline.md)
+  (harness и golden corpus — [`tools/bench/`](tools/bench/))
 
 ## Что входит в R1
 

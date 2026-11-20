@@ -1,0 +1,106 @@
+{
+  "file": "tools/bench/results/linux-x64/profiles/configure-danfoss.cpuprofile",
+  "totalMs": 550.491,
+  "top": [
+    {
+      "function": "post node:inspector",
+      "selfMs": 142.53,
+      "percent": 25.89143146754443
+    },
+    {
+      "function": "configure file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman-converters@26.125.0_supports-color@7.2.0/node_modules/zigbee-herdsman-converters/dist/lib/modernExtend.js",
+      "selfMs": 79.321,
+      "percent": 14.409136570806789
+    },
+    {
+      "function": "setupAttributes file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman-converters@26.125.0_supports-color@7.2.0/node_modules/zigbee-herdsman-converters/dist/lib/modernExtend.js",
+      "selfMs": 60.902,
+      "percent": 11.063214475804326
+    },
+    {
+      "function": "readResponse file:///config/workspace/zigbee2mqtt-rs/tools/bench/mocks.mjs",
+      "selfMs": 32.466,
+      "percent": 5.897644103173349
+    },
+    {
+      "function": "getInputClusters file:///config/workspace/zigbee2mqtt-rs/tools/bench/mocks.mjs",
+      "selfMs": 29.025,
+      "percent": 5.272565764017941
+    },
+    {
+      "function": "configure file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman-converters@26.125.0_supports-color@7.2.0/node_modules/zigbee-herdsman-converters/dist/index.js",
+      "selfMs": 27.826,
+      "percent": 5.054760204980645
+    },
+    {
+      "function": "getCluster file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman@11.2.0_supports-color@7.2.0/node_modules/zigbee-herdsman/dist/zspec/zcl/utils.js",
+      "selfMs": 25.664,
+      "percent": 4.662019905865854
+    },
+    {
+      "function": "(anonymous) file:///config/workspace/zigbee2mqtt-rs/tools/bench/mocks.mjs",
+      "selfMs": 22.915,
+      "percent": 4.1626475273891845
+    },
+    {
+      "function": "(program) ",
+      "selfMs": 16.749,
+      "percent": 3.0425565540581045
+    },
+    {
+      "function": "read file:///config/workspace/zigbee2mqtt-rs/tools/bench/mocks.mjs",
+      "selfMs": 13.899,
+      "percent": 2.524836918314741
+    },
+    {
+      "function": "(garbage collector) ",
+      "selfMs": 11.818,
+      "percent": 2.1468107562158147
+    },
+    {
+      "function": "getEndpointsWithCluster file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman-converters@26.125.0_supports-color@7.2.0/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 9.985,
+      "percent": 1.8138352852271882
+    },
+    {
+      "function": "getCluster file:///config/workspace/zigbee2mqtt-rs/tools/bench/mocks.mjs",
+      "selfMs": 9.668,
+      "percent": 1.7562503292515228
+    },
+    {
+      "function": "isEndpoint file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman-converters@26.125.0_supports-color@7.2.0/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 9.644,
+      "percent": 1.751890584950526
+    },
+    {
+      "function": "structuredClone node:internal/worker/js_transferable",
+      "selfMs": 9.642,
+      "percent": 1.751527272925443
+    },
+    {
+      "function": "normalizeValue file:///config/workspace/zigbee2mqtt-rs/tools/bench/mocks.mjs",
+      "selfMs": 8.762,
+      "percent": 1.5916699818888955
+    },
+    {
+      "function": "(anonymous) file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman-converters@26.125.0_supports-color@7.2.0/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 5.432,
+      "percent": 0.9867554601255969
+    },
+    {
+      "function": "callOnce file:///config/workspace/zigbee2mqtt-rs/tools/bench/runner.mjs",
+      "selfMs": 5.371,
+      "percent": 0.9756744433605635
+    },
+    {
+      "function": "splitArrayIntoChunks file:///config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/.pnpm/zigbee-herdsman-converters@26.125.0_supports-color@7.2.0/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 5.351,
+      "percent": 0.9720413231097329
+    },
+    {
+      "function": "delay file:///config/workspace/zigbee2mqtt-rs/tools/bench/mocks.mjs",
+      "selfMs": 4.312,
+      "percent": 0.7833007260790821
+    }
+  ]
+}

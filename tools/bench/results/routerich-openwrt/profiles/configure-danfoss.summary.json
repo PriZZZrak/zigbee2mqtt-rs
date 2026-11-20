@@ -1,0 +1,106 @@
+{
+  "file": "tools/bench/results/routerich-openwrt/profiles/configure-danfoss.cpuprofile",
+  "totalMs": 5649.535,
+  "top": [
+    {
+      "function": "setupAttributes file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/modernExtend.js",
+      "selfMs": 770.347,
+      "percent": 13.635582397489351
+    },
+    {
+      "function": "configure file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/modernExtend.js",
+      "selfMs": 660.791,
+      "percent": 11.696378551509106
+    },
+    {
+      "function": "post node:inspector",
+      "selfMs": 493.175,
+      "percent": 8.729479505835435
+    },
+    {
+      "function": "(garbage collector) ",
+      "selfMs": 464.312,
+      "percent": 8.218587901482158
+    },
+    {
+      "function": "readResponse file:///tmp/z2m-bench/mocks.mjs",
+      "selfMs": 402.221,
+      "percent": 7.119541696794515
+    },
+    {
+      "function": "configure file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/index.js",
+      "selfMs": 326.799,
+      "percent": 5.784529169214812
+    },
+    {
+      "function": "(program) ",
+      "selfMs": 296.216,
+      "percent": 5.2431925813363405
+    },
+    {
+      "function": "normalizeValue file:///tmp/z2m-bench/mocks.mjs",
+      "selfMs": 285.853,
+      "percent": 5.059761555597054
+    },
+    {
+      "function": "isEndpoint file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 263.408,
+      "percent": 4.662472221165104
+    },
+    {
+      "function": "(anonymous) file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 179.879,
+      "percent": 3.1839611578652045
+    },
+    {
+      "function": "read file:///tmp/z2m-bench/mocks.mjs",
+      "selfMs": 170.952,
+      "percent": 3.025948153255091
+    },
+    {
+      "function": "structuredClone ",
+      "selfMs": 163.178,
+      "percent": 2.888343907949946
+    },
+    {
+      "function": "structuredClone node:internal/worker/js_transferable",
+      "selfMs": 154.013,
+      "percent": 2.726118167247393
+    },
+    {
+      "function": "configure file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/devices/danfoss.js",
+      "selfMs": 145.687,
+      "percent": 2.5787432062992792
+    },
+    {
+      "function": "getInputClusters file:///tmp/z2m-bench/mocks.mjs",
+      "selfMs": 123.948,
+      "percent": 2.193950475570113
+    },
+    {
+      "function": "clone file:///tmp/z2m-bench/runner.mjs",
+      "selfMs": 101.166,
+      "percent": 1.790696048435845
+    },
+    {
+      "function": "getEndpointsWithCluster file:///opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters/dist/lib/utils.js",
+      "selfMs": 86.821,
+      "percent": 1.5367813457213735
+    },
+    {
+      "function": "runScenario file:///tmp/z2m-bench/runner.mjs",
+      "selfMs": 84.388,
+      "percent": 1.4937158544906795
+    },
+    {
+      "function": "getCluster file:///tmp/z2m-bench/mocks.mjs",
+      "selfMs": 67.754,
+      "percent": 1.199284542887158
+    },
+    {
+      "function": "(anonymous) file:///tmp/z2m-bench/mocks.mjs",
+      "selfMs": 56.001,
+      "percent": 0.9912497223222796
+    }
+  ]
+}

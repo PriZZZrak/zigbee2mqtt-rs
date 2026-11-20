@@ -1,0 +1,3510 @@
+[
+  {
+    "id": "package-load",
+    "kind": "package",
+    "description": "Cold require of the converter package root and zigbee-herdsman.",
+    "input": {},
+    "expected": null,
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-ikea-modern-extend",
+    "kind": "prepare",
+    "description": "prepareDefinition for a modernExtend light (merge extends/exposes/options).",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      }
+    },
+    "expected": {
+      "model": "LED1545G12",
+      "vendor": "IKEA",
+      "zigbeeModel": [
+        "TRADFRI bulb E27 WS opal 980lm",
+        "TRADFRI bulb E26 WS opal 980lm",
+        "TRADFRI bulb E27 WS�opal 980lm"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-danfoss-thermostat",
+    "kind": "prepare",
+    "description": "prepareDefinition for a thermostat with large exposes/options and onEvent.",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      }
+    },
+    "expected": {
+      "model": "014G2461",
+      "vendor": "Danfoss",
+      "zigbeeModel": [
+        "eTRV0100",
+        "eTRV0101",
+        "eTRV0103",
+        "TRV001",
+        "TRV003",
+        "eT093WRO",
+        "eT093WRG"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-tuya-sensor",
+    "kind": "prepare",
+    "description": "prepareDefinition for a modernExtend Tuya datapoint device.",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      }
+    },
+    "expected": {
+      "model": "ZWSH16",
+      "vendor": "AVATTO",
+      "zigbeeModel": null
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-onoff",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "genOnOff",
+        "type": "attributeReport",
+        "data": {
+          "onOff": 1
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": "ON"
+      },
+      "published": [
+        {
+          "state": "ON"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-brightness",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "genLevelCtrl",
+        "type": "attributeReport",
+        "data": {
+          "currentLevel": 128
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "brightness": 128
+      },
+      "published": [
+        {
+          "brightness": 128
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-color-temp",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "lightingColorCtrl",
+        "type": "attributeReport",
+        "data": {
+          "colorTemperature": 250
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "color_temp": 250,
+        "color_mode": "color_temp"
+      },
+      "published": [
+        {
+          "color_temp": 250,
+          "color_mode": "color_temp"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-ikea-color-xy",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "lightingColorCtrl",
+        "type": "attributeReport",
+        "data": {
+          "currentX": 24939,
+          "currentY": 60778
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "color": {
+          "x": 0.3805,
+          "y": 0.9274
+        },
+        "color_mode": "xy"
+      },
+      "published": [
+        {
+          "color": {
+            "x": 0.3805,
+            "y": 0.9274
+          },
+          "color_mode": "xy"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-ikea-onoff",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "state",
+      "value": "ON",
+      "message": {
+        "state": "ON"
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "genOnOff",
+        "command": "on",
+        "payload": {},
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "set-ikea-brightness",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "brightness",
+      "value": 128,
+      "message": {
+        "brightness": 128
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "brightness": 128,
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "genLevelCtrl",
+        "command": "moveToLevelWithOnOff",
+        "payload": {
+          "level": 128,
+          "transtime": 0,
+          "optionsMask": 0,
+          "optionsOverride": 0
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "set-ikea-color-temp",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "color_temp",
+      "value": 250,
+      "message": {
+        "color_temp": 250
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "color_mode": "color_temp",
+          "color_temp": 250
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "lightingColorCtrl",
+        "command": "moveToColorTemp",
+        "payload": {
+          "colortemp": 250,
+          "transtime": 0,
+          "optionsMask": 0,
+          "optionsOverride": 0
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "get-ikea-onoff",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "state",
+      "message": {},
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "genOnOff",
+        "attributes": [
+          "onOff"
+        ],
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "set-ikea-brightness-host-delay",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "ikea.js",
+        "model": "LED1545G12"
+      },
+      "device": {
+        "modelID": "LED1545G12",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "brightness",
+      "value": 128,
+      "message": {
+        "brightness": 128
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "brightness": 128,
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "genLevelCtrl",
+        "command": "moveToLevelWithOnOff",
+        "payload": {
+          "level": 128,
+          "transtime": 0,
+          "optionsMask": 0,
+          "optionsOverride": 0
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "fz-lumi-occupancy",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lumi.js",
+        "model": "RTCGQ01LM"
+      },
+      "device": {
+        "modelID": "RTCGQ01LM",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "msOccupancySensing",
+        "type": "attributeReport",
+        "data": {
+          "occupancy": 1
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "occupancy": true
+      },
+      "published": [
+        {
+          "occupancy": true
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-lumi-occupancy-clear",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lumi.js",
+        "model": "RTCGQ01LM"
+      },
+      "device": {
+        "modelID": "RTCGQ01LM",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "msOccupancySensing",
+        "type": "attributeReport",
+        "data": {
+          "occupancy": 0
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-l101-thermostat",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "hvacThermostat",
+        "type": "attributeReport",
+        "data": {
+          "localTemp": 2150,
+          "occupiedHeatingSetpoint": 2000
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1,
+          "manufacturerCode": 30583
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "local_temperature_l1": 21.5,
+        "occupied_heating_setpoint_l1": 20
+      },
+      "published": [
+        {
+          "local_temperature_l1": 21.5,
+          "occupied_heating_setpoint_l1": 20
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-l101-setpoint",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "occupied_heating_setpoint",
+      "value": 21.5,
+      "message": {
+        "occupied_heating_setpoint": 21.5
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "occupied_heating_setpoint": 21.5
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "write",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": {
+          "occupiedHeatingSetpoint": 2150
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "get-l101-sensor-type",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "sensor_type",
+      "message": {
+        "sensor_type": "10 кОм"
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          30464
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      }
+    ]
+  },
+  {
+    "id": "fz-tuya-dp-temperature",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      },
+      "device": {
+        "modelID": "ZWSH16",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "manuSpecificTuya",
+        "type": "commandDataReport",
+        "data": {
+          "dpValues": [
+            {
+              "dp": 1,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                215
+              ]
+            }
+          ]
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 11
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "temperature": 21.5
+      },
+      "published": [
+        {
+          "temperature": 21.5
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-tuya-dp-multi",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      },
+      "device": {
+        "modelID": "ZWSH16",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "manuSpecificTuya",
+        "type": "commandDataResponse",
+        "data": {
+          "dpValues": [
+            {
+              "dp": 1,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                220
+              ]
+            },
+            {
+              "dp": 2,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                44
+              ]
+            },
+            {
+              "dp": 4,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                88
+              ]
+            }
+          ]
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 12
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "temperature": 22,
+        "humidity": 44,
+        "battery": 88
+      },
+      "published": [
+        {
+          "temperature": 22,
+          "humidity": 44,
+          "battery": 88
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-tuya-temperature-unit",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "avatto.js",
+        "model": "ZWSH16"
+      },
+      "device": {
+        "modelID": "ZWSH16",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "temperature_unit",
+      "value": "fahrenheit",
+      "message": {
+        "temperature_unit": "fahrenheit"
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "temperature_unit": "fahrenheit"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "manuSpecificTuya",
+        "command": "dataRequest",
+        "payload": {
+          "seq": 1,
+          "dpValues": [
+            {
+              "dp": 9,
+              "datatype": 2,
+              "data": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        "options": {
+          "disableDefaultResponse": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "fz-ts0002-ep2-onoff",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "tuya.js",
+        "model": "TS0002"
+      },
+      "device": {
+        "modelID": "TS0002",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 2,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 2,
+      "msg": {
+        "cluster": "genOnOff",
+        "type": "attributeReport",
+        "data": {
+          "onOff": 1
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 1
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state_l2": "ON"
+      },
+      "published": [
+        {
+          "state_l2": "ON"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-ts0002-ep2-onoff",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "tuya.js",
+        "model": "TS0002"
+      },
+      "device": {
+        "modelID": "TS0002",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 2,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 2,
+      "key": "state",
+      "value": "ON",
+      "message": {
+        "state": "ON",
+        "state_l2": "ON"
+      },
+      "endpointName": "l2",
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "state": "ON"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 2,
+        "cluster": "genOnOff",
+        "command": "on",
+        "payload": {},
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "fz-danfoss-temperature",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      },
+      "device": {
+        "modelID": "014G2461",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "hvacThermostat",
+        "type": "attributeReport",
+        "data": {
+          "localTemp": 2100,
+          "occupiedHeatingSetpoint": 2000
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 21
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "local_temperature": 21,
+        "occupied_heating_setpoint": 20,
+        "occupied_heating_setpoint_scheduled": 20
+      },
+      "published": [
+        {
+          "local_temperature": 21,
+          "occupied_heating_setpoint": 20,
+          "occupied_heating_setpoint_scheduled": 20
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "get-danfoss-schedule",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      },
+      "device": {
+        "modelID": "014G2461",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "weekly_schedule",
+      "message": {
+        "weekly_schedule": {}
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "command": "getWeeklySchedule",
+        "payload": {
+          "daystoreturn": 255,
+          "modetoreturn": 3
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "configure-l101z",
+    "kind": "configure",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "lytko.js",
+        "model": "L101Z-SBI"
+      },
+      "device": {
+        "modelID": "L101Z-SBI",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 2,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          },
+          {
+            "id": 3,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "bind",
+        "endpoint": 2,
+        "cluster": "msTemperatureMeasurement",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 2,
+        "cluster": "msRelativeHumidity",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 2,
+        "cluster": "msRelativeHumidity",
+        "attributes": [
+          "measuredValue"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 2,
+        "cluster": "msTemperatureMeasurement",
+        "attributes": [
+          "measuredValue"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "localTemp",
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "localTemp",
+            "minimumReportInterval": 60,
+            "maximumReportInterval": 120,
+            "reportableChange": 50
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "occupiedHeatingSetpoint",
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "occupiedHeatingSetpoint",
+            "minimumReportInterval": 1,
+            "maximumReportInterval": 120,
+            "reportableChange": 50
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "systemMode",
+            "minimumReportInterval": 10,
+            "maximumReportInterval": 3600,
+            "reportableChange": null
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "systemMode",
+            "minimumReportInterval": 1,
+            "maximumReportInterval": 120,
+            "reportableChange": 1
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "runningMode",
+            "minimumReportInterval": 10,
+            "maximumReportInterval": 3600,
+            "reportableChange": null
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "attribute": "runningMode",
+            "minimumReportInterval": 1,
+            "maximumReportInterval": 120,
+            "reportableChange": 1
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "localTemp",
+          "occupiedHeatingSetpoint",
+          "systemMode",
+          "runningMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 3,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          30464,
+          30465
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "keypadLockout"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          30464,
+          30465
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      }
+    ]
+  },
+  {
+    "id": "configure-danfoss",
+    "kind": "configure",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "014G2461"
+      },
+      "device": {
+        "modelID": "014G2461",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "haDiagnostic",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "haDiagnostic",
+        "items": [
+          {
+            "attribute": "danfossSystemStatusCode",
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 1
+          }
+        ],
+        "options": {
+          "manufacturerCode": 4678
+        }
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "haDiagnostic",
+        "attributes": [
+          "danfossSystemStatusCode"
+        ],
+        "options": {
+          "manufacturerCode": 4678
+        }
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "hvacThermostat"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "hvacUserInterfaceCfg"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "haDiagnostic"
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10,
+            "attribute": "localTemp"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "localTemp"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 10,
+            "attribute": "occupiedHeatingSetpoint"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "occupiedHeatingSetpoint"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 0,
+            "attribute": "systemMode"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "systemMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "items": [
+          {
+            "minimumReportInterval": 0,
+            "maximumReportInterval": 3600,
+            "reportableChange": 0,
+            "attribute": "pIHeatingDemand"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "pIHeatingDemand"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "maxHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "minHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "programingOperMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "systemMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "keypadLockout"
+        ],
+        "options": {}
+      },
+      {
+        "op": "write",
+        "endpoint": 1,
+        "cluster": "genTime",
+        "attributes": {
+          "time": 848513333,
+          "timeStatus": 2,
+          "timeZone": 14400,
+          "dstStart": 4294967295,
+          "dstEnd": 4294967295,
+          "dstShift": 0
+        },
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "absMaxHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "absMinHeatSetpointLimit"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossHeatingSystemMode"
+        ],
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "genPowerCfg",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "configureReporting",
+        "endpoint": 1,
+        "cluster": "genPowerCfg",
+        "items": [
+          {
+            "minimumReportInterval": 3600,
+            "maximumReportInterval": 65000,
+            "reportableChange": 10,
+            "attribute": "batteryPercentageRemaining"
+          }
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "genPowerCfg",
+        "attributes": [
+          "batteryPercentageRemaining"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "keypadLockout"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossMountedModeActive"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossMountedModeControl"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossThermostatOrientation"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacUserInterfaceCfg",
+        "attributes": [
+          "danfossViewingDirection"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossHeatAvailable"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossHeatRequired"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossExternalMeasuredRoomSensor"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossRadiatorCovered"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossWindowOpenFeatureEnable"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossWindowOpenInternal"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossWindowOpenExternal"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossDayOfWeek"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAlgorithmScaleFactor"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossLoadBalancingEnable"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossLoadRoomMean"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossLoadEstimate"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossPreheatStatus"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossPreheatTime"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAdaptionRunStatus"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAdaptionRunSettings"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossAdaptionRunControl"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "danfossRegulationSetpointOffset"
+        ],
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "onEvent-daewoo-start",
+    "kind": "onEvent",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "daewoo.js",
+        "model": "WKE502Z"
+      },
+      "device": {
+        "modelID": "WKE502Z",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "eventType": "start",
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "addCustomCluster",
+        "name": "genBasic"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "genGroups"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "genOnOff"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "genLevelCtrl"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "manuSpecificTuya2"
+      },
+      {
+        "op": "addCustomCluster",
+        "name": "manuSpecificTuya3"
+      }
+    ]
+  },
+  {
+    "id": "onEvent-daewoo-announce",
+    "kind": "onEvent",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "daewoo.js",
+        "model": "WKE502Z"
+      },
+      "device": {
+        "modelID": "WKE502Z",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "eventType": "deviceAnnounce",
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "command",
+        "endpoint": 1,
+        "cluster": "manuSpecificTuya",
+        "command": "dataRequest",
+        "payload": {
+          "seq": 1,
+          "dpValues": [
+            {
+              "dp": 101,
+              "datatype": 1,
+              "data": [
+                1
+              ]
+            }
+          ]
+        },
+        "options": {
+          "disableDefaultResponse": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "prepare-external-l101",
+    "kind": "prepare",
+    "description": "prepareDefinition for the real L101Ze_z2m.js external converter.",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      }
+    },
+    "expected": {
+      "model": "L101Ze.v2",
+      "vendor": "Lytko",
+      "zigbeeModel": [
+        "L101Ze.v2"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-external-l101-temp",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "hvacThermostat",
+        "type": "attributeReport",
+        "data": {
+          "localTemp": 2150,
+          "occupiedHeatingSetpoint": 2000
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 31,
+          "manufacturerCode": 30583
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "local_temperature": 21.5,
+        "occupied_heating_setpoint": 20
+      },
+      "published": [
+        {
+          "local_temperature": 21.5,
+          "occupied_heating_setpoint": 20
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "set-external-l101-mode",
+    "kind": "set",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "system_mode",
+      "value": "heat",
+      "message": {
+        "system_mode": "heat"
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "state": {
+          "system_mode": "heat"
+        }
+      },
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "write",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": {
+          "systemMode": 4
+        },
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "get-external-l101-sensor",
+    "kind": "get",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "key": "sensor_type",
+      "message": {
+        "sensor_type": "10 кОм"
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          65280
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      }
+    ]
+  },
+  {
+    "id": "configure-external-l101",
+    "kind": "configure",
+    "input": {
+      "definition": {
+        "source": "external",
+        "model": "L101Ze.v2"
+      },
+      "device": {
+        "modelID": "L101Ze.v2",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": null,
+      "published": []
+    },
+    "expectedHostCalls": [
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "haElectricalMeasurement",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "bind",
+        "endpoint": 1,
+        "cluster": "seMetering",
+        "target": {
+          "type": "endpoint",
+          "ieeeAddr": "0x00124b0000000000",
+          "endpoint": 1
+        },
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          "localTemp",
+          "occupiedHeatingSetpoint",
+          "systemMode",
+          "runningState"
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "hvacThermostat",
+        "attributes": [
+          65280,
+          65281,
+          65282,
+          65285
+        ],
+        "options": {
+          "manufacturerCode": 30583
+        }
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "haElectricalMeasurement",
+        "attributes": [
+          1288,
+          1295,
+          2048
+        ],
+        "options": {}
+      },
+      {
+        "op": "read",
+        "endpoint": 1,
+        "cluster": "seMetering",
+        "attributes": [
+          "currentSummDelivered"
+        ],
+        "options": {}
+      }
+    ]
+  },
+  {
+    "id": "prepare-heavy-yokis-81-extends",
+    "kind": "prepare",
+    "description": "Top static-complexity definition from heavy-scan.mjs (81 extends).",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "yokis.js",
+        "model": "MTV300E-UP"
+      }
+    },
+    "expected": {
+      "model": "MTV300E-UP",
+      "vendor": "YOKIS",
+      "zigbeeModel": [
+        "MTV300E-UP"
+      ]
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "prepare-heavy-icon2-thermostat",
+    "kind": "prepare",
+    "description": "Heavy thermostat definition: 9 fromZigbee, 22 toZigbee, configure.",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "danfoss.js",
+        "model": "Icon2"
+      }
+    },
+    "expected": {
+      "model": "Icon2",
+      "vendor": "Danfoss",
+      "zigbeeModel": null
+    },
+    "expectedHostCalls": []
+  },
+  {
+    "id": "fz-tuya-m9pro-multi-dp",
+    "kind": "fromZigbee",
+    "input": {
+      "definition": {
+        "source": "package",
+        "file": "tuya.js",
+        "model": "M9Pro"
+      },
+      "device": {
+        "modelID": "M9Pro",
+        "manufacturerName": "Bench",
+        "manufacturerID": 4660,
+        "type": "Router",
+        "ieeeAddr": "0x00124b0000000001",
+        "networkAddress": 4660,
+        "endpoints": [
+          {
+            "id": 1,
+            "inputClusters": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              15,
+              20,
+              25,
+              32,
+              513,
+              516,
+              1024,
+              1026,
+              1029,
+              1280,
+              1794,
+              2820,
+              2821,
+              61184,
+              64512,
+              64640
+            ],
+            "outputClusters": []
+          }
+        ]
+      },
+      "endpointId": 1,
+      "msg": {
+        "cluster": "manuSpecificTuya",
+        "type": "commandDataReport",
+        "data": {
+          "dpValues": [
+            {
+              "dp": 1,
+              "datatype": 4,
+              "data": [
+                1
+              ]
+            },
+            {
+              "dp": 2,
+              "datatype": 4,
+              "data": [
+                2
+              ]
+            },
+            {
+              "dp": 18,
+              "datatype": 4,
+              "data": [
+                3
+              ]
+            },
+            {
+              "dp": 20,
+              "datatype": 4,
+              "data": [
+                3
+              ]
+            }
+          ]
+        },
+        "linkquality": 100,
+        "meta": {
+          "zclTransactionSequenceNumber": 41
+        }
+      },
+      "options": {},
+      "state": {}
+    },
+    "expected": {
+      "result": {
+        "action": "scene_2",
+        "mode_l1": "curtain",
+        "mode_l3": "curtain"
+      },
+      "published": [
+        {
+          "action": "scene_2",
+          "mode_l1": "curtain",
+          "mode_l3": "curtain"
+        }
+      ]
+    },
+    "expectedHostCalls": []
+  }
+]
