@@ -115,14 +115,16 @@ holds the x86 CPU profile summaries.
 | simple on/off | `fz-ikea-onoff`, `set-ikea-onoff`, `get-ikea-onoff` |
 | brightness/color | `fz-ikea-brightness`, `fz-ikea-color-temp`, `fz-ikea-color-xy`, `set-ikea-brightness`, `set-ikea-color-temp` |
 | Tuya datapoints | `fz-tuya-dp-temperature`, `fz-tuya-dp-multi`, `set-tuya-temperature-unit`, `fz-tuya-m9pro-multi-dp` |
-| thermostat schedule | `get-danfoss-schedule`, `fz-danfoss-temperature`, `set-l101-setpoint` |
+| thermostat schedule | `get-danfoss-schedule`, `fz-danfoss-temperature`, `fz-l101-thermostat`, `set-l101-setpoint`, `get-l101-sensor-type` |
+| occupancy sensors | `fz-lumi-occupancy`, `fz-lumi-occupancy-clear` |
 | multi-endpoint | `fz-ts0002-ep2-onoff`, `set-ts0002-ep2-onoff` |
 | complex fromZigbee | `fz-danfoss-temperature`, `fz-tuya-m9pro-multi-dp` |
 | configure with I/O | `configure-l101z`, `configure-danfoss`, `configure-external-l101` |
 | onEvent/timers | `onEvent-daewoo-start`, `onEvent-daewoo-announce` |
-| modernExtend preparation | `prepare-ikea-modern-extend`, `prepare-danfoss-thermostat`, `prepare-tuya-sensor`, `prepare-heavy-*` |
+| modernExtend preparation | `prepare-ikea-modern-extend`, `prepare-danfoss-thermostat`, `prepare-tuya-sensor`, `prepare-heavy-yokis-81-extends`, `prepare-heavy-icon2-thermostat` |
 | real external converter | `prepare-external-l101`, `fz-external-l101-temp`, `set-external-l101-mode`, `get-external-l101-sensor`, `configure-external-l101` |
 | host I/O separation | `set-ikea-brightness-host-delay` |
+| cold package load (pseudo-scenario) | `package-load` |
 
 ## Caveats
 
