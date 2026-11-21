@@ -156,6 +156,9 @@ both targets; Routerich c4 is 1.25×.
 - Worker shutdown is explicit; job outcomes are notified before the JS context
   is dropped. Pending responses after shutdown are impossible by channel
   closure.
+- Worker startup (package index + bootstrap) measured **2.39 s** on Routerich
+  and ~5.1 s on the loaded x86 container; it is a cold path and must stay off
+  the bridge request path.
 
 ## 7. Reproducible build and pin
 
