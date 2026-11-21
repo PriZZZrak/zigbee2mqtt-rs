@@ -1,0 +1,18 @@
+{
+  "engine": "boa",
+  "version": "0.22.0",
+  "loop_iteration_limit_10m": {
+    "result": "RuntimeLimitError: reached the maximum number of iteration loops on this execution",
+    "x86_ms": 161.9
+  },
+  "recursion_limit_512": {
+    "result": "RuntimeLimitError: reached the maximum number of recursive calls on this execution",
+    "x86_ms": 0.4
+  },
+  "long_builtin": {
+    "result": "not interruptible",
+    "detail": "2000 x 200KB RegExp replacements did not finish within 15 minutes and the probe had to be killed; the loop limit does not cover builtin work",
+    "x86_ms": null
+  },
+  "memory_limit": "no public per-context heap limit"
+}

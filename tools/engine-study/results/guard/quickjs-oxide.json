@@ -1,0 +1,23 @@
+{
+  "engine": "quickjs-oxide",
+  "version": "0.5.0",
+  "interrupt": {
+    "result": "RuntimeError::Interrupted",
+    "x86_ms": 100.2,
+    "routerich_ms": 133.4
+  },
+  "after_interrupt": {
+    "result": "1 + 1 = 2",
+    "detail": "the same runtime continues to work after clearing the interrupt"
+  },
+  "heap_limit": {
+    "limit_bytes": 16777216,
+    "result": "InternalError: out of memory (catchable)",
+    "x86_ms": 26.7,
+    "routerich_ms": 336.5
+  },
+  "after_heap_limit": {
+    "result": "1 + 1 = 2",
+    "detail": "the same runtime continues to work after the catchable OOM"
+  }
+}

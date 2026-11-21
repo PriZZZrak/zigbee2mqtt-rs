@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 1.507913999998891,
+        "meanMs": 0.34976683333316033,
+        "minMs": 0.20405099999970844,
+        "p50Ms": 0.28707200000008015,
+        "p95Ms": 0.7005589999998847,
+        "p99Ms": 1.507913999998891
+      },
+      "error": null,
+      "id": "fz-tuya-dp-temperature",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "temperature": 21.5
+          }
+        ],
+        "result": {
+          "temperature": 21.5
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 2.9281150000006164,
+        "meanMs": 1.6589085333333666,
+        "minMs": 1.079346000001351,
+        "p50Ms": 1.5547719999995024,
+        "p95Ms": 2.587953000000198,
+        "p99Ms": 2.9281150000006164
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 6.5421710000009625,
+        "meanMs": 0.5909959999999046,
+        "minMs": 0.22975099999803208,
+        "p50Ms": 0.4017920000005688,
+        "p95Ms": 0.8197419999978592,
+        "p99Ms": 6.5421710000009625
+      },
+      "error": null,
+      "id": "fz-tuya-dp-multi",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "battery": 88,
+            "humidity": 44,
+            "temperature": 22
+          }
+        ],
+        "result": {
+          "battery": 88,
+          "humidity": 44,
+          "temperature": 22
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 25.907768999999465,
+        "meanMs": 3.4218612666667165,
+        "minMs": 1.1004290000000765,
+        "p50Ms": 1.8100670000003447,
+        "p95Ms": 13.434889000000112,
+        "p99Ms": 25.907768999999465
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 1.3067879999980505,
+        "meanMs": 0.36336249999973613,
+        "minMs": 0.21382299999822865,
+        "p50Ms": 0.27453000000241445,
+        "p95Ms": 0.9140740000002552,
+        "p99Ms": 1.3067879999980505
+      },
+      "error": null,
+      "id": "fz-tuya-m9pro-multi-dp",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "action": "scene_2",
+            "mode_l1": "curtain",
+            "mode_l3": "curtain"
+          }
+        ],
+        "result": {
+          "action": "scene_2",
+          "mode_l1": "curtain",
+          "mode_l3": "curtain"
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 10754.701353,
+        "meanMs": 360.3085625666665,
+        "minMs": 1.1595960000013292,
+        "p50Ms": 1.615325999999186,
+        "p95Ms": 8.574984999999288,
+        "p99Ms": 10754.701353
+      }
+    }
+  ],
+  "coldRootMs": 4782.805081,
+  "coldTotalMs": 6561.274019,
+  "cpuMs": 12810.0,
+  "engine": "boa",
+  "maxRssKb": 77224,
+  "prepareMs": 1778.468938,
+  "rssBeforeKb": 67888,
+  "version": "0.22.0"
+}

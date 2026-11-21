@@ -1,0 +1,76 @@
+{
+  "cases": [
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-heavy-yokis-81-extends",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 23.0739080000003,
+        "meanMs": 1.9367008000002595,
+        "minMs": 0.6739370000004783,
+        "p50Ms": 0.8605230000002848,
+        "p95Ms": 5.06472500000109,
+        "p99Ms": 23.0739080000003
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-heavy-icon2-thermostat",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 611.7135500000004,
+        "meanMs": 21.036448766666854,
+        "minMs": 0.4916610000000219,
+        "p50Ms": 0.5582159999994474,
+        "p95Ms": 2.197471000000405,
+        "p99Ms": 611.7135500000004
+      }
+    }
+  ],
+  "coldRootMs": 4557.921832,
+  "coldTotalMs": 5768.691317,
+  "cpuMs": 5030.0,
+  "engine": "boa",
+  "maxRssKb": 40156,
+  "prepareMs": 1210.769485,
+  "rssBeforeKb": 36008,
+  "version": "0.22.0"
+}

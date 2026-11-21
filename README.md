@@ -18,6 +18,8 @@ Node.js-мост, сохранив MQTT-контракты, сущности Hom
   (внешние конвертеры и полная база устройств)
 - Node.js baseline конвертеров: [`docs/converter-benchmark-baseline.md`](docs/converter-benchmark-baseline.md)
   (harness и golden corpus — [`tools/bench/`](tools/bench/))
+- Engine feasibility study: [`docs/converter-engine-study.md`](docs/converter-engine-study.md)
+  (прототипы — [`tools/engine-study/`](tools/engine-study/))
 
 ## Что входит в R1
 

@@ -1,0 +1,2194 @@
+{
+  "cases": [
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-ikea-modern-extend",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.3360839999995733,
+        "meanMs": 0.1608247000000574,
+        "minMs": 0.13257199999998193,
+        "p50Ms": 0.1429590000002463,
+        "p95Ms": 0.3360839999995733,
+        "p99Ms": 0.3360839999995733
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-danfoss-thermostat",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 128.63058200000023,
+        "meanMs": 13.04064099999996,
+        "minMs": 0.11410599999999248,
+        "p50Ms": 0.1632710000003499,
+        "p95Ms": 128.63058200000023,
+        "p99Ms": 128.63058200000023
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-tuya-sensor",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 408.6542629999999,
+        "meanMs": 40.95471769999999,
+        "minMs": 0.09448499999962225,
+        "p50Ms": 0.09640900000022155,
+        "p95Ms": 408.6542629999999,
+        "p99Ms": 408.6542629999999
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.2040510000001632,
+        "meanMs": 0.10187179999993531,
+        "minMs": 0.04878099999950791,
+        "p50Ms": 0.08602199999950244,
+        "p95Ms": 0.2040510000001632,
+        "p99Ms": 0.2040510000001632
+      },
+      "error": null,
+      "id": "fz-ikea-onoff",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "state": "ON"
+          }
+        ],
+        "result": {
+          "state": "ON"
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.466595999999754,
+        "meanMs": 0.5074722999999721,
+        "minMs": 0.22644100000024991,
+        "p50Ms": 0.3927129999997305,
+        "p95Ms": 1.466595999999754,
+        "p99Ms": 1.466595999999754
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.25490899999977046,
+        "meanMs": 0.12674720000009074,
+        "minMs": 0.0921769999999924,
+        "p50Ms": 0.099025000000438,
+        "p95Ms": 0.25490899999977046,
+        "p99Ms": 0.25490899999977046
+      },
+      "error": null,
+      "id": "fz-ikea-brightness",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "brightness": 128
+          }
+        ],
+        "result": {
+          "brightness": 128
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.0302559999995538,
+        "meanMs": 0.4957846999999219,
+        "minMs": 0.3671690000001035,
+        "p50Ms": 0.3868649999999434,
+        "p95Ms": 1.0302559999995538,
+        "p99Ms": 1.0302559999995538
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.37101499999971566,
+        "meanMs": 0.1803755999999339,
+        "minMs": 0.1313399999999092,
+        "p50Ms": 0.14149700000007215,
+        "p95Ms": 0.37101499999971566,
+        "p99Ms": 0.37101499999971566
+      },
+      "error": null,
+      "id": "fz-ikea-color-temp",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "color_mode": "color_temp",
+            "color_temp": 250
+          }
+        ],
+        "result": {
+          "color_mode": "color_temp",
+          "color_temp": 250
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.9427730000002156,
+        "meanMs": 0.42406710000009296,
+        "minMs": 0.30038199999989956,
+        "p50Ms": 0.33731500000021697,
+        "p95Ms": 0.9427730000002156,
+        "p99Ms": 0.9427730000002156
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.4972009999996771,
+        "meanMs": 0.32380359999988284,
+        "minMs": 0.2300569999997606,
+        "p50Ms": 0.2939190000001872,
+        "p95Ms": 0.4972009999996771,
+        "p99Ms": 0.4972009999996771
+      },
+      "error": null,
+      "id": "fz-ikea-color-xy",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "color": {
+              "x": 0.3805,
+              "y": 0.9274
+            },
+            "color_mode": "xy"
+          }
+        ],
+        "result": {
+          "color": {
+            "x": 0.3805,
+            "y": 0.9274
+          },
+          "color_mode": "xy"
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.5410759999999757,
+        "meanMs": 0.7564577000000099,
+        "minMs": 0.455728999999792,
+        "p50Ms": 0.61869200000001,
+        "p95Ms": 1.5410759999999757,
+        "p99Ms": 1.5410759999999757
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 2.298265000000356,
+        "meanMs": 0.8702475000000505,
+        "minMs": 0.34423999999989974,
+        "p50Ms": 0.4960470000000896,
+        "p95Ms": 2.298265000000356,
+        "p99Ms": 2.298265000000356
+      },
+      "error": null,
+      "id": "set-ikea-onoff",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genOnOff",
+            "command": "on",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {}
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 2.7169850000000224,
+        "meanMs": 1.3418728000000102,
+        "minMs": 0.5642179999995278,
+        "p50Ms": 0.9503140000001622,
+        "p95Ms": 2.7169850000000224,
+        "p99Ms": 2.7169850000000224
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 1.2435410000002776,
+        "meanMs": 0.6527705000000878,
+        "minMs": 0.3823260000003757,
+        "p50Ms": 0.4195660000004864,
+        "p95Ms": 1.2435410000002776,
+        "p99Ms": 1.2435410000002776
+      },
+      "error": null,
+      "id": "set-ikea-brightness",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "level": 128,
+              "optionsMask": 0,
+              "optionsOverride": 0,
+              "transtime": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.7500509999995302,
+        "meanMs": 0.9940474999999424,
+        "minMs": 0.6184619999999086,
+        "p50Ms": 0.6936340000002019,
+        "p95Ms": 1.7500509999995302,
+        "p99Ms": 1.7500509999995302
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.8520579999999427,
+        "meanMs": 0.5600009000000228,
+        "minMs": 0.46203799999966577,
+        "p50Ms": 0.4878140000000713,
+        "p95Ms": 0.8520579999999427,
+        "p99Ms": 0.8520579999999427
+      },
+      "error": null,
+      "id": "set-ikea-color-temp",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "lightingColorCtrl",
+            "command": "moveToColorTemp",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "colortemp": 250,
+              "optionsMask": 0,
+              "optionsOverride": 0,
+              "transtime": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "color_temp",
+          "color_temp_percent"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "color_mode": "color_temp",
+            "color_temp": 250
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.2375389999997424,
+        "meanMs": 0.8537740999998732,
+        "minMs": 0.719717999999375,
+        "p50Ms": 0.7602660000002288,
+        "p95Ms": 1.2375389999997424,
+        "p99Ms": 1.2375389999997424
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.6117670000003272,
+        "meanMs": 0.2280876000000262,
+        "minMs": 0.12387700000044788,
+        "p50Ms": 0.1990499999997155,
+        "p95Ms": 0.6117670000003272,
+        "p99Ms": 0.6117670000003272
+      },
+      "error": null,
+      "id": "get-ikea-onoff",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "attributes": [
+              "onOff"
+            ],
+            "cluster": "genOnOff",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.9462359999997716,
+        "meanMs": 0.5129893000000265,
+        "minMs": 0.33916199999976016,
+        "p50Ms": 0.4839660000002368,
+        "p95Ms": 0.9462359999997716,
+        "p99Ms": 0.9462359999997716
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 1.523841000000175,
+        "meanMs": 0.7154472999999598,
+        "minMs": 0.5357490000001235,
+        "p50Ms": 0.6239249999998719,
+        "p95Ms": 1.523841000000175,
+        "p99Ms": 1.523841000000175
+      },
+      "error": null,
+      "id": "set-ikea-brightness-host-delay",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "level": 128,
+              "optionsMask": 0,
+              "optionsOverride": 0,
+              "transtime": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.828993999999966,
+        "meanMs": 1.0591405999999097,
+        "minMs": 0.8389780000002247,
+        "p50Ms": 0.9652399999999944,
+        "p95Ms": 1.828993999999966,
+        "p99Ms": 1.828993999999966
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.4114869999993971,
+        "meanMs": 0.20528949999970791,
+        "minMs": 0.08132800000021234,
+        "p50Ms": 0.1788909999995667,
+        "p95Ms": 0.4114869999993971,
+        "p99Ms": 0.4114869999993971
+      },
+      "error": null,
+      "id": "fz-lumi-occupancy",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "occupancy": true
+          }
+        ],
+        "result": {
+          "occupancy": true
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1149.416029,
+        "meanMs": 115.43019380000014,
+        "minMs": 0.2566020000003846,
+        "p50Ms": 0.5047409999988304,
+        "p95Ms": 1149.416029,
+        "p99Ms": 1149.416029
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.05632199999945442,
+        "meanMs": 0.03264659999967989,
+        "minMs": 0.023390000000290456,
+        "p50Ms": 0.02646799999911309,
+        "p95Ms": 0.05632199999945442,
+        "p99Ms": 0.05632199999945442
+      },
+      "error": null,
+      "id": "fz-lumi-occupancy-clear",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.34916400000020076,
+        "meanMs": 0.22278629999973418,
+        "minMs": 0.1851230000011128,
+        "p50Ms": 0.19512599999870872,
+        "p95Ms": 0.34916400000020076,
+        "p99Ms": 0.34916400000020076
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.4372620000003735,
+        "meanMs": 0.20504330000012488,
+        "minMs": 0.11979900000005728,
+        "p50Ms": 0.1694259999985661,
+        "p95Ms": 0.4372620000003735,
+        "p99Ms": 0.4372620000003735
+      },
+      "error": null,
+      "id": "fz-l101-thermostat",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "local_temperature_l1": 21.5,
+            "occupied_heating_setpoint_l1": 20
+          }
+        ],
+        "result": {
+          "local_temperature_l1": 21.5,
+          "occupied_heating_setpoint_l1": 20
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 104.7634829999988,
+        "meanMs": 10.956221699999785,
+        "minMs": 0.316077999999834,
+        "p50Ms": 0.45903700000053504,
+        "p95Ms": 104.7634829999988,
+        "p99Ms": 104.7634829999988
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.7216410000000906,
+        "meanMs": 0.32444219999997587,
+        "minMs": 0.1554230000001553,
+        "p50Ms": 0.2147450000002209,
+        "p95Ms": 0.7216410000000906,
+        "p99Ms": 0.7216410000000906
+      },
+      "error": null,
+      "id": "set-l101-setpoint",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "attributes": {
+              "occupiedHeatingSetpoint": 2150
+            },
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "write"
+          }
+        ],
+        "converterKey": [
+          "occupied_heating_setpoint"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "occupied_heating_setpoint": 21.5
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.3016319999996997,
+        "meanMs": 0.6955195999999887,
+        "minMs": 0.3827879999998913,
+        "p50Ms": 0.4987399999999979,
+        "p95Ms": 1.3016319999996997,
+        "p99Ms": 1.3016319999996997
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.6577019999995173,
+        "meanMs": 0.2874715000002652,
+        "minMs": 0.09971700000096462,
+        "p50Ms": 0.16511799999989307,
+        "p95Ms": 0.6577019999995173,
+        "p99Ms": 0.6577019999995173
+      },
+      "error": null,
+      "id": "get-l101-sensor-type",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "attributes": [
+              30464
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": [
+          "sensor_type",
+          "target_temp_first",
+          "min_setpoint_deadband"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.919381999999132,
+        "meanMs": 0.5851227999999538,
+        "minMs": 0.2769160000007105,
+        "p50Ms": 0.4438030000010258,
+        "p95Ms": 0.919381999999132,
+        "p99Ms": 0.919381999999132
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.35178000000087195,
+        "meanMs": 0.1502833000001374,
+        "minMs": 0.05693699999847013,
+        "p50Ms": 0.08625200000005862,
+        "p95Ms": 0.35178000000087195,
+        "p99Ms": 0.35178000000087195
+      },
+      "error": null,
+      "id": "fz-tuya-dp-temperature",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "temperature": 21.5
+          }
+        ],
+        "result": {
+          "temperature": 21.5
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.5116070000003674,
+        "meanMs": 0.5877924999999777,
+        "minMs": 0.24036699999942357,
+        "p50Ms": 0.3840959999997722,
+        "p95Ms": 1.5116070000003674,
+        "p99Ms": 1.5116070000003674
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.24513699999988603,
+        "meanMs": 0.09984009999989212,
+        "minMs": 0.058399000000463275,
+        "p50Ms": 0.06763199999932112,
+        "p95Ms": 0.24513699999988603,
+        "p99Ms": 0.24513699999988603
+      },
+      "error": null,
+      "id": "fz-tuya-dp-multi",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "battery": 88,
+            "humidity": 44,
+            "temperature": 22
+          }
+        ],
+        "result": {
+          "battery": 88,
+          "humidity": 44,
+          "temperature": 22
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.7200259999999616,
+        "meanMs": 0.41127170000008845,
+        "minMs": 0.2454460000008112,
+        "p50Ms": 0.3131549999998242,
+        "p95Ms": 0.7200259999999616,
+        "p99Ms": 0.7200259999999616
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.9535449999993943,
+        "meanMs": 0.5589160000001356,
+        "minMs": 0.4065630000004603,
+        "p50Ms": 0.48065799999949377,
+        "p95Ms": 0.9535449999993943,
+        "p99Ms": 0.9535449999993943
+      },
+      "error": null,
+      "id": "set-tuya-temperature-unit",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "manuSpecificTuya",
+            "command": "dataRequest",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "dpValues": [
+                {
+                  "data": {
+                    "0": 0,
+                    "1": 0,
+                    "2": 0,
+                    "3": 1
+                  },
+                  "datatype": 2,
+                  "dp": 9
+                }
+              ],
+              "seq": 1
+            }
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "temperature_unit": "fahrenheit"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.2221500000005108,
+        "meanMs": 0.8152262999999949,
+        "minMs": 0.6333119999999326,
+        "p50Ms": 0.7488789999997607,
+        "p95Ms": 1.2221500000005108,
+        "p99Ms": 1.2221500000005108
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.7506490000005215,
+        "meanMs": 0.21645380000009026,
+        "minMs": 0.10071599999992031,
+        "p50Ms": 0.15842299999985698,
+        "p95Ms": 0.7506490000005215,
+        "p99Ms": 0.7506490000005215
+      },
+      "error": null,
+      "id": "fz-ts0002-ep2-onoff",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "state_l2": "ON"
+          }
+        ],
+        "result": {
+          "state_l2": "ON"
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 2374.6350170000005,
+        "meanMs": 237.96795070000016,
+        "minMs": 0.3927899999998772,
+        "p50Ms": 0.5186680000006163,
+        "p95Ms": 2374.6350170000005,
+        "p99Ms": 2374.6350170000005
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.3050760000005539,
+        "meanMs": 0.24362229999996998,
+        "minMs": 0.2192090000007738,
+        "p50Ms": 0.23682800000005955,
+        "p95Ms": 0.3050760000005539,
+        "p99Ms": 0.3050760000005539
+      },
+      "error": null,
+      "id": "set-ts0002-ep2-onoff",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genOnOff",
+            "command": "on",
+            "endpoint": 2,
+            "op": "command",
+            "payload": {}
+          }
+        ],
+        "converterKey": [
+          "state",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.2421559999993406,
+        "meanMs": 0.6569635999998354,
+        "minMs": 0.5287470000002941,
+        "p50Ms": 0.5734510000002047,
+        "p95Ms": 1.2421559999993406,
+        "p99Ms": 1.2421559999993406
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 2.2963390000022628,
+        "meanMs": 1.154849500000364,
+        "minMs": 0.8536739999963174,
+        "p50Ms": 0.9018410000007862,
+        "p95Ms": 2.2963390000022628,
+        "p99Ms": 2.2963390000022628
+      },
+      "error": null,
+      "id": "fz-danfoss-temperature",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "local_temperature": 21,
+            "occupied_heating_setpoint": 20,
+            "occupied_heating_setpoint_scheduled": 20
+          }
+        ],
+        "result": {
+          "local_temperature": 21,
+          "occupied_heating_setpoint": 20,
+          "occupied_heating_setpoint_scheduled": 20
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 3.093308999999863,
+        "meanMs": 2.0250427999998464,
+        "minMs": 1.6357920000000377,
+        "p50Ms": 1.7314309999992474,
+        "p95Ms": 3.093308999999863,
+        "p99Ms": 3.093308999999863
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.2749149999999645,
+        "meanMs": 0.16913449999974545,
+        "minMs": 0.14018899999973655,
+        "p50Ms": 0.15703899999971327,
+        "p95Ms": 0.2749149999999645,
+        "p99Ms": 0.2749149999999645
+      },
+      "error": null,
+      "id": "get-danfoss-schedule",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "hvacThermostat",
+            "command": "getWeeklySchedule",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "daystoreturn": 255,
+              "modetoreturn": 3
+            }
+          }
+        ],
+        "converterKey": [
+          "weekly_schedule"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.8085090000004129,
+        "meanMs": 0.47231020000017454,
+        "minMs": 0.39740600000004633,
+        "p50Ms": 0.4248759999991307,
+        "p95Ms": 0.8085090000004129,
+        "p99Ms": 0.8085090000004129
+      }
+    },
+    {
+      "calls": 17,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 3.959063000000242,
+        "meanMs": 2.4828107000000275,
+        "minMs": 1.752051999998912,
+        "p50Ms": 2.0907509999997274,
+        "p95Ms": 3.959063000000242,
+        "p99Ms": 3.959063000000242
+      },
+      "error": null,
+      "id": "configure-l101z",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "msTemperatureMeasurement",
+            "endpoint": 2,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "msRelativeHumidity",
+            "endpoint": 2,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "attributes": [
+              "measuredValue"
+            ],
+            "cluster": "msRelativeHumidity",
+            "endpoint": 2,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "measuredValue"
+            ],
+            "cluster": "msTemperatureMeasurement",
+            "endpoint": 2,
+            "op": "read"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "localTemp",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "localTemp",
+                "maximumReportInterval": 120,
+                "minimumReportInterval": 60,
+                "reportableChange": 50
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "occupiedHeatingSetpoint",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "occupiedHeatingSetpoint",
+                "maximumReportInterval": 120,
+                "minimumReportInterval": 1,
+                "reportableChange": 50
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "systemMode",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 10,
+                "reportableChange": null
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "systemMode",
+                "maximumReportInterval": 120,
+                "minimumReportInterval": 1,
+                "reportableChange": 1
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "runningMode",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 10,
+                "reportableChange": null
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "items": [
+              {
+                "attribute": "runningMode",
+                "maximumReportInterval": 120,
+                "minimumReportInterval": 1,
+                "reportableChange": 1
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "localTemp",
+              "occupiedHeatingSetpoint",
+              "systemMode",
+              "runningMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              30464,
+              30465
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 3,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "keypadLockout"
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              30464,
+              30465
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 17,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 4.8388979999990624,
+        "meanMs": 2.9492809000001214,
+        "minMs": 2.048126000000593,
+        "p50Ms": 2.539017000000058,
+        "p95Ms": 4.8388979999990624,
+        "p99Ms": 4.8388979999990624
+      }
+    },
+    {
+      "calls": 54,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 219.30424700000003,
+        "meanMs": 163.89999119999985,
+        "minMs": 130.09117699999933,
+        "p50Ms": 153.58756899999935,
+        "p95Ms": 219.30424700000003,
+        "p99Ms": 219.30424700000003
+      },
+      "error": null,
+      "id": "configure-danfoss",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "haDiagnostic",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "haDiagnostic",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "danfossSystemStatusCode",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 1
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "danfossSystemStatusCode"
+            ],
+            "cluster": "haDiagnostic",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "name": "hvacThermostat",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "hvacUserInterfaceCfg",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "haDiagnostic",
+            "op": "addCustomCluster"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "localTemp",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "localTemp"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "occupiedHeatingSetpoint",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "occupiedHeatingSetpoint"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "systemMode",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 0
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "systemMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "pIHeatingDemand",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 0
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "pIHeatingDemand"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "maxHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "minHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "programingOperMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "systemMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "keypadLockout"
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": {
+              "dstEnd": 4294967295,
+              "dstShift": 0,
+              "dstStart": 4294967295,
+              "time": 848491200,
+              "timeStatus": 2,
+              "timeZone": 0
+            },
+            "cluster": "genTime",
+            "endpoint": 1,
+            "op": "write"
+          },
+          {
+            "attributes": [
+              "absMaxHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "absMinHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossHeatingSystemMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "genPowerCfg",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "genPowerCfg",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "batteryPercentageRemaining",
+                "maximumReportInterval": 65000,
+                "minimumReportInterval": 3600,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "batteryPercentageRemaining"
+            ],
+            "cluster": "genPowerCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "keypadLockout"
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossMountedModeActive"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossMountedModeControl"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossThermostatOrientation"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossViewingDirection"
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossHeatAvailable"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossHeatRequired"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossExternalMeasuredRoomSensor"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossRadiatorCovered"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossWindowOpenFeatureEnable"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossWindowOpenInternal"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossWindowOpenExternal"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossDayOfWeek"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAlgorithmScaleFactor"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossLoadBalancingEnable"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossLoadRoomMean"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossLoadEstimate"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossPreheatStatus"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossPreheatTime"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAdaptionRunStatus"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAdaptionRunSettings"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAdaptionRunControl"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossRegulationSetpointOffset"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 51,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 219.8421499999995,
+        "meanMs": 164.28220939999946,
+        "minMs": 130.35762799999975,
+        "p50Ms": 154.23165199999858,
+        "p95Ms": 219.8421499999995,
+        "p99Ms": 219.8421499999995
+      }
+    },
+    {
+      "calls": 6,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.2494459999998071,
+        "meanMs": 0.15845459999982267,
+        "minMs": 0.11464399999931628,
+        "p50Ms": 0.13180199999987963,
+        "p95Ms": 0.2494459999998071,
+        "p99Ms": 0.2494459999998071
+      },
+      "error": null,
+      "id": "onEvent-daewoo-start",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "name": "genBasic",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "genGroups",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "genOnOff",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "genLevelCtrl",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "manuSpecificTuya2",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "manuSpecificTuya3",
+            "op": "addCustomCluster"
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 24.255503999998837,
+        "meanMs": 2.7570021999992607,
+        "minMs": 0.23544399999991583,
+        "p50Ms": 0.3203869999979361,
+        "p95Ms": 24.255503999998837,
+        "p99Ms": 24.255503999998837
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.780733000001419,
+        "meanMs": 0.46169219999974304,
+        "minMs": 0.3218489999999292,
+        "p50Ms": 0.36509100000148464,
+        "p95Ms": 0.780733000001419,
+        "p99Ms": 0.780733000001419
+      },
+      "error": null,
+      "id": "onEvent-daewoo-announce",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "manuSpecificTuya",
+            "command": "dataRequest",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "dpValues": [
+                {
+                  "data": {
+                    "0": 1
+                  },
+                  "datatype": 1,
+                  "dp": 101
+                }
+              ],
+              "seq": 1
+            }
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.120202000000063,
+        "meanMs": 0.6666737999994439,
+        "minMs": 0.46942499999931897,
+        "p50Ms": 0.5515219999997498,
+        "p95Ms": 1.120202000000063,
+        "p99Ms": 1.120202000000063
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-external-l101",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 52.53239400000166,
+        "meanMs": 5.363943899999867,
+        "minMs": 0.1015640000005078,
+        "p50Ms": 0.10771899999781454,
+        "p95Ms": 52.53239400000166,
+        "p99Ms": 52.53239400000166
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.2656040000001667,
+        "meanMs": 0.16708790000047885,
+        "minMs": 0.0959469999979774,
+        "p50Ms": 0.16688800000156334,
+        "p95Ms": 0.2656040000001667,
+        "p99Ms": 0.2656040000001667
+      },
+      "error": null,
+      "id": "fz-external-l101-temp",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "local_temperature": 21.5,
+            "occupied_heating_setpoint": 20
+          }
+        ],
+        "result": {
+          "local_temperature": 21.5,
+          "occupied_heating_setpoint": 20
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.6685510000006616,
+        "meanMs": 0.47593389999983626,
+        "minMs": 0.28845600000022387,
+        "p50Ms": 0.4789649999984249,
+        "p95Ms": 0.6685510000006616,
+        "p99Ms": 0.6685510000006616
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.23636699999951816,
+        "meanMs": 0.17687479999967765,
+        "minMs": 0.12949399999888556,
+        "p50Ms": 0.1418809999995574,
+        "p95Ms": 0.23636699999951816,
+        "p99Ms": 0.23636699999951816
+      },
+      "error": null,
+      "id": "set-external-l101-mode",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "attributes": {
+              "systemMode": 4
+            },
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "write"
+          }
+        ],
+        "converterKey": [
+          "system_mode"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "system_mode": "heat"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.5046650000003865,
+        "meanMs": 0.39884559999954944,
+        "minMs": 0.3023829999983718,
+        "p50Ms": 0.33754599999883794,
+        "p95Ms": 0.5046650000003865,
+        "p99Ms": 0.5046650000003865
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.17365899999822432,
+        "meanMs": 0.11078149999993911,
+        "minMs": 0.0907920000008744,
+        "p50Ms": 0.09425499999997557,
+        "p95Ms": 0.17365899999822432,
+        "p99Ms": 0.17365899999822432
+      },
+      "error": null,
+      "id": "get-external-l101-sensor",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "attributes": [
+              65280
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": [
+          "sensor_type"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 0.4362630000014178,
+        "meanMs": 0.29668190000011235,
+        "minMs": 0.25506400000085705,
+        "p50Ms": 0.261834999999337,
+        "p95Ms": 0.4362630000014178,
+        "p99Ms": 0.4362630000014178
+      }
+    },
+    {
+      "calls": 7,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.7844260000001668,
+        "meanMs": 0.6647503000000142,
+        "minMs": 0.5959180000008928,
+        "p50Ms": 0.6286949999994249,
+        "p95Ms": 0.7844260000001668,
+        "p99Ms": 0.7844260000001668
+      },
+      "error": null,
+      "id": "configure-external-l101",
+      "iterations": 10,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "haElectricalMeasurement",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "seMetering",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "attributes": [
+              "localTemp",
+              "occupiedHeatingSetpoint",
+              "systemMode",
+              "runningState"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              65280,
+              65281,
+              65282,
+              65285
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              1288,
+              1295,
+              2048
+            ],
+            "cluster": "haElectricalMeasurement",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "currentSummDelivered"
+            ],
+            "cluster": "seMetering",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 7,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 1.1204330000000482,
+        "meanMs": 0.8695090000001073,
+        "minMs": 0.7681139999986044,
+        "p50Ms": 0.8142799999986892,
+        "p95Ms": 1.1204330000000482,
+        "p99Ms": 1.1204330000000482
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-heavy-yokis-81-extends",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 239.70771400000012,
+        "meanMs": 24.17761530000007,
+        "minMs": 0.11864500000046974,
+        "p50Ms": 0.16611899999770685,
+        "p95Ms": 239.70771400000012,
+        "p99Ms": 239.70771400000012
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-heavy-icon2-thermostat",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 2.429682000001776,
+        "meanMs": 0.3434164000002056,
+        "minMs": 0.10271800000009534,
+        "p50Ms": 0.10987399999976331,
+        "p95Ms": 2.429682000001776,
+        "p99Ms": 2.429682000001776
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 10,
+        "maxMs": 0.4235669999998208,
+        "meanMs": 0.16214810000019497,
+        "minMs": 0.11064299999816284,
+        "p50Ms": 0.120799000000261,
+        "p95Ms": 0.4235669999998208,
+        "p99Ms": 0.4235669999998208
+      },
+      "error": null,
+      "id": "fz-tuya-m9pro-multi-dp",
+      "iterations": 10,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "action": "scene_2",
+            "mode_l1": "curtain",
+            "mode_l3": "curtain"
+          }
+        ],
+        "result": {
+          "action": "scene_2",
+          "mode_l1": "curtain",
+          "mode_l3": "curtain"
+        }
+      },
+      "wallMs": {
+        "count": 10,
+        "maxMs": 4.782036999999036,
+        "meanMs": 0.9951402000002417,
+        "minMs": 0.4044089999988501,
+        "p50Ms": 0.446419000001697,
+        "p95Ms": 4.782036999999036,
+        "p99Ms": 4.782036999999036
+      }
+    }
+  ],
+  "coldRootMs": 1871.4185850000001,
+  "coldTotalMs": 2458.819301,
+  "cpuMs": 7080.0,
+  "engine": "quickjs-oxide",
+  "maxRssKb": 58400,
+  "prepareMs": 587.400716,
+  "rssBeforeKb": 57836,
+  "version": "0.5.0"
+}

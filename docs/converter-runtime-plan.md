@@ -139,25 +139,31 @@ thresholds, finalized after the engine spike.
 ## 6. Engine choice
 
 Engine is treated as a replaceable component behind a small host boundary.
+The measured comparison is in
+[`converter-engine-study.md`](converter-engine-study.md); prototypes are in
+[`../tools/engine-study/`](../tools/engine-study/).
 
-| Engine | Pure Rust | CJS/ES | Bytecode cache | Maturity | Role |
-|---|---|---:|---|---|---|
-| Boa 0.22 | yes | ES + custom CJS loader | no | high | baseline |
-| Kataan 0.0.10 | yes | ES/CJS + host | `.ktbc` + snapshot | young | speed spike |
-| quickrs-core 0.16.2 (QuickJS-ng port) | yes | QuickJS semantics | likely | very young | watch |
-| QuickJS-ng (`rquickjs`) | no (C) | yes | yes | high | only with explicit approval |
-| Node sidecar | no | exact | V8 | high | last resort |
+| Engine | Pure Rust | Real upstream corpus | Guard features | Role |
+|---|---|---:|---|---|
+| **quickjs-oxide 0.5.0** | yes | **36/36** | interrupt + heap byte limit + catchable OOM + recovery | **selected** |
+| Boa 0.22.0 | yes | 36/36 | loop/recursion limits; no interrupt or heap limit | reference/fallback |
+| Kataan 0.0.10 | yes | 33/36 (`tuya.js` compiler/`find` failures) | interrupt; no heap byte limit | **rejected** |
+| quickjs-oxide-cli / Nova VM | yes | not an embedding target | n/a | not feasible here |
+| QuickJS-ng (`rquickjs`) | no (C) | n/a | n/a | excluded by AGENTS §6 |
 
-Recommendation: start with **Boa 0.22 + shared realm + lazy loading**. Run a
-Kataan spike in parallel on the real external converter. Adopt Kataan only if
-it passes the converter corpus and is materially faster; it is the only
-pure-Rust candidate with serializable bytecode/snapshot. Do not ship two
-engines in production.
+Decision: **quickjs-oxide 0.5.0** is the only pure-Rust engine that passed all
+36 real-upstream scenarios and stayed in the Node range for cold start and RSS
+on Routerich. It is **GO for the next-stage prototype**, but **NO-GO for
+production** until the Promise-heavy `configure` path meets the p95 gate:
+quickjs-oxide measured ~154 ms per Danfoss configure versus Node 6.7 ms p50 /
+15.6 ms p95, and showed a 1.4 s GC p95 in one Lumi run. Reports and sets are
+already at or near Node converter parity.
 
 ### Spike gates
 
-Use the same `tools/bench/corpus/golden.json` and host-call expectations for
-Boa, Kataan and the future Rust host. Functional equality is a prerequisite.
+Use the same `tools/bench/corpus/golden.json` and host-call expectations. The
+quickjs-oxide prototype already matches result/published/host-call sequences
+for all 36 scenarios; functional equality is a prerequisite for the runtime.
 
 Proposed provisional gates (replace with the measured baseline after the
 spike; the Node baseline is in `converter-benchmark-baseline.md`):
@@ -171,8 +177,9 @@ spike; the Node baseline is in `converter-benchmark-baseline.md`):
 - worker RSS ≤ 1.5× Node harness maxRSS (target ≤ 110 MB) and bounded;
 - no conversion blocks the bridge event loop > 50 ms p99.
 
-If Boa misses the gates, run Kataan with the same corpus and golden calls. If
-both miss, return with measurements and discuss a C engine or Node sidecar.
+The selected engine must not proceed to production if it misses the p95 gate.
+First optimize/batch the host API and tune GC; do not switch to a C engine or
+Node sidecar without explicit user approval.
 
 ## 7. Host API and module loader
 

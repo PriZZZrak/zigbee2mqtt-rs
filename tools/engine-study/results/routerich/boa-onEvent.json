@@ -1,0 +1,95 @@
+{
+  "cases": [
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 2.377284999999574,
+        "meanMs": 0.8437539999998687,
+        "minMs": 0.49066099999981816,
+        "p50Ms": 0.5508300000001327,
+        "p95Ms": 1.8690809999998237,
+        "p99Ms": 2.377284999999574
+      },
+      "error": null,
+      "id": "onEvent-daewoo-start",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 3.391153999999915,
+        "meanMs": 1.7587232333335427,
+        "minMs": 1.1600580000003902,
+        "p50Ms": 1.264393000000382,
+        "p95Ms": 3.31528900000103,
+        "p99Ms": 3.391153999999915
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 103.91045099999974,
+        "meanMs": 5.053401466666734,
+        "minMs": 1.0948120000002746,
+        "p50Ms": 1.5389219999997297,
+        "p95Ms": 3.2229580000002898,
+        "p99Ms": 103.91045099999974
+      },
+      "error": null,
+      "id": "onEvent-daewoo-announce",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "manuSpecificTuya",
+            "command": "dataRequest",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "dpValues": [
+                {
+                  "data": {
+                    "0": 1
+                  },
+                  "datatype": 1,
+                  "dp": 101
+                }
+              ],
+              "seq": 1
+            }
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 104.61054800000056,
+        "meanMs": 6.131608633333296,
+        "minMs": 1.7890609999994922,
+        "p50Ms": 2.479079000000638,
+        "p95Ms": 5.269159999999829,
+        "p99Ms": 104.61054800000056
+      }
+    }
+  ],
+  "coldRootMs": 4591.018046,
+  "coldTotalMs": 6045.856924,
+  "cpuMs": 4810.0,
+  "engine": "boa",
+  "maxRssKb": 40184,
+  "prepareMs": 1454.8388779999998,
+  "rssBeforeKb": 34816,
+  "version": "0.22.0"
+}

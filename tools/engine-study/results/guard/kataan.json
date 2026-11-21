@@ -1,0 +1,15 @@
+{
+  "engine": "kataan",
+  "version": "0.0.10",
+  "interrupt": {
+    "result": "ExecError::Interrupted",
+    "x86_ms": 100.1,
+    "watchdog": "Interrupt handle tripped from another thread after 100 ms"
+  },
+  "interrupt_reuse": {
+    "result": "ExecError::Interrupted",
+    "x86_ms": 100.1,
+    "detail": "the same handle can be cleared and reused for a second run"
+  },
+  "memory_limit": "no total heap byte limit; Limits bounds string/array/JSON/BigInt sizes and call depth only"
+}

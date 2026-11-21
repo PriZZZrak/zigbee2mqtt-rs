@@ -1,0 +1,265 @@
+{
+  "cases": [
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 0.0,
+        "meanMs": 0.0,
+        "minMs": 0.0,
+        "p50Ms": 0.0,
+        "p95Ms": 0.0,
+        "p99Ms": 0.0
+      },
+      "error": null,
+      "id": "prepare-external-l101",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 2.6008019999999306,
+        "meanMs": 0.7797509666665974,
+        "minMs": 0.5065109999995911,
+        "p50Ms": 0.5751439999994545,
+        "p95Ms": 1.831995000000461,
+        "p99Ms": 2.6008019999999306
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 4.228823999998895,
+        "meanMs": 0.6603620666666453,
+        "minMs": 0.38232699999934994,
+        "p50Ms": 0.4499580000001515,
+        "p95Ms": 1.3995799999993324,
+        "p99Ms": 4.228823999998895
+      },
+      "error": null,
+      "id": "fz-external-l101-temp",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "local_temperature": 21.5,
+            "occupied_heating_setpoint": 20
+          }
+        ],
+        "result": {
+          "local_temperature": 21.5,
+          "occupied_heating_setpoint": 20
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 106.26173000000016,
+        "meanMs": 5.455268066666819,
+        "minMs": 1.221227999999428,
+        "p50Ms": 1.647334000000228,
+        "p95Ms": 5.666798000000199,
+        "p99Ms": 106.26173000000016
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 2.555021999999554,
+        "meanMs": 0.627335900000071,
+        "minMs": 0.35962800000015704,
+        "p50Ms": 0.4344160000000557,
+        "p95Ms": 2.4654609999997774,
+        "p99Ms": 2.555021999999554
+      },
+      "error": null,
+      "id": "set-external-l101-mode",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "attributes": {
+              "systemMode": 4
+            },
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "write"
+          }
+        ],
+        "converterKey": [
+          "system_mode"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "system_mode": "heat"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 4.579603999999563,
+        "meanMs": 1.9460852666666142,
+        "minMs": 1.2659309999999095,
+        "p50Ms": 1.547924000000421,
+        "p95Ms": 3.982531999999992,
+        "p99Ms": 4.579603999999563
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 4.659624000000804,
+        "meanMs": 0.6927652000000913,
+        "minMs": 0.3871740000004138,
+        "p50Ms": 0.562448000000586,
+        "p95Ms": 1.1104310000000623,
+        "p99Ms": 4.659624000000804
+      },
+      "error": null,
+      "id": "get-external-l101-sensor",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "attributes": [
+              65280
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": [
+          "sensor_type"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 5.955023999999867,
+        "meanMs": 1.8773887666665663,
+        "minMs": 1.2998630000001867,
+        "p50Ms": 1.7512830000005124,
+        "p95Ms": 2.636657000000014,
+        "p99Ms": 5.955023999999867
+      }
+    },
+    {
+      "calls": 7,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 163.84216599999945,
+        "meanMs": 8.57226853333347,
+        "minMs": 1.9765699999998103,
+        "p50Ms": 3.08769299999949,
+        "p95Ms": 6.10567600000013,
+        "p99Ms": 163.84216599999945
+      },
+      "error": null,
+      "id": "configure-external-l101",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "haElectricalMeasurement",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "seMetering",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "attributes": [
+              "localTemp",
+              "occupiedHeatingSetpoint",
+              "systemMode",
+              "runningState"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              65280,
+              65281,
+              65282,
+              65285
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              1288,
+              1295,
+              2048
+            ],
+            "cluster": "haElectricalMeasurement",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "currentSummDelivered"
+            ],
+            "cluster": "seMetering",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 7,
+        "hostMs": 0,
+        "published": [],
+        "result": null
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 164.92366700000002,
+        "meanMs": 9.83391389999997,
+        "minMs": 2.7806930000006105,
+        "p50Ms": 4.592529999999897,
+        "p95Ms": 7.330597000000125,
+        "p99Ms": 164.92366700000002
+      }
+    }
+  ],
+  "coldRootMs": 5353.887157,
+  "coldTotalMs": 6227.698682,
+  "cpuMs": 4810.0,
+  "engine": "boa",
+  "maxRssKb": 40252,
+  "prepareMs": 873.8115250000001,
+  "rssBeforeKb": 33184,
+  "version": "0.22.0"
+}

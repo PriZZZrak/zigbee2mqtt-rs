@@ -1,0 +1,174 @@
+{
+  "cases": [
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 0.5607549999995172,
+        "meanMs": 0.28243969999988017,
+        "minMs": 0.2040499999993699,
+        "p50Ms": 0.23298200000135696,
+        "p95Ms": 0.5113579999997455,
+        "p99Ms": 0.5607549999995172
+      },
+      "error": null,
+      "id": "fz-ikea-onoff",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "state": "ON"
+          }
+        ],
+        "result": {
+          "state": "ON"
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 2.870409000000109,
+        "meanMs": 1.607349733333346,
+        "minMs": 1.1897579999995287,
+        "p50Ms": 1.35441499999979,
+        "p95Ms": 2.6501230000012583,
+        "p99Ms": 2.870409000000109
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 2.85001899999952,
+        "meanMs": 0.5814629333333869,
+        "minMs": 0.23198100000081467,
+        "p50Ms": 0.341855000000578,
+        "p95Ms": 2.736374999999498,
+        "p99Ms": 2.85001899999952
+      },
+      "error": null,
+      "id": "fz-ikea-brightness",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "brightness": 128
+          }
+        ],
+        "result": {
+          "brightness": 128
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 130.9769780000006,
+        "meanMs": 6.387457399999978,
+        "minMs": 1.2511579999991227,
+        "p50Ms": 1.882622999999512,
+        "p95Ms": 4.274143000000549,
+        "p99Ms": 130.9769780000006
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 1.2556210000002466,
+        "meanMs": 0.7180764666669347,
+        "minMs": 0.5308240000003934,
+        "p50Ms": 0.6796310000008816,
+        "p95Ms": 1.2449249999999663,
+        "p99Ms": 1.2556210000002466
+      },
+      "error": null,
+      "id": "fz-ikea-color-temp",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "color_mode": "color_temp",
+            "color_temp": 250
+          }
+        ],
+        "result": {
+          "color_mode": "color_temp",
+          "color_temp": 250
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 26.885628999998517,
+        "meanMs": 3.1325736333332617,
+        "minMs": 1.5501560000002428,
+        "p50Ms": 2.099138999999923,
+        "p95Ms": 4.0170019999986835,
+        "p99Ms": 26.885628999998517
+      }
+    },
+    {
+      "calls": 0,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 1.479060999999092,
+        "meanMs": 0.756398933333124,
+        "minMs": 0.5856849999991027,
+        "p50Ms": 0.6254640000006475,
+        "p95Ms": 1.3561850000005506,
+        "p99Ms": 1.479060999999092
+      },
+      "error": null,
+      "id": "fz-ikea-color-xy",
+      "iterations": 30,
+      "sample": {
+        "calls": [],
+        "converterKey": null,
+        "hostCalls": 0,
+        "hostMs": 0,
+        "published": [
+          {
+            "color": {
+              "x": 0.3805,
+              "y": 0.9274
+            },
+            "color_mode": "xy"
+          }
+        ],
+        "result": {
+          "color": {
+            "x": 0.3805,
+            "y": 0.9274
+          },
+          "color_mode": "xy"
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 3.1467079999993075,
+        "meanMs": 2.0469645333332966,
+        "minMs": 1.6214819999986505,
+        "p50Ms": 1.733355999998821,
+        "p95Ms": 3.0833840000004784,
+        "p99Ms": 3.1467079999993075
+      }
+    }
+  ],
+  "coldRootMs": 5199.308285,
+  "coldTotalMs": 7663.0322080000005,
+  "cpuMs": 5780.0,
+  "engine": "boa",
+  "maxRssKb": 40304,
+  "prepareMs": 2463.723923,
+  "rssBeforeKb": 36896,
+  "version": "0.22.0"
+}

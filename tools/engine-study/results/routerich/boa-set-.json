@@ -1,0 +1,427 @@
+{
+  "cases": [
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 4.1116409999995085,
+        "meanMs": 1.9249236666666851,
+        "minMs": 1.377727999999479,
+        "p50Ms": 1.5514640000001236,
+        "p95Ms": 3.802333000000544,
+        "p99Ms": 4.1116409999995085
+      },
+      "error": null,
+      "id": "set-ikea-onoff",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genOnOff",
+            "command": "on",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {}
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 7.8746560000008685,
+        "meanMs": 3.4898241000001993,
+        "minMs": 2.523090000000593,
+        "p50Ms": 3.0897700000014083,
+        "p95Ms": 5.186678000000029,
+        "p99Ms": 7.8746560000008685
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 153.135725000001,
+        "meanMs": 7.287032533333361,
+        "minMs": 1.3406419999992067,
+        "p50Ms": 2.136454999998932,
+        "p95Ms": 4.219359999999142,
+        "p99Ms": 153.135725000001
+      },
+      "error": null,
+      "id": "set-ikea-brightness",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "level": 128,
+              "optionsMask": 0,
+              "optionsOverride": 0,
+              "transtime": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 154.74897399999918,
+        "meanMs": 9.420910633333339,
+        "minMs": 2.8507879999997385,
+        "p50Ms": 3.8768890000001193,
+        "p95Ms": 7.597817000000759,
+        "p99Ms": 154.74897399999918
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 5.654948000000331,
+        "meanMs": 2.4836423666667544,
+        "minMs": 1.5680830000001151,
+        "p50Ms": 2.1484590000000026,
+        "p95Ms": 4.544902999999977,
+        "p99Ms": 5.654948000000331
+      },
+      "error": null,
+      "id": "set-ikea-color-temp",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "lightingColorCtrl",
+            "command": "moveToColorTemp",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "colortemp": 250,
+              "optionsMask": 0,
+              "optionsOverride": 0,
+              "transtime": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "color_temp",
+          "color_temp_percent"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "color_mode": "color_temp",
+            "color_temp": 250
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 33.35585700000047,
+        "meanMs": 5.016632899999967,
+        "minMs": 2.7516859999996086,
+        "p50Ms": 3.712771999999859,
+        "p95Ms": 7.134626000000026,
+        "p99Ms": 33.35585700000047
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 10.813465000000178,
+        "meanMs": 2.171744066666512,
+        "minMs": 1.2776260000009645,
+        "p50Ms": 1.658643999999185,
+        "p95Ms": 4.118564999998853,
+        "p99Ms": 10.813465000000178
+      },
+      "error": null,
+      "id": "set-ikea-brightness-host-delay",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "level": 128,
+              "optionsMask": 0,
+              "optionsOverride": 0,
+              "transtime": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 12.23258900000019,
+        "meanMs": 3.685442133333375,
+        "minMs": 2.4352230000004056,
+        "p50Ms": 2.9491199999993114,
+        "p95Ms": 6.447684999999183,
+        "p99Ms": 12.23258900000019
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 2.4737699999986944,
+        "meanMs": 0.585784533333026,
+        "minMs": 0.32423500000004424,
+        "p50Ms": 0.4591919999984384,
+        "p95Ms": 1.216841999999815,
+        "p99Ms": 2.4737699999986944
+      },
+      "error": null,
+      "id": "set-l101-setpoint",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "attributes": {
+              "occupiedHeatingSetpoint": 2150
+            },
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "write"
+          }
+        ],
+        "converterKey": [
+          "occupied_heating_setpoint"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "occupied_heating_setpoint": 21.5
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 461.2795649999998,
+        "meanMs": 18.317824033333302,
+        "minMs": 1.2689320000008593,
+        "p50Ms": 1.8388430000013616,
+        "p95Ms": 28.579203999999663,
+        "p99Ms": 461.2795649999998
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 12.39755299999888,
+        "meanMs": 2.2797069333334243,
+        "minMs": 1.089426000000458,
+        "p50Ms": 1.6350229999989097,
+        "p95Ms": 5.271930000000793,
+        "p99Ms": 12.39755299999888
+      },
+      "error": null,
+      "id": "set-tuya-temperature-unit",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "manuSpecificTuya",
+            "command": "dataRequest",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "dpValues": [
+                {
+                  "data": {
+                    "0": 0,
+                    "1": 0,
+                    "2": 0,
+                    "3": 1
+                  },
+                  "datatype": 2,
+                  "dp": 9
+                }
+              ],
+              "seq": 1
+            }
+          }
+        ],
+        "converterKey": null,
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "temperature_unit": "fahrenheit"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 1007.9872019999984,
+        "meanMs": 37.276364600000065,
+        "minMs": 2.0627450000010867,
+        "p50Ms": 3.0511459999997896,
+        "p95Ms": 13.635785000000396,
+        "p99Ms": 1007.9872019999984
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 1.5715450000025155,
+        "meanMs": 0.6495749666663566,
+        "minMs": 0.4564989999998943,
+        "p50Ms": 0.5132049999956507,
+        "p95Ms": 1.0706519999985176,
+        "p99Ms": 1.5715450000025155
+      },
+      "error": null,
+      "id": "set-ts0002-ep2-onoff",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "cluster": "genOnOff",
+            "command": "on",
+            "endpoint": 2,
+            "op": "command",
+            "payload": {}
+          }
+        ],
+        "converterKey": [
+          "state",
+          "on_time",
+          "off_wait_time"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "state": "ON"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 10658.537667,
+        "meanMs": 373.60577546666667,
+        "minMs": 1.410197999997763,
+        "p50Ms": 1.6234819999990575,
+        "p95Ms": 494.5402399999985,
+        "p99Ms": 10658.537667
+      }
+    },
+    {
+      "calls": 1,
+      "converterMs": {
+        "count": 30,
+        "maxMs": 2.4863120000009076,
+        "meanMs": 0.715691266666666,
+        "minMs": 0.45380499999737367,
+        "p50Ms": 0.6398520000002463,
+        "p95Ms": 1.187680999999429,
+        "p99Ms": 2.4863120000009076
+      },
+      "error": null,
+      "id": "set-external-l101-mode",
+      "iterations": 30,
+      "sample": {
+        "calls": [
+          {
+            "attributes": {
+              "systemMode": 4
+            },
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "write"
+          }
+        ],
+        "converterKey": [
+          "system_mode"
+        ],
+        "hostCalls": 1,
+        "hostMs": 0,
+        "published": [],
+        "result": {
+          "state": {
+            "system_mode": "heat"
+          }
+        }
+      },
+      "wallMs": {
+        "count": 30,
+        "maxMs": 157.5536710000015,
+        "meanMs": 7.394679633333241,
+        "minMs": 1.4258939999999711,
+        "p50Ms": 2.1186049999996612,
+        "p95Ms": 5.335407000002306,
+        "p99Ms": 157.5536710000015
+      }
+    }
+  ],
+  "coldRootMs": 4831.914697,
+  "coldTotalMs": 7346.985101,
+  "cpuMs": 15590.0,
+  "engine": "boa",
+  "maxRssKb": 81444,
+  "prepareMs": 2515.070404,
+  "rssBeforeKb": 73064,
+  "version": "0.22.0"
+}

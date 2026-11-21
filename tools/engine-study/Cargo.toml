@@ -1,0 +1,19 @@
+[workspace]
+
+[package]
+name = "engine-study"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+boa_engine = { version = "0.22.0", optional = true, default-features = false }
+kataan = { version = "0.0.10", optional = true, default-features = false, features = ["std", "regex", "host", "module"] }
+serde_json = "1"
+quickjs-oxide = { version = "0.5.0", optional = true }
+quickjs-oxide-host = { version = "0.5.0", optional = true }
+
+[features]
+boa = ["dep:boa_engine"]
+kataan = ["dep:kataan"]
+qjs = ["dep:quickjs-oxide", "dep:quickjs-oxide-host"]
