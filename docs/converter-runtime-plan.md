@@ -140,8 +140,10 @@ thresholds, finalized after the engine spike.
 
 Engine is treated as a replaceable component behind a small host boundary.
 The measured comparison is in
-[`converter-engine-study.md`](converter-engine-study.md); prototypes are in
-[`../tools/engine-study/`](../tools/engine-study/).
+[`converter-engine-study.md`](converter-engine-study.md); the follow-up async
+host study is in
+[`converter-async-host-validation.md`](converter-async-host-validation.md);
+prototypes are in [`../tools/engine-study/`](../tools/engine-study/).
 
 | Engine | Pure Rust | Real upstream corpus | Guard features | Role |
 |---|---|---:|---|---|

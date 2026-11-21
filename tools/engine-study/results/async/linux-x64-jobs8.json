@@ -1,0 +1,505 @@
+{
+  "engine": "quickjs-oxide",
+  "runs": [
+    {
+      "configureConverterMs": 258.410708,
+      "configureDoneMs": 282.45274099999995,
+      "configureError": null,
+      "configureResult": {
+        "calls": [
+          {
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "endpoint": 1,
+            "op": "command",
+            "payload": {
+              "level": 128,
+              "optionsMask": 0,
+              "optionsOverride": 0,
+              "transtime": 0
+            }
+          },
+          {
+            "cluster": "haDiagnostic",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "danfossSystemStatusCode",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 1
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "danfossSystemStatusCode"
+            ],
+            "cluster": "haDiagnostic",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "name": "hvacThermostat",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "hvacUserInterfaceCfg",
+            "op": "addCustomCluster"
+          },
+          {
+            "name": "haDiagnostic",
+            "op": "addCustomCluster"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "localTemp",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "localTemp"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "occupiedHeatingSetpoint",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "occupiedHeatingSetpoint"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "systemMode",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 0
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "systemMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "pIHeatingDemand",
+                "maximumReportInterval": 3600,
+                "minimumReportInterval": 0,
+                "reportableChange": 0
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "pIHeatingDemand"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "maxHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "minHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "programingOperMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "systemMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "keypadLockout"
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": {
+              "dstEnd": 4294967295,
+              "dstShift": 0,
+              "dstStart": 4294967295,
+              "time": 848491200,
+              "timeStatus": 2,
+              "timeZone": 14400
+            },
+            "cluster": "genTime",
+            "endpoint": 1,
+            "op": "write"
+          },
+          {
+            "attributes": [
+              "absMaxHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "absMinHeatSetpointLimit"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossHeatingSystemMode"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "cluster": "genPowerCfg",
+            "endpoint": 1,
+            "op": "bind",
+            "target": 1
+          },
+          {
+            "cluster": "genPowerCfg",
+            "endpoint": 1,
+            "items": [
+              {
+                "attribute": "batteryPercentageRemaining",
+                "maximumReportInterval": 65000,
+                "minimumReportInterval": 3600,
+                "reportableChange": 10
+              }
+            ],
+            "op": "configureReporting"
+          },
+          {
+            "attributes": [
+              "batteryPercentageRemaining"
+            ],
+            "cluster": "genPowerCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "keypadLockout"
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossMountedModeActive"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossMountedModeControl"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossThermostatOrientation"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossViewingDirection"
+            ],
+            "cluster": "hvacUserInterfaceCfg",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossHeatAvailable"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossHeatRequired"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossExternalMeasuredRoomSensor"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossRadiatorCovered"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossWindowOpenFeatureEnable"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossWindowOpenInternal"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossWindowOpenExternal"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossDayOfWeek"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAlgorithmScaleFactor"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossLoadBalancingEnable"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossLoadRoomMean"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossLoadEstimate"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossPreheatStatus"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossPreheatTime"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAdaptionRunStatus"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAdaptionRunSettings"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossAdaptionRunControl"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          },
+          {
+            "attributes": [
+              "danfossRegulationSetpointOffset"
+            ],
+            "cluster": "hvacThermostat",
+            "endpoint": 1,
+            "op": "read"
+          }
+        ],
+        "converterMs": 258.410708,
+        "hostCalls": 51,
+        "hostMs": 0,
+        "perf": {
+          "addCustomCluster": 3,
+          "boundaryMs": 0.034867999999960375,
+          "getCluster": 26,
+          "getEndpoint": 2,
+          "getInputClusters": 37,
+          "hostCalls": 51,
+          "mockMs": 0,
+          "resumeMs": 0,
+          "serializeMs": 0.10976700000009032
+        },
+        "published": [],
+        "result": null
+      },
+      "driveError": null,
+      "engine": "quickjs-oxide",
+      "firstJobDoneMs": 281.2245929999999,
+      "hostOpsSettled": 59,
+      "initialEvalMs": 281.153217,
+      "initialJobsMs": 0.0009970000000407708,
+      "interleaved": true,
+      "jobs": 8,
+      "jobsBeforeConfigureDone": 8,
+      "mode": "normal",
+      "readResultMs": 0.055889,
+      "runJobsMs": 1.4374810000000007,
+      "settleMs": 0.023230000000000008,
+      "totalMs": 1.466296,
+      "turns": 51
+    },
+    {
+      "evalAfterError": true,
+      "hostResult": "rejected:host EIO",
+      "mode": "host_error"
+    },
+    {
+      "afterInterrupt": true,
+      "hostTimeoutResult": "rejected:host timeout after 100 ms",
+      "interruptMs": 100.186729,
+      "interruptResult": "Interrupted",
+      "mode": "timeout_cancel"
+    }
+  ],
+  "version": "0.5.0"
+}

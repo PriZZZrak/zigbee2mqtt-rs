@@ -231,6 +231,7 @@ struct Args {
     bootstrap: PathBuf,
     filter: String,
     iterations: usize,
+    profile_host: bool,
 }
 
 fn parse_args() -> Args {
@@ -243,6 +244,7 @@ fn parse_args() -> Args {
         bootstrap: PathBuf::from("tools/engine-study/fixtures/bootstrap.js"),
         filter: String::new(),
         iterations: 20,
+        profile_host: false,
     };
     let mut iter = std::env::args().skip(1);
     while let Some(flag) = iter.next() {
@@ -256,6 +258,7 @@ fn parse_args() -> Args {
             "--bootstrap" => args.bootstrap = PathBuf::from(value()),
             "--filter" => args.filter = value(),
             "--iterations" => args.iterations = value().parse().expect("iterations"),
+            "--profile-host" => args.profile_host = true,
             other => panic!("unknown argument {other}"),
         }
     }
@@ -348,7 +351,7 @@ fn run_qjs(args: &Args, root: &Path, scenarios: &[Value]) {
         .expect("hostOp");
 
     let preamble = format!(
-        "globalThis.__root = {};\nglobalThis.__external = {};\nglobalThis.__zclPath = {};\nglobalThis.__herdsmanRoot = {};",
+        "globalThis.__root = {};\nglobalThis.__external = {};\nglobalThis.__zclPath = {};\nglobalThis.__herdsmanRoot = {};\nglobalThis.__profileHost = {};",
         serde_json::to_string(&root.to_string_lossy()).unwrap(),
         serde_json::to_string(&args.external.to_string_lossy()).unwrap(),
         serde_json::to_string(&args.zcl.to_string_lossy()).unwrap(),
@@ -360,6 +363,7 @@ fn run_qjs(args: &Args, root: &Path, scenarios: &[Value]) {
                 .to_string_lossy()
         )
         .unwrap(),
+        args.profile_host,
     );
     context.eval(&preamble).expect("globals");
 
@@ -475,6 +479,7 @@ fn summarize_results(id: &str, text: &str, error: Value) -> Value {
                 "converterKey": r["converterKey"],
                 "hostMs": r["hostMs"],
                 "hostCalls": r["hostCalls"],
+                "perf": r["perf"],
                 "calls": r["calls"],
             })
         });
@@ -518,7 +523,7 @@ fn run_boa(args: &Args, root: &Path, scenarios: &[Value]) {
     }
 
     let preamble = format!(
-        "globalThis.__root = {};\nglobalThis.__external = {};\nglobalThis.__zclPath = {};\nglobalThis.__herdsmanRoot = {};",
+        "globalThis.__root = {};\nglobalThis.__external = {};\nglobalThis.__zclPath = {};\nglobalThis.__herdsmanRoot = {};\nglobalThis.__profileHost = {};",
         serde_json::to_string(&root.to_string_lossy()).unwrap(),
         serde_json::to_string(&args.external.to_string_lossy()).unwrap(),
         serde_json::to_string(&args.zcl.to_string_lossy()).unwrap(),
@@ -530,6 +535,7 @@ fn run_boa(args: &Args, root: &Path, scenarios: &[Value]) {
                 .to_string_lossy()
         )
         .unwrap(),
+        args.profile_host,
     );
     context
         .eval(Source::from_bytes(&preamble))
@@ -641,7 +647,7 @@ fn run_kataan(args: &Args, root: &Path, scenarios: &[Value]) {
     interp.register_global_fn("__hostOp", 1, host_op);
 
     let preamble = format!(
-        "globalThis.__root = {};\nglobalThis.__external = {};\nglobalThis.__zclPath = {};\nglobalThis.__herdsmanRoot = {};",
+        "globalThis.__root = {};\nglobalThis.__external = {};\nglobalThis.__zclPath = {};\nglobalThis.__herdsmanRoot = {};\nglobalThis.__profileHost = {};",
         serde_json::to_string(&root.to_string_lossy()).unwrap(),
         serde_json::to_string(&args.external.to_string_lossy()).unwrap(),
         serde_json::to_string(&args.zcl.to_string_lossy()).unwrap(),
@@ -653,6 +659,7 @@ fn run_kataan(args: &Args, root: &Path, scenarios: &[Value]) {
                 .to_string_lossy()
         )
         .unwrap(),
+        args.profile_host,
     );
     let program = Parser::parse_program(&preamble).expect("preamble parse");
     interp.run(&program).expect("set globals");

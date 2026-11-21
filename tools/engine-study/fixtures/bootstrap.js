@@ -122,8 +122,11 @@
 
   // ---- Zcl shim from a JSON snapshot of zigbee-herdsman ------------------
   var zcl = JSON.parse(__readFile(zclPath));
+  var clusterCache = Object.create(null);
   zcl.Utils = {
     getCluster: function (name, manufacturerCode, customClusters) {
+      perf.getCluster = (perf.getCluster || 0) + 1;
+      if (!manufacturerCode && !customClusters && clusterCache[name]) return clusterCache[name];
       if (customClusters && customClusters[name]) return customClusters[name];
       var cluster = zcl.Clusters[name];
       if (!cluster) {
@@ -139,6 +142,7 @@
         }
         throw new Error("Unknown cluster " + String(name));
       }
+      if (!manufacturerCode && !customClusters) clusterCache[name] = cluster;
       return cluster;
     },
     getClusterAttribute: function (clusterName, attributeName) {
@@ -325,11 +329,27 @@
   }
   var hostMs = 0;
   var hostCalls = 0;
+  var profileHost = !!globalThis.__profileHost;
+  var perf = { serializeMs: 0, boundaryMs: 0, resumeMs: 0, mockMs: 0, hostCalls: 0 };
+  function profileStart() { return profileHost ? __now() : 0; }
+  function profileEnd(started) { if (profileHost) perf.mockMs += __now() - started; }
   function hostCall(op) {
     var started = __now();
-    var result = __hostOp(JSON.stringify(op));
-    hostMs += __now() - started;
+    var text = JSON.stringify(op);
+    var serialized = __now();
+    var result = __hostOp(text);
+    var returned = __now();
+    hostMs += returned - started;
     hostCalls += 1;
+    perf.serializeMs += serialized - started;
+    perf.boundaryMs += returned - serialized;
+    perf.hostCalls += 1;
+    if (profileHost && result && typeof result.then === "function") {
+      result = result.then(function (value) {
+        perf.resumeMs += __now() - returned;
+        return value;
+      });
+    }
     return result && typeof result.then === "function" ? result : Promise.resolve(result);
   }
 
@@ -347,15 +367,24 @@
       device: device,
       getDevice: function () { return device; },
       getCluster: function (key, manufacturerCode) {
+        perf.endpointGetCluster = (perf.endpointGetCluster || 0) + 1;
         return zcl.Utils.getCluster(key, manufacturerCode, device.customClusters);
       },
+      inputClusterCache: null,
+      outputClusterCache: null,
       getInputClusters: function () {
-        return endpoint.inputClusters.map(function (key) { return zcl.Utils.getCluster(key); });
+        perf.getInputClusters = (perf.getInputClusters || 0) + 1;
+        if (endpoint.inputClusterCache) return endpoint.inputClusterCache;
+        endpoint.inputClusterCache = endpoint.inputClusters.map(function (key) { return zcl.Utils.getCluster(key); });
+        return endpoint.inputClusterCache;
       },
       getOutputClusters: function () {
-        return endpoint.outputClusters.map(function (key) { return zcl.Utils.getCluster(key); });
+        if (endpoint.outputClusterCache) return endpoint.outputClusterCache;
+        endpoint.outputClusterCache = endpoint.outputClusters.map(function (key) { return zcl.Utils.getCluster(key); });
+        return endpoint.outputClusterCache;
       },
       supportsInputCluster: function (key) {
+        perf.supportsInputCluster = (perf.supportsInputCluster || 0) + 1;
         var name = zcl.Utils.getCluster(key).name;
         return endpoint.inputClusters.some(function (candidate) {
           return zcl.Utils.getCluster(candidate).name === name;
@@ -423,14 +452,20 @@
       customReadResponse: undefined,
       endpoints: [],
       getEndpoint: function (id) {
+        perf.getEndpoint = (perf.getEndpoint || 0) + 1;
         for (var i = 0; i < device.endpoints.length; i++) {
           if (device.endpoints[i].ID === id) return device.endpoints[i];
         }
         return undefined;
       },
       addCustomCluster: function (name, definition) {
+        perf.addCustomCluster = (perf.addCustomCluster || 0) + 1;
         callLog.push({ op: "addCustomCluster", name: name });
         device.customClusters[name] = definition;
+        for (var e = 0; e < device.endpoints.length; e++) {
+          device.endpoints[e].inputClusterCache = null;
+          device.endpoints[e].outputClusterCache = null;
+        }
       },
       save: function () { return Promise.resolve(); },
     };
@@ -496,6 +531,7 @@
     callLog.length = 0;
     hostMs = 0;
     hostCalls = 0;
+    perf = { serializeMs: 0, boundaryMs: 0, resumeMs: 0, mockMs: 0, hostCalls: 0 };
     readValues = Object.assign({}, scenario.readValues || {});
     var endpointId = scenario.endpointId || 1;
     var endpoint = device.getEndpoint(endpointId) || device.endpoints[0];
@@ -528,7 +564,7 @@
     }
 
     if (scenario.kind === "prepare") {
-      return { result: null, published: [], calls: [], converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls };
+      return { result: null, published: [], calls: [], converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls, perf: perf };
     }
 
     if (scenario.kind === "fromZigbee") {
@@ -555,7 +591,7 @@
         if (converted) merged = Object.assign(merged, converted);
       }
       if (Object.keys(merged).length) published.push(merged);
-      return { result: Object.keys(merged).length ? merged : null, published: published, calls: callLog.slice(), converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls };
+      return { result: Object.keys(merged).length ? merged : null, published: published, calls: callLog.slice(), converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls, perf: perf };
     }
 
     if (scenario.kind === "set" || scenario.kind === "get") {
@@ -571,7 +607,7 @@
           ? converter.convertSet(endpoint, scenario.key, scenario.value, meta)
           : converter.convertGet(endpoint, scenario.key, meta);
       });
-      return { result: result === undefined ? null : result, published: published, calls: callLog.slice(), converterKey: converter.key, converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls };
+      return { result: result === undefined ? null : result, published: published, calls: callLog.slice(), converterKey: converter.key, converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls, perf: perf };
     }
 
     if (scenario.kind === "configure") {
@@ -584,7 +620,7 @@
       coordinator.endpoints = [makeEndpoint({ id: 1, inputClusters: [], outputClusters: [] }, coordinator)];
       coordinator.endpoints[0].deviceIeeeAddress = coordinator.ieeeAddr;
       await timed(function () { return definition.configure(device, coordinator.endpoints[0], definition); });
-      return { result: null, published: published, calls: callLog.slice(), converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls };
+      return { result: null, published: published, calls: callLog.slice(), converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls, perf: perf };
     }
 
     if (scenario.kind === "onEvent") {
@@ -592,7 +628,7 @@
       var event = { type: scenario.eventType, data: { device: device, state: Object.assign({}, state), options: Object.assign({}, options), deviceExposesChanged: function () {} } };
       if (scenario.eventType === "deviceInterview") event.data.status = "successful";
       await timed(function () { return definition.onEvent(event); });
-      return { result: null, published: published, calls: callLog.slice(), converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls };
+      return { result: null, published: published, calls: callLog.slice(), converterMs: converterMs, hostMs: hostMs, hostCalls: hostCalls, perf: perf };
     }
 
     throw new Error("unknown scenario kind " + scenario.kind);
@@ -623,6 +659,46 @@
       globalThis.__lastError = String(error && (error.name ? error.name + ": " + error.message + "\n" + (error.stack || "") : error.stack || error));
       return -1;
     }
+  };
+
+  globalThis.__asyncStart = function (configureJson, jobJson, jobs) {
+    var state = { start: __now(), configureDone: null, configureError: null, jobsDone: 0, firstJobDone: null, allDone: null };
+    globalThis.__asyncState = state;
+    var configurePromise = runScenario(JSON.parse(configureJson))
+      .then(function (result) { state.configureResult = result; state.configureDone = __now() - state.start; })
+      .catch(function (error) { state.configureError = String(error && error.stack ? error.stack : error); state.configureDone = __now() - state.start; });
+    var jobPromises = [];
+    for (var i = 0; i < jobs; i++) {
+      var jobSpec = JSON.parse(jobJson);
+      jobSpec.device = Object.assign({}, jobSpec.device || {}, {
+        ieeeAddr: "0x00124b" + (0x2000 + i).toString(16).padStart(10, "0").slice(-10),
+        networkAddress: 0x2000 + i,
+      });
+      jobPromises.push(runScenario(jobSpec).then(function () {
+        state.jobsDone += 1;
+        if (state.firstJobDone === null) state.firstJobDone = __now() - state.start;
+      }).catch(function (error) { state.jobError = String(error && error.stack ? error.stack : error); }));
+    }
+    Promise.all([configurePromise].concat(jobPromises)).then(function () {
+      state.allDone = __now() - state.start;
+      globalThis.__lastResult = JSON.stringify(state);
+    });
+    return true;
+  };
+
+  globalThis.__hostErrorProbe = async function () {
+    try {
+      await __hostOp("{}");
+      globalThis.__lastResult = "resolved";
+    } catch (error) {
+      globalThis.__lastResult = "rejected:" + String(error);
+    }
+  };
+
+  globalThis.__nowCost = function (n) {
+    var started = __now();
+    for (var i = 0; i < n; i++) __now();
+    return (__now() - started) / n;
   };
 
   globalThis.__prepareOnly = function (spec) {

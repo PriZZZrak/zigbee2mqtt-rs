@@ -13,11 +13,12 @@ for the comparison, measurements and GO/NO-GO decision.
 | `src/bin/feature_probe.rs` | Language/feature probe (`fixtures/features.js`) |
 | `src/bin/converter_probe.rs` | Loads the real upstream package through the JS CJS loader and runs the golden scenarios |
 | `src/bin/guard_probe.rs` | Infinite loop / heap limit / recovery probes |
+| `src/bin/async_probe.rs` | Pending-Promise host scheduler, interleaving, host error/timeout/interrupt |
 | `fixtures/bootstrap.js` | CJS loader, Node shims, Zcl shim, device/endpoint mocks, scenario runner |
 | `fixtures/scenarios.json` | The 36 converter scenarios from `tools/bench/scenarios.mjs` |
 | `fixtures/zcl.json` | JSON snapshot of upstream `Zcl` enums/clusters/consts |
 | `fixtures/features.js` | Language surface probe |
-| `results/` | Raw x86 and Routerich runs, guard results |
+| `results/` | Raw x86 and Routerich runs, guard, async and profile results |
 
 The upstream package is not vendored here; the probes read the pinned install
 from `.upstream/` (x86) or `/opt/zigbee2mqtt/node_modules/...` (router).
@@ -65,6 +66,25 @@ Guard probe:
 ```bash
 target/release/guard_probe
 ```
+
+Async host scheduler (quickjs-oxide only):
+
+```bash
+target/release/async_probe --jobs 8
+```
+
+Host-operation profiles (`serializeMs`, `boundaryMs`, `resumeMs`, Zcl/mock
+lookup counts):
+
+```bash
+target/release/converter_probe --filter configure-danfoss --iterations 20 \
+  --profile-host
+```
+
+The async probe starts one `configure-danfoss` plus N independent set jobs,
+returns pending Promises to Rust, settles them from the scheduler and reports
+interleaving, host errors, timeout and interrupt recovery. The current
+scheduler is a study prototype, not a production scheduler.
 
 ## Run (Routerich AX3000)
 
@@ -124,5 +144,10 @@ environment workarounds, not part of the runtime design.
 - It calls the real upstream converters; it is not a substitute for the
   production host, loader or bridge integration.
 - `converterMs` excludes loader/mock overhead; `wallMs` includes it.
+- `bootstrap.js` contains study-only lookup caches used by the async
+  performance experiment. They preserve upstream semantics (cluster
+  definitions are immutable and caches are invalidated on
+  `addCustomCluster`), but production should use a Rust-side Zcl index
+  instead.
 - Do not reuse the prototype as production code. The study report lists the
   gates that a production runtime must satisfy.

@@ -246,16 +246,19 @@ Rejected:
 - **GO** for a focused next-stage **prototype** of the runtime on
   quickjs-oxide, because the engine is viable, functionally compatible and can
   be bounded.
-- **NO-GO for production** against the current acceptance gate
-  (converter-only p95 ≤ 2× Node) until the **configure/async host path** is
-  brought into budget. quickjs-oxide is ~10–14× Node on `configure-danfoss`, ~2.8× on
-  `configure-l101z` p95, and one scenario showed a 1.4 s GC p95. Reports are at
-  parity; sets are ~1.6× on p95. These are host-integration and GC
-  tuning problems, not language-compatibility problems.
+- **NO-GO for production** until the scheduler and remaining gates are
+  complete. The follow-up
+  [`converter-async-host-validation.md`](converter-async-host-validation.md)
+  found that the Danfoss slowdown was a study-shim Zcl lookup cost (962
+  uncached `getCluster` calls); after semantic-preserving lookup caches the
+  Routerich configure p95 is **25.1 ms vs Node 15.6 ms (1.6×)** and the true
+  async floor is 22–26 ms. Reports are at parity; the remaining production
+  risk is scheduler fairness under concurrent devices, not the engine's
+  language support.
 - Do not start the production implementation before:
-  1. the configure path is re-measured with a batched/optimized host API and
-     reaches the p95 gate (or the gate is explicitly amended with user
-     approval);
+  1. the scheduler prototype is replaced by bounded, fair per-device
+     scheduling and re-measured under concurrent load; the configure path is
+     already within the p95 gate after the lookup-cache fix;
   2. the quickjs-oxide 0.5.0 pin is vendored/audited and the build is
      reproducible for aarch64-musl;
   3. timer execution, `setTimeout(...).unref()` semantics, Zcl/time shims and

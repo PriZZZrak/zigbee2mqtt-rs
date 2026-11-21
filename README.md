@@ -20,6 +20,7 @@ Node.js-мост, сохранив MQTT-контракты, сущности Hom
   (harness и golden corpus — [`tools/bench/`](tools/bench/))
 - Engine feasibility study: [`docs/converter-engine-study.md`](docs/converter-engine-study.md)
   (прототипы — [`tools/engine-study/`](tools/engine-study/))
+- Async host validation: [`docs/converter-async-host-validation.md`](docs/converter-async-host-validation.md)
 
 ## Что входит в R1
 
