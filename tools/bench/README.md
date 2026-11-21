@@ -166,6 +166,7 @@ concurrent reports and sets, and pending host Promises:
 | `mixed-32-devices-c16` | 3,000 mixed reports/sets, 32 devices, 1 ms delay |
 | `queue-backlog-sets-c4` | 2,000 sets queued up front, 5 ms delay, concurrency 4 |
 | `pending-sets-c64-delay20` | 200 sets, 20 ms delay, concurrency 64 (many in-flight Promises) |
+| `scheduler-configure-c1` / `-c4` | one Danfoss configure + 8 set jobs, serial or 4-way; optional 1 ms host delay |
 
 All operations are enqueued before workers start, so `queueWaitMs` measures
 backlog time and `latencyMs` measures submit-to-complete. `serviceMs` is
@@ -173,6 +174,12 @@ execution time after a worker picks the operation. Results report throughput
 (completed ops / wall time) and p50/p95/p99 for queue wait, service and
 end-to-end latency, plus CPU and RSS. The workload is deterministic (fixed
 device assignment and transaction-id sequence); only timing varies.
+
+The scheduler workloads warm the configure/set definitions before measuring,
+matching the Rust runtime's warmup; use the `-delay1` variants when comparing
+against a Rust host boundary that crosses threads. The Node single-call
+baseline is not the reference for these runs. Full results used by the runtime
+prototype are in `tools/bench/results/scheduler/`.
 
 The stress run does not replace or extend the single-call tables: keep its
 output in `stress/` and compare stress-to-stress only.

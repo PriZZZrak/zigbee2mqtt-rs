@@ -1,0 +1,13 @@
+[package]
+name = "converter-runtime"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+# Minimal converter runtime prototype. Not a production bridge integration.
+
+[dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }
+quickjs-oxide = "=0.5.0"
+quickjs-oxide-host = "=0.5.0"

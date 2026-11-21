@@ -1,0 +1,262 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "same-device",
+  "maxConcurrent": 4,
+  "hostDelayMs": 5,
+  "submitted": 4,
+  "submitErrors": 0,
+  "servedHostOps": 56,
+  "elapsedMs": 858.71994,
+  "startupMs": 1440.259808,
+  "warmupMs": 828.947954,
+  "completed": 6,
+  "failed": 0,
+  "cancelled": 0,
+  "lateResponses": 0,
+  "hostTimeouts": 0,
+  "gcCollections": 3,
+  "gcMaxPauseMs": 12.341668,
+  "heapLiveBytes": 5631659,
+  "cases": [
+    {
+      "id": 3,
+      "scenarioId": "set-ikea-brightness",
+      "device": "same-device",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 5.967251000000147,
+        "hostMs": 0.10012499999993452,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04463199999997869,
+          "boundaryMs": 0.05549299999995583,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.008153,
+        "evalMs": 1.623429,
+        "jsExecMs": 5.967251000000147,
+        "promiseSchedMs": 0.653655,
+        "hostWaitMs": 5.128393,
+        "totalMs": 7.420654,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 12.341668,
+        "heapLiveBytes": 5631659
+      }
+    },
+    {
+      "id": 4,
+      "scenarioId": "set-ikea-brightness",
+      "device": "same-device",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 6.17851399999995,
+        "hostMs": 0.20436499999993885,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.08242099999995389,
+          "boundaryMs": 0.12194399999998495,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 5.669368,
+        "evalMs": 2.4939850000000003,
+        "jsExecMs": 6.17851399999995,
+        "promiseSchedMs": 0.418804,
+        "hostWaitMs": 5.147312,
+        "totalMs": 13.649618,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 12.341668,
+        "heapLiveBytes": 5631659
+      }
+    },
+    {
+      "id": 5,
+      "scenarioId": "set-ikea-brightness",
+      "device": "same-device",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 5.743394999999964,
+        "hostMs": 0.11353999999994356,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04402900000002319,
+          "boundaryMs": 0.06951099999992039,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 13.574276999999999,
+        "evalMs": 1.653257,
+        "jsExecMs": 5.743394999999964,
+        "promiseSchedMs": 0.328034,
+        "hostWaitMs": 5.155832,
+        "totalMs": 20.69754,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 12.341668,
+        "heapLiveBytes": 5631659
+      }
+    },
+    {
+      "id": 6,
+      "scenarioId": "set-ikea-brightness",
+      "device": "same-device",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 5.763615999999956,
+        "hostMs": 0.09712200000001305,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.043348000000037246,
+          "boundaryMs": 0.053773999999975786,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 20.648129,
+        "evalMs": 1.4220979999999999,
+        "jsExecMs": 5.763615999999956,
+        "promiseSchedMs": 0.375692,
+        "hostWaitMs": 5.1635159999999996,
+        "totalMs": 27.605491,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 12.341668,
+        "heapLiveBytes": 5631659
+      }
+    }
+  ]
+}

@@ -1,0 +1,326 @@
+{
+  "manifest": {
+    "generatedAt": "2026-11-20T12:00:00.000Z",
+    "label": "routerich-openwrt",
+    "benchmark": "concurrency-stress",
+    "node": "v22.23.4",
+    "platform": "linux",
+    "arch": "arm64",
+    "converterVersion": "26.125.0",
+    "converterRoot": "/opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters",
+    "upstreamZigbee2mqtt": null,
+    "upstreamConverters": null,
+    "externalConverter": {
+      "path": "/tmp/z2m-bench/fixtures/external/L101Ze_z2m.js",
+      "sha256": "25393d405e551804858a046dc251ec4aa7907ecce7ddf3ba16aea919c6814907"
+    },
+    "fixedClock": "2026-11-20T12:00:00Z",
+    "command": "/usr/bin/node /tmp/z2m-bench/stress.mjs --package /opt/zigbee2mqtt/node_modules/zigbee-herdsman-converters --external /tmp/z2m-bench/fixtures/external/L101Ze_z2m.js --filter scheduler-configure --label routerich-openwrt --out /tmp/z2m-bench/scheduler-node"
+  },
+  "results": [
+    {
+      "name": "scheduler-configure-c1",
+      "kind": "scheduler",
+      "devices": 9,
+      "concurrency": 1,
+      "operations": 9,
+      "hostDelayMs": 0,
+      "wallMs": 89.72328299999936,
+      "throughputOpsPerSec": 100.30841158587637,
+      "queueWaitMs": {
+        "count": 9,
+        "meanMs": 57.53813822222219,
+        "p50Ms": 63.884272999999666,
+        "p95Ms": 76.9153439999991,
+        "p99Ms": 76.9153439999991,
+        "minMs": 1.2581580000005488,
+        "maxMs": 76.9153439999991,
+        "totalMs": 517.8432439999997,
+        "opsPerSecond": 17.379776803653744
+      },
+      "serviceMs": {
+        "count": 9,
+        "meanMs": 9.626621888889026,
+        "p50Ms": 4.253590999998778,
+        "p95Ms": 49.0708369999993,
+        "p99Ms": 49.0708369999993,
+        "minMs": 1.7019600000003265,
+        "maxMs": 49.0708369999993,
+        "totalMs": 86.63959700000123,
+        "opsPerSecond": 103.87859952764867
+      },
+      "latencyMs": {
+        "count": 9,
+        "meanMs": 67.1647601111112,
+        "p50Ms": 67.39914300000055,
+        "p95Ms": 88.12996600000042,
+        "p99Ms": 88.12996600000042,
+        "minMs": 50.32899499999985,
+        "maxMs": 88.12996600000042,
+        "totalMs": 604.4828410000009,
+        "opsPerSecond": 14.88876009302634
+      },
+      "converterMs": {
+        "count": 9,
+        "meanMs": 8.343449555555505,
+        "p50Ms": 3.4613179999996646,
+        "p95Ms": 47.56184899999971,
+        "p99Ms": 47.56184899999971,
+        "minMs": 0.9957849999991595,
+        "maxMs": 47.56184899999971,
+        "totalMs": 75.09104599999955,
+        "opsPerSecond": 119.85450302556784
+      },
+      "configureLatencyMs": {
+        "count": 1,
+        "meanMs": 50.32899499999985,
+        "p50Ms": 50.32899499999985,
+        "p95Ms": 50.32899499999985,
+        "p99Ms": 50.32899499999985,
+        "minMs": 50.32899499999985,
+        "maxMs": 50.32899499999985,
+        "totalMs": 50.32899499999985,
+        "opsPerSecond": 19.869262241378017
+      },
+      "configureConverterMs": {
+        "count": 1,
+        "meanMs": 47.56184899999971,
+        "p50Ms": 47.56184899999971,
+        "p95Ms": 47.56184899999971,
+        "p99Ms": 47.56184899999971,
+        "minMs": 47.56184899999971,
+        "maxMs": 47.56184899999971,
+        "totalMs": 47.56184899999971,
+        "opsPerSecond": 21.025254926485427
+      }
+    },
+    {
+      "name": "scheduler-configure-c4",
+      "kind": "scheduler",
+      "devices": 9,
+      "concurrency": 4,
+      "operations": 9,
+      "hostDelayMs": 0,
+      "wallMs": 25.27864099999897,
+      "throughputOpsPerSec": 356.03179775369915,
+      "queueWaitMs": {
+        "count": 9,
+        "meanMs": 5.793433666666008,
+        "p50Ms": 6.275399000000107,
+        "p95Ms": 12.209328999999343,
+        "p99Ms": 12.209328999999343,
+        "minMs": 0.24282899999889196,
+        "maxMs": 12.209328999999343,
+        "totalMs": 52.14090299999407,
+        "opsPerSecond": 172.60920855170122
+      },
+      "serviceMs": {
+        "count": 9,
+        "meanMs": 6.542379999999968,
+        "p50Ms": 4.818961999999374,
+        "p95Ms": 24.953561000000263,
+        "p99Ms": 24.953561000000263,
+        "minMs": 1.7147320000003674,
+        "maxMs": 24.953561000000263,
+        "totalMs": 58.88141999999971,
+        "opsPerSecond": 152.84957461963458
+      },
+      "latencyMs": {
+        "count": 9,
+        "meanMs": 12.335813666665976,
+        "p50Ms": 12.194402999999511,
+        "p95Ms": 25.196389999999155,
+        "p99Ms": 25.196389999999155,
+        "minMs": 6.216922999999952,
+        "maxMs": 25.196389999999155,
+        "totalMs": 111.02232299999378,
+        "opsPerSecond": 81.06477829688814
+      },
+      "converterMs": {
+        "count": 9,
+        "meanMs": 4.961313333333237,
+        "p50Ms": 2.780226999999286,
+        "p95Ms": 24.05910799999947,
+        "p99Ms": 24.05910799999947,
+        "minMs": 0.8630599999996775,
+        "maxMs": 24.05910799999947,
+        "totalMs": 44.651819999999134,
+        "opsPerSecond": 201.55953329562323
+      },
+      "configureLatencyMs": {
+        "count": 1,
+        "meanMs": 25.196389999999155,
+        "p50Ms": 25.196389999999155,
+        "p95Ms": 25.196389999999155,
+        "p99Ms": 25.196389999999155,
+        "minMs": 25.196389999999155,
+        "maxMs": 25.196389999999155,
+        "totalMs": 25.196389999999155,
+        "opsPerSecond": 39.68822517829076
+      },
+      "configureConverterMs": {
+        "count": 1,
+        "meanMs": 24.05910799999947,
+        "p50Ms": 24.05910799999947,
+        "p95Ms": 24.05910799999947,
+        "p99Ms": 24.05910799999947,
+        "minMs": 24.05910799999947,
+        "maxMs": 24.05910799999947,
+        "totalMs": 24.05910799999947,
+        "opsPerSecond": 41.564300721374295
+      }
+    },
+    {
+      "name": "scheduler-configure-c1-delay1",
+      "kind": "scheduler",
+      "devices": 9,
+      "concurrency": 1,
+      "operations": 9,
+      "hostDelayMs": 1,
+      "wallMs": 276.14595999999983,
+      "throughputOpsPerSec": 32.59145996559213,
+      "queueWaitMs": {
+        "count": 9,
+        "meanMs": 235.4649773333341,
+        "p50Ms": 263.1855220000016,
+        "p95Ms": 273.89201800000046,
+        "p99Ms": 273.89201800000046,
+        "minMs": 0.07817299999987881,
+        "maxMs": 273.89201800000046,
+        "totalMs": 2119.184796000007,
+        "opsPerSecond": 4.246916086311885
+      },
+      "serviceMs": {
+        "count": 9,
+        "meanMs": 30.653201888888766,
+        "p50Ms": 2.3036469999988185,
+        "p95Ms": 255.30965000000106,
+        "p99Ms": 255.30965000000106,
+        "minMs": 1.0971950000002835,
+        "maxMs": 255.30965000000106,
+        "totalMs": 275.8788169999989,
+        "opsPerSecond": 32.62301940347974
+      },
+      "latencyMs": {
+        "count": 9,
+        "meanMs": 266.11817922222286,
+        "p50Ms": 267.0643280000004,
+        "p95Ms": 276.0933320000004,
+        "p99Ms": 276.0933320000004,
+        "minMs": 255.38782300000094,
+        "maxMs": 276.0933320000004,
+        "totalMs": 2395.0636130000057,
+        "opsPerSecond": 3.7577290019143965
+      },
+      "converterMs": {
+        "count": 9,
+        "meanMs": 29.57527711111147,
+        "p50Ms": 1.939556999999695,
+        "p95Ms": 249.779896,
+        "p99Ms": 249.779896,
+        "minMs": 0.7198710000011488,
+        "maxMs": 249.779896,
+        "totalMs": 266.1774940000032,
+        "opsPerSecond": 33.81202469356741
+      },
+      "configureLatencyMs": {
+        "count": 1,
+        "meanMs": 255.38782300000094,
+        "p50Ms": 255.38782300000094,
+        "p95Ms": 255.38782300000094,
+        "p99Ms": 255.38782300000094,
+        "minMs": 255.38782300000094,
+        "maxMs": 255.38782300000094,
+        "totalMs": 255.38782300000094,
+        "opsPerSecond": 3.915613470733083
+      },
+      "configureConverterMs": {
+        "count": 1,
+        "meanMs": 249.779896,
+        "p50Ms": 249.779896,
+        "p95Ms": 249.779896,
+        "p99Ms": 249.779896,
+        "minMs": 249.779896,
+        "maxMs": 249.779896,
+        "totalMs": 249.779896,
+        "opsPerSecond": 4.003524767261493
+      }
+    },
+    {
+      "name": "scheduler-configure-c4-delay1",
+      "kind": "scheduler",
+      "devices": 9,
+      "concurrency": 4,
+      "operations": 9,
+      "hostDelayMs": 1,
+      "wallMs": 112.21107999999913,
+      "throughputOpsPerSec": 80.2059832237607,
+      "queueWaitMs": {
+        "count": 9,
+        "meanMs": 6.762691000000107,
+        "p50Ms": 8.311749000000418,
+        "p95Ms": 13.86035400000037,
+        "p99Ms": 13.86035400000037,
+        "minMs": 0.12395400000059453,
+        "maxMs": 13.86035400000037,
+        "totalMs": 60.86421900000096,
+        "opsPerSecond": 147.87013039631475
+      },
+      "serviceMs": {
+        "count": 9,
+        "meanMs": 17.029171888888918,
+        "p50Ms": 3.959748999999647,
+        "p95Ms": 112.03988299999946,
+        "p99Ms": 112.03988299999946,
+        "minMs": 3.428540000000794,
+        "maxMs": 112.03988299999946,
+        "totalMs": 153.26254700000027,
+        "opsPerSecond": 58.722761536776396
+      },
+      "latencyMs": {
+        "count": 9,
+        "meanMs": 23.791862888889025,
+        "p50Ms": 13.85050500000034,
+        "p95Ms": 112.16383700000006,
+        "p99Ms": 112.16383700000006,
+        "minMs": 8.29989999999998,
+        "maxMs": 112.16383700000006,
+        "totalMs": 214.12676600000123,
+        "opsPerSecond": 42.03117698980215
+      },
+      "converterMs": {
+        "count": 9,
+        "meanMs": 16.67668277777759,
+        "p50Ms": 3.6429779999998573,
+        "p95Ms": 111.57738499999869,
+        "p99Ms": 111.57738499999869,
+        "minMs": 3.1347749999986263,
+        "maxMs": 111.57738499999869,
+        "totalMs": 150.0901449999983,
+        "opsPerSecond": 59.96396365664182
+      },
+      "configureLatencyMs": {
+        "count": 1,
+        "meanMs": 112.16383700000006,
+        "p50Ms": 112.16383700000006,
+        "p95Ms": 112.16383700000006,
+        "p99Ms": 112.16383700000006,
+        "minMs": 112.16383700000006,
+        "maxMs": 112.16383700000006,
+        "totalMs": 112.16383700000006,
+        "opsPerSecond": 8.915529521337607
+      },
+      "configureConverterMs": {
+        "count": 1,
+        "meanMs": 111.57738499999869,
+        "p50Ms": 111.57738499999869,
+        "p95Ms": 111.57738499999869,
+        "p99Ms": 111.57738499999869,
+        "minMs": 111.57738499999869,
+        "maxMs": 111.57738499999869,
+        "totalMs": 111.57738499999869,
+        "opsPerSecond": 8.96238964553625
+      }
+    }
+  ]
+}

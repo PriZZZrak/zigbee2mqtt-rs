@@ -1,0 +1,98 @@
+{
+  "manifest": {
+    "generatedAt": "2026-11-20T12:00:00.000Z",
+    "label": "linux-x64",
+    "benchmark": "concurrency-stress",
+    "node": "v24.22.2",
+    "platform": "linux",
+    "arch": "x64",
+    "converterVersion": "26.125.0",
+    "converterRoot": "/config/workspace/zigbee2mqtt-rs/.upstream/zigbee2mqtt/node_modules/zigbee-herdsman-converters",
+    "upstreamZigbee2mqtt": "3c841fdfd66c92239921ef84fde8f039c64e1662",
+    "upstreamConverters": "3c841fdfd66c92239921ef84fde8f039c64e1662",
+    "externalConverter": {
+      "path": "/config/workspace/zigbee2mqtt-rs/tools/bench/fixtures/external/L101Ze_z2m.js",
+      "sha256": "25393d405e551804858a046dc251ec4aa7907ecce7ddf3ba16aea919c6814907"
+    },
+    "fixedClock": "2026-11-20T12:00:00Z",
+    "command": "/config/.local/node-v24.22.2-linux-x64/bin/node /config/workspace/zigbee2mqtt-rs/tools/bench/stress.mjs --filter scheduler-configure-c4-delay1 --out /tmp/opencode/node-sched-c4d1"
+  },
+  "results": [
+    {
+      "name": "scheduler-configure-c4-delay1",
+      "kind": "scheduler",
+      "devices": 9,
+      "concurrency": 4,
+      "operations": 9,
+      "hostDelayMs": 1,
+      "wallMs": 56.446357000000035,
+      "throughputOpsPerSec": 159.44341633951672,
+      "queueWaitMs": {
+        "count": 9,
+        "meanMs": 0.9725988888889232,
+        "p50Ms": 0.6832320000000891,
+        "p95Ms": 2.199294000000009,
+        "p99Ms": 2.199294000000009,
+        "minMs": 0.07346899999993184,
+        "maxMs": 2.199294000000009,
+        "totalMs": 8.753390000000309,
+        "opsPerSecond": 1028.1730849419118
+      },
+      "serviceMs": {
+        "count": 9,
+        "meanMs": 7.317250111111106,
+        "p50Ms": 1.3925910000000385,
+        "p95Ms": 56.35967100000016,
+        "p99Ms": 56.35967100000016,
+        "minMs": 0.4799759999998514,
+        "maxMs": 56.35967100000016,
+        "totalMs": 65.85525099999995,
+        "opsPerSecond": 136.66336189349587
+      },
+      "latencyMs": {
+        "count": 9,
+        "meanMs": 8.289849000000029,
+        "p50Ms": 2.1981849999999667,
+        "p95Ms": 56.433140000000094,
+        "p99Ms": 56.433140000000094,
+        "minMs": 0.6815160000001015,
+        "maxMs": 56.433140000000094,
+        "totalMs": 74.60864100000026,
+        "opsPerSecond": 120.62945899255783
+      },
+      "converterMs": {
+        "count": 9,
+        "meanMs": 7.266593999999992,
+        "p50Ms": 1.343691999999919,
+        "p95Ms": 56.243265000000065,
+        "p99Ms": 56.243265000000065,
+        "minMs": 0.44415600000002087,
+        "maxMs": 56.243265000000065,
+        "totalMs": 65.39934599999992,
+        "opsPerSecond": 137.61605505963334
+      },
+      "configureLatencyMs": {
+        "count": 1,
+        "meanMs": 56.433140000000094,
+        "p50Ms": 56.433140000000094,
+        "p95Ms": 56.433140000000094,
+        "p99Ms": 56.433140000000094,
+        "minMs": 56.433140000000094,
+        "maxMs": 56.433140000000094,
+        "totalMs": 56.433140000000094,
+        "opsPerSecond": 17.72008433342533
+      },
+      "configureConverterMs": {
+        "count": 1,
+        "meanMs": 56.243265000000065,
+        "p50Ms": 56.243265000000065,
+        "p95Ms": 56.243265000000065,
+        "p99Ms": 56.243265000000065,
+        "minMs": 56.243265000000065,
+        "maxMs": 56.243265000000065,
+        "totalMs": 56.243265000000065,
+        "opsPerSecond": 17.779906625264356
+      }
+    }
+  ]
+}

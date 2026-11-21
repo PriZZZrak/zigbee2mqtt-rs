@@ -143,6 +143,9 @@ The measured comparison is in
 [`converter-engine-study.md`](converter-engine-study.md); the follow-up async
 host study is in
 [`converter-async-host-validation.md`](converter-async-host-validation.md);
+the scheduler prototype is in
+[`converter-runtime-scheduler-prototype.md`](converter-runtime-scheduler-prototype.md)
+and [`../crates/converter-runtime/`](../crates/converter-runtime/); engine
 prototypes are in [`../tools/engine-study/`](../tools/engine-study/).
 
 | Engine | Pure Rust | Real upstream corpus | Guard features | Role |

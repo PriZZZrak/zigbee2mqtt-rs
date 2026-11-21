@@ -11,6 +11,7 @@ Last verified against crates.io / `Cargo.lock`: **2026-11-14**.
 | Crate | Manifest | Locked | Latest stable | Status |
 |---|---|---|---|---|
 | `serde_json` | `1` | 1.0.154 | 1.0.154 | current |
+| `quickjs-oxide` / `-host` | `0.5.0` | 0.5.0 | 0.5.0 | pure-Rust JS engine selected by the engine study; used only by `converter-runtime` |
 | `serde_yaml_ng` | `0.10` | 0.10.0 | 0.10.0 | current; replaced deprecated `serde_yaml` |
 | `tokio` | `1` | 1.54.1 | 1.54.1 | current; `test-util` is a dev-only feature |
 | `rumqttc-v4-next` (aliased `rumqttc`) | `0.34` | 0.34.0 | 0.34.0 | MQTT 3.1.1 client; `default-features = false, features = ["use-rustls-no-provider"]` — no ring/aws-lc, the pure-Rust `rustls-rustcrypto` provider is installed in `mqtt.rs` |
@@ -81,6 +82,7 @@ Notes:
 | `bind-decorator` | `this` binding | language feature | — | omitted |
 | `zigbee-herdsman` | Zigbee stack | `zigbee-apiarist` | workspace crate | PARTIAL |
 | `zigbee-herdsman-converters` | device converters | `crates/zigbee-converters` (separate crate) | `zigbee_converters::{Definition, DefinitionRegistry, Expose, ...}` | PORTED minimal surface required by the bridge; converter database and authoring tooling excluded (AGENTS §5 Q4) |
+| JavaScript engine | executes upstream converter JS | `quickjs-oxide` 0.5.0 | `converter-runtime` worker (`crates/converter-runtime`) | prototype scheduler validated; not yet bridge-integrated |
 | `zigbee2mqtt-windfront` | static frontend | served assets | `util::static_file_server` | assets only; the deprecated `zigbee2mqtt-frontend` package is not supported (its enum value remains in the pinned settings schema for parity) |
 
 ### Development tooling

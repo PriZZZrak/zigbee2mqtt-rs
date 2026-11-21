@@ -1,0 +1,42 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "mix",
+  "maxConcurrent": 1,
+  "hostDelayMs": 0,
+  "submitted": 1,
+  "submitErrors": 0,
+  "servedHostOps": 5,
+  "elapsedMs": 858.7011709999999,
+  "startupMs": 1959.978255,
+  "warmupMs": 853.982772,
+  "completed": 0,
+  "failed": 3,
+  "cancelled": 0,
+  "lateResponses": 0,
+  "hostTimeouts": 0,
+  "gcCollections": 3,
+  "gcMaxPauseMs": 12.292198,
+  "heapLiveBytes": 5631449,
+  "cases": [
+    {
+      "id": 3,
+      "scenarioId": "configure-danfoss",
+      "device": "0x00124b0000000001",
+      "state": "Failed",
+      "error": "host EIO",
+      "result": null,
+      "metrics": {
+        "queueWaitMs": 0.012003,
+        "evalMs": 3.830718,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.490583,
+        "hostWaitMs": 0.44149399999999994,
+        "totalMs": 4.429328,
+        "hostCalls": 2,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 12.292198,
+        "heapLiveBytes": 5631449
+      }
+    }
+  ]
+}

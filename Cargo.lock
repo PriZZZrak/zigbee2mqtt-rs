@@ -212,6 +212,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "converter-runtime"
+version = "0.1.0"
+dependencies = [
+ "quickjs-oxide",
+ "quickjs-oxide-host",
+ "serde_json",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -721,6 +730,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -782,6 +797,25 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e7820bc0a80a0238e650327316f929ba18d5be054b647490a3a6a339f3e7c0"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -936,6 +970,45 @@ checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "quickjs-oxide"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46ca1ec7eee524bbdf40ad057e02b8b52082da4b1d8e657ba33cf5d73eb2ded2"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "quickjs-oxide-core",
+ "quickjs-oxide-regexp",
+]
+
+[[package]]
+name = "quickjs-oxide-core"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a79d17ea827273dfefa0fc4d6eae819c72bc6f55fd0b1c5f808d1641599c43de"
+dependencies = [
+ "hashbrown",
+ "libm",
+ "quickjs-oxide-regexp",
+]
+
+[[package]]
+name = "quickjs-oxide-host"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cf7aaa1cbb0868b483c68f35b92752441b8786e1de37c73a623eabf4d3b020e"
+dependencies = [
+ "quickjs-oxide",
+ "tz-rs",
+]
+
+[[package]]
+name = "quickjs-oxide-regexp"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02e9e69a508e8525f37a6960701e247c49af67135857ecec61d14d9dc10f6e1a"
 
 [[package]]
 name = "quote"
@@ -1626,6 +1699,12 @@ name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
+
+[[package]]
+name = "tz-rs"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fc6c929ffa10fb34f4a3c7e9a73620a83ef2e85e47f9ec3381b8289e6762f42"
 
 [[package]]
 name = "unicode-ident"

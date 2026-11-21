@@ -62,6 +62,7 @@ const templates = {
   occupancy: template("fz-lumi-occupancy"),
   tuyaMulti: template("fz-tuya-m9pro-multi-dp"),
   setBrightness: template("set-ikea-brightness"),
+  configureDanfoss: template("configure-danfoss"),
 };
 
 const preparedCache = new Map();
@@ -133,6 +134,7 @@ function buildPool({ devices, delayMs, kind }) {
 }
 
 async function runWorkload(config) {
+  if (config.kind === "scheduler") return runSchedulerWorkload(config);
   const { name, operations, concurrency, devices, delayMs, kind } = config;
   upstream.clearStore();
   const pool = buildPool({ devices, delayMs, kind });
@@ -204,6 +206,67 @@ async function runWorkload(config) {
   };
 }
 
+async function runSchedulerWorkload(config) {
+  const { name, jobs, concurrency, delayMs } = config;
+  upstream.clearStore();
+  const configure = buildDevice(templates.configureDanfoss, 0, delayMs);
+  const sets = [];
+  for (let index = 0; index < jobs; index++) {
+    sets.push(buildDevice(templates.setBrightness, index + 1, delayMs));
+  }
+  const entries = [configure, ...sets];
+  // Warm the definition/device-file and converter caches before the
+  // comparable concurrent measurement; the runtime probe likewise reports
+  // cold load separately from scheduler latency.
+  await execute(configure);
+  await execute(sets[0]);
+  const submittedAt = performance.now();
+  const latencies = [];
+  const queueWait = [];
+  const service = [];
+  const converter = [];
+  const configureLatency = [];
+  const configureConverter = [];
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const index = cursor++;
+      if (index >= entries.length) return;
+      const start = performance.now();
+      queueWait.push(start - submittedAt);
+      const result = await execute(entries[index]);
+      const end = performance.now();
+      latencies.push(end - submittedAt);
+      service.push(end - start);
+      converter.push(result.converterMs);
+      if (index === 0) {
+        configureLatency.push(end - submittedAt);
+        configureConverter.push(result.converterMs);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, () => worker()));
+  const wallMs = performance.now() - submittedAt;
+  return {
+    name,
+    kind: "scheduler",
+    devices: entries.length,
+    concurrency,
+    operations: entries.length,
+    hostDelayMs: delayMs,
+    wallMs,
+    throughputOpsPerSec: (entries.length * 1000) / wallMs,
+    queueWaitMs: stats(queueWait),
+    serviceMs: stats(service),
+    latencyMs: stats(latencies),
+    converterMs: stats(converter),
+    configureLatencyMs: stats(configureLatency),
+    configureConverterMs: stats(configureConverter),
+  };
+}
+
 const workloadDefinitions = [
   {
     name: "reports-1-device-c1",
@@ -260,6 +323,34 @@ const workloadDefinitions = [
     concurrency: 64,
     devices: 32,
     delayMs: 20,
+  },
+  {
+    name: "scheduler-configure-c1",
+    kind: "scheduler",
+    jobs: 8,
+    concurrency: 1,
+    delayMs: 0,
+  },
+  {
+    name: "scheduler-configure-c4",
+    kind: "scheduler",
+    jobs: 8,
+    concurrency: 4,
+    delayMs: 0,
+  },
+  {
+    name: "scheduler-configure-c1-delay1",
+    kind: "scheduler",
+    jobs: 8,
+    concurrency: 1,
+    delayMs: 1,
+  },
+  {
+    name: "scheduler-configure-c4-delay1",
+    kind: "scheduler",
+    jobs: 8,
+    concurrency: 4,
+    delayMs: 1,
   },
 ];
 
