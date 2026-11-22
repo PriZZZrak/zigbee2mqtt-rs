@@ -1,0 +1,9 @@
+{
+  "status": "Stopped",
+  "restartMs": 1220.800017,
+  "rssBeforeKb": 20628,
+  "rssAfterKb": 30228,
+  "peakBeforeKb": 20736,
+  "peakAfterKb": 30228,
+  "secondJobCompleted": true
+}

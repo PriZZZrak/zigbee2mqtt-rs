@@ -4,8 +4,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use converter_runtime::{
-    CancelStatus, ConverterRuntime, HostResult, JobRequest, JobState, RuntimeConfig, SubmitError,
-    WorkerHealth,
+    CancelStatus, ConverterRuntime, HostResult, JobRequest, JobState, RespondStatus, RuntimeConfig,
+    SubmitError, WorkerHealth,
 };
 use serde_json::json;
 
@@ -157,8 +157,12 @@ fn admission_and_shutdown_are_bounded() {
     let pending = runtime.submit(timer_job(10_000, false, false)).unwrap();
     thread::sleep(Duration::from_millis(20));
     let started = Instant::now();
-    runtime.shutdown();
-    assert!(started.elapsed() < Duration::from_secs(3));
+    let status = runtime.shutdown_with_timeout(Duration::from_millis(500));
+    assert!(matches!(
+        status,
+        converter_runtime::ShutdownStatus::Stopped | converter_runtime::ShutdownStatus::TimedOut
+    ));
+    assert!(started.elapsed() < Duration::from_secs(2));
     let _ = pending;
 }
 
@@ -175,8 +179,14 @@ fn duplicate_host_response_is_counted_as_late() {
     let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
     let correlation = request.correlation_id;
     drop(receiver);
-    assert!(runtime.respond(correlation, HostResult::Ok(json!(true))));
-    assert!(runtime.respond(correlation, HostResult::Ok(json!(true))));
+    assert_eq!(
+        runtime.respond(correlation, HostResult::Ok(json!(true))),
+        RespondStatus::Delivered
+    );
+    assert_eq!(
+        runtime.respond(correlation, HostResult::Ok(json!(true))),
+        RespondStatus::Delivered
+    );
     let outcome = runtime.wait(id, Duration::from_secs(2)).unwrap();
     assert_eq!(outcome.state, JobState::Completed);
     thread::sleep(Duration::from_millis(20));
@@ -286,7 +296,284 @@ fn shutdown_interrupts_long_js_without_blocking() {
         .unwrap();
     thread::sleep(Duration::from_millis(30));
     let started = Instant::now();
-    runtime.shutdown();
-    assert!(started.elapsed() < Duration::from_secs(3));
+    let status = runtime.shutdown_with_timeout(Duration::from_secs(1));
+    assert!(matches!(
+        status,
+        converter_runtime::ShutdownStatus::Stopped | converter_runtime::ShutdownStatus::TimedOut
+    ));
+    assert!(started.elapsed() < Duration::from_secs(2));
     let _ = id;
+}
+
+#[test]
+fn response_delivery_backpressure_is_explicit() {
+    let mut config = config();
+    config.max_pending_responses = 1;
+    config.job_timeout = Duration::from_secs(5);
+    let mut runtime = ConverterRuntime::new(config).unwrap();
+    let _loop = runtime
+        .submit(JobRequest {
+            device: "response-bp".to_owned(),
+            scenario: json!({"id": "loop", "kind": "jsLoop"}),
+        })
+        .unwrap();
+    thread::sleep(Duration::from_millis(30));
+    assert_eq!(
+        runtime.respond(999, HostResult::Ok(json!(true))),
+        RespondStatus::Delivered
+    );
+    assert_eq!(
+        runtime.respond(998, HostResult::Ok(json!(true))),
+        RespondStatus::Backpressure
+    );
+    runtime.shutdown();
+}
+
+#[test]
+fn file_access_is_sandboxed_against_escapes_and_symlinks() {
+    let mut runtime = ConverterRuntime::new(config()).unwrap();
+    let allowed = runtime
+        .submit(JobRequest {
+            device: "file".to_owned(),
+            scenario: json!({
+                "id": "allowed",
+                "kind": "read-file",
+                "path": PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests/fixture-package/dist/index.js")
+                    .to_string_lossy(),
+            }),
+        })
+        .unwrap();
+    let outcome = runtime.wait(allowed, Duration::from_secs(1)).unwrap();
+    assert_eq!(outcome.state, JobState::Completed);
+    assert!(
+        outcome.result.unwrap()["content"]
+            .as_str()
+            .unwrap()
+            .contains("prepareDefinition")
+    );
+
+    for path in ["/etc/passwd", "../../../../etc/passwd"] {
+        let denied = runtime
+            .submit(JobRequest {
+                device: "file".to_owned(),
+                scenario: json!({"id": "denied", "kind": "read-file", "path": path}),
+            })
+            .unwrap();
+        let outcome = runtime.wait(denied, Duration::from_secs(1)).unwrap();
+        assert_eq!(outcome.state, JobState::Failed, "{path}");
+    }
+
+    #[cfg(unix)]
+    {
+        let link = std::env::temp_dir().join("converter-runtime-escape-link");
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink("/etc/passwd", &link).unwrap();
+        let denied = runtime
+            .submit(JobRequest {
+                device: "file".to_owned(),
+                scenario: json!({
+                    "id": "symlink",
+                    "kind": "read-file",
+                    "path": link.to_string_lossy(),
+                }),
+            })
+            .unwrap();
+        let outcome = runtime.wait(denied, Duration::from_secs(1)).unwrap();
+        assert_eq!(outcome.state, JobState::Failed);
+        let _ = std::fs::remove_file(link);
+    }
+    runtime.shutdown();
+}
+
+#[test]
+fn device_leave_cancels_jobs_and_timers() {
+    let mut runtime = ConverterRuntime::new(config()).unwrap();
+    let long = runtime
+        .submit(JobRequest {
+            device: "leave-me".to_owned(),
+            scenario: json!({"id": "long", "kind": "timer", "delay": 10_000}),
+        })
+        .unwrap();
+    thread::sleep(Duration::from_millis(20));
+    assert!(runtime.cancel_device("leave-me"));
+    let outcome = runtime.wait(long, Duration::from_secs(1)).unwrap();
+    assert_eq!(outcome.state, JobState::Cancelled);
+    let replacement = runtime
+        .submit(JobRequest {
+            device: "leave-me".to_owned(),
+            scenario: json!({"id": "short", "kind": "timer", "delay": 10}),
+        })
+        .unwrap();
+    assert_eq!(
+        runtime
+            .wait(replacement, Duration::from_secs(1))
+            .unwrap()
+            .state,
+        JobState::Completed
+    );
+    runtime.shutdown();
+}
+
+#[test]
+fn timer_outliving_job_is_removed_on_device_leave() {
+    let mut runtime = ConverterRuntime::new(config()).unwrap();
+    let late = runtime
+        .submit(JobRequest {
+            device: "late-device".to_owned(),
+            scenario: json!({"id": "late", "kind": "timer-late", "delay": 500}),
+        })
+        .unwrap();
+    assert_eq!(
+        runtime.wait(late, Duration::from_secs(1)).unwrap().state,
+        JobState::Completed
+    );
+    assert!(runtime.cancel_device("late-device"));
+    thread::sleep(Duration::from_millis(700));
+    let check = runtime
+        .submit(JobRequest {
+            device: "late-device".to_owned(),
+            scenario: json!({"id": "check", "kind": "timer-check"}),
+        })
+        .unwrap();
+    let outcome = runtime.wait(check, Duration::from_secs(1)).unwrap();
+    assert_eq!(outcome.state, JobState::Completed);
+    assert_eq!(outcome.result.unwrap()["lateTimerFired"], false);
+    runtime.shutdown();
+}
+
+#[test]
+fn timer_callback_error_does_not_kill_the_worker() {
+    let mut runtime = ConverterRuntime::new(config()).unwrap();
+    let error = runtime
+        .submit(JobRequest {
+            device: "timer-error".to_owned(),
+            scenario: json!({"id": "error", "kind": "timer-error", "delay": 10}),
+        })
+        .unwrap();
+    assert_eq!(
+        runtime.wait(error, Duration::from_secs(1)).unwrap().state,
+        JobState::Completed
+    );
+    thread::sleep(Duration::from_millis(50));
+    let next = runtime.submit(timer_job(10, false, false)).unwrap();
+    assert_eq!(
+        runtime.wait(next, Duration::from_secs(1)).unwrap().state,
+        JobState::Completed
+    );
+    runtime.shutdown();
+}
+
+fn on_event_config() -> RuntimeConfig {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture-package");
+    let mut config = RuntimeConfig::new(fixture.clone(), fixture.clone());
+    config.external_path = fixture.join("external/on-event.js");
+    config.max_concurrent_jobs = 1;
+    config.job_timeout = Duration::from_secs(5);
+    config.host_timeout = Duration::from_millis(100);
+    config.max_rss_bytes = 512 << 20;
+    config
+}
+
+fn on_event_job(device: &str, event_type: &str) -> JobRequest {
+    JobRequest {
+        device: device.to_owned(),
+        scenario: json!({
+            "id": "on-event",
+            "kind": "onEvent",
+            "eventType": event_type,
+            "definition": {
+                "source": "external",
+                "model": "synthetic-on-event",
+                "file": "",
+            },
+        }),
+    }
+}
+
+#[test]
+fn on_event_timer_is_removed_on_device_leave() {
+    let mut runtime = ConverterRuntime::new(on_event_config()).unwrap();
+    let id = runtime
+        .submit(on_event_job("on-event-device", "start"))
+        .unwrap();
+    let outcome = runtime.wait(id, Duration::from_secs(2)).unwrap();
+    assert_eq!(outcome.state, JobState::Completed, "{outcome:?}");
+    assert!(runtime.cancel_device("on-event-device"));
+    thread::sleep(Duration::from_millis(250));
+    let check = runtime
+        .submit(JobRequest {
+            device: "observer".to_owned(),
+            scenario: json!({"id": "check", "kind": "on-event-timer-check"}),
+        })
+        .unwrap();
+    let outcome = runtime.wait(check, Duration::from_secs(2)).unwrap();
+    assert_eq!(outcome.state, JobState::Completed);
+    assert_eq!(outcome.result.unwrap()["onEventTimerFired"], false);
+    runtime.shutdown();
+}
+
+#[test]
+fn cancelling_a_running_on_event_removes_its_timer_and_frees_the_device() {
+    let mut runtime = ConverterRuntime::new(on_event_config()).unwrap();
+    let running = runtime
+        .submit(on_event_job("on-event-running", "deviceJoined"))
+        .unwrap();
+    thread::sleep(Duration::from_millis(30));
+    assert_eq!(runtime.cancel_request(running), CancelStatus::Accepted);
+    assert_eq!(
+        runtime.wait(running, Duration::from_secs(2)).unwrap().state,
+        JobState::Cancelled
+    );
+    thread::sleep(Duration::from_millis(250));
+    let check = runtime
+        .submit(JobRequest {
+            device: "observer".to_owned(),
+            scenario: json!({"id": "check", "kind": "on-event-timer-check"}),
+        })
+        .unwrap();
+    let outcome = runtime.wait(check, Duration::from_secs(2)).unwrap();
+    assert_eq!(outcome.state, JobState::Completed);
+    assert_eq!(outcome.result.unwrap()["onEventWaitTimerFired"], false);
+    let replacement = runtime
+        .submit(JobRequest {
+            device: "on-event-running".to_owned(),
+            scenario: json!({"id": "short", "kind": "timer", "delay": 10}),
+        })
+        .unwrap();
+    assert_eq!(
+        runtime
+            .wait(replacement, Duration::from_secs(2))
+            .unwrap()
+            .state,
+        JobState::Completed
+    );
+    runtime.shutdown();
+}
+
+#[test]
+fn fast_completions_do_not_leak_admission() {
+    let mut config = config();
+    config.max_total_queue = 1;
+    config.max_per_device_queue = 1;
+    let mut runtime = ConverterRuntime::new(config).unwrap();
+    for _ in 0..100 {
+        let mut submitted = None;
+        for _ in 0..100 {
+            match runtime.submit(timer_job(0, false, false)) {
+                Ok(id) => {
+                    submitted = Some(id);
+                    break;
+                }
+                Err(SubmitError::Backpressure) => thread::sleep(Duration::from_millis(1)),
+                Err(error) => panic!("unexpected submit error: {error:?}"),
+            }
+        }
+        let id = submitted.expect("admission credit never returned");
+        assert_eq!(
+            runtime.wait(id, Duration::from_secs(2)).unwrap().state,
+            JobState::Completed
+        );
+    }
+    runtime.shutdown();
 }

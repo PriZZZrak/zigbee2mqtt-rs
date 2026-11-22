@@ -55,6 +55,7 @@ pub struct RuntimeConfig {
     pub max_rss_bytes: u64,
     pub rss_poll_interval: Duration,
     pub worker_heartbeat_timeout: Duration,
+    pub shutdown_timeout: Duration,
 }
 
 impl RuntimeConfig {
@@ -77,6 +78,7 @@ impl RuntimeConfig {
             max_rss_bytes: 128 << 20,
             rss_poll_interval: Duration::from_millis(500),
             worker_heartbeat_timeout: Duration::from_secs(5),
+            shutdown_timeout: Duration::from_secs(5),
         }
     }
 }
@@ -142,6 +144,20 @@ pub enum WorkerHealth {
     RssExceeded,
     Unresponsive,
     Stopped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ShutdownStatus {
+    Stopped,
+    TimedOut,
+    AlreadyStopped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RespondStatus {
+    Delivered,
+    Backpressure,
+    Closed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -389,21 +405,25 @@ impl ConverterRuntime {
         self.host_rx.lock().unwrap()
     }
 
-    pub fn respond(&self, correlation_id: CorrelationId, result: HostResult) -> bool {
-        if self
-            .response_tx
-            .send(ResponseEvent {
-                correlation_id,
-                result,
-            })
-            .is_err()
-        {
-            return false;
+    /// Non-blocking host response delivery. On backpressure the caller keeps
+    /// the already-completed physical result and retries with the same
+    /// correlation ID; the pending job remains waiting until it arrives or
+    /// times out. A closed response channel means the worker is gone.
+    pub fn respond(&self, correlation_id: CorrelationId, result: HostResult) -> RespondStatus {
+        match self.response_tx.try_send(ResponseEvent {
+            correlation_id,
+            result,
+        }) {
+            Ok(()) => {
+                let _ = self.tx.try_send(Command::Wake);
+                RespondStatus::Delivered
+            }
+            Err(mpsc::TrySendError::Full(_)) => {
+                self.counters.lock().unwrap().response_backpressure += 1;
+                RespondStatus::Backpressure
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => RespondStatus::Closed,
         }
-        // Wake the worker; a full command queue is fine because the worker
-        // also polls the response channel every turn.
-        let _ = self.tx.try_send(Command::Wake);
-        true
     }
 
     /// Non-blocking admission. The bridge thread never waits for the worker.
@@ -413,16 +433,19 @@ impl ConverterRuntime {
             return Err(SubmitError::Backpressure);
         }
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        // Register the id before the worker can observe the command, so a
+        // very fast completion still removes an existing admission entry
+        // instead of leaving a stale one behind.
+        self.admitted_ids.lock().unwrap().insert(id);
         match self.tx.try_send(Command::Submit { id, request }) {
-            Ok(()) => {
-                self.admitted_ids.lock().unwrap().insert(id);
-                Ok(id)
-            }
+            Ok(()) => Ok(id),
             Err(mpsc::TrySendError::Full(_)) => {
+                self.admitted_ids.lock().unwrap().remove(&id);
                 self.admission.release(&device);
                 Err(SubmitError::Backpressure)
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.admitted_ids.lock().unwrap().remove(&id);
                 self.admission.release(&device);
                 Err(SubmitError::Closed)
             }
@@ -452,6 +475,16 @@ impl ConverterRuntime {
             self.interrupt.interrupt();
         }
         CancelStatus::Accepted
+    }
+
+    /// Cancel all queued/running jobs and timers owned by a device. Used by
+    /// the bridge on device leave/removal.
+    pub fn cancel_device(&self, device: impl Into<String>) -> bool {
+        self.tx
+            .try_send(Command::CancelDevice {
+                device: device.into(),
+            })
+            .is_ok()
     }
 
     /// Compatibility convenience for the earlier probe API.
@@ -500,67 +533,110 @@ impl ConverterRuntime {
     /// Recreate the JS worker and supervisor after an unrecoverable worker
     /// failure or a deliberate reload. The caller must reacquire
     /// `host_receiver()` because the transport channels are replaced.
-    pub fn restart(&mut self) -> Result<(), String> {
+    /// Stop the old worker with a bounded wait, then create a fresh one.
+    /// Returns `TimedOut` if the old worker could not be joined in time; the
+    /// detached join helper continues in the background and the OS process
+    /// supervisor remains the final recovery boundary.
+    pub fn restart(&mut self) -> Result<ShutdownStatus, String> {
+        let status = self.shutdown_with_timeout(self.config.shutdown_timeout);
+        if status == ShutdownStatus::TimedOut {
+            return Ok(status);
+        }
         let config = self.config.clone();
         let fresh = ConverterRuntime::new(config)?;
         let old = std::mem::replace(self, fresh);
         drop(old);
-        Ok(())
+        Ok(ShutdownStatus::Stopped)
     }
 
-    pub fn shutdown(&mut self) {
-        self.send_shutdown();
-        if let Some(join) = self.join.take() {
-            join.join().ok();
-        }
+    /// Bounded shutdown. `JoinHandle::join` has no timeout; a helper thread
+    /// performs the join and the caller waits only for the configured bound.
+    /// A timed-out worker is detached and must be contained by the OS service
+    /// supervisor; this method never claims it was stopped.
+    pub fn shutdown(&mut self) -> ShutdownStatus {
+        self.shutdown_with_timeout(self.config.shutdown_timeout)
     }
 
-    fn send_shutdown(&mut self) {
+    pub fn shutdown_with_timeout(&mut self, timeout: Duration) -> ShutdownStatus {
         if self.shutdown_sent {
-            return;
+            return ShutdownStatus::AlreadyStopped;
         }
         self.shutdown_sent = true;
         self.supervisor_stop.store(true, Ordering::Relaxed);
         self.interrupt.interrupt();
-        let (reply_tx, reply_rx) = mpsc::sync_channel(1);
-        if self
-            .tx
-            .try_send(Command::Shutdown {
+        let deadline = Instant::now() + timeout;
+
+        let (reply_tx, _reply_rx) = mpsc::sync_channel(1);
+        let mut sent = false;
+        let mut disconnected = false;
+        while Instant::now() < deadline {
+            match self.tx.try_send(Command::Shutdown {
                 reply: reply_tx.clone(),
-            })
-            .is_err()
-        {
-            // Queue full: interrupt the worker, then retry with the same
-            // reply slot so the eventual shutdown can be acknowledged.
-            self.interrupt.interrupt();
-            let deadline = Instant::now() + Duration::from_secs(5);
-            while Instant::now() < deadline {
-                if self
-                    .tx
-                    .try_send(Command::Shutdown {
-                        reply: reply_tx.clone(),
-                    })
-                    .is_ok()
-                {
+            }) {
+                Ok(()) => {
+                    sent = true;
                     break;
                 }
-                std::thread::sleep(Duration::from_millis(5));
+                Err(mpsc::TrySendError::Full(_)) => {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                Err(mpsc::TrySendError::Disconnected(_)) => {
+                    disconnected = true;
+                    break;
+                }
             }
         }
-        reply_rx.recv_timeout(Duration::from_secs(5)).ok();
-        if let Some(supervisor) = self.supervisor.take() {
-            supervisor.join().ok();
+
+        let Some(join) = self.join.take() else {
+            *self.health.lock().unwrap() = WorkerHealth::Stopped;
+            return ShutdownStatus::Stopped;
+        };
+        if disconnected {
+            // The worker already dropped its command receiver, so this join
+            // cannot wait for a live execution turn.
+            join.join().ok();
+            if let Some(supervisor) = self.supervisor.take() {
+                supervisor.join().ok();
+            }
+            *self.health.lock().unwrap() = WorkerHealth::Stopped;
+            return ShutdownStatus::Stopped;
         }
-        *self.health.lock().unwrap() = WorkerHealth::Stopped;
+        if !sent {
+            // The queue stayed full for the whole deadline: detach the join
+            // and report the worker as unresponsive, never as stopped.
+            std::thread::spawn(move || {
+                join.join().ok();
+            });
+            *self.health.lock().unwrap() = WorkerHealth::Unresponsive;
+            return ShutdownStatus::TimedOut;
+        }
+
+        let (done_tx, done_rx) = mpsc::channel();
+        // Detach the actual join so this call has a hard deadline.
+        std::thread::spawn(move || {
+            join.join().ok();
+            let _ = done_tx.send(());
+        });
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match done_rx.recv_timeout(remaining) {
+            Ok(()) => {
+                *self.health.lock().unwrap() = WorkerHealth::Stopped;
+                if let Some(supervisor) = self.supervisor.take() {
+                    supervisor.join().ok();
+                }
+                ShutdownStatus::Stopped
+            }
+            Err(_) => {
+                *self.health.lock().unwrap() = WorkerHealth::Unresponsive;
+                ShutdownStatus::TimedOut
+            }
+        }
     }
 }
 
 impl Drop for ConverterRuntime {
     fn drop(&mut self) {
-        self.send_shutdown();
-        if let Some(join) = self.join.take() {
-            join.join().ok();
-        }
+        let _ = self.shutdown_with_timeout(Duration::from_millis(100));
     }
 }
 
@@ -571,6 +647,7 @@ impl Drop for ConverterRuntime {
 enum Command {
     Submit { id: JobId, request: JobRequest },
     Cancel { id: JobId },
+    CancelDevice { device: String },
     Wake,
     Shutdown { reply: mpsc::SyncSender<()> },
 }
@@ -607,6 +684,63 @@ struct JobRecord {
     generation: u64,
 }
 
+#[derive(Clone)]
+struct AllowedFiles {
+    roots: Vec<PathBuf>,
+    files: HashSet<PathBuf>,
+}
+
+impl AllowedFiles {
+    fn new(config: &RuntimeConfig) -> Self {
+        let mut roots = Vec::new();
+        for root in [&config.package_root, &config.herdsman_root] {
+            if let Ok(root) = root.canonicalize() {
+                roots.push(root);
+            }
+        }
+        let mut files = HashSet::new();
+        if !config.external_path.as_os_str().is_empty() {
+            if let Ok(file) = config.external_path.canonicalize() {
+                files.insert(file);
+            }
+            if let Some(parent) = config
+                .external_path
+                .parent()
+                .and_then(|parent| parent.canonicalize().ok())
+            {
+                roots.push(parent);
+            }
+        }
+        roots.sort();
+        roots.dedup();
+        Self { roots, files }
+    }
+
+    fn allowed(&self, path: &Path) -> bool {
+        if let Ok(canonical) = path.canonicalize() {
+            if self.files.contains(&canonical) {
+                return true;
+            }
+            return self.roots.iter().any(|root| canonical.starts_with(root));
+        }
+        // Nonexistent candidates (loader probes) are allowed only when their
+        // existing parent is inside a root; symlink escapes fail here too.
+        path.parent()
+            .and_then(|parent| parent.canonicalize().ok())
+            .is_some_and(|parent| self.roots.iter().any(|root| parent.starts_with(root)))
+    }
+
+    fn read(&self, path: &Path) -> std::io::Result<String> {
+        if !self.allowed(path) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "path is outside the converter sandbox",
+            ));
+        }
+        std::fs::read_to_string(path)
+    }
+}
+
 struct TimerEntry {
     id: u64,
     deadline: Instant,
@@ -615,6 +749,7 @@ struct TimerEntry {
     args: Vec<Value>,
     refed: bool,
     job_id: JobId,
+    device: String,
 }
 
 struct Timers {
@@ -637,6 +772,7 @@ impl Timers {
         interval: Option<Duration>,
         args: Vec<Value>,
         job_id: JobId,
+        device: String,
     ) -> u64 {
         let id = self.next_id;
         self.next_id = self.next_id.saturating_add(1);
@@ -650,6 +786,7 @@ impl Timers {
                 args,
                 refed: true,
                 job_id,
+                device,
             },
         );
         id
@@ -670,6 +807,10 @@ impl Timers {
 
     fn cancel_job(&mut self, job_id: JobId) {
         self.entries.retain(|_, timer| timer.job_id != job_id);
+    }
+
+    fn cancel_device(&mut self, device: &str) {
+        self.entries.retain(|_, timer| timer.device != device);
     }
 }
 
@@ -803,6 +944,9 @@ impl Worker {
         let timers_clear = Rc::clone(&timers);
         let timers_unref = Rc::clone(&timers);
         let timers_ref = Rc::clone(&timers);
+        let allowed_files = AllowedFiles::new(&config);
+        let read_access = allowed_files.clone();
+        let exists_access = allowed_files.clone();
 
         let pending = Rc::new(RefCell::new(PendingHosts {
             next_correlation: 1,
@@ -822,10 +966,10 @@ impl Worker {
         let active_jobs_failed = Rc::clone(&host_active_jobs);
 
         context
-            .define_function(&global, "__readFile", 1, |scope: &mut Scope<'_>| {
+            .define_function(&global, "__readFile", 1, move |scope: &mut Scope<'_>| {
                 let arg = scope.arg(0);
                 let path = scope.to_js_string(&arg)?.to_utf8_lossy();
-                match std::fs::read_to_string(&path) {
+                match read_access.read(Path::new(&path)) {
                     Ok(text) => Ok(Value::String(
                         JsString::try_from_utf8(&text)
                             .map_err(|_| RuntimeError::Exception(Value::Undefined))?,
@@ -838,10 +982,11 @@ impl Worker {
             })
             .map_err(|error| format!("__readFile: {error:?}"))?;
         context
-            .define_function(&global, "__fileExists", 1, |scope: &mut Scope<'_>| {
+            .define_function(&global, "__fileExists", 1, move |scope: &mut Scope<'_>| {
                 let arg = scope.arg(0);
                 let path = scope.to_js_string(&arg)?.to_utf8_lossy();
-                Ok(Value::Bool(Path::new(&path).is_file()))
+                let path = Path::new(&path);
+                Ok(Value::Bool(exists_access.allowed(path) && path.is_file()))
             })
             .map_err(|error| format!("__fileExists: {error:?}"))?;
         context
@@ -888,12 +1033,19 @@ impl Worker {
                         _ => None,
                     })
                     .unwrap_or(0);
-                let timer_args = args.iter().skip(4).cloned().collect();
+                let device = args
+                    .get(4)
+                    .and_then(|value| match value {
+                        Value::String(value) => Some(value.to_utf8_lossy()),
+                        _ => None,
+                    })
+                    .unwrap_or_default();
+                let timer_args = args.iter().skip(5).cloned().collect();
                 let delay = Duration::from_secs_f64(delay_ms / 1000.0);
                 let interval = repeat.then_some(delay);
                 let id = timers_set
                     .borrow_mut()
-                    .insert(callback, delay, interval, timer_args, job_id);
+                    .insert(callback, delay, interval, timer_args, job_id, device);
                 Ok(Value::Int(id as i32))
             })
             .map_err(|error| format!("__setTimer: {error:?}"))?;
@@ -1122,6 +1274,10 @@ impl Worker {
                         self.cancel(id);
                         worked = true;
                     }
+                    Ok(Command::CancelDevice { device }) => {
+                        self.cancel_device(&device);
+                        worked = true;
+                    }
                     Ok(Command::Wake) => {}
                     Ok(Command::Shutdown { reply }) => {
                         shutdown = Some(reply);
@@ -1160,6 +1316,9 @@ impl Worker {
                     }
                     Ok(Command::Cancel { id }) => {
                         self.cancel(id);
+                    }
+                    Ok(Command::CancelDevice { device }) => {
+                        self.cancel_device(&device);
                     }
                     Ok(Command::Wake) => {}
                     Ok(Command::Shutdown { reply }) => {
@@ -1239,7 +1398,11 @@ impl Worker {
                 .as_secs_f64()
                 * 1000.0;
             job.generation = generation;
-            job.scenario.to_string()
+            let mut scenario = job.scenario.clone();
+            if let Some(object) = scenario.as_object_mut() {
+                object.insert("__deviceKey".to_owned(), Json::String(job.device.clone()));
+            }
+            scenario.to_string()
         };
         self.states
             .lock()
@@ -1559,6 +1722,33 @@ impl Worker {
         self.total_queued = 0;
     }
 
+    fn cancel_device(&mut self, device: &str) {
+        let queued: Vec<JobId> = self
+            .device_queues
+            .remove(device)
+            .map(|queue| queue.into_iter().collect())
+            .unwrap_or_default();
+        self.total_queued = self.total_queued.saturating_sub(queued.len());
+        for id in queued {
+            self.finish_job(
+                id,
+                JobState::Cancelled,
+                None,
+                Some("device removed".to_owned()),
+            );
+        }
+        if let Some(id) = self.active_devices.get(device).copied() {
+            self.finish_job(
+                id,
+                JobState::Cancelled,
+                None,
+                Some("device removed".to_owned()),
+            );
+        }
+        self.timers.borrow_mut().cancel_device(device);
+        self.ready_set.remove(device);
+    }
+
     fn process_cancellations(&mut self) {
         let requested: Vec<JobId> = self.cancel_requests.lock().unwrap().drain().collect();
         for id in requested {
@@ -1583,6 +1773,7 @@ impl Worker {
                         args: timer.args.clone(),
                         refed: timer.refed,
                         job_id: timer.job_id,
+                        device: timer.device.clone(),
                     },
                 );
             }

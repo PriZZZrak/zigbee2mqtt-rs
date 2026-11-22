@@ -307,8 +307,8 @@
     return timer;
   }
   function setHostTimer(callback, delay, repeat, args) {
-    var callArgs = [callback, Number(delay) || 0, !!repeat, globalThis.__timerJobId || 0]
-      .concat(args || []);
+    var callArgs = [callback, Number(delay) || 0, !!repeat, globalThis.__timerJobId || 0,
+      globalThis.__timerDevice || ""].concat(args || []);
     var id = __setTimer.apply(null, callArgs);
     return makeTimer(id, true);
   }
@@ -496,10 +496,10 @@
   function findDefinition(spec) {
     var key = spec.source + "|" + (spec.file || "") + "|" + spec.model;
     if (definitionCache[key]) return definitionCache[key];
-    modelsIndex = modelsIndex || JSON.parse(__readFile(join(root, "dist/models-index.json")));
     var coordinate = null;
     var definitions;
     if (spec.source !== "external") {
+      modelsIndex = modelsIndex || JSON.parse(__readFile(join(root, "dist/models-index.json")));
       coordinate = modelsIndex[String(spec.model || "").trim().toLowerCase()];
     }
     if (spec.source === "external") {
@@ -547,8 +547,12 @@
 
   async function runScenario(scenario) {
     globalThis.__timerJobId = scenario.__jobId || 0;
+    globalThis.__timerDevice = scenario.__deviceKey || (scenario.device && scenario.device.ieeeAddr) || "";
     if (scenario.kind === "jsLoop") {
       while (true) {}
+    }
+    if (scenario.kind === "read-file") {
+      return { content: __readFile(scenario.path) };
     }
     if (scenario.kind === "host-op") {
       var hostOperation = {
@@ -563,6 +567,10 @@
           .catch(function (error) { reject(error); });
       });
     }
+    if (scenario.kind === "timer-error") {
+      setTimeout(function () { throw new Error("timer boom"); }, Number(scenario.delay || 20));
+      return { scheduled: true };
+    }
     if (scenario.kind === "timer-late") {
       globalThis.__lateTimerFired = false;
       setTimeout(function () { globalThis.__lateTimerFired = true; }, Number(scenario.delay || 20));
@@ -570,6 +578,12 @@
     }
     if (scenario.kind === "timer-check") {
       return { lateTimerFired: globalThis.__lateTimerFired === true };
+    }
+    if (scenario.kind === "on-event-timer-check") {
+      return {
+        onEventTimerFired: globalThis.__onEventTimerFired === true,
+        onEventWaitTimerFired: globalThis.__onEventWaitTimerFired === true,
+      };
     }
     if (scenario.kind === "timer") {
       var timerDelay = Number(scenario.delay || 10);

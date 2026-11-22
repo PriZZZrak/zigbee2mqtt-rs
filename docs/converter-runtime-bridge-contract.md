@@ -1,6 +1,8 @@
 # Converter runtime <-> Rust bridge integration contract
 
-Status: proposed contract for the offline bridge integration milestone.
+Status: contract implemented for the offline harness
+(`crates/converter-runtime/tests/bridge_offline.rs`); production dispatcher
+wiring is the next milestone.
 Runtime implementation: `crates/converter-runtime`; scheduler report:
 [`converter-runtime-scheduler-prototype.md`](converter-runtime-scheduler-prototype.md).
 
@@ -46,6 +48,11 @@ bridge host transport ◀── HostRequest{correlation, job, payload} ── ru
 - Host-request and response queues are bounded. A host operation that cannot
   be admitted fails with an explicit host error; the bridge must not silently
   drop the physical operation.
+- `respond()` returns `Delivered`, `Backpressure` or `Closed` without blocking.
+  On `Backpressure`, retain the completed physical result and retry the same
+  correlation ID with backoff; do not execute the Zigbee operation again and do
+  not drop the result. On `Closed`, the worker is gone; record the orphaned
+  response and recover through supervisor/OS restart.
 - Duplicate/late responses are ignored by correlation ID and counted; a response
   after a job's terminal state is not an error.
 
@@ -53,8 +60,10 @@ bridge host transport ◀── HostRequest{correlation, job, payload} ── ru
 
 - `device` is the ordering key. At most one JS job per device is active;
   queued work is FIFO. Different devices are scheduled round-robin.
-- On device removal: cancel queued/running jobs, clear job-tagged timers, wait
-  for terminal outcomes, then remove the device from the bridge index.
+- On device removal: call `cancel_device(device)`, which cancels queued/running
+  jobs and removes all timers owned by the device (including onEvent timers that
+  outlived their job), wait for terminal outcomes, then remove the device from
+  the bridge index.
 - On rename: the device key and queued jobs must be updated atomically by the
   bridge; in-flight jobs retain their original key until terminal.
 - On external-converter reload: use a separate external realm or
@@ -64,7 +73,9 @@ bridge host transport ◀── HostRequest{correlation, job, payload} ── ru
 ## 5. Host transport
 
 - Every operation has a correlation ID and a bounded payload
-  (`max_host_payload_bytes`).
+  (`max_host_payload_bytes`). `__readFile`/`__fileExists` are sandboxed to the
+  package/herdsman roots and the external converter directory; `..`, absolute
+  escapes and symlinks outside are rejected.
 - The bridge resolves the Promise only when the real ZNP/device response
   arrives; timeouts, cancellations and transport errors are delivered as
   rejected Promises.
@@ -77,13 +88,22 @@ bridge host transport ◀── HostRequest{correlation, job, payload} ── ru
 
 ## 6. Shutdown and recovery
 
-- `shutdown()` is bounded: it clears timers/queues, interrupts the worker,
-  joins it and stops the supervisor. The bridge must have an outer timeout and
-  must not block its event loop.
+- `shutdown_with_timeout(timeout)` returns `Stopped`, `TimedOut` or
+  `AlreadyStopped`. It never waits for an unbounded `join`: a helper thread
+  performs the join and the caller waits only for the deadline. A timed-out
+  worker is detached and marked `Unresponsive`; the bridge must treat this as a
+  process-level failure and let the OS supervisor kill/restart, not as a
+  successful stop.
 - `health()` reports `Running`, `RssExceeded`, `Unresponsive`, `Stopped`.
   `rss_bytes()` is process RSS; JS heap is reported separately in job metrics.
-- `restart()` recreates worker/supervisor and transport channels. The bridge
-  must reacquire `host_receiver()` and re-register host transport wiring.
+- `restart()` is sequential: bounded old-worker shutdown, then a new
+  worker/supervisor and transport channels. Old and new JS heaps do not
+  overlap; on Routerich measured peak RSS stayed ~17 MB and the next job
+  completed, at the cost of a ~2.4–2.7 s package/bootstrap reload. The bridge must
+  reacquire `host_receiver()` and re-register host transport wiring, and run
+  reload off the request path. If the old worker does not stop within
+  `shutdown_timeout`, `restart()` returns `TimedOut` and creates no second
+  runtime; the bridge must restart the process instead.
 - An OS service supervisor remains required for process death/panic; in-process
   restart is not a substitute.
 
@@ -98,7 +118,28 @@ These are the bridge's scheduler SLO inputs. The single-call Node baseline is
 not a valid comparison for concurrent bridge workloads; use the Node scheduler
 workloads in `tools/bench/stress.mjs`.
 
-## 8. Non-goals of this contract
+## 8. Offline integration harness
+
+`crates/converter-runtime/tests/bridge_offline.rs` simulates the Rust bridge
+without ZNP, MQTT or HA:
+
+- one transport thread owns `host_receiver()` and parses each
+  `HostRequest.operation`, mirroring the bridge command mapping;
+- every completed result is delivered with `respond()`; `Backpressure` retries
+  the same correlation ID with a bounded backoff and never re-executes the
+  physical operation;
+- the simulated event loop burst-submits eight host-operation jobs across
+  three devices and asserts the slowest `submit()` stayed below 100 ms while
+  responses were in flight;
+- a device removal cancels a long timer job and frees the device;
+- the harness then stops the transport, joins it and performs a bounded
+  shutdown, asserting `Stopped` and `WorkerHealth::Stopped`.
+
+The test proves the transport/admission/lifecycle API is sufficient for the
+bridge side. It does not implement the production dispatcher, the job event
+channel, Tokio task wiring or the ZNP/MQTT/HA command semantics.
+
+## 9. Non-goals of this contract
 
 - Zigbee/MQTT/HA command semantics.
 - The full device catalog or per-device HA discovery.

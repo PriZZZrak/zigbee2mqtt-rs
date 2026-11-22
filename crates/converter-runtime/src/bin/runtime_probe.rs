@@ -51,6 +51,18 @@ fn arg(name: &str, fallback: &str) -> String {
     fallback.to_owned()
 }
 
+fn deliver(runtime: &ConverterRuntime, correlation_id: u64, result: HostResult) {
+    for _ in 0..100 {
+        match runtime.respond(correlation_id, result.clone()) {
+            converter_runtime::RespondStatus::Delivered
+            | converter_runtime::RespondStatus::Closed => return,
+            converter_runtime::RespondStatus::Backpressure => {
+                thread::sleep(Duration::from_millis(1));
+            }
+        }
+    }
+}
+
 fn main() {
     let package = arg(
         "--package",
@@ -124,11 +136,11 @@ fn main() {
             }
             mixed += 1;
             let effective_mode = if host_mode == "mix" {
-                if mixed % 7 == 0 {
+                if mixed.is_multiple_of(7) {
                     "drop"
-                } else if mixed % 11 == 0 {
+                } else if mixed.is_multiple_of(11) {
                     "error"
-                } else if mixed % 13 == 0 {
+                } else if mixed.is_multiple_of(13) {
                     "late"
                 } else {
                     "ok"
@@ -139,19 +151,26 @@ fn main() {
             match effective_mode {
                 "drop" => {}
                 "error" => {
-                    let _ = runtime_host.respond(
+                    deliver(
+                        &runtime_host,
                         request.correlation_id,
                         HostResult::Err("host EIO".to_owned()),
                     );
                 }
                 "late" => {
                     thread::sleep(Duration::from_millis(host_delay_ms));
-                    let _ =
-                        runtime_host.respond(request.correlation_id, HostResult::Ok(json!(true)));
+                    deliver(
+                        &runtime_host,
+                        request.correlation_id,
+                        HostResult::Ok(json!(true)),
+                    );
                 }
                 _ => {
-                    let _ =
-                        runtime_host.respond(request.correlation_id, HostResult::Ok(json!(true)));
+                    deliver(
+                        &runtime_host,
+                        request.correlation_id,
+                        HostResult::Ok(json!(true)),
+                    );
                 }
             }
         }
@@ -177,21 +196,21 @@ fn main() {
     if warmup {
         let warm_started = Instant::now();
         let mut warm_ids = Vec::new();
-        if let Some(configure) = &configure {
-            if let Ok(id) = runtime.submit(JobRequest {
+        if let Some(configure) = &configure
+            && let Ok(id) = runtime.submit(JobRequest {
                 device: "warmup-configure".to_owned(),
                 scenario: configure.clone(),
-            }) {
-                warm_ids.push(id);
-            }
+            })
+        {
+            warm_ids.push(id);
         }
-        if let Some(job) = &set_job {
-            if let Ok(id) = runtime.submit(JobRequest {
+        if let Some(job) = &set_job
+            && let Ok(id) = runtime.submit(JobRequest {
                 device: "warmup-set".to_owned(),
                 scenario: job.clone(),
-            }) {
-                warm_ids.push(id);
-            }
+            })
+        {
+            warm_ids.push(id);
         }
         for id in warm_ids {
             let _ = runtime.wait(id, Duration::from_millis(timeout_ms));

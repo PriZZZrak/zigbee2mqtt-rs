@@ -124,15 +124,17 @@ are **not** used for this comparison.
 
 | Workload | Node configure | Rust runtime | Ratio |
 |---|---:|---:|---:|
-| c1 | 255.4 ms | 107.2 ms | 0.42× |
-| c4 | 112.2 ms | 119.4 ms | 1.06× |
+| c1 | 255.4 ms | 131.8 ms | 0.52× |
+| c4 | 112.2 ms | 139.4 ms | 1.24× |
 
 With zero host delay Node's mock promises settle in JS microtasks while the
 runtime crosses the Rust boundary; those runs are retained for diagnosis
 (Node c1/c4 50.3/25.2 ms, runtime 34.7/67.6 ms on Routerich) but are not the
 acceptance comparison. The comparable async-host path is within 2× Node on
-both targets; Routerich c4 is 1.06× (runs under live-service load ranged
-108–143 ms).
+both targets; Routerich c4 is 1.24× on the median of three runs (individual
+runs ranged 127–195 ms; c1 median 131.8 ms, range 95–195 ms; best observed
+95 ms c1 / 111 ms c4). Variance comes from the live Node service sharing the
+router; the median is the reported figure.
 
 ## 5. Lifecycle, backpressure and failure tests
 
@@ -206,6 +208,34 @@ The audit findings were addressed in the same crate:
   recalled; their late responses are counted and ignored. `cancel-reuse`
   cancels a running configure and immediately completes a report on the same
   device.
+- **P0 non-blocking response delivery.** `respond()` now returns
+  `RespondStatus::{Delivered,Backpressure,Closed}` and uses `try_send`; a full
+  response queue never blocks the caller. On backpressure the bridge retains
+  the already-completed physical result and retries the same correlation ID;
+  the pending job remains waiting until it arrives or times out. Duplicate and
+  late responses are counted/ignored.
+- **P0 bounded shutdown.** `shutdown_with_timeout()` places the `JoinHandle`
+  in a helper thread and waits only for a configured deadline; it returns
+  `ShutdownStatus::{Stopped,TimedOut,AlreadyStopped}`. A timed-out worker is
+  explicitly detached and marked `Unresponsive`; the method does **not** claim
+  it was stopped. OS/service supervision remains the final boundary. `Drop`
+  uses a short bounded wait, and `restart()` stops the old worker before
+  creating the new one; a timed-out restart returns `TimedOut` and does not
+  create a second runtime.
+- **P1 admission race.** The admitted id is registered **before** the Submit
+  command is sent; a failed send removes it and releases admission. A worker
+  that finishes immediately therefore removes an existing entry rather than
+  leaving a stale one.
+- **P1 file sandbox.** `__readFile`/`__fileExists` canonicalize paths and
+  allow only the package root, herdsman root and the external converter's
+  directory/exact file. `..`, absolute escapes and symlinks resolving outside
+  the roots are rejected; tests cover all three.
+- **P1 timer ownership.** Timer entries carry job id and device key
+  (`__deviceKey` injected by the scheduler). Job cancellation removes its
+  timers; `cancel_device()` removes queued/running jobs and all device timers;
+  `restart()`/shutdown clear the queue. Timer callbacks that outlive a job can
+  publish JS state but cannot issue new host operations (generation guard).
+  Callback errors are logged and do not kill the worker.
 - **P1 host value bridge.** Recursive JSON→JS conversion now builds real
   arrays/objects and uses `Int`/`Float`/`BigInt` without truncating i64/u64
   values; unit tests cover 2^32, 2^53+1 and `u64::MAX`. No array/object becomes
@@ -221,8 +251,11 @@ The audit findings were addressed in the same crate:
 - **Timers:** `setTimeout`/`clearTimeout`/`setInterval`/`clearInterval`,
   `.ref()`, `.unref()`, `.hasRef()`, `.close()` are backed by a Rust timer
   queue. Callbacks run on the worker and may outlive the converter call; a
-  pending 10 s timer does not block shutdown. Timers tagged with a cancelled
-  job are removed; restart/shutdown clears the whole queue.
+  pending 10 s timer does not block shutdown. Entries carry both the creating
+  job and the device key injected by the scheduler, so cancelling a job removes
+  its timers and `cancel_device()` removes every timer owned by a removed
+  device, including `onEvent` timers that outlived their call. Restart/shutdown
+  clears the whole queue; a recreated realm starts with an empty timer set.
 - **Bounded host transport:** host-request and response queues are bounded
   (`max_pending_host_ops`, `max_pending_responses`), payload size
   (`max_host_payload_bytes`) is enforced, and duplicate/late correlation IDs
@@ -237,16 +270,17 @@ The audit findings were addressed in the same crate:
   RSS/heartbeat violation. `restart()` recreates worker and supervisor with
   the same config; the bridge must reacquire `host_receiver()`.
 - **Tests:** four unit tests (number bridge, object/array bridge, bounded
-  admission, metric retention) and two ignored integration regressions
+  admission, metric retention), two ignored integration regressions
   (`timeout_then_same_device_job_completes`,
-  `cancel_then_same_device_job_completes`) and twelve autonomous
-  timer/lifecycle tests in `tests/timers.rs` (fake package, no ignored) pass;
-  the JS-loop watchdog is exercised by `runtime_probe --mode js-timeout`.
+  `cancel_then_same_device_job_completes`), twenty autonomous
+  timer/lifecycle tests in `tests/timers.rs` and one offline bridge transport
+  test in `tests/bridge_offline.rs` (fake package, no ignored) pass; the
+  JS-loop watchdog is exercised by `runtime_probe --mode js-timeout`.
 - **Soak (Routerich, 32 MB JS heap cap):** 60 s mixed reports/sets with host
-  drops/errors/timeouts and cancellations: **3,928 completed, 1,213 failed,
-  1,709 cancelled, 322 host timeouts, 0 late responses**, process RSS
-  **42.7 MB** before shutdown (peak 54.5 MB), live JS heap 13.6 MB (peak
-  23.6 MB), max GC pause 116 ms, no OOM or worker death. A 5 s x86 soak
+  drops/errors/timeouts and cancellations: **4,083 completed, 508 failed,
+  1,523 cancelled, 329 host timeouts, 0 late responses**, process RSS
+  **42.4 MB** before shutdown (peak 54.2 MB), live JS heap 20.4 MB (peak
+  23.6 MB), max GC pause 132 ms, no OOM or worker death. A 5 s x86 soak
   completed 83 jobs (26 failed, 37 cancelled) with 66 MB RSS before shutdown.
 
 Raw hardening results are in
@@ -269,25 +303,45 @@ hardening probe now reports:
 - `rssKb` — post-shutdown RSS, retained only for diagnostics and never compared
   with heap.
 
-The consistent Routerich sample is **42.7 MB process RSS / 13.6 MB JS live
-heap** before shutdown (peak 54.5 MB RSS / 23.6 MB heap). RSS includes the
+The consistent Routerich sample is **42.4 MB process RSS / 20.4 MB JS live
+heap** before shutdown (peak 54.2 MB RSS / 23.6 MB heap). RSS includes the
 binary, loader, Zcl snapshot and native allocator; heap is JS-only, so RSS
 must be larger. The same methodology applies to x86 runs.
+
+### Restart memory strategy
+
+`restart()` is **sequential**: it performs a bounded shutdown of the old worker
+before creating the new runtime, so old and new JS heaps never coexist. On
+Routerich a restart that includes package load measured **15.8 MB RSS before
+and after**, peak **17.2 MB**, and the next timer job completed. On x86 the
+same probe measured 20.6 → 30.2 MB RSS, peak 30.2 MB. The cost is restart
+latency (Routerich ~2.4–2.7 s including package/bootstrap); the bridge must perform
+reload off the request path. A timed-out old worker is detached, not overlapped
+with a new one, and must be contained by the OS supervisor.
+
+Probe: `crates/converter-runtime/src/bin/restart_probe.rs`;
+raw result is part of the scheduler results set.
 
 ## 8. Limits and next milestone
 
 Not yet production:
 
-- Timers are runtime-global; job attribution uses the best-effort
-  `__timerJobId` set when the call starts. Timers created from an async
-  continuation or a timer callback may not be associated with the originating
-  job. A timer that outlives its job cannot issue new host operations because
-  the generation guard requires an active job; it can publish JS state.
+- Timers are runtime-global; job/device attribution uses the best-effort
+  `__timerJobId`/`__timerDevice` set when the call starts. A timer created from
+  an async continuation inherits the tags of the call that scheduled it; a
+  timer created inside another timer callback inherits that callback's tags.
+  A timer that outlives its job cannot issue new host operations because the
+  generation guard requires an active job; it can publish JS state. Device
+  leave/removal removes all timers carrying that device key.
 - Timer callbacks run on the shared worker; a runaway timer callback is covered
   by the same shared interrupt policy.
 - The JS watchdog uses the one runtime-wide interrupt handle: a single job's
-  timeout cancels all active jobs on the shared interpreter. Production should
-  isolate or restart the realm, or accept a documented shared-timeout policy.
+  timeout or synchronous cancellation aborts all active jobs on the shared
+  interpreter. Production must accept the documented shared-timeout policy or
+  isolate realms.
+- A shutdown that times out detaches the worker thread; it is not force-killed
+  in-process. The OS service supervisor must terminate the process and restart
+  the runtime.
 - Supervision is in-process (RSS + heartbeat + restart); a crash that kills
   the whole process still needs an OS service supervisor.
 - `restart()` replaces the transport channels; bridge code must reacquire
@@ -304,12 +358,13 @@ Not yet production:
   queues with request deadlines. The comparable 1-configure + 8-set workloads
   above are the performance reference.
 
-**Decision:** GO for the next-stage production scheduler/timer milestone. The
-runtime is demonstrably correct on the golden corpus and meets the comparable
-async-host target (≤2× Node); timers, bounded host transport, cancellation
-contract and in-process supervision are now implemented. NO-GO for deployment
-until bridge integration, OS-level supervision/restart and the production
-device lifecycle contract are implemented.
+**Decision:** GO for offline bridge integration (contract + harness) and for
+the next production-scheduler milestone. The runtime is demonstrably correct
+on the golden corpus and meets the comparable async-host target (≤2× Node);
+timers, bounded host transport, cancellation contract and in-process
+supervision are implemented. NO-GO for deployment/HIL until the production
+bridge dispatcher, event-channel delivery, OS-level supervision/restart and
+the production device lifecycle contract are implemented.
 
 ## 9. Sources and raw results
 
