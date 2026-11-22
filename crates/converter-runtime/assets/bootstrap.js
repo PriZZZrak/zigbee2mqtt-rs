@@ -333,8 +333,8 @@
   var perf = { serializeMs: 0, boundaryMs: 0, resumeMs: 0, mockMs: 0, hostCalls: 0 };
   function profileStart() { return profileHost ? __now() : 0; }
   function profileEnd(started) { if (profileHost) perf.mockMs += __now() - started; }
-  function hostCall(op, jobId, state) {
-    var hostOp = jobId === undefined ? op : Object.assign({}, op, { jobId: jobId });
+  function hostCall(op, jobId, jobGeneration, state) {
+    var hostOp = jobId === undefined ? op : Object.assign({}, op, { jobId: jobId, generation: jobGeneration });
     var started = __now();
     var text = JSON.stringify(hostOp);
     var serialized = __now();
@@ -354,7 +354,7 @@
     return result && typeof result.then === "function" ? result : Promise.resolve(result);
   }
 
-  function makeEndpoint(spec, device, jobId, state) {
+  function makeEndpoint(spec, device, jobId, jobGeneration, state) {
     var endpoint = {
       constructor: { name: "Endpoint" },
       ID: spec.id,
@@ -402,35 +402,35 @@
         for (var i = 0; i < names.length; i++) {
           result[names[i]] = state.readValues[String(cluster) + ":" + names[i]] ?? state.readValues[names[i]] ?? 0;
         }
-        return hostCall(op, jobId, state).then(function () { return result; });
+        return hostCall(op, jobId, jobGeneration, state).then(function () { return result; });
       },
       write: function (cluster, attributes) {
         var op = { op: "write", endpoint: endpoint.ID, cluster: String(cluster), attributes: cloneRecord(attributes || {}) };
         state.calls.push(op);
-        return hostCall(op, jobId, state);
+        return hostCall(op, jobId, jobGeneration, state);
       },
       command: function (cluster, command, payload) {
         var op = { op: "command", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}) };
         state.calls.push(op);
-        return hostCall(op, jobId, state);
+        return hostCall(op, jobId, jobGeneration, state);
       },
       commandResponse: function (cluster, command, payload) {
         var op = { op: "commandResponse", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}) };
         state.calls.push(op);
-        return hostCall(op, jobId, state).then(function () { return { status: 0 }; });
+        return hostCall(op, jobId, jobGeneration, state).then(function () { return { status: 0 }; });
       },
       defaultResponse: function () { return Promise.resolve(); },
       bind: function (cluster, target) {
         var op = { op: "bind", endpoint: endpoint.ID, cluster: String(cluster), target: target && target.ID };
         state.calls.push(op);
         endpoint.binds.push({ cluster: cluster, target: target });
-        return hostCall(op, jobId, state);
+        return hostCall(op, jobId, jobGeneration, state);
       },
       configureReporting: function (cluster, items) {
         var op = { op: "configureReporting", endpoint: endpoint.ID, cluster: String(cluster), items: cloneRecord(items) };
         state.calls.push(op);
         endpoint.configuredReportings.push({ cluster: cluster, items: items });
-        return hostCall(op, jobId, state);
+        return hostCall(op, jobId, jobGeneration, state);
       },
       readResponse: function () { return Promise.resolve(); },
     };
@@ -439,6 +439,7 @@
 
   function makeDevice(spec, state) {
     var jobId = spec.__jobId;
+    var jobGeneration = spec.__jobGeneration;
     var deviceSpec = spec.device || {};
     var endpointsSpec = deviceSpec.endpoints || [{ id: 1, inputClusters: [], outputClusters: [] }];
     var device = {
@@ -471,7 +472,7 @@
       },
       save: function () { return Promise.resolve(); },
     };
-    device.endpoints = endpointsSpec.map(function (endpointSpec) { return makeEndpoint(endpointSpec, device, jobId, state); });
+    device.endpoints = endpointsSpec.map(function (endpointSpec) { return makeEndpoint(endpointSpec, device, jobId, jobGeneration, state); });
     return device;
   }
 
@@ -528,6 +529,9 @@
   }
 
   async function runScenario(scenario) {
+    if (scenario.kind === "jsLoop") {
+      while (true) {}
+    }
     var definition = prepare(scenario.definition);
     var jobState = {
       calls: [],
@@ -615,9 +619,9 @@
       var coordinator = {
         ieeeAddr: "0x00124b0000000000",
         networkAddress: 0,
-        getEndpoint: function (id) { return makeEndpoint({ id: id, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, jobState); },
+        getEndpoint: function (id) { return makeEndpoint({ id: id, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, scenario.__jobGeneration, jobState); },
       };
-      coordinator.endpoints = [makeEndpoint({ id: 1, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, jobState)];
+      coordinator.endpoints = [makeEndpoint({ id: 1, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, scenario.__jobGeneration, jobState)];
       coordinator.endpoints[0].deviceIeeeAddress = coordinator.ieeeAddr;
       await timed(function () { return definition.configure(device, coordinator.endpoints[0], definition); });
       return { result: null, published: published, calls: jobState.calls.slice(), converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
@@ -661,9 +665,10 @@
     }
   };
 
-  globalThis.__startRuntimeJob = function (id, json) {
+  globalThis.__startRuntimeJob = function (id, generation, json) {
     var runtimeSpec = JSON.parse(json);
     runtimeSpec.__jobId = Number(id);
+    runtimeSpec.__jobGeneration = Number(generation);
     runScenario(runtimeSpec)
       .then(function (result) { __runtimeDone(String(id), JSON.stringify(result)); })
       .catch(function (error) { __runtimeFailed(String(id), String(error && (error.stack || error.message) || error)); });

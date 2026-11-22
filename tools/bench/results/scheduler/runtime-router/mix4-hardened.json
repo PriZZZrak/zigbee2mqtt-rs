@@ -1,0 +1,982 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "mix",
+  "maxConcurrent": 4,
+  "hostDelayMs": 1,
+  "submitted": 9,
+  "submitErrors": 0,
+  "servedHostOps": 111,
+  "elapsedMs": 1075.310543,
+  "startupMs": 1986.185888,
+  "warmupMs": 949.704734,
+  "completed": 11,
+  "failed": 0,
+  "cancelled": 0,
+  "lateResponses": 0,
+  "hostTimeouts": 0,
+  "gcCollections": 3,
+  "gcMaxPauseMs": 11.526471,
+  "heapLiveBytes": 5631664,
+  "rssKb": 6272,
+  "cases": [
+    {
+      "id": 3,
+      "scenarioId": "configure-danfoss",
+      "device": "0x00124b0000000001",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "haDiagnostic",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "haDiagnostic",
+            "items": [
+              {
+                "attribute": "danfossSystemStatusCode",
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 1
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "haDiagnostic",
+            "attributes": [
+              "danfossSystemStatusCode"
+            ]
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "hvacThermostat"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "hvacUserInterfaceCfg"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "haDiagnostic"
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 10,
+                "attribute": "localTemp"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "localTemp"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 10,
+                "attribute": "occupiedHeatingSetpoint"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "occupiedHeatingSetpoint"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 0,
+                "attribute": "systemMode"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "systemMode"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 0,
+                "attribute": "pIHeatingDemand"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "pIHeatingDemand"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "maxHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "minHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "programingOperMode"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "systemMode"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              "keypadLockout"
+            ]
+          },
+          {
+            "op": "write",
+            "endpoint": 1,
+            "cluster": "genTime",
+            "attributes": {
+              "time": 848491200,
+              "timeStatus": 2,
+              "timeZone": 0,
+              "dstStart": 4294967295,
+              "dstEnd": 4294967295,
+              "dstShift": 0
+            }
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "absMaxHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "absMinHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossHeatingSystemMode"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "genPowerCfg",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "genPowerCfg",
+            "items": [
+              {
+                "minimumReportInterval": 3600,
+                "maximumReportInterval": 65000,
+                "reportableChange": 10,
+                "attribute": "batteryPercentageRemaining"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "genPowerCfg",
+            "attributes": [
+              "batteryPercentageRemaining"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              "keypadLockout"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossMountedModeActive"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossMountedModeControl"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossThermostatOrientation"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              "danfossViewingDirection"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossHeatAvailable"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossHeatRequired"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossExternalMeasuredRoomSensor"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossRadiatorCovered"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossWindowOpenFeatureEnable"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossWindowOpenInternal"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossWindowOpenExternal"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossDayOfWeek"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAlgorithmScaleFactor"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossLoadBalancingEnable"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossLoadRoomMean"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossLoadEstimate"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossPreheatStatus"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossPreheatTime"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAdaptionRunStatus"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAdaptionRunSettings"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAdaptionRunControl"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossRegulationSetpointOffset"
+            ]
+          }
+        ],
+        "converterMs": 121.97306300000014,
+        "hostMs": 8.084691999998881,
+        "hostCalls": 51,
+        "perf": {
+          "serializeMs": 2.7474459999993996,
+          "boundaryMs": 5.337245999999482,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 51,
+          "getEndpoint": 3,
+          "addCustomCluster": 3,
+          "getInputClusters": 37
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.015158,
+        "evalMs": 1.429508,
+        "jsExecMs": 121.97306300000014,
+        "promiseSchedMs": 40.634839,
+        "hostWaitMs": 87.840767,
+        "totalMs": 124.769371,
+        "hostCalls": 51,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 4,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003000",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 6.694351000000097,
+        "hostMs": 0.22790299999996932,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04493400000001202,
+          "boundaryMs": 0.1829689999999573,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.012079999999999999,
+        "evalMs": 1.662873,
+        "jsExecMs": 6.694351000000097,
+        "promiseSchedMs": 0.406947,
+        "hostWaitMs": 5.974557,
+        "totalMs": 8.816645999999999,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 5,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003001",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 4.352616999999896,
+        "hostMs": 0.2169770000000426,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.06586200000003828,
+          "boundaryMs": 0.15111500000000433,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.013157,
+        "evalMs": 2.691513,
+        "jsExecMs": 4.352616999999896,
+        "promiseSchedMs": 0.386942,
+        "hostWaitMs": 3.579656,
+        "totalMs": 7.113454,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 6,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003002",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 2.3523519999998825,
+        "hostMs": 0.13280199999996967,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04616600000008475,
+          "boundaryMs": 0.08663599999988492,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.019697000000000003,
+        "evalMs": 2.2173179999999997,
+        "jsExecMs": 2.3523519999998825,
+        "promiseSchedMs": 0.43210699999999996,
+        "hostWaitMs": 1.651255,
+        "totalMs": 4.362465,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 7,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003003",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 5.9478579999999965,
+        "hostMs": 0.12387699999999312,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04362600000001749,
+          "boundaryMs": 0.08025099999997565,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 2.049969,
+        "evalMs": 1.668029,
+        "jsExecMs": 5.9478579999999965,
+        "promiseSchedMs": 0.384557,
+        "hostWaitMs": 5.354865,
+        "totalMs": 9.39979,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 8,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003004",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 7.7710790000001,
+        "hostMs": 0.24582999999995536,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.1321099999998978,
+          "boundaryMs": 0.11372000000005757,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 3.788016,
+        "evalMs": 1.916629,
+        "jsExecMs": 7.7710790000001,
+        "promiseSchedMs": 0.44172500000000003,
+        "hostWaitMs": 6.930256,
+        "totalMs": 16.531404,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 9,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003005",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 6.075351000000069,
+        "hostMs": 0.15057600000000093,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.07763499999998658,
+          "boundaryMs": 0.07294100000001436,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 5.860606,
+        "evalMs": 2.819699,
+        "jsExecMs": 6.075351000000069,
+        "promiseSchedMs": 0.384787,
+        "hostWaitMs": 4.453717999999999,
+        "totalMs": 16.573413,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 10,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003006",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 4.444640000000049,
+        "hostMs": 0.2133610000000772,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04847400000005564,
+          "boundaryMs": 0.16488700000002154,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 9.436338000000001,
+        "evalMs": 3.116619,
+        "jsExecMs": 4.444640000000049,
+        "promiseSchedMs": 0.436877,
+        "hostWaitMs": 3.590659,
+        "totalMs": 16.595727,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 11,
+      "scenarioId": "set-ikea-brightness",
+      "device": "0x00124b0000003007",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 4.129175999999916,
+        "hostMs": 0.9101490000001604,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04939700000011271,
+          "boundaryMs": 0.8607520000000477,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 16.612115,
+        "evalMs": 2.486693,
+        "jsExecMs": 4.129175999999916,
+        "promiseSchedMs": 0.42941399999999996,
+        "hostWaitMs": 2.701746,
+        "totalMs": 22.021301,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.526471,
+        "heapLiveBytes": 5631664
+      }
+    }
+  ]
+}

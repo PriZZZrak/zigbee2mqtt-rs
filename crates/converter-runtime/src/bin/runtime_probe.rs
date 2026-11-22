@@ -11,6 +11,21 @@ use std::time::{Duration, Instant};
 use converter_runtime::{ConverterRuntime, HostResult, JobRequest, RuntimeConfig, SubmitError};
 use serde_json::{Value as Json, json};
 
+fn rss_kb() -> u64 {
+    let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("VmRSS:") {
+            return rest
+                .trim()
+                .trim_end_matches("kB")
+                .trim()
+                .parse()
+                .unwrap_or(0);
+        }
+    }
+    0
+}
+
 fn arg(name: &str, fallback: &str) -> String {
     let mut iter = std::env::args().skip(1);
     while let Some(flag) = iter.next() {
@@ -44,8 +59,13 @@ fn main() {
     let host_timeout_ms: u64 = arg("--host-timeout-ms", "5000")
         .parse()
         .expect("host timeout");
+    let job_timeout_ms: u64 = arg("--job-timeout-ms", "10000")
+        .parse()
+        .expect("job timeout");
     let cancel_after_ms: u64 = arg("--cancel-after-ms", "0").parse().expect("cancel delay");
     let queue_cap: usize = arg("--queue-cap", "16").parse().expect("queue cap");
+    let duration_ms: u64 = arg("--duration-ms", "20000").parse().expect("duration");
+    let heap_mb: usize = arg("--heap-mb", "128").parse().expect("heap mb");
     let total_cap: usize = arg("--total-cap", "128").parse().expect("total cap");
 
     let scenarios: Json = serde_json::from_str(
@@ -60,6 +80,8 @@ fn main() {
     config.max_per_device_queue = queue_cap;
     config.max_total_queue = total_cap;
     config.host_timeout = Duration::from_millis(host_timeout_ms);
+    config.heap_limit_bytes = heap_mb << 20;
+    config.job_timeout = Duration::from_millis(job_timeout_ms);
     let runtime = Arc::new(ConverterRuntime::new(config).expect("runtime"));
 
     let served = Arc::new(AtomicU64::new(0));
@@ -69,6 +91,7 @@ fn main() {
     let runtime_host = Arc::clone(&runtime);
     let responder = thread::spawn(move || {
         let receiver = runtime_host.host_receiver();
+        let mut mixed = 0u64;
         loop {
             let request = match receiver.recv_timeout(Duration::from_millis(200)) {
                 Ok(request) => request,
@@ -84,7 +107,21 @@ fn main() {
             if host_delay_ms > 0 {
                 thread::sleep(Duration::from_millis(host_delay_ms));
             }
-            match host_mode.as_str() {
+            mixed += 1;
+            let effective_mode = if host_mode == "mix" {
+                if mixed % 7 == 0 {
+                    "drop"
+                } else if mixed % 11 == 0 {
+                    "error"
+                } else if mixed % 13 == 0 {
+                    "late"
+                } else {
+                    "ok"
+                }
+            } else {
+                host_mode.as_str()
+            };
+            match effective_mode {
                 "drop" => {}
                 "error" => {
                     let _ = runtime_host.respond(
@@ -116,6 +153,10 @@ fn main() {
     let set_job = scenarios
         .iter()
         .find(|scenario| scenario["id"] == "set-ikea-brightness")
+        .cloned();
+    let report_job = scenarios
+        .iter()
+        .find(|scenario| scenario["id"] == "fz-ikea-onoff")
         .cloned();
     let mut warmup_ms = 0.0;
     if warmup {
@@ -177,6 +218,102 @@ fn main() {
                 }
             }
         }
+    } else if mode == "soak" {
+        let deadline = Instant::now() + Duration::from_millis(duration_ms);
+        let reports = scenarios
+            .iter()
+            .filter(|s| s["kind"] == "fromZigbee")
+            .cloned()
+            .collect::<Vec<_>>();
+        let sets = scenarios
+            .iter()
+            .filter(|s| s["kind"] == "set")
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut round = 0usize;
+        while Instant::now() < deadline {
+            let mut batch = Vec::new();
+            for index in 0..16 {
+                let pool = if index % 2 == 0 { &reports } else { &sets };
+                if pool.is_empty() {
+                    continue;
+                }
+                let mut scenario = pool[(round + index) % pool.len()].clone();
+                scenario["device"]["ieeeAddr"] = json!(format!("0x00124b{:010x}", 0x4000 + index));
+                scenario["device"]["networkAddress"] = json!(0x4000 + index);
+                if let Ok(id) = runtime.submit(JobRequest {
+                    device: format!("soak-{index}"),
+                    scenario,
+                }) {
+                    if index % 5 == 0 {
+                        let _ = runtime.cancel(id);
+                    }
+                    batch.push(id);
+                } else {
+                    submit_errors += 1;
+                }
+            }
+            for id in batch {
+                let _ = runtime.wait(id, Duration::from_millis(500));
+            }
+            round += 1;
+            thread::sleep(Duration::from_millis(5));
+        }
+    } else if mode == "js-timeout" {
+        let scenario = json!({
+            "id": "js-loop",
+            "kind": "jsLoop",
+            "definition": {"source": "package", "file": "ikea.js", "model": "LED1545G12"},
+            "device": {"ieeeAddr": "0x00124b0000000bbb", "networkAddress": 0xbbb}
+        });
+        let first = runtime
+            .submit(JobRequest {
+                device: "js-timeout-device".to_owned(),
+                scenario,
+            })
+            .expect("js loop job");
+        labels.insert(first, "js-loop".to_owned());
+        ids.push(first);
+        let _ = runtime.wait(first, Duration::from_millis(timeout_ms));
+        let Some(report) = report_job.clone() else {
+            panic!("report missing")
+        };
+        let second = runtime
+            .submit(JobRequest {
+                device: "js-timeout-device".to_owned(),
+                scenario: report,
+            })
+            .expect("reuse after js timeout");
+        labels.insert(second, "fz-ikea-onoff".to_owned());
+        ids.push(second);
+    } else if mode == "timeout-reuse" || mode == "cancel-reuse" {
+        let Some(configure) = configure.clone() else {
+            panic!("configure scenario missing");
+        };
+        let Some(report) = report_job.clone() else {
+            panic!("report scenario missing");
+        };
+        let first = runtime
+            .submit(JobRequest {
+                device: "reuse-device".to_owned(),
+                scenario: configure,
+            })
+            .expect("first job");
+        labels.insert(first, "configure-danfoss".to_owned());
+        ids.push(first);
+        if mode == "cancel-reuse" {
+            thread::sleep(Duration::from_millis(20));
+            runtime.cancel(first);
+        }
+        let _ = runtime.wait(first, Duration::from_millis(timeout_ms));
+        let second = runtime
+            .submit(JobRequest {
+                device: "reuse-device".to_owned(),
+                scenario: report,
+            })
+            .expect("reuse job");
+        labels.insert(second, "fz-ikea-onoff".to_owned());
+        ids.push(second);
     } else if mode == "mix" {
         if let Some(configure) = configure {
             let device = configure["device"]["ieeeAddr"]
@@ -290,6 +427,7 @@ fn main() {
             "gcCollections": metrics.gc_collections,
             "gcMaxPauseMs": metrics.gc_max_pause_ms,
             "heapLiveBytes": metrics.heap_live_bytes,
+            "rssKb": rss_kb(),
             "cases": cases,
         }))
         .unwrap()

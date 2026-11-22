@@ -1,0 +1,22 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "soak",
+  "maxConcurrent": 1,
+  "hostDelayMs": 0,
+  "submitted": 0,
+  "submitErrors": 0,
+  "servedHostOps": 2298,
+  "elapsedMs": 61138.728491,
+  "startupMs": 2007.9063370000001,
+  "warmupMs": 996.8120150000001,
+  "completed": 4074,
+  "failed": 506,
+  "cancelled": 1518,
+  "lateResponses": 0,
+  "hostTimeouts": 328,
+  "gcCollections": 18,
+  "gcMaxPauseMs": 178.100503,
+  "heapLiveBytes": 23596135,
+  "rssKb": 12284,
+  "cases": []
+}

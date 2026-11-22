@@ -1,0 +1,83 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "js-timeout",
+  "maxConcurrent": 1,
+  "hostDelayMs": 0,
+  "submitted": 2,
+  "submitErrors": 0,
+  "servedHostOps": 52,
+  "elapsedMs": 2581.485143,
+  "startupMs": 1484.547774,
+  "warmupMs": 579.095419,
+  "completed": 3,
+  "failed": 0,
+  "cancelled": 1,
+  "lateResponses": 0,
+  "hostTimeouts": 0,
+  "gcCollections": 3,
+  "gcMaxPauseMs": 11.835306000000001,
+  "heapLiveBytes": 5631874,
+  "cases": [
+    {
+      "id": 3,
+      "scenarioId": "js-loop",
+      "device": "js-timeout-device",
+      "state": "Cancelled",
+      "error": "JS execution timeout",
+      "result": null,
+      "metrics": {
+        "queueWaitMs": 0.014972,
+        "evalMs": 0.0,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 2000.2485769999998,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.835306000000001,
+        "heapLiveBytes": 5631874
+      }
+    },
+    {
+      "id": 4,
+      "scenarioId": "fz-ikea-onoff",
+      "device": "js-timeout-device",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": "ON"
+        },
+        "published": [
+          {
+            "state": "ON"
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.1684439999994538,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.01046,
+        "evalMs": 1.444912,
+        "jsExecMs": 0.1684439999994538,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 1.859728,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.835306000000001,
+        "heapLiveBytes": 5631874
+      }
+    }
+  ]
+}

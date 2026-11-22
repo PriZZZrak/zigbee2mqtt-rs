@@ -117,21 +117,22 @@ are **not** used for this comparison.
 
 | Workload | Node configure | Rust runtime | Ratio |
 |---|---:|---:|---:|
-| c1 | 57.4 ms | 79.9 ms | 1.39× |
-| c4 | 56.4 ms | 89.1 ms | 1.58× |
+| c1 | 57.4 ms | 91.2 ms | 1.59× |
+| c4 | 56.4 ms | 109.0 ms | 1.93× |
 
 ### Routerich AX3000 (same host-delay model)
 
 | Workload | Node configure | Rust runtime | Ratio |
 |---|---:|---:|---:|
-| c1 | 255.4 ms | 106.8 ms | 0.42× |
-| c4 | 112.2 ms | 140.1 ms | 1.25× |
+| c1 | 255.4 ms | 110.6 ms | 0.43× |
+| c4 | 112.2 ms | 120.7 ms | 1.08× |
 
 With zero host delay Node's mock promises settle in JS microtasks while the
 runtime crosses the Rust boundary; those runs are retained for diagnosis
 (Node c1/c4 50.3/25.2 ms, runtime 34.7/67.6 ms on Routerich) but are not the
 acceptance comparison. The comparable async-host path is within 2× Node on
-both targets; Routerich c4 is 1.25×.
+both targets; Routerich c4 median is 1.08× (three runs under live-service
+load; individual runs ranged 111–221 ms).
 
 ## 5. Lifecycle, backpressure and failure tests
 
@@ -182,17 +183,66 @@ PATH=/tmp:$PATH \
 The router binary is statically linked; the Node service was not stopped and
 no Zigbee operation was performed. The probe reads `/opt/zigbee2mqtt` only.
 
+## 7a. Hardening round (2026-11-22)
+
+The audit findings were addressed in the same crate:
+
+- **P0 timeout slot leak fixed.** All terminal paths (`success`, `failure`,
+  `timeout`, `cancel`, `shutdown`) go through one `finish_job`: it removes the
+  active-device slot, pending host capabilities, generation guard, admission
+  credit and live state, then publishes the outcome. Regression: a configure
+  whose host operations time out is followed by a successful report on the
+  same device (`timeout-reuse`).
+- **P0 non-blocking admission.** The bridge-facing command channel is a
+  bounded `sync_channel` and `submit` uses `try_send`; it never waits for a
+  worker acknowledgement. A mutexed admission counter enforces per-device and
+  global caps before enqueue; full/disconnected returns `Backpressure`/`Closed`
+  immediately. Host responses use a separate queue, and a wake command keeps
+  the worker responsive.
+- **P1 cancellation safety.** Each start gets a generation token. `__hostOp`,
+  `__runtimeDone` and `__runtimeFailed` carry/check the token against the
+  active job map; a cancelled/stale JS continuation cannot send new host
+  operations or publish a result. Already-issued physical operations are not
+  recalled; their late responses are counted and ignored. `cancel-reuse`
+  cancels a running configure and immediately completes a report on the same
+  device.
+- **P1 host value bridge.** Recursive JSON→JS conversion now builds real
+  arrays/objects and uses `Int`/`Float`/`BigInt` without truncating i64/u64
+  values; unit tests cover 2^32, 2^53+1 and `u64::MAX`. No array/object becomes
+  `undefined`.
+- **Timeouts under load.** The worker drains bounded command/response batches,
+  then calls `check_timeouts()` on every turn before starting more work; a
+  continuous command stream cannot starve timeouts.
+- **Long JS and memory.** A single watchdog thread arms the qjs interrupt at
+  the earliest job deadline. An infinite JS loop is cancelled after the job
+  timeout (`JS execution timeout`) and the same device can start a new job;
+  a shared-JS timeout cancels all active jobs (one interpreter, documented).
+  Metrics/outcomes are retention-capped; states are removed on finish.
+- **Tests:** four unit tests (number bridge, object/array bridge, bounded
+  admission, metric retention) and two ignored integration regressions
+  (`timeout_then_same_device_job_completes`,
+  `cancel_then_same_device_job_completes`) pass with the pinned package.
+  The JS-loop watchdog is exercised by `runtime_probe --mode js-timeout`.
+- **Soak (Routerich, 32 MB JS heap cap):** 60 s mixed reports/sets with host
+  drops/errors/timeouts and cancellations: **4,074 completed, 506 failed,
+  1,518 cancelled, 328 host timeouts, 0 late responses**, RSS **12.3 MB**,
+  live heap 23.6 MB, max GC pause 178 ms (earlier 60 s runs: 105–177 ms), no
+  OOM or worker death. A 5 s x86 soak completed 101 jobs with 49 MB RSS.
+
+Raw hardening results are in
+`tools/bench/results/scheduler/hardening/` (x86) and
+`tools/bench/results/scheduler/runtime-router/*-hardened.json` plus
+`soak-32mb-60s.json`.
+
 ## 8. Limits and next milestone
 
 Not yet production:
 
-- `submit` currently waits for a worker ack (bounded); the bridge needs a
-  non-blocking submission/ack protocol or an explicit bounded async API.
 - Timers are still the study stub (`.unref()` objects, no callback execution).
   A real timer queue is a mandatory next milestone.
-- Host response payloads are converted only for primitive JSON in this
-  prototype; object/array responses and read values need the full JS value
-  bridge.
+- The JS watchdog uses the one runtime-wide interrupt handle: a single job's
+  timeout cancels all active jobs on the shared interpreter. Production should
+  isolate or restart the realm, or accept a documented shared-timeout policy.
 - No supervision process/RSS watchdog is integrated (the engine heap cap is
   not an RSS cap).
 - Definition/device modules are loaded lazily inside the worker; cold eval is
@@ -200,16 +250,18 @@ Not yet production:
 - Per-device fairness is validated at the scheduler level; the production
   bridge still needs backpressure integration and shutdown draining.
 - Under the full 36-scenario corpus at `max-concurrent 4`, the Danfoss
-  configure measures ~675 ms because its host waits interleave with many other
-  heavy jobs on one JS thread (host wait ~624 ms). This is a scheduler policy
-  finding: production should bound concurrency or prioritise configure work.
-  The comparable 1-configure + 8-set workloads above are the reference.
+  configure is queued behind many independent devices (queue wait ~4.7 s,
+  total ~5.3 s; host wait ~535 ms) because it is submitted later in the batch.
+  This is expected fair round-robin behaviour, not a slot leak. Production
+  should bound concurrency, prioritise configure work, or use per-device
+  queues with request deadlines. The comparable 1-configure + 8-set workloads
+  above are the performance reference.
 
 **Decision:** GO for the next-stage production scheduler/timer milestone. The
 runtime is demonstrably correct on the golden corpus and meets the comparable
-async-host target (≤2× Node); NO-GO for deployment until timers, non-blocking
-submission, full host value bridge, RSS supervision and bridge integration are
-implemented.
+async-host target (≤2× Node); NO-GO for deployment until timers, realm
+supervision/RSS watchdog, bridge integration and a production timer/supervision
+milestone are implemented.
 
 ## 9. Sources and raw results
 

@@ -1,0 +1,2327 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "all",
+  "maxConcurrent": 4,
+  "hostDelayMs": 0,
+  "submitted": 36,
+  "submitErrors": 0,
+  "servedHostOps": 140,
+  "elapsedMs": 6741.8588,
+  "startupMs": 2437.426449,
+  "warmupMs": 940.706198,
+  "completed": 38,
+  "failed": 0,
+  "cancelled": 0,
+  "lateResponses": 0,
+  "hostTimeouts": 0,
+  "gcCollections": 5,
+  "gcMaxPauseMs": 160.242159,
+  "heapLiveBytes": 20969466,
+  "rssKb": 9532,
+  "cases": [
+    {
+      "id": 3,
+      "scenarioId": "prepare-ikea-modern-extend",
+      "device": "prepare-ikea-modern-extend",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.02139,
+        "evalMs": 1.1823700000000001,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 497.845871,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 4,
+      "scenarioId": "prepare-danfoss-thermostat",
+      "device": "prepare-danfoss-thermostat",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.015926999999999997,
+        "evalMs": 1.327021,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 495.975639,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 5,
+      "scenarioId": "prepare-tuya-sensor",
+      "device": "prepare-tuya-sensor",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.015081,
+        "evalMs": 491.67418899999996,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 494.238286,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 6,
+      "scenarioId": "fz-ikea-onoff",
+      "device": "fz-ikea-onoff",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": "ON"
+        },
+        "published": [
+          {
+            "state": "ON"
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.143188999999893,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.02139,
+        "evalMs": 1.57339,
+        "jsExecMs": 0.143188999999893,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 2.303494,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 7,
+      "scenarioId": "fz-ikea-brightness",
+      "device": "fz-ikea-brightness",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "brightness": 128
+        },
+        "published": [
+          {
+            "brightness": 128
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.1681949999997414,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.388558,
+        "evalMs": 1.0847310000000001,
+        "jsExecMs": 0.1681949999997414,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 9.259679,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 8,
+      "scenarioId": "fz-ikea-color-temp",
+      "device": "fz-ikea-color-temp",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "color_temp": 250,
+          "color_mode": "color_temp"
+        },
+        "published": [
+          {
+            "color_temp": 250,
+            "color_mode": "color_temp"
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.7534179999997832,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1.868078,
+        "evalMs": 2.195621,
+        "jsExecMs": 0.7534179999997832,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 9.300457999999999,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 9,
+      "scenarioId": "fz-ikea-color-xy",
+      "device": "fz-ikea-color-xy",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "color": {
+            "x": 0.3805,
+            "y": 0.9274
+          },
+          "color_mode": "xy"
+        },
+        "published": [
+          {
+            "color": {
+              "x": 0.3805,
+              "y": 0.9274
+            },
+            "color_mode": "xy"
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.35778099999993174,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4.67462,
+        "evalMs": 1.557002,
+        "jsExecMs": 0.35778099999993174,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 9.341083999999999,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 10,
+      "scenarioId": "set-ikea-onoff",
+      "device": "set-ikea-onoff",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genOnOff",
+            "command": "on",
+            "payload": {}
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 0.7277189999999791,
+        "hostMs": 0.1147969999999532,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.03731700000003002,
+          "boundaryMs": 0.07747999999992317,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 6.813611,
+        "evalMs": 1.9081650000000001,
+        "jsExecMs": 0.7277189999999791,
+        "promiseSchedMs": 0.422874,
+        "hostWaitMs": 0.151807,
+        "totalMs": 9.374861,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 11,
+      "scenarioId": "set-ikea-brightness",
+      "device": "set-ikea-brightness",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 5.388719999999921,
+        "hostMs": 0.1307240000001002,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04524199999991651,
+          "boundaryMs": 0.08548200000018369,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 9.389403,
+        "evalMs": 1.559387,
+        "jsExecMs": 5.388719999999921,
+        "promiseSchedMs": 0.398637,
+        "hostWaitMs": 4.791802000000001,
+        "totalMs": 18.485118,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 12,
+      "scenarioId": "set-ikea-color-temp",
+      "device": "set-ikea-color-temp",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "color_mode": "color_temp",
+            "color_temp": 250
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "lightingColorCtrl",
+            "command": "moveToColorTemp",
+            "payload": {
+              "colortemp": 250,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "color_temp",
+          "color_temp_percent"
+        ],
+        "converterMs": 4.304067000000259,
+        "hostMs": 0.14426699999989978,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04778099999998631,
+          "boundaryMs": 0.09648599999991347,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 11.019037,
+        "evalMs": 1.575698,
+        "jsExecMs": 4.304067000000259,
+        "promiseSchedMs": 0.888605,
+        "hostWaitMs": 3.542647,
+        "totalMs": 18.539593,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 13,
+      "scenarioId": "get-ikea-onoff",
+      "device": "get-ikea-onoff",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "genOnOff",
+            "attributes": [
+              "onOff"
+            ]
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 3.3636019999999007,
+        "hostMs": 0.12064500000019508,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04485700000009274,
+          "boundaryMs": 0.07578800000010233,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 12.671831999999998,
+        "evalMs": 1.245155,
+        "jsExecMs": 3.3636019999999007,
+        "promiseSchedMs": 0.685862,
+        "hostWaitMs": 3.1260049999999997,
+        "totalMs": 18.611457,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 14,
+      "scenarioId": "set-ikea-brightness-host-delay",
+      "device": "set-ikea-brightness-host-delay",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "brightness": 128,
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "genLevelCtrl",
+            "command": "moveToLevelWithOnOff",
+            "payload": {
+              "level": 128,
+              "transtime": 0,
+              "optionsMask": 0,
+              "optionsOverride": 0
+            }
+          }
+        ],
+        "converterKey": [
+          "state",
+          "brightness",
+          "brightness_percent",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 2.8353179999999156,
+        "hostMs": 0.1336479999997664,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04577999999992244,
+          "boundaryMs": 0.08786799999984396,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 13.990158000000001,
+        "evalMs": 1.613015,
+        "jsExecMs": 2.8353179999999156,
+        "promiseSchedMs": 0.7745,
+        "hostWaitMs": 2.133991,
+        "totalMs": 18.633385,
+        "hostCalls": 1,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.205529,
+        "heapLiveBytes": 5631664
+      }
+    },
+    {
+      "id": 15,
+      "scenarioId": "fz-lumi-occupancy",
+      "device": "fz-lumi-occupancy",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "occupancy": true
+        },
+        "published": [
+          {
+            "occupancy": true
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.2544469999998,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 18.675858,
+        "evalMs": 1453.15715,
+        "jsExecMs": 0.2544469999998,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 1636.4232439999998,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 16,
+      "scenarioId": "fz-lumi-occupancy-clear",
+      "device": "fz-lumi-occupancy-clear",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0.10718100000030972,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1472.349366,
+        "evalMs": 1.236614,
+        "jsExecMs": 0.10718100000030972,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 1636.474102,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 17,
+      "scenarioId": "fz-l101-thermostat",
+      "device": "fz-l101-thermostat",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "local_temperature_l1": 21.5,
+          "occupied_heating_setpoint_l1": 20
+        },
+        "published": [
+          {
+            "local_temperature_l1": 21.5,
+            "occupied_heating_setpoint_l1": 20
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.3801719999996749,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1474.134423,
+        "evalMs": 159.835443,
+        "jsExecMs": 0.3801719999996749,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 1636.497723,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 18,
+      "scenarioId": "set-l101-setpoint",
+      "device": "set-l101-setpoint",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "occupied_heating_setpoint": 21.5
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "write",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": {
+              "occupiedHeatingSetpoint": 2150
+            }
+          }
+        ],
+        "converterKey": [
+          "occupied_heating_setpoint"
+        ],
+        "converterMs": 0.4890439999994669,
+        "hostMs": 0.11264300000038928,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.036009000000376545,
+          "boundaryMs": 0.07663400000001275,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1634.516002,
+        "evalMs": 1.477751,
+        "jsExecMs": 0.4890439999994669,
+        "promiseSchedMs": 0.315308,
+        "hostWaitMs": 0.124723,
+        "totalMs": 1637.236829,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 19,
+      "scenarioId": "get-l101-sensor-type",
+      "device": "get-l101-sensor-type",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              30464
+            ]
+          }
+        ],
+        "converterKey": [
+          "sensor_type",
+          "target_temp_first",
+          "min_setpoint_deadband"
+        ],
+        "converterMs": 6.59540300000026,
+        "hostMs": 0.1633480000000418,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.05309000000033848,
+          "boundaryMs": 0.11025799999970332,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1637.302077,
+        "evalMs": 2.258945,
+        "jsExecMs": 6.59540300000026,
+        "promiseSchedMs": 0.351395,
+        "hostWaitMs": 6.290558,
+        "totalMs": 1646.1967419999999,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 20,
+      "scenarioId": "fz-tuya-dp-temperature",
+      "device": "fz-tuya-dp-temperature",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "temperature": 21.5
+        },
+        "published": [
+          {
+            "temperature": 21.5
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.3353140000003805,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1639.639271,
+        "evalMs": 1.230766,
+        "jsExecMs": 0.3353140000003805,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 1646.100795,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 21,
+      "scenarioId": "fz-tuya-dp-multi",
+      "device": "fz-tuya-dp-multi",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "temperature": 22,
+          "humidity": 44,
+          "battery": 88
+        },
+        "published": [
+          {
+            "temperature": 22,
+            "humidity": 44,
+            "battery": 88
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.5391340000005584,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1641.484882,
+        "evalMs": 1.42266,
+        "jsExecMs": 0.5391340000005584,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 1646.152346,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 22,
+      "scenarioId": "set-tuya-temperature-unit",
+      "device": "set-tuya-temperature-unit",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "temperature_unit": "fahrenheit"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "manuSpecificTuya",
+            "command": "dataRequest",
+            "payload": {
+              "seq": 1,
+              "dpValues": [
+                {
+                  "dp": 9,
+                  "datatype": 2,
+                  "data": {
+                    "0": 0,
+                    "1": 0,
+                    "2": 0,
+                    "3": 1
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "converterMs": 3085.8049960000003,
+        "hostMs": 0.1822759999995469,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.07909699999981967,
+          "boundaryMs": 0.10317899999972724,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1643.617564,
+        "evalMs": 1.278778,
+        "jsExecMs": 3085.8049960000003,
+        "promiseSchedMs": 0.372015,
+        "hostWaitMs": 3084.903926,
+        "totalMs": 4731.235316,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 23,
+      "scenarioId": "fz-ts0002-ep2-onoff",
+      "device": "fz-ts0002-ep2-onoff",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state_l2": "ON"
+        },
+        "published": [
+          {
+            "state_l2": "ON"
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.195278999999573,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 1646.206129,
+        "evalMs": 3077.8701069999997,
+        "jsExecMs": 0.195278999999573,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 4731.152373000001,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 24,
+      "scenarioId": "set-ts0002-ep2-onoff",
+      "device": "set-ts0002-ep2-onoff",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "state": "ON"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 2,
+            "cluster": "genOnOff",
+            "command": "on",
+            "payload": {}
+          }
+        ],
+        "converterKey": [
+          "state",
+          "on_time",
+          "off_wait_time"
+        ],
+        "converterMs": 5.017782000000807,
+        "hostMs": 0.1310330000005706,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04647300000033283,
+          "boundaryMs": 0.08456000000023778,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4724.467793,
+        "evalMs": 1.874234,
+        "jsExecMs": 5.017782000000807,
+        "promiseSchedMs": 0.26914400000000005,
+        "hostWaitMs": 4.569055,
+        "totalMs": 4731.249397,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 25,
+      "scenarioId": "fz-danfoss-temperature",
+      "device": "fz-danfoss-temperature",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "local_temperature": 21,
+          "occupied_heating_setpoint": 20,
+          "occupied_heating_setpoint_scheduled": 20
+        },
+        "published": [
+          {
+            "local_temperature": 21,
+            "occupied_heating_setpoint": 20,
+            "occupied_heating_setpoint_scheduled": 20
+          }
+        ],
+        "calls": [],
+        "converterMs": 1.704805999999735,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4726.432127,
+        "evalMs": 1.3272519999999999,
+        "jsExecMs": 1.704805999999735,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 4731.194845,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 26,
+      "scenarioId": "get-danfoss-schedule",
+      "device": "get-danfoss-schedule",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "command": "getWeeklySchedule",
+            "payload": {
+              "daystoreturn": 255,
+              "modetoreturn": 3
+            }
+          }
+        ],
+        "converterKey": [
+          "weekly_schedule"
+        ],
+        "converterMs": 51.08511699999963,
+        "hostMs": 0.1927400000004127,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.05847600000015518,
+          "boundaryMs": 0.1342640000002575,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4731.3201070000005,
+        "evalMs": 1.887391,
+        "jsExecMs": 51.08511699999963,
+        "promiseSchedMs": 1.136666,
+        "hostWaitMs": 50.3327,
+        "totalMs": 4785.847538,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 27,
+      "scenarioId": "configure-l101z",
+      "device": "configure-l101z",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "bind",
+            "endpoint": 2,
+            "cluster": "msTemperatureMeasurement",
+            "target": 1
+          },
+          {
+            "op": "bind",
+            "endpoint": 2,
+            "cluster": "msRelativeHumidity",
+            "target": 1
+          },
+          {
+            "op": "read",
+            "endpoint": 2,
+            "cluster": "msRelativeHumidity",
+            "attributes": [
+              "measuredValue"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 2,
+            "cluster": "msTemperatureMeasurement",
+            "attributes": [
+              "measuredValue"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "localTemp",
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 10
+              }
+            ]
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "localTemp",
+                "minimumReportInterval": 60,
+                "maximumReportInterval": 120,
+                "reportableChange": 50
+              }
+            ]
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "occupiedHeatingSetpoint",
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 10
+              }
+            ]
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "occupiedHeatingSetpoint",
+                "minimumReportInterval": 1,
+                "maximumReportInterval": 120,
+                "reportableChange": 50
+              }
+            ]
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "systemMode",
+                "minimumReportInterval": 10,
+                "maximumReportInterval": 3600,
+                "reportableChange": null
+              }
+            ]
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "systemMode",
+                "minimumReportInterval": 1,
+                "maximumReportInterval": 120,
+                "reportableChange": 1
+              }
+            ]
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "runningMode",
+                "minimumReportInterval": 10,
+                "maximumReportInterval": 3600,
+                "reportableChange": null
+              }
+            ]
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "attribute": "runningMode",
+                "minimumReportInterval": 1,
+                "maximumReportInterval": 120,
+                "reportableChange": 1
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "localTemp",
+              "occupiedHeatingSetpoint",
+              "systemMode",
+              "runningMode"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 3,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              30464,
+              30465
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              "keypadLockout"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              30464,
+              30465
+            ]
+          }
+        ],
+        "converterMs": 127.20343500000035,
+        "hostMs": 2.2153179999986605,
+        "hostCalls": 17,
+        "perf": {
+          "serializeMs": 0.92530700000043,
+          "boundaryMs": 1.2900109999982303,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 17,
+          "getEndpoint": 4
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4733.289517,
+        "evalMs": 1.550615,
+        "jsExecMs": 127.20343500000035,
+        "promiseSchedMs": 6.524229,
+        "hostWaitMs": 122.01383899999999,
+        "totalMs": 4870.051629,
+        "hostCalls": 17,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 28,
+      "scenarioId": "configure-danfoss",
+      "device": "configure-danfoss",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "haDiagnostic",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "haDiagnostic",
+            "items": [
+              {
+                "attribute": "danfossSystemStatusCode",
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 1
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "haDiagnostic",
+            "attributes": [
+              "danfossSystemStatusCode"
+            ]
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "hvacThermostat"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "hvacUserInterfaceCfg"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "haDiagnostic"
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 10,
+                "attribute": "localTemp"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "localTemp"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 10,
+                "attribute": "occupiedHeatingSetpoint"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "occupiedHeatingSetpoint"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 0,
+                "attribute": "systemMode"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "systemMode"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "items": [
+              {
+                "minimumReportInterval": 0,
+                "maximumReportInterval": 3600,
+                "reportableChange": 0,
+                "attribute": "pIHeatingDemand"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "pIHeatingDemand"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "maxHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "minHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "programingOperMode"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "systemMode"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              "keypadLockout"
+            ]
+          },
+          {
+            "op": "write",
+            "endpoint": 1,
+            "cluster": "genTime",
+            "attributes": {
+              "time": 848491200,
+              "timeStatus": 2,
+              "timeZone": 0,
+              "dstStart": 4294967295,
+              "dstEnd": 4294967295,
+              "dstShift": 0
+            }
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "absMaxHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "absMinHeatSetpointLimit"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossHeatingSystemMode"
+            ]
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "genPowerCfg",
+            "target": 1
+          },
+          {
+            "op": "configureReporting",
+            "endpoint": 1,
+            "cluster": "genPowerCfg",
+            "items": [
+              {
+                "minimumReportInterval": 3600,
+                "maximumReportInterval": 65000,
+                "reportableChange": 10,
+                "attribute": "batteryPercentageRemaining"
+              }
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "genPowerCfg",
+            "attributes": [
+              "batteryPercentageRemaining"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              "keypadLockout"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossMountedModeActive"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossMountedModeControl"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossThermostatOrientation"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacUserInterfaceCfg",
+            "attributes": [
+              "danfossViewingDirection"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossHeatAvailable"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossHeatRequired"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossExternalMeasuredRoomSensor"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossRadiatorCovered"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossWindowOpenFeatureEnable"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossWindowOpenInternal"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossWindowOpenExternal"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossDayOfWeek"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAlgorithmScaleFactor"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossLoadBalancingEnable"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossLoadRoomMean"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossLoadEstimate"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossPreheatStatus"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossPreheatTime"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAdaptionRunStatus"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAdaptionRunSettings"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossAdaptionRunControl"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "danfossRegulationSetpointOffset"
+            ]
+          }
+        ],
+        "converterMs": 563.1851349999997,
+        "hostMs": 6.980577000004814,
+        "hostCalls": 51,
+        "perf": {
+          "serializeMs": 2.2841830000024856,
+          "boundaryMs": 4.6963940000023285,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 51,
+          "getEndpoint": 3,
+          "addCustomCluster": 3,
+          "getInputClusters": 37
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4734.935464,
+        "evalMs": 1.419814,
+        "jsExecMs": 563.1851349999997,
+        "promiseSchedMs": 33.776135,
+        "hostWaitMs": 535.3112270000001,
+        "totalMs": 5300.871819,
+        "hostCalls": 51,
+        "gcCollections": 5,
+        "gcMaxPauseMs": 160.242159,
+        "heapLiveBytes": 20969466
+      }
+    },
+    {
+      "id": 29,
+      "scenarioId": "onEvent-daewoo-start",
+      "device": "onEvent-daewoo-start",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "addCustomCluster",
+            "name": "genBasic"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "genGroups"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "genOnOff"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "genLevelCtrl"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "manuSpecificTuya2"
+          },
+          {
+            "op": "addCustomCluster",
+            "name": "manuSpecificTuya3"
+          }
+        ],
+        "converterMs": 0.3099999999994907,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1,
+          "addCustomCluster": 6
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4736.434143,
+        "evalMs": 46.14750900000001,
+        "jsExecMs": 0.3099999999994907,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 4785.773905,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 30,
+      "scenarioId": "onEvent-daewoo-announce",
+      "device": "onEvent-daewoo-announce",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "command",
+            "endpoint": 1,
+            "cluster": "manuSpecificTuya",
+            "command": "dataRequest",
+            "payload": {
+              "seq": 1,
+              "dpValues": [
+                {
+                  "dp": 101,
+                  "datatype": 1,
+                  "data": {
+                    "0": 1
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "converterMs": 51.44843800000035,
+        "hostMs": 0.15596199999981764,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.07624999999916326,
+          "boundaryMs": 0.07971200000065437,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 2
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4785.867311999999,
+        "evalMs": 1.726197,
+        "jsExecMs": 51.44843800000035,
+        "promiseSchedMs": 0.675321,
+        "hostWaitMs": 50.663858999999995,
+        "totalMs": 4844.227385,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 31,
+      "scenarioId": "prepare-external-l101",
+      "device": "prepare-external-l101",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4787.6951500000005,
+        "evalMs": 49.046997000000005,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 4844.130823,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 32,
+      "scenarioId": "fz-external-l101-temp",
+      "device": "fz-external-l101-temp",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "local_temperature": 21.5,
+          "occupied_heating_setpoint": 20
+        },
+        "published": [
+          {
+            "local_temperature": 21.5,
+            "occupied_heating_setpoint": 20
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.8332069999987652,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4844.325486,
+        "evalMs": 1.6454849999999999,
+        "jsExecMs": 0.8332069999987652,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 4852.915999000001,
+        "hostCalls": 0,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 33,
+      "scenarioId": "set-external-l101-mode",
+      "device": "set-external-l101-mode",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "state": {
+            "system_mode": "heat"
+          }
+        },
+        "published": [],
+        "calls": [
+          {
+            "op": "write",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": {
+              "systemMode": 4
+            }
+          }
+        ],
+        "converterKey": [
+          "system_mode"
+        ],
+        "converterMs": 2.003958000000239,
+        "hostMs": 0.11325899999974354,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.03393199999936769,
+          "boundaryMs": 0.07932700000037585,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4847.25552,
+        "evalMs": 1.317404,
+        "jsExecMs": 2.003958000000239,
+        "promiseSchedMs": 0.319079,
+        "hostWaitMs": 1.72035,
+        "totalMs": 4852.977475999999,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 34,
+      "scenarioId": "get-external-l101-sensor",
+      "device": "get-external-l101-sensor",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              65280
+            ]
+          }
+        ],
+        "converterKey": [
+          "sensor_type"
+        ],
+        "converterMs": 2.468150000000606,
+        "hostMs": 0.1281860000008237,
+        "hostCalls": 1,
+        "perf": {
+          "serializeMs": 0.04878100000041741,
+          "boundaryMs": 0.07940500000040629,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 1,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4853.110970000001,
+        "evalMs": 1.651794,
+        "jsExecMs": 2.468150000000606,
+        "promiseSchedMs": 0.254062,
+        "hostWaitMs": 2.209085,
+        "totalMs": 4869.878893,
+        "hostCalls": 1,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 35,
+      "scenarioId": "configure-external-l101",
+      "device": "configure-external-l101",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "target": 1
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "haElectricalMeasurement",
+            "target": 1
+          },
+          {
+            "op": "bind",
+            "endpoint": 1,
+            "cluster": "seMetering",
+            "target": 1
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              "localTemp",
+              "occupiedHeatingSetpoint",
+              "systemMode",
+              "runningState"
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "hvacThermostat",
+            "attributes": [
+              65280,
+              65281,
+              65282,
+              65285
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "haElectricalMeasurement",
+            "attributes": [
+              1288,
+              1295,
+              2048
+            ]
+          },
+          {
+            "op": "read",
+            "endpoint": 1,
+            "cluster": "seMetering",
+            "attributes": [
+              "currentSummDelivered"
+            ]
+          }
+        ],
+        "converterMs": 6.663804999999229,
+        "hostMs": 0.6080739999979414,
+        "hostCalls": 7,
+        "perf": {
+          "serializeMs": 0.25790999999844644,
+          "boundaryMs": 0.350163999999495,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 7,
+          "getEndpoint": 3
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4854.841783999999,
+        "evalMs": 1.179062,
+        "jsExecMs": 6.663804999999229,
+        "promiseSchedMs": 1.7635900000000002,
+        "hostWaitMs": 5.433191000000001,
+        "totalMs": 4870.009157,
+        "hostCalls": 7,
+        "gcCollections": 4,
+        "gcMaxPauseMs": 28.365719000000002,
+        "heapLiveBytes": 11267236
+      }
+    },
+    {
+      "id": 36,
+      "scenarioId": "prepare-heavy-yokis-81-extends",
+      "device": "prepare-heavy-yokis-81-extends",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 4870.033700999999,
+        "evalMs": 401.643347,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 5282.366234,
+        "hostCalls": 0,
+        "gcCollections": 5,
+        "gcMaxPauseMs": 160.242159,
+        "heapLiveBytes": 20969466
+      }
+    },
+    {
+      "id": 37,
+      "scenarioId": "prepare-heavy-icon2-thermostat",
+      "device": "prepare-heavy-icon2-thermostat",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 5271.8744050000005,
+        "evalMs": 2.9878940000000003,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 5282.400936,
+        "hostCalls": 0,
+        "gcCollections": 5,
+        "gcMaxPauseMs": 160.242159,
+        "heapLiveBytes": 20969466
+      }
+    },
+    {
+      "id": 38,
+      "scenarioId": "fz-tuya-m9pro-multi-dp",
+      "device": "fz-tuya-m9pro-multi-dp",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": {
+          "action": "scene_2",
+          "mode_l1": "curtain",
+          "mode_l3": "curtain"
+        },
+        "published": [
+          {
+            "action": "scene_2",
+            "mode_l1": "curtain",
+            "mode_l3": "curtain"
+          }
+        ],
+        "calls": [],
+        "converterMs": 0.3356979999998657,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 5275.054808,
+        "evalMs": 5.7481160000000004,
+        "jsExecMs": 0.3356979999998657,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 5282.4131689999995,
+        "hostCalls": 0,
+        "gcCollections": 5,
+        "gcMaxPauseMs": 160.242159,
+        "heapLiveBytes": 20969466
+      }
+    }
+  ]
+}

@@ -36,10 +36,8 @@ scenario/external paths.
 
 ## Known limits
 
-- `submit` waits for a bounded worker acknowledgement; a production bridge
-  needs a non-blocking submission protocol.
+- `submit` is non-blocking and bounded; host responses use a separate queue.
 - Timers are not executed yet.
-- Host responses currently bridge primitive JSON values; object/array read
-  values need the production value bridge.
+- A shared-runtime JS timeout aborts all active jobs (single interpreter).
 - No process supervision/RSS watchdog yet.
 - This is a scheduler prototype, not a deployment artifact.
