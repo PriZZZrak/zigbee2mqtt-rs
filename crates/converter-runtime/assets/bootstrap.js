@@ -297,15 +297,32 @@
   globalThis.Buffer = Buffer;
   globalThis.TextEncoder = TextEncoderImpl;
   globalThis.TextDecoder = TextDecoderImpl;
-  function makeTimer() {
-    return { unref: function () { return this; }, ref: function () { return this; },
-      hasRef: function () { return false; }, close: function () {},
-      [Symbol.toPrimitive]: function () { return 0; } };
+  function makeTimer(id, refed) {
+    var timer = { id: id, _refed: refed,
+      unref: function () { __unrefTimer(id); this._refed = false; return this; },
+      ref: function () { __refTimer(id); this._refed = true; return this; },
+      hasRef: function () { return this._refed; },
+      close: function () { __clearTimer(id); this._refed = false; },
+      [Symbol.toPrimitive]: function () { return id; } };
+    return timer;
   }
-  globalThis.setTimeout = function () { return makeTimer(); };
-  globalThis.clearTimeout = function () {};
-  globalThis.setInterval = function () { return makeTimer(); };
-  globalThis.clearInterval = function () {};
+  function setHostTimer(callback, delay, repeat, args) {
+    var callArgs = [callback, Number(delay) || 0, !!repeat, globalThis.__timerJobId || 0]
+      .concat(args || []);
+    var id = __setTimer.apply(null, callArgs);
+    return makeTimer(id, true);
+  }
+  globalThis.setTimeout = function (callback, delay) {
+    return setHostTimer(callback, delay, false, Array.prototype.slice.call(arguments, 2));
+  };
+  globalThis.clearTimeout = function (timer) {
+    var id = timer && typeof timer === "object" ? timer.id : timer;
+    __clearTimer(Number(id) || 0);
+  };
+  globalThis.setInterval = function (callback, delay) {
+    return setHostTimer(callback, delay, true, Array.prototype.slice.call(arguments, 2));
+  };
+  globalThis.clearInterval = globalThis.clearTimeout;
   globalThis.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
 
   var RealDate = Date;
@@ -529,8 +546,41 @@
   }
 
   async function runScenario(scenario) {
+    globalThis.__timerJobId = scenario.__jobId || 0;
     if (scenario.kind === "jsLoop") {
       while (true) {}
+    }
+    if (scenario.kind === "host-op") {
+      var hostOperation = {
+        op: "probe",
+        jobId: scenario.__jobId || 0,
+        generation: scenario.__jobGeneration || 0,
+        payload: scenario.payload || "",
+      };
+      return await new Promise(function (resolve, reject) {
+        __hostOp(JSON.stringify(hostOperation))
+          .then(function (value) { resolve({ value: value }); })
+          .catch(function (error) { reject(error); });
+      });
+    }
+    if (scenario.kind === "timer-late") {
+      globalThis.__lateTimerFired = false;
+      setTimeout(function () { globalThis.__lateTimerFired = true; }, Number(scenario.delay || 20));
+      return { scheduled: true };
+    }
+    if (scenario.kind === "timer-check") {
+      return { lateTimerFired: globalThis.__lateTimerFired === true };
+    }
+    if (scenario.kind === "timer") {
+      var timerDelay = Number(scenario.delay || 10);
+      return await new Promise(function (resolve) {
+        var timer = setTimeout(function () { resolve({ fired: true }); }, timerDelay);
+        if (scenario.unref) timer.unref();
+        if (scenario.clear) {
+          clearTimeout(timer);
+          setTimeout(function () { resolve({ fired: false, cleared: true }); }, timerDelay + 20);
+        }
+      });
     }
     var definition = prepare(scenario.definition);
     var jobState = {

@@ -6,18 +6,21 @@
   "submitted": 9,
   "submitErrors": 0,
   "servedHostOps": 111,
-  "elapsedMs": 1075.310543,
-  "startupMs": 1986.185888,
-  "warmupMs": 949.704734,
+  "elapsedMs": 1108.007871,
+  "startupMs": 2208.3523,
+  "warmupMs": 986.4294289999999,
   "completed": 11,
   "failed": 0,
   "cancelled": 0,
   "lateResponses": 0,
   "hostTimeouts": 0,
   "gcCollections": 3,
-  "gcMaxPauseMs": 11.526471,
-  "heapLiveBytes": 5631664,
-  "rssKb": 6272,
+  "gcMaxPauseMs": 11.965358,
+  "heapLiveBytes": 5633682,
+  "rssKb": 6496,
+  "rssBeforeShutdownKb": 21116,
+  "rssPeakKb": 21116,
+  "heapLivePeakBytes": 5633682,
   "cases": [
     {
       "id": 3,
@@ -471,12 +474,12 @@
             ]
           }
         ],
-        "converterMs": 121.97306300000014,
-        "hostMs": 8.084691999998881,
+        "converterMs": 115.53140099999996,
+        "hostMs": 9.843293000000926,
         "hostCalls": 51,
         "perf": {
-          "serializeMs": 2.7474459999993996,
-          "boundaryMs": 5.337245999999482,
+          "serializeMs": 5.272152999999662,
+          "boundaryMs": 4.5711400000012645,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 51,
@@ -486,16 +489,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 0.015158,
-        "evalMs": 1.429508,
-        "jsExecMs": 121.97306300000014,
-        "promiseSchedMs": 40.634839,
-        "hostWaitMs": 87.840767,
-        "totalMs": 124.769371,
+        "queueWaitMs": 0.013465000000000001,
+        "evalMs": 2.348353,
+        "jsExecMs": 115.53140099999996,
+        "promiseSchedMs": 35.958397,
+        "hostWaitMs": 85.060602,
+        "totalMs": 119.39451500000001,
         "hostCalls": 51,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -533,12 +536,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 6.694351000000097,
-        "hostMs": 0.22790299999996932,
+        "converterMs": 5.608778000000029,
+        "hostMs": 0.24290700000005927,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.04493400000001202,
-          "boundaryMs": 0.1829689999999573,
+          "serializeMs": 0.04793500000005224,
+          "boundaryMs": 0.19497200000000703,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -546,16 +549,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 0.012079999999999999,
-        "evalMs": 1.662873,
-        "jsExecMs": 6.694351000000097,
-        "promiseSchedMs": 0.406947,
-        "hostWaitMs": 5.974557,
-        "totalMs": 8.816645999999999,
+        "queueWaitMs": 0.012696,
+        "evalMs": 1.9417900000000001,
+        "jsExecMs": 5.608778000000029,
+        "promiseSchedMs": 0.413257,
+        "hostWaitMs": 4.930841,
+        "totalMs": 9.209596000000001,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -593,12 +596,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 4.352616999999896,
-        "hostMs": 0.2169770000000426,
+        "converterMs": 3.2510389999999916,
+        "hostMs": 0.17865999999992255,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.06586200000003828,
-          "boundaryMs": 0.15111500000000433,
+          "serializeMs": 0.049167000000011285,
+          "boundaryMs": 0.12949299999991126,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -606,16 +609,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 0.013157,
-        "evalMs": 2.691513,
-        "jsExecMs": 4.352616999999896,
-        "promiseSchedMs": 0.386942,
-        "hostWaitMs": 3.579656,
-        "totalMs": 7.113454,
+        "queueWaitMs": 0.015312,
+        "evalMs": 2.378822,
+        "jsExecMs": 3.2510389999999916,
+        "promiseSchedMs": 0.775808,
+        "hostWaitMs": 2.6010310000000003,
+        "totalMs": 7.259188,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -653,12 +656,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 2.3523519999998825,
-        "hostMs": 0.13280199999996967,
+        "converterMs": 2.4304499999999507,
+        "hostMs": 0.13772599999992963,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.04616600000008475,
-          "boundaryMs": 0.08663599999988492,
+          "serializeMs": 0.04839599999991151,
+          "boundaryMs": 0.08933000000001812,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -666,16 +669,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 0.019697000000000003,
-        "evalMs": 2.2173179999999997,
-        "jsExecMs": 2.3523519999998825,
-        "promiseSchedMs": 0.43210699999999996,
-        "hostWaitMs": 1.651255,
-        "totalMs": 4.362465,
+        "queueWaitMs": 0.019774,
+        "evalMs": 1.540998,
+        "jsExecMs": 2.4304499999999507,
+        "promiseSchedMs": 1.068189,
+        "hostWaitMs": 1.734046,
+        "totalMs": 4.8266610000000005,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -713,12 +716,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 5.9478579999999965,
-        "hostMs": 0.12387699999999312,
+        "converterMs": 6.264479999999935,
+        "hostMs": 0.13334099999997306,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.04362600000001749,
-          "boundaryMs": 0.08025099999997565,
+          "serializeMs": 0.04739700000004632,
+          "boundaryMs": 0.08594399999992675,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -726,16 +729,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 2.049969,
-        "evalMs": 1.668029,
-        "jsExecMs": 5.9478579999999965,
-        "promiseSchedMs": 0.384557,
-        "hostWaitMs": 5.354865,
-        "totalMs": 9.39979,
+        "queueWaitMs": 3.239728,
+        "evalMs": 6.895944,
+        "jsExecMs": 6.264479999999935,
+        "promiseSchedMs": 0.578605,
+        "hostWaitMs": 5.514062,
+        "totalMs": 17.495193999999998,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -773,12 +776,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 7.7710790000001,
-        "hostMs": 0.24582999999995536,
+        "converterMs": 5.061104,
+        "hostMs": 0.13311000000010154,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.1321099999998978,
-          "boundaryMs": 0.11372000000005757,
+          "serializeMs": 0.04701199999999517,
+          "boundaryMs": 0.08609800000010637,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -786,16 +789,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 3.788016,
-        "evalMs": 1.916629,
-        "jsExecMs": 7.7710790000001,
-        "promiseSchedMs": 0.44172500000000003,
-        "hostWaitMs": 6.930256,
-        "totalMs": 16.531404,
+        "queueWaitMs": 10.205844,
+        "evalMs": 1.6751859999999998,
+        "jsExecMs": 5.061104,
+        "promiseSchedMs": 0.434954,
+        "hostWaitMs": 4.342926,
+        "totalMs": 17.554362,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -833,12 +836,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 6.075351000000069,
-        "hostMs": 0.15057600000000093,
+        "converterMs": 3.7306959999999663,
+        "hostMs": 0.14880600000003597,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.07763499999998658,
-          "boundaryMs": 0.07294100000001436,
+          "serializeMs": 0.0452420000000302,
+          "boundaryMs": 0.10356400000000576,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -846,16 +849,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 5.860606,
-        "evalMs": 2.819699,
-        "jsExecMs": 6.075351000000069,
-        "promiseSchedMs": 0.384787,
-        "hostWaitMs": 4.453717999999999,
-        "totalMs": 16.573413,
+        "queueWaitMs": 11.954971,
+        "evalMs": 1.59001,
+        "jsExecMs": 3.7306959999999663,
+        "promiseSchedMs": 0.40971799999999997,
+        "hostWaitMs": 3.1200059999999996,
+        "totalMs": 17.58637,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -893,12 +896,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 4.444640000000049,
-        "hostMs": 0.2133610000000772,
+        "converterMs": 2.72844699999996,
+        "hostMs": 0.13010900000006131,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.04847400000005564,
-          "boundaryMs": 0.16488700000002154,
+          "serializeMs": 0.04493400000001202,
+          "boundaryMs": 0.0851750000000493,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -906,16 +909,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 9.436338000000001,
-        "evalMs": 3.116619,
-        "jsExecMs": 4.444640000000049,
-        "promiseSchedMs": 0.436877,
-        "hostWaitMs": 3.590659,
-        "totalMs": 16.595727,
+        "queueWaitMs": 17.628535,
+        "evalMs": 1.579239,
+        "jsExecMs": 2.72844699999996,
+        "promiseSchedMs": 1.9559469999999999,
+        "hostWaitMs": 2.118065,
+        "totalMs": 24.179778,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     },
     {
@@ -953,12 +956,12 @@
           "on_time",
           "off_wait_time"
         ],
-        "converterMs": 4.129175999999916,
-        "hostMs": 0.9101490000001604,
+        "converterMs": 3.0976160000000164,
+        "hostMs": 0.13364899999999125,
         "hostCalls": 1,
         "perf": {
-          "serializeMs": 0.04939700000011271,
-          "boundaryMs": 0.8607520000000477,
+          "serializeMs": 0.049396999999999025,
+          "boundaryMs": 0.08425199999999222,
           "resumeMs": 0,
           "mockMs": 0,
           "hostCalls": 1,
@@ -966,16 +969,16 @@
         }
       },
       "metrics": {
-        "queueWaitMs": 16.612115,
-        "evalMs": 2.486693,
-        "jsExecMs": 4.129175999999916,
-        "promiseSchedMs": 0.42941399999999996,
-        "hostWaitMs": 2.701746,
-        "totalMs": 22.021301,
+        "queueWaitMs": 19.215621,
+        "evalMs": 1.571313,
+        "jsExecMs": 3.0976160000000164,
+        "promiseSchedMs": 0.612229,
+        "hostWaitMs": 2.438221,
+        "totalMs": 24.182470000000002,
         "hostCalls": 1,
         "gcCollections": 3,
-        "gcMaxPauseMs": 11.526471,
-        "heapLiveBytes": 5631664
+        "gcMaxPauseMs": 11.965358,
+        "heapLiveBytes": 5633682
       }
     }
   ]

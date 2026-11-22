@@ -36,8 +36,12 @@ scenario/external paths.
 
 ## Known limits
 
-- `submit` is non-blocking and bounded; host responses use a separate queue.
-- Timers are not executed yet.
+- `submit` is non-blocking and bounded; host requests/responses are bounded and
+  payload-limited.
+- `setTimeout`/`clearTimeout`/`setInterval`/`clearInterval`/`.unref()` are
+  implemented; timers may outlive a converter call and are cleared on
+  cancellation/restart/shutdown.
 - A shared-runtime JS timeout aborts all active jobs (single interpreter).
-- No process supervision/RSS watchdog yet.
+- In-process RSS/heartbeat supervision and `restart()` exist; an OS service
+  supervisor is still required for process death.
 - This is a scheduler prototype, not a deployment artifact.

@@ -145,7 +145,8 @@ host study is in
 [`converter-async-host-validation.md`](converter-async-host-validation.md);
 the scheduler prototype is in
 [`converter-runtime-scheduler-prototype.md`](converter-runtime-scheduler-prototype.md)
-and [`../crates/converter-runtime/`](../crates/converter-runtime/); engine
+and [`../crates/converter-runtime/`](../crates/converter-runtime/); bridge
+contract in [`converter-runtime-bridge-contract.md`](converter-runtime-bridge-contract.md); engine
 prototypes are in [`../tools/engine-study/`](../tools/engine-study/).
 
 | Engine | Pure Rust | Real upstream corpus | Guard features | Role |

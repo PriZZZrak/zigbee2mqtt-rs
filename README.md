@@ -22,6 +22,7 @@ Node.js-мост, сохранив MQTT-контракты, сущности Hom
   (прототипы — [`tools/engine-study/`](tools/engine-study/))
 - Async host validation: [`docs/converter-async-host-validation.md`](docs/converter-async-host-validation.md)
 - Scheduler prototype: [`docs/converter-runtime-scheduler-prototype.md`](docs/converter-runtime-scheduler-prototype.md)
+- Bridge integration contract: [`docs/converter-runtime-bridge-contract.md`](docs/converter-runtime-bridge-contract.md)
   (crate — [`crates/converter-runtime/`](crates/converter-runtime/))
 
 ## Что входит в R1

@@ -11,6 +11,21 @@ use std::time::{Duration, Instant};
 use converter_runtime::{ConverterRuntime, HostResult, JobRequest, RuntimeConfig, SubmitError};
 use serde_json::{Value as Json, json};
 
+fn status_kb(field: &str) -> u64 {
+    let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix(field) {
+            return rest
+                .trim()
+                .trim_end_matches("kB")
+                .trim()
+                .parse()
+                .unwrap_or(0);
+        }
+    }
+    0
+}
+
 fn rss_kb() -> u64 {
     let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
     for line in status.lines() {
@@ -259,6 +274,97 @@ fn main() {
             round += 1;
             thread::sleep(Duration::from_millis(5));
         }
+    } else if mode == "timer"
+        || mode == "timer-clear"
+        || mode == "timer-unref"
+        || mode == "timer-shutdown"
+        || mode == "timer-late"
+    {
+        if mode == "timer-late" {
+            let scenario = json!({
+                "id": "timer-late",
+                "kind": "timer-late",
+                "delay": 20,
+                "definition": {"source": "package", "file": "ikea.js", "model": "LED1545G12"},
+                "device": {"ieeeAddr": "0x00124b0000000ccc", "networkAddress": 0xccc}
+            });
+            let first = runtime
+                .submit(JobRequest {
+                    device: "timer-late-device".to_owned(),
+                    scenario,
+                })
+                .expect("late timer job");
+            labels.insert(first, "timer-late".to_owned());
+            ids.push(first);
+            let _ = runtime.wait(first, Duration::from_millis(1000));
+            thread::sleep(Duration::from_millis(60));
+            let check = json!({
+                "id": "timer-check",
+                "kind": "timer-check",
+                "definition": {"source": "package", "file": "ikea.js", "model": "LED1545G12"},
+                "device": {"ieeeAddr": "0x00124b0000000ccc", "networkAddress": 0xccc}
+            });
+            let second = runtime
+                .submit(JobRequest {
+                    device: "timer-late-device".to_owned(),
+                    scenario: check,
+                })
+                .expect("timer check job");
+            labels.insert(second, "timer-check".to_owned());
+            ids.push(second);
+        } else {
+            let scenario = json!({
+                "id": "timer",
+                "kind": "timer",
+                "delay": if mode == "timer-shutdown" { 10000 } else { 20 },
+                "unref": mode == "timer-unref",
+                "clear": mode == "timer-clear",
+                "definition": {"source": "package", "file": "ikea.js", "model": "LED1545G12"},
+                "device": {"ieeeAddr": "0x00124b0000000ccc", "networkAddress": 0xccc}
+            });
+            let id = runtime
+                .submit(JobRequest {
+                    device: "timer-device".to_owned(),
+                    scenario,
+                })
+                .expect("timer job");
+            labels.insert(id, mode.clone());
+            if mode != "timer-shutdown" {
+                ids.push(id);
+            } else {
+                thread::sleep(Duration::from_millis(20));
+            }
+        }
+    } else if mode == "js-cancel" {
+        let scenario = json!({
+            "id": "js-loop",
+            "kind": "jsLoop",
+            "definition": {"source": "package", "file": "ikea.js", "model": "LED1545G12"},
+            "device": {"ieeeAddr": "0x00124b0000000bbb", "networkAddress": 0xbbb}
+        });
+        let first = runtime
+            .submit(JobRequest {
+                device: "js-cancel-device".to_owned(),
+                scenario,
+            })
+            .expect("js loop job");
+        labels.insert(first, "js-loop".to_owned());
+        ids.push(first);
+        thread::sleep(Duration::from_millis(20));
+        let status = runtime.cancel_request(first);
+        labels.insert(first, format!("js-loop-{status:?}"));
+        let _ = runtime.wait(first, Duration::from_millis(timeout_ms));
+        let Some(report) = report_job.clone() else {
+            panic!("report missing")
+        };
+        let second = runtime
+            .submit(JobRequest {
+                device: "js-cancel-device".to_owned(),
+                scenario: report,
+            })
+            .expect("reuse after js cancel");
+        labels.insert(second, "fz-ikea-onoff".to_owned());
+        ids.push(second);
     } else if mode == "js-timeout" {
         let scenario = json!({
             "id": "js-loop",
@@ -375,6 +481,8 @@ fn main() {
     }
     let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
     let metrics = runtime.metrics();
+    let rss_before_shutdown_kb = rss_kb();
+    let rss_peak_kb = status_kb("VmHWM:");
     stop_responder.store(true, Ordering::Relaxed);
     responder.join().ok();
     let mut runtime = Arc::try_unwrap(runtime).ok().expect("runtime still shared");
@@ -428,6 +536,9 @@ fn main() {
             "gcMaxPauseMs": metrics.gc_max_pause_ms,
             "heapLiveBytes": metrics.heap_live_bytes,
             "rssKb": rss_kb(),
+            "rssBeforeShutdownKb": rss_before_shutdown_kb,
+            "rssPeakKb": rss_peak_kb,
+            "heapLivePeakBytes": metrics.heap_live_peak_bytes,
             "cases": cases,
         }))
         .unwrap()

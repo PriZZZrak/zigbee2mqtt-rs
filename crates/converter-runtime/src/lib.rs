@@ -15,8 +15,8 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use quickjs_oxide::engine::api::core::{
-    HeapLimits, InterruptHandle, Js, JsBigInt, JsString, PromiseCapability, Runtime, RuntimeError,
-    RuntimeOptions, Scope, Value,
+    CallableRef, HeapLimits, InterruptHandle, Js, JsBigInt, JsString, PromiseCapability, Runtime,
+    RuntimeError, RuntimeOptions, Scope, Value,
 };
 use quickjs_oxide_host::SystemHost;
 use serde_json::Value as Json;
@@ -46,6 +46,15 @@ pub struct RuntimeConfig {
     pub max_retained_outcomes: usize,
     /// Maximum metric samples kept per vector.
     pub max_metric_samples: usize,
+    /// Maximum pending host operations across the worker.
+    pub max_pending_host_ops: usize,
+    /// Maximum queued host responses.
+    pub max_pending_responses: usize,
+    /// Maximum serialized host request payload.
+    pub max_host_payload_bytes: usize,
+    pub max_rss_bytes: u64,
+    pub rss_poll_interval: Duration,
+    pub worker_heartbeat_timeout: Duration,
 }
 
 impl RuntimeConfig {
@@ -62,6 +71,12 @@ impl RuntimeConfig {
             heap_limit_bytes: 128 << 20,
             max_retained_outcomes: 256,
             max_metric_samples: 4096,
+            max_pending_host_ops: 256,
+            max_pending_responses: 256,
+            max_host_payload_bytes: 256 * 1024,
+            max_rss_bytes: 128 << 20,
+            rss_poll_interval: Duration::from_millis(500),
+            worker_heartbeat_timeout: Duration::from_secs(5),
         }
     }
 }
@@ -121,6 +136,23 @@ pub enum HostResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkerHealth {
+    Starting,
+    Running,
+    RssExceeded,
+    Unresponsive,
+    Stopped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CancelStatus {
+    Accepted,
+    AlreadyTerminal,
+    Unknown,
+    Overloaded,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubmitError {
     Backpressure,
     Closed,
@@ -141,6 +173,9 @@ pub struct RuntimeMetrics {
     pub cancelled: u64,
     pub late_responses: u64,
     pub host_timeouts: u64,
+    pub host_request_backpressure: u64,
+    pub response_backpressure: u64,
+    pub payload_rejected: u64,
     pub queue_wait_ms: Vec<f64>,
     pub js_exec_ms: Vec<f64>,
     pub promise_sched_ms: Vec<f64>,
@@ -149,6 +184,7 @@ pub struct RuntimeMetrics {
     pub gc_collections: u64,
     pub gc_max_pause_ms: f64,
     pub heap_live_bytes: u64,
+    pub heap_live_peak_bytes: u64,
 }
 
 struct AdmissionState {
@@ -202,12 +238,19 @@ impl Admission {
 
 pub struct ConverterRuntime {
     tx: mpsc::SyncSender<Command>,
-    response_tx: mpsc::Sender<ResponseEvent>,
+    response_tx: mpsc::SyncSender<ResponseEvent>,
     admission: Arc<Admission>,
     host_rx: Mutex<mpsc::Receiver<HostRequest>>,
     outcomes: Arc<(Mutex<HashMap<JobId, JobOutcome>>, Condvar)>,
     counters: Arc<Mutex<RuntimeMetrics>>,
     states: Arc<Mutex<HashMap<JobId, JobState>>>,
+    cancel_requests: Arc<Mutex<HashSet<JobId>>>,
+    admitted_ids: Arc<Mutex<HashSet<JobId>>>,
+    health: Arc<Mutex<WorkerHealth>>,
+    last_rss_bytes: Arc<AtomicU64>,
+    supervisor_stop: Arc<AtomicBool>,
+    supervisor: Option<JoinHandle<()>>,
+    config: RuntimeConfig,
     next_id: AtomicU64,
     interrupt: InterruptHandle,
     join: Option<JoinHandle<()>>,
@@ -217,8 +260,8 @@ pub struct ConverterRuntime {
 impl ConverterRuntime {
     pub fn new(config: RuntimeConfig) -> Result<Self, String> {
         let (tx, rx) = mpsc::sync_channel(config.max_total_queue.max(1) + 16);
-        let (response_tx, response_rx) = mpsc::channel();
-        let (host_tx, host_rx) = mpsc::channel();
+        let (response_tx, response_rx) = mpsc::sync_channel(config.max_pending_responses.max(1));
+        let (host_tx, host_rx) = mpsc::sync_channel(config.max_pending_host_ops.max(1));
         let (ready_tx, ready_rx) = mpsc::channel();
         let outcomes = Arc::new((
             Mutex::new(HashMap::<JobId, JobOutcome>::new()),
@@ -226,6 +269,16 @@ impl ConverterRuntime {
         ));
         let counters = Arc::new(Mutex::new(RuntimeMetrics::default()));
         let states = Arc::new(Mutex::new(HashMap::<JobId, JobState>::new()));
+        let cancel_requests = Arc::new(Mutex::new(HashSet::<JobId>::new()));
+        let worker_cancel_requests = Arc::clone(&cancel_requests);
+        let admitted_ids = Arc::new(Mutex::new(HashSet::<JobId>::new()));
+        let worker_admitted_ids = Arc::clone(&admitted_ids);
+        let health = Arc::new(Mutex::new(WorkerHealth::Starting));
+        let worker_health = Arc::clone(&health);
+        let last_rss_bytes = Arc::new(AtomicU64::new(0));
+        let supervisor_stop = Arc::new(AtomicBool::new(false));
+        let heartbeat = Arc::new(Mutex::new(Instant::now()));
+        let worker_heartbeat = Arc::clone(&heartbeat);
         let admission = Arc::new(Admission::new(
             config.max_total_queue.max(1),
             config.max_per_device_queue.max(1),
@@ -236,6 +289,8 @@ impl ConverterRuntime {
         let worker_counters = Arc::clone(&counters);
         let bootstrap = include_str!("../assets/bootstrap.js").to_owned();
         let zcl = include_str!("../assets/zcl.json").to_owned();
+        let supervisor_config = config.clone();
+        let stored_config = config.clone();
 
         let join = thread::Builder::new()
             .name("converter-js-worker".into())
@@ -251,6 +306,10 @@ impl ConverterRuntime {
                     worker_outcomes,
                     worker_counters,
                     worker_states,
+                    worker_cancel_requests,
+                    worker_admitted_ids,
+                    worker_heartbeat,
+                    worker_health,
                 );
                 match worker {
                     Ok(mut worker) => {
@@ -269,6 +328,40 @@ impl ConverterRuntime {
             .recv()
             .map_err(|_| "converter worker exited during startup".to_owned())??;
         counters.lock().unwrap().startup_ms = startup_ms;
+        let supervisor_health = Arc::clone(&health);
+        let supervisor_rss = Arc::clone(&last_rss_bytes);
+        let supervisor_stop_thread = Arc::clone(&supervisor_stop);
+        let supervisor_interrupt = interrupt.clone();
+        let supervisor_heartbeat = Arc::clone(&heartbeat);
+        let supervisor = thread::Builder::new()
+            .name("converter-supervisor".into())
+            .spawn(move || {
+                loop {
+                    if supervisor_stop_thread.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    thread::sleep(supervisor_config.rss_poll_interval);
+                    if supervisor_stop_thread.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let rss = process_rss_bytes();
+                    supervisor_rss.store(rss, Ordering::Relaxed);
+                    let heartbeat_age = supervisor_heartbeat.lock().unwrap().elapsed();
+                    let mut health = supervisor_health.lock().unwrap();
+                    if rss > supervisor_config.max_rss_bytes {
+                        *health = WorkerHealth::RssExceeded;
+                        drop(health);
+                        supervisor_interrupt.interrupt();
+                    } else if heartbeat_age > supervisor_config.worker_heartbeat_timeout {
+                        *health = WorkerHealth::Unresponsive;
+                        drop(health);
+                        supervisor_interrupt.interrupt();
+                    } else if *health != WorkerHealth::Running {
+                        *health = WorkerHealth::Running;
+                    }
+                }
+            })
+            .map_err(|error| format!("spawn converter supervisor: {error}"))?;
 
         Ok(Self {
             tx,
@@ -278,6 +371,13 @@ impl ConverterRuntime {
             outcomes,
             counters,
             states,
+            cancel_requests,
+            admitted_ids,
+            health,
+            last_rss_bytes,
+            supervisor_stop,
+            supervisor: Some(supervisor),
+            config: stored_config,
             next_id: AtomicU64::new(1),
             interrupt,
             join: Some(join),
@@ -314,7 +414,10 @@ impl ConverterRuntime {
         }
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         match self.tx.try_send(Command::Submit { id, request }) {
-            Ok(()) => Ok(id),
+            Ok(()) => {
+                self.admitted_ids.lock().unwrap().insert(id);
+                Ok(id)
+            }
             Err(mpsc::TrySendError::Full(_)) => {
                 self.admission.release(&device);
                 Err(SubmitError::Backpressure)
@@ -326,9 +429,37 @@ impl ConverterRuntime {
         }
     }
 
-    /// Non-blocking cancel request; the outcome is delivered through `wait`.
+    /// Non-blocking cancel request. Acceptance is separate from the terminal
+    /// state: the outcome is delivered through `wait`.
+    pub fn cancel_request(&self, id: JobId) -> CancelStatus {
+        if self.outcomes.0.lock().unwrap().contains_key(&id) {
+            return CancelStatus::AlreadyTerminal;
+        }
+        let state = self.states.lock().unwrap().get(&id).copied();
+        let Some(state) = state else {
+            if self.admitted_ids.lock().unwrap().contains(&id) {
+                self.cancel_requests.lock().unwrap().insert(id);
+                let _ = self.tx.try_send(Command::Cancel { id });
+                return CancelStatus::Accepted;
+            }
+            return CancelStatus::Unknown;
+        };
+        self.cancel_requests.lock().unwrap().insert(id);
+        let _ = self.tx.try_send(Command::Cancel { id });
+        if state == JobState::Running {
+            // A synchronous JS slice cannot observe the queue; interrupt the
+            // shared execution turn. The worker documents the shared policy.
+            self.interrupt.interrupt();
+        }
+        CancelStatus::Accepted
+    }
+
+    /// Compatibility convenience for the earlier probe API.
     pub fn cancel(&self, id: JobId) -> bool {
-        self.tx.try_send(Command::Cancel { id }).is_ok()
+        matches!(
+            self.cancel_request(id),
+            CancelStatus::Accepted | CancelStatus::AlreadyTerminal
+        )
     }
 
     pub fn wait(&self, id: JobId, timeout: Duration) -> Result<JobOutcome, WaitError> {
@@ -354,8 +485,27 @@ impl ConverterRuntime {
         self.states.lock().unwrap().get(&id).copied()
     }
 
+    pub fn health(&self) -> WorkerHealth {
+        self.health.lock().unwrap().clone()
+    }
+
+    pub fn rss_bytes(&self) -> u64 {
+        self.last_rss_bytes.load(Ordering::Relaxed)
+    }
+
     pub fn metrics(&self) -> RuntimeMetrics {
         self.counters.lock().unwrap().clone()
+    }
+
+    /// Recreate the JS worker and supervisor after an unrecoverable worker
+    /// failure or a deliberate reload. The caller must reacquire
+    /// `host_receiver()` because the transport channels are replaced.
+    pub fn restart(&mut self) -> Result<(), String> {
+        let config = self.config.clone();
+        let fresh = ConverterRuntime::new(config)?;
+        let old = std::mem::replace(self, fresh);
+        drop(old);
+        Ok(())
     }
 
     pub fn shutdown(&mut self) {
@@ -370,6 +520,7 @@ impl ConverterRuntime {
             return;
         }
         self.shutdown_sent = true;
+        self.supervisor_stop.store(true, Ordering::Relaxed);
         self.interrupt.interrupt();
         let (reply_tx, reply_rx) = mpsc::sync_channel(1);
         if self
@@ -397,6 +548,10 @@ impl ConverterRuntime {
             }
         }
         reply_rx.recv_timeout(Duration::from_secs(5)).ok();
+        if let Some(supervisor) = self.supervisor.take() {
+            supervisor.join().ok();
+        }
+        *self.health.lock().unwrap() = WorkerHealth::Stopped;
     }
 }
 
@@ -450,6 +605,72 @@ struct JobRecord {
     metrics: JobMetrics,
     pending_hosts: usize,
     generation: u64,
+}
+
+struct TimerEntry {
+    id: u64,
+    deadline: Instant,
+    interval: Option<Duration>,
+    callback: CallableRef,
+    args: Vec<Value>,
+    refed: bool,
+    job_id: JobId,
+}
+
+struct Timers {
+    next_id: u64,
+    entries: HashMap<u64, TimerEntry>,
+}
+
+impl Timers {
+    fn new() -> Self {
+        Self {
+            next_id: 1,
+            entries: HashMap::new(),
+        }
+    }
+
+    fn insert(
+        &mut self,
+        callback: CallableRef,
+        delay: Duration,
+        interval: Option<Duration>,
+        args: Vec<Value>,
+        job_id: JobId,
+    ) -> u64 {
+        let id = self.next_id;
+        self.next_id = self.next_id.saturating_add(1);
+        self.entries.insert(
+            id,
+            TimerEntry {
+                id,
+                deadline: Instant::now() + delay,
+                interval,
+                callback,
+                args,
+                refed: true,
+                job_id,
+            },
+        );
+        id
+    }
+
+    fn due(&mut self, now: Instant) -> Vec<TimerEntry> {
+        let due_ids: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|(_, timer)| timer.deadline <= now)
+            .map(|(id, _)| *id)
+            .collect();
+        due_ids
+            .into_iter()
+            .filter_map(|id| self.entries.remove(&id))
+            .collect()
+    }
+
+    fn cancel_job(&mut self, job_id: JobId) {
+        self.entries.retain(|_, timer| timer.job_id != job_id);
+    }
 }
 
 struct Watchdog {
@@ -529,6 +750,8 @@ struct Worker {
     outcomes: Arc<(Mutex<HashMap<JobId, JobOutcome>>, Condvar)>,
     counters: Arc<Mutex<RuntimeMetrics>>,
     states: Arc<Mutex<HashMap<JobId, JobState>>>,
+    cancel_requests: Arc<Mutex<HashSet<JobId>>>,
+    admitted_ids: Arc<Mutex<HashSet<JobId>>>,
     jobs: HashMap<JobId, JobRecord>,
     device_queues: HashMap<String, VecDeque<JobId>>,
     ready_devices: VecDeque<String>,
@@ -541,6 +764,9 @@ struct Worker {
     pending_outcomes: VecDeque<JobId>,
     next_generation: u64,
     watchdog: Watchdog,
+    timers: Rc<RefCell<Timers>>,
+    heartbeat: Arc<Mutex<Instant>>,
+    health: Arc<Mutex<WorkerHealth>>,
     startup_ms: f64,
 }
 
@@ -551,11 +777,15 @@ impl Worker {
         zcl: String,
         rx: mpsc::Receiver<Command>,
         response_rx: mpsc::Receiver<ResponseEvent>,
-        host_tx: mpsc::Sender<HostRequest>,
+        host_tx: mpsc::SyncSender<HostRequest>,
         admission: Arc<Admission>,
         outcomes: Arc<(Mutex<HashMap<JobId, JobOutcome>>, Condvar)>,
         counters: Arc<Mutex<RuntimeMetrics>>,
         states: Arc<Mutex<HashMap<JobId, JobState>>>,
+        cancel_requests: Arc<Mutex<HashSet<JobId>>>,
+        admitted_ids: Arc<Mutex<HashSet<JobId>>>,
+        heartbeat: Arc<Mutex<Instant>>,
+        health: Arc<Mutex<WorkerHealth>>,
     ) -> Result<Self, String> {
         let options = RuntimeOptions::from(HeapLimits {
             max_bytes: config.heap_limit_bytes,
@@ -568,6 +798,11 @@ impl Worker {
             .global_object()
             .map_err(|error| format!("global: {error:?}"))?;
         let watchdog = Watchdog::new(runtime.interrupt_handle());
+        let timers = Rc::new(RefCell::new(Timers::new()));
+        let timers_set = Rc::clone(&timers);
+        let timers_clear = Rc::clone(&timers);
+        let timers_unref = Rc::clone(&timers);
+        let timers_ref = Rc::clone(&timers);
 
         let pending = Rc::new(RefCell::new(PendingHosts {
             next_correlation: 1,
@@ -578,6 +813,9 @@ impl Worker {
         let host_completions = Rc::clone(&completions);
         let host_completions_failed = Rc::clone(&completions);
         let host_tx_op = host_tx.clone();
+        let host_metrics = Arc::clone(&counters);
+        let max_host_payload_bytes = config.max_host_payload_bytes;
+        let max_pending_host_ops = config.max_pending_host_ops;
         let host_active_jobs = Rc::new(RefCell::new(HashMap::<JobId, u64>::new()));
         let active_jobs_for_op = Rc::clone(&host_active_jobs);
         let active_jobs_done = Rc::clone(&host_active_jobs);
@@ -620,9 +858,84 @@ impl Worker {
             })
             .map_err(|error| format!("__log: {error:?}"))?;
         context
+            .define_function(&global, "__setTimer", 4, move |scope: &mut Scope<'_>| {
+                let args = scope.args();
+                if args.len() < 3 {
+                    return Err(scope.throw_error(
+                        quickjs_oxide::engine::api::core::NativeErrorKind::Type,
+                        "setTimer expects callback, delay and repeat",
+                    ));
+                }
+                let Value::Object(callback_object) = &args[0] else {
+                    return Err(scope.throw_error(
+                        quickjs_oxide::engine::api::core::NativeErrorKind::Type,
+                        "timer callback must be a function",
+                    ));
+                };
+                let Some(callback) = scope.as_callable(callback_object)? else {
+                    return Err(scope.throw_error(
+                        quickjs_oxide::engine::api::core::NativeErrorKind::Type,
+                        "timer callback must be callable",
+                    ));
+                };
+                let delay_ms = scope.to_number(&args[1])?.max(0.0);
+                let repeat = matches!(args[2], Value::Bool(true));
+                let job_id = args
+                    .get(3)
+                    .and_then(|value| match value {
+                        Value::Int(value) => Some(*value as u64),
+                        Value::Float(value) => Some(*value as u64),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                let timer_args = args.iter().skip(4).cloned().collect();
+                let delay = Duration::from_secs_f64(delay_ms / 1000.0);
+                let interval = repeat.then_some(delay);
+                let id = timers_set
+                    .borrow_mut()
+                    .insert(callback, delay, interval, timer_args, job_id);
+                Ok(Value::Int(id as i32))
+            })
+            .map_err(|error| format!("__setTimer: {error:?}"))?;
+        context
+            .define_function(&global, "__clearTimer", 1, move |scope: &mut Scope<'_>| {
+                let arg = scope.arg(0);
+                let id = scope.to_number(&arg)? as u64;
+                timers_clear.borrow_mut().entries.remove(&id);
+                Ok(Value::Undefined)
+            })
+            .map_err(|error| format!("__clearTimer: {error:?}"))?;
+        context
+            .define_function(&global, "__unrefTimer", 1, move |scope: &mut Scope<'_>| {
+                let arg = scope.arg(0);
+                let id = scope.to_number(&arg)? as u64;
+                if let Some(timer) = timers_unref.borrow_mut().entries.get_mut(&id) {
+                    timer.refed = false;
+                }
+                Ok(Value::Undefined)
+            })
+            .map_err(|error| format!("__unrefTimer: {error:?}"))?;
+        context
+            .define_function(&global, "__refTimer", 1, move |scope: &mut Scope<'_>| {
+                let arg = scope.arg(0);
+                let id = scope.to_number(&arg)? as u64;
+                if let Some(timer) = timers_ref.borrow_mut().entries.get_mut(&id) {
+                    timer.refed = true;
+                }
+                Ok(Value::Undefined)
+            })
+            .map_err(|error| format!("__refTimer: {error:?}"))?;
+        context
             .define_function(&global, "__hostOp", 1, move |scope: &mut Scope<'_>| {
                 let arg = scope.arg(0);
                 let operation = scope.to_js_string(&arg)?.to_utf8_lossy();
+                if operation.len() > max_host_payload_bytes {
+                    host_metrics.lock().unwrap().payload_rejected += 1;
+                    return Err(scope.throw_error(
+                        quickjs_oxide::engine::api::core::NativeErrorKind::Internal,
+                        "host operation payload exceeds limit",
+                    ));
+                }
                 let parsed: Json = serde_json::from_str(&operation).unwrap_or(Json::Null);
                 let job_id = parsed["jobId"].as_u64().unwrap_or(0);
                 let generation = parsed["generation"].as_u64().unwrap_or(0);
@@ -643,6 +956,14 @@ impl Worker {
                             "pending map already borrowed",
                         ));
                     };
+                    if pending.map.len() >= max_pending_host_ops {
+                        drop(pending);
+                        host_metrics.lock().unwrap().host_request_backpressure += 1;
+                        return Err(scope.throw_error(
+                            quickjs_oxide::engine::api::core::NativeErrorKind::Internal,
+                            "too many pending host operations",
+                        ));
+                    }
                     let id = pending.next_correlation;
                     pending.next_correlation = id.saturating_add(1);
                     pending.map.insert(
@@ -661,11 +982,12 @@ impl Worker {
                     device,
                     operation: parsed,
                 };
-                if host_tx_op.send(request).is_err() {
+                if host_tx_op.try_send(request).is_err() {
                     host_pending.borrow_mut().map.remove(&correlation_id);
+                    host_metrics.lock().unwrap().host_request_backpressure += 1;
                     return Err(scope.throw_error(
                         quickjs_oxide::engine::api::core::NativeErrorKind::Internal,
-                        "host request channel closed",
+                        "host request queue is full",
                     ));
                 }
                 Ok(Value::Object(promise))
@@ -757,6 +1079,8 @@ impl Worker {
             outcomes,
             counters,
             states,
+            cancel_requests,
+            admitted_ids,
             jobs: HashMap::new(),
             device_queues: HashMap::new(),
             ready_devices: VecDeque::new(),
@@ -769,6 +1093,9 @@ impl Worker {
             pending_outcomes: VecDeque::new(),
             next_generation: 1,
             watchdog,
+            timers,
+            heartbeat,
+            health,
             startup_ms,
         })
     }
@@ -778,7 +1105,9 @@ impl Worker {
     }
 
     fn run(&mut self) {
+        *self.health.lock().unwrap() = WorkerHealth::Running;
         loop {
+            *self.heartbeat.lock().unwrap() = Instant::now();
             let mut shutdown = None;
             let mut worked = false;
             // Drain a bounded batch of commands; timeouts are checked after
@@ -814,7 +1143,9 @@ impl Worker {
                     Err(mpsc::TryRecvError::Disconnected) => break,
                 }
             }
+            self.process_cancellations();
             self.check_timeouts();
+            self.fire_timers();
             self.drain_completions();
             self.start_ready_jobs();
             if let Some(reply) = shutdown {
@@ -1043,14 +1374,16 @@ impl Worker {
         if matches!(error, RuntimeError::Interrupted) {
             self.runtime.interrupt_handle().clear();
             let ids: Vec<JobId> = self.active_devices.values().copied().collect();
+            let requested = self.cancel_requests.lock().unwrap().clone();
             for id in ids {
-                self.finish_job(
-                    id,
-                    JobState::Cancelled,
-                    None,
-                    Some("JS execution timeout".to_owned()),
-                );
+                let reason = if requested.contains(&id) {
+                    "cancelled during synchronous JS"
+                } else {
+                    "JS execution interrupted (shared watchdog/cancellation)"
+                };
+                self.finish_job(id, JobState::Cancelled, None, Some(reason.to_owned()));
             }
+            self.cancel_requests.lock().unwrap().clear();
         } else {
             self.complete_job(job_id, Err(format!("{context}: {error:?}")));
         }
@@ -1105,7 +1438,11 @@ impl Worker {
             .retain(|_, pending| pending.job_id != job_id);
         self.active_jobs.borrow_mut().remove(&job_id);
         self.admission.release(&job.device);
+        self.admitted_ids.lock().unwrap().remove(&job_id);
         self.states.lock().unwrap().remove(&job_id);
+        if job.state == JobState::Cancelled {
+            self.timers.borrow_mut().cancel_job(job_id);
+        }
 
         let outcome = JobOutcome {
             id: job_id,
@@ -1150,7 +1487,10 @@ impl Worker {
             );
             metrics.gc_collections = metrics.gc_collections.max(job.metrics.gc_collections);
             metrics.gc_max_pause_ms = metrics.gc_max_pause_ms.max(job.metrics.gc_max_pause_ms);
-            metrics.heap_live_bytes = metrics.heap_live_bytes.max(job.metrics.heap_live_bytes);
+            metrics.heap_live_bytes = job.metrics.heap_live_bytes;
+            metrics.heap_live_peak_bytes = metrics
+                .heap_live_peak_bytes
+                .max(job.metrics.heap_live_bytes);
         }
         {
             let (lock, cvar) = &*self.outcomes;
@@ -1211,11 +1551,51 @@ impl Worker {
                 Some("runtime shutdown".to_owned()),
             );
         }
+        self.timers.borrow_mut().entries.clear();
         self.device_queues.clear();
         self.ready_devices.clear();
         self.ready_set.clear();
         self.active_devices.clear();
         self.total_queued = 0;
+    }
+
+    fn process_cancellations(&mut self) {
+        let requested: Vec<JobId> = self.cancel_requests.lock().unwrap().drain().collect();
+        for id in requested {
+            self.cancel(id);
+        }
+    }
+
+    fn fire_timers(&mut self) {
+        let due = self.timers.borrow_mut().due(Instant::now());
+        if due.is_empty() {
+            return;
+        }
+        for timer in due {
+            if let Some(interval) = timer.interval {
+                self.timers.borrow_mut().entries.insert(
+                    timer.id,
+                    TimerEntry {
+                        id: timer.id,
+                        deadline: Instant::now() + interval,
+                        interval: Some(interval),
+                        callback: timer.callback.clone(),
+                        args: timer.args.clone(),
+                        refed: timer.refed,
+                        job_id: timer.job_id,
+                    },
+                );
+            }
+            let call = self
+                .context
+                .call(&timer.callback, Value::Undefined, &timer.args);
+            if let Err(error) = call {
+                eprintln!("[runtime] timer callback error: {error:?}");
+            }
+        }
+        if let Err(error) = self.runtime.run_jobs() {
+            eprintln!("[runtime] timer job error: {error:?}");
+        }
     }
 
     fn check_timeouts(&mut self) {
@@ -1329,6 +1709,22 @@ fn push_sample(values: &mut Vec<f64>, value: f64, limit: usize) {
         values.remove(0);
     }
     values.push(value);
+}
+
+fn process_rss_bytes() -> u64 {
+    let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("VmRSS:") {
+            return rest
+                .trim()
+                .trim_end_matches("kB")
+                .trim()
+                .parse::<u64>()
+                .unwrap_or(0)
+                * 1024;
+        }
+    }
+    0
 }
 
 fn now_ms() -> f64 {

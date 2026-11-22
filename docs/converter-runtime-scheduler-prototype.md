@@ -124,15 +124,15 @@ are **not** used for this comparison.
 
 | Workload | Node configure | Rust runtime | Ratio |
 |---|---:|---:|---:|
-| c1 | 255.4 ms | 110.6 ms | 0.43× |
-| c4 | 112.2 ms | 120.7 ms | 1.08× |
+| c1 | 255.4 ms | 107.2 ms | 0.42× |
+| c4 | 112.2 ms | 119.4 ms | 1.06× |
 
 With zero host delay Node's mock promises settle in JS microtasks while the
 runtime crosses the Rust boundary; those runs are retained for diagnosis
 (Node c1/c4 50.3/25.2 ms, runtime 34.7/67.6 ms on Routerich) but are not the
 acceptance comparison. The comparable async-host path is within 2× Node on
-both targets; Routerich c4 median is 1.08× (three runs under live-service
-load; individual runs ranged 111–221 ms).
+both targets; Routerich c4 is 1.06× (runs under live-service load ranged
+108–143 ms).
 
 ## 5. Lifecycle, backpressure and failure tests
 
@@ -218,33 +218,80 @@ The audit findings were addressed in the same crate:
   timeout (`JS execution timeout`) and the same device can start a new job;
   a shared-JS timeout cancels all active jobs (one interpreter, documented).
   Metrics/outcomes are retention-capped; states are removed on finish.
+- **Timers:** `setTimeout`/`clearTimeout`/`setInterval`/`clearInterval`,
+  `.ref()`, `.unref()`, `.hasRef()`, `.close()` are backed by a Rust timer
+  queue. Callbacks run on the worker and may outlive the converter call; a
+  pending 10 s timer does not block shutdown. Timers tagged with a cancelled
+  job are removed; restart/shutdown clears the whole queue.
+- **Bounded host transport:** host-request and response queues are bounded
+  (`max_pending_host_ops`, `max_pending_responses`), payload size
+  (`max_host_payload_bytes`) is enforced, and duplicate/late correlation IDs
+  are counted and ignored.
+- **Cancellation contract:** `cancel_request` returns `Accepted`,
+  `AlreadyTerminal`, `Unknown` or `Overloaded` separately from the terminal
+  state. Admission-tracked jobs can be cancelled before the worker has
+  created their live state. A running synchronous JS slice triggers the shared
+  interrupt; queued/waiting jobs use the normal loop.
+- **Supervision:** a supervisor thread samples process RSS and worker
+  heartbeat, exposes `health()`/`rss_bytes()`, and interrupts the worker on
+  RSS/heartbeat violation. `restart()` recreates worker and supervisor with
+  the same config; the bridge must reacquire `host_receiver()`.
 - **Tests:** four unit tests (number bridge, object/array bridge, bounded
   admission, metric retention) and two ignored integration regressions
   (`timeout_then_same_device_job_completes`,
-  `cancel_then_same_device_job_completes`) pass with the pinned package.
-  The JS-loop watchdog is exercised by `runtime_probe --mode js-timeout`.
+  `cancel_then_same_device_job_completes`) and twelve autonomous
+  timer/lifecycle tests in `tests/timers.rs` (fake package, no ignored) pass;
+  the JS-loop watchdog is exercised by `runtime_probe --mode js-timeout`.
 - **Soak (Routerich, 32 MB JS heap cap):** 60 s mixed reports/sets with host
-  drops/errors/timeouts and cancellations: **4,074 completed, 506 failed,
-  1,518 cancelled, 328 host timeouts, 0 late responses**, RSS **12.3 MB**,
-  live heap 23.6 MB, max GC pause 178 ms (earlier 60 s runs: 105–177 ms), no
-  OOM or worker death. A 5 s x86 soak completed 101 jobs with 49 MB RSS.
+  drops/errors/timeouts and cancellations: **3,928 completed, 1,213 failed,
+  1,709 cancelled, 322 host timeouts, 0 late responses**, process RSS
+  **42.7 MB** before shutdown (peak 54.5 MB), live JS heap 13.6 MB (peak
+  23.6 MB), max GC pause 116 ms, no OOM or worker death. A 5 s x86 soak
+  completed 83 jobs (26 failed, 37 cancelled) with 66 MB RSS before shutdown.
 
 Raw hardening results are in
 `tools/bench/results/scheduler/hardening/` (x86) and
 `tools/bench/results/scheduler/runtime-router/*-hardened.json` plus
 `soak-32mb-60s.json`.
 
+### RSS vs JS heap measurement
+
+The earlier "12.3 MB RSS / 23.6 MB heap" pair was not measured at the same
+point: the RSS value was read **after** `runtime.shutdown()` released the
+worker, while the heap value was the maximum across completed jobs. The
+hardening probe now reports:
+
+- `rssBeforeShutdownKb` — process `VmRSS` sampled immediately before shutdown,
+  while the worker and its heap are alive;
+- `rssPeakKb` — `VmHWM` high-water mark;
+- `heapLiveBytes` — qjs live JS heap from the last completed job;
+- `heapLivePeakBytes` — maximum live heap across jobs;
+- `rssKb` — post-shutdown RSS, retained only for diagnostics and never compared
+  with heap.
+
+The consistent Routerich sample is **42.7 MB process RSS / 13.6 MB JS live
+heap** before shutdown (peak 54.5 MB RSS / 23.6 MB heap). RSS includes the
+binary, loader, Zcl snapshot and native allocator; heap is JS-only, so RSS
+must be larger. The same methodology applies to x86 runs.
+
 ## 8. Limits and next milestone
 
 Not yet production:
 
-- Timers are still the study stub (`.unref()` objects, no callback execution).
-  A real timer queue is a mandatory next milestone.
+- Timers are runtime-global; job attribution uses the best-effort
+  `__timerJobId` set when the call starts. Timers created from an async
+  continuation or a timer callback may not be associated with the originating
+  job. A timer that outlives its job cannot issue new host operations because
+  the generation guard requires an active job; it can publish JS state.
+- Timer callbacks run on the shared worker; a runaway timer callback is covered
+  by the same shared interrupt policy.
 - The JS watchdog uses the one runtime-wide interrupt handle: a single job's
   timeout cancels all active jobs on the shared interpreter. Production should
   isolate or restart the realm, or accept a documented shared-timeout policy.
-- No supervision process/RSS watchdog is integrated (the engine heap cap is
-  not an RSS cap).
+- Supervision is in-process (RSS + heartbeat + restart); a crash that kills
+  the whole process still needs an OS service supervisor.
+- `restart()` replaces the transport channels; bridge code must reacquire
+  `host_receiver()` and re-deliver its host transport wiring.
 - Definition/device modules are loaded lazily inside the worker; cold eval is
   visible in `evalMs` and must not run on the bridge request path.
 - Per-device fairness is validated at the scheduler level; the production
@@ -259,9 +306,10 @@ Not yet production:
 
 **Decision:** GO for the next-stage production scheduler/timer milestone. The
 runtime is demonstrably correct on the golden corpus and meets the comparable
-async-host target (≤2× Node); NO-GO for deployment until timers, realm
-supervision/RSS watchdog, bridge integration and a production timer/supervision
-milestone are implemented.
+async-host target (≤2× Node); timers, bounded host transport, cancellation
+contract and in-process supervision are now implemented. NO-GO for deployment
+until bridge integration, OS-level supervision/restart and the production
+device lifecycle contract are implemented.
 
 ## 9. Sources and raw results
 
