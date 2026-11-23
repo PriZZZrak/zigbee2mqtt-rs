@@ -1,0 +1,42 @@
+{
+  "mode": "configure",
+  "model": "TRADFRI bulb E27 WS opal 1000lm",
+  "source": "package",
+  "iterations": 50,
+  "concurrentDevices": 1,
+  "outerMs": {
+    "p50": 2.381797,
+    "p95": 3.029998
+  },
+  "workerTotalMs": {
+    "p50": 2.214476,
+    "p95": 2.853365
+  },
+  "jsExecMs": {
+    "p50": 0.947006000000016,
+    "p95": 1.5058440000000104
+  },
+  "hostWaitMs": {
+    "p50": 0.218278,
+    "p95": 0.30813500000000005
+  },
+  "dispatchOverheadMs": {
+    "p50": 0.15338899999999978,
+    "p95": 0.2071430000000003
+  },
+  "workerOverheadMs": {
+    "p50": 0.0,
+    "p95": 0.0
+  },
+  "counters": {
+    "submitted": 51,
+    "completed": 51,
+    "failed": 0,
+    "cancelled": 0,
+    "hostTimeouts": 0,
+    "lateResponses": 0,
+    "responseBackpressure": 0,
+    "heapLiveBytes": 5642736
+  },
+  "transportCalls": 100
+}

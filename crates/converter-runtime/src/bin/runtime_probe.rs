@@ -117,7 +117,7 @@ fn main() {
     let served_host = Arc::clone(&served);
     let runtime_host = Arc::clone(&runtime);
     let responder = thread::spawn(move || {
-        let receiver = runtime_host.host_receiver();
+        let receiver = runtime_host.take_host_receiver().expect("host receiver");
         let mut mixed = 0u64;
         loop {
             let request = match receiver.recv_timeout(Duration::from_millis(200)) {

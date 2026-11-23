@@ -24,6 +24,8 @@ Node.js-мост, сохранив MQTT-контракты, сущности Hom
 - Scheduler prototype: [`docs/converter-runtime-scheduler-prototype.md`](docs/converter-runtime-scheduler-prototype.md)
 - Bridge integration contract: [`docs/converter-runtime-bridge-contract.md`](docs/converter-runtime-bridge-contract.md)
   (crate — [`crates/converter-runtime/`](crates/converter-runtime/))
+- Offline bridge integration: [`docs/converter-bridge-integration.md`](docs/converter-bridge-integration.md)
+  (dispatcher/tests — [`crates/z2m-rs/src/converter/`](crates/z2m-rs/src/converter/))
 
 ## Что входит в R1
 

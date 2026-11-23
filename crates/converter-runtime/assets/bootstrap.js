@@ -371,7 +371,7 @@
     return result && typeof result.then === "function" ? result : Promise.resolve(result);
   }
 
-  function makeEndpoint(spec, device, jobId, jobGeneration, state) {
+  function makeEndpoint(spec, device, jobId, jobGeneration, state, useHostReadResult) {
     var endpoint = {
       constructor: { name: "Endpoint" },
       ID: spec.id,
@@ -419,7 +419,10 @@
         for (var i = 0; i < names.length; i++) {
           result[names[i]] = state.readValues[String(cluster) + ":" + names[i]] ?? state.readValues[names[i]] ?? 0;
         }
-        return hostCall(op, jobId, jobGeneration, state).then(function () { return result; });
+        return hostCall(op, jobId, jobGeneration, state).then(function (response) {
+          if (useHostReadResult && response && typeof response === "object") return response;
+          return result;
+        });
       },
       write: function (cluster, attributes) {
         var op = { op: "write", endpoint: endpoint.ID, cluster: String(cluster), attributes: cloneRecord(attributes || {}) };
@@ -489,7 +492,9 @@
       },
       save: function () { return Promise.resolve(); },
     };
-    device.endpoints = endpointsSpec.map(function (endpointSpec) { return makeEndpoint(endpointSpec, device, jobId, jobGeneration, state); });
+    device.endpoints = endpointsSpec.map(function (endpointSpec) {
+      return makeEndpoint(endpointSpec, device, jobId, jobGeneration, state, spec.__useHostReadResult === true);
+    });
     return device;
   }
 
@@ -632,7 +637,35 @@
     }
 
     if (scenario.kind === "prepare") {
-      return { result: null, published: [], calls: [], converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
+      if (scenario.__metadata !== true) {
+        return { result: null, published: [], calls: [], converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
+      }
+      var zigbeeModels = Array.isArray(definition.zigbeeModel)
+        ? definition.zigbeeModel
+        : (definition.zigbeeModel ? [definition.zigbeeModel] : []);
+      var metadata = {
+        model: definition.model || "",
+        vendor: definition.vendor || "",
+        description: definition.description || "",
+        zigbeeModel: zigbeeModels,
+        endpoint: definition.endpoint || {},
+        version: definition.version || "0.0.0",
+        fromZigbee: definition.fromZigbee.map(function (converter) {
+          return {
+            cluster: converter.cluster,
+            type: Array.isArray(converter.type) ? converter.type : [converter.type],
+          };
+        }),
+        toZigbee: definition.toZigbee.map(function (converter) {
+          return {
+            key: Array.isArray(converter.key) ? converter.key : [converter.key],
+            endpoints: Array.isArray(converter.endpoints) ? converter.endpoints : null,
+          };
+        }),
+        hasConfigure: typeof definition.configure === "function",
+        hasOnEvent: typeof definition.onEvent === "function",
+      };
+      return { result: metadata, published: [], calls: [], converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
     }
 
     if (scenario.kind === "fromZigbee") {
@@ -683,9 +716,9 @@
       var coordinator = {
         ieeeAddr: "0x00124b0000000000",
         networkAddress: 0,
-        getEndpoint: function (id) { return makeEndpoint({ id: id, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, scenario.__jobGeneration, jobState); },
+        getEndpoint: function (id) { return makeEndpoint({ id: id, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, scenario.__jobGeneration, jobState, false); },
       };
-      coordinator.endpoints = [makeEndpoint({ id: 1, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, scenario.__jobGeneration, jobState)];
+      coordinator.endpoints = [makeEndpoint({ id: 1, inputClusters: [], outputClusters: [] }, coordinator, scenario.__jobId, scenario.__jobGeneration, jobState, false)];
       coordinator.endpoints[0].deviceIeeeAddress = coordinator.ieeeAddr;
       await timed(function () { return definition.configure(device, coordinator.endpoints[0], definition); });
       return { result: null, published: published, calls: jobState.calls.slice(), converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
@@ -735,7 +768,10 @@
     runtimeSpec.__jobGeneration = Number(generation);
     runScenario(runtimeSpec)
       .then(function (result) { __runtimeDone(String(id), JSON.stringify(result)); })
-      .catch(function (error) { __runtimeFailed(String(id), String(error && (error.stack || error.message) || error)); });
+      .catch(function (error) {
+        var text = error && (error.message && error.stack ? error.message + "\n" + error.stack : (error.stack || error.message));
+        __runtimeFailed(String(id), String(text || error));
+      });
   };
 
   globalThis.__asyncStart = function (configureJson, jobJson, jobs) {

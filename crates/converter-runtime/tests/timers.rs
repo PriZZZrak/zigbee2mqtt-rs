@@ -4,8 +4,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use converter_runtime::{
-    CancelStatus, ConverterRuntime, HostResult, JobRequest, JobState, RespondStatus, RuntimeConfig,
-    SubmitError, WorkerHealth,
+    CancelDeviceStatus, CancelStatus, ConverterRuntime, HostResult, JobRequest, JobState,
+    RespondStatus, RuntimeConfig, SubmitError, WorkerHealth,
 };
 use serde_json::json;
 
@@ -175,7 +175,7 @@ fn duplicate_host_response_is_counted_as_late() {
             scenario: json!({"id": "dup", "kind": "host-op", "payload": "ok"}),
         })
         .unwrap();
-    let receiver = runtime.host_receiver();
+    let receiver = runtime.take_host_receiver().expect("host receiver");
     let request = receiver.recv_timeout(Duration::from_secs(2)).unwrap();
     let correlation = request.correlation_id;
     drop(receiver);
@@ -396,7 +396,10 @@ fn device_leave_cancels_jobs_and_timers() {
         })
         .unwrap();
     thread::sleep(Duration::from_millis(20));
-    assert!(runtime.cancel_device("leave-me"));
+    assert_eq!(
+        runtime.cancel_device("leave-me"),
+        CancelDeviceStatus::Accepted
+    );
     let outcome = runtime.wait(long, Duration::from_secs(1)).unwrap();
     assert_eq!(outcome.state, JobState::Cancelled);
     let replacement = runtime
@@ -428,7 +431,10 @@ fn timer_outliving_job_is_removed_on_device_leave() {
         runtime.wait(late, Duration::from_secs(1)).unwrap().state,
         JobState::Completed
     );
-    assert!(runtime.cancel_device("late-device"));
+    assert_eq!(
+        runtime.cancel_device("late-device"),
+        CancelDeviceStatus::Accepted
+    );
     thread::sleep(Duration::from_millis(700));
     let check = runtime
         .submit(JobRequest {
@@ -499,7 +505,10 @@ fn on_event_timer_is_removed_on_device_leave() {
         .unwrap();
     let outcome = runtime.wait(id, Duration::from_secs(2)).unwrap();
     assert_eq!(outcome.state, JobState::Completed, "{outcome:?}");
-    assert!(runtime.cancel_device("on-event-device"));
+    assert_eq!(
+        runtime.cancel_device("on-event-device"),
+        CancelDeviceStatus::Accepted
+    );
     thread::sleep(Duration::from_millis(250));
     let check = runtime
         .submit(JobRequest {
@@ -576,4 +585,73 @@ fn fast_completions_do_not_leak_admission() {
         );
     }
     runtime.shutdown();
+}
+
+#[test]
+fn job_events_are_delivered_without_waiting() {
+    let mut runtime = ConverterRuntime::new(config()).unwrap();
+    let events = runtime.take_events().expect("events");
+    assert!(runtime.take_events().is_none(), "single event consumer");
+    let id = runtime.submit(timer_job(10, false, false)).unwrap();
+    let started = events.recv_timeout(Duration::from_secs(2)).unwrap();
+    match started {
+        converter_runtime::JobEvent::Started { id: started, .. } => assert_eq!(started, id),
+        other => panic!("unexpected event: {other:?}"),
+    }
+    let finished = events.recv_timeout(Duration::from_secs(2)).unwrap();
+    match finished {
+        converter_runtime::JobEvent::Finished(outcome) => {
+            assert_eq!(outcome.id, id);
+            assert_eq!(outcome.state, JobState::Completed);
+        }
+        other => panic!("unexpected event: {other:?}"),
+    }
+    runtime.shutdown();
+}
+
+#[test]
+fn events_survive_a_temporarily_full_event_queue() {
+    let mut config = config();
+    config.max_pending_events = 1;
+    let mut runtime = ConverterRuntime::new(config).unwrap();
+    // Submit while the receiver is not being drained; the worker queues the
+    // overflow and flushes it once the bridge reads.
+    let mut ids = Vec::new();
+    for _ in 0..5 {
+        ids.push(runtime.submit(timer_job(5, false, false)).unwrap());
+    }
+    for id in &ids {
+        let _ = runtime.wait(*id, Duration::from_secs(2)).unwrap();
+    }
+    let events = runtime.take_events().expect("events");
+    let mut finished = 0;
+    for _ in 0..10 {
+        match events.recv_timeout(Duration::from_secs(2)) {
+            Ok(converter_runtime::JobEvent::Finished(outcome)) => {
+                assert_eq!(outcome.state, JobState::Completed);
+                finished += 1;
+            }
+            Ok(_) => {}
+            Err(error) => panic!("event missing after {finished}: {error}"),
+        }
+        if finished == ids.len() {
+            break;
+        }
+    }
+    assert_eq!(finished, ids.len());
+    runtime.shutdown();
+}
+
+#[test]
+fn device_cancel_reports_closed_after_shutdown() {
+    let mut runtime = ConverterRuntime::new(config()).unwrap();
+    assert_eq!(
+        runtime.cancel_device("closed-device"),
+        CancelDeviceStatus::Accepted
+    );
+    runtime.shutdown();
+    assert_eq!(
+        runtime.cancel_device("closed-device"),
+        CancelDeviceStatus::Closed
+    );
 }

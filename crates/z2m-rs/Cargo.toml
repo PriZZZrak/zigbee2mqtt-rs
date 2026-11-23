@@ -11,6 +11,7 @@ tokio = { version = "1", features = ["rt", "sync", "time", "net", "macros", "sig
 rumqttc = { package = "rumqttc-v4-next", version = "0.34", default-features = false, features = ["use-rustls-no-provider"] }
 zigbee-apiarist = { path = "../zigbee-apiarist" }
 zigbee-converters = { path = "../zigbee-converters" }
+converter-runtime = { path = "../converter-runtime" }
 zip = { version = "9.5.1", default-features = false, features = ["deflate"] }
 base64 = "0.23.1"
 md-5 = "0.11.0"
@@ -21,6 +22,14 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["tls12"
 rustls-rustcrypto = "0.1.0-pre.0"
 rustls-pemfile = "2"
 rustls-native-certs = "0.8"
+
+[features]
+converter-probe = []
+
+[[bin]]
+name = "converter_bridge_probe"
+path = "src/bin/converter_bridge_probe.rs"
+required-features = ["converter-probe"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "test-util"] }

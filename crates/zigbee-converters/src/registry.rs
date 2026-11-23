@@ -69,8 +69,16 @@ impl DefinitionRegistry {
         self.external_count += 1;
     }
 
+    /// Register an already shared definition (converter runtime adapters).
+    pub fn register_shared(&mut self, definition: DefinitionRef) {
+        self.insert_shared(definition);
+    }
+
     fn insert(&mut self, definition: Definition) {
-        let definition = Arc::new(definition);
+        self.insert_shared(Arc::new(definition));
+    }
+
+    fn insert_shared(&mut self, definition: DefinitionRef) {
         let index = self.definitions.len();
         let models = definition.zigbee_model.clone();
         self.definitions.push(definition);

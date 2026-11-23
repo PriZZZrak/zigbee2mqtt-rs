@@ -82,7 +82,7 @@ Notes:
 | `bind-decorator` | `this` binding | language feature | — | omitted |
 | `zigbee-herdsman` | Zigbee stack | `zigbee-apiarist` | workspace crate | PARTIAL |
 | `zigbee-herdsman-converters` | device converters | `crates/zigbee-converters` (separate crate) | `zigbee_converters::{Definition, DefinitionRegistry, Expose, ...}` | PORTED minimal surface required by the bridge; converter database and authoring tooling excluded (AGENTS §5 Q4) |
-| JavaScript engine | executes upstream converter JS | `quickjs-oxide` 0.5.0 | `converter-runtime` worker (`crates/converter-runtime`) | prototype scheduler and offline bridge harness validated; not yet wired to the production dispatcher |
+| JavaScript engine | executes upstream converter JS | `quickjs-oxide` 0.5.0 | `converter-runtime` worker (`crates/converter-runtime`) | scheduler and bridge dispatcher wired (`z2m_rs::converter`); offline transport validated, real Endpoint transport pending |
 | `zigbee2mqtt-windfront` | static frontend | served assets | `util::static_file_server` | assets only; the deprecated `zigbee2mqtt-frontend` package is not supported (its enum value remains in the pinned settings schema for parity) |
 
 ### Development tooling

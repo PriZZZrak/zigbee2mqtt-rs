@@ -50,6 +50,7 @@ pub struct RuntimeConfig {
     pub max_pending_host_ops: usize,
     /// Maximum queued host responses.
     pub max_pending_responses: usize,
+    pub max_pending_events: usize,
     /// Maximum serialized host request payload.
     pub max_host_payload_bytes: usize,
     pub max_rss_bytes: u64,
@@ -74,6 +75,7 @@ impl RuntimeConfig {
             max_metric_samples: 4096,
             max_pending_host_ops: 256,
             max_pending_responses: 256,
+            max_pending_events: 1024,
             max_host_payload_bytes: 256 * 1024,
             max_rss_bytes: 128 << 20,
             rss_poll_interval: Duration::from_millis(500),
@@ -123,6 +125,16 @@ pub struct JobOutcome {
     pub metrics: JobMetrics,
 }
 
+/// Jobs are reported through the runtime event channel. `Started` is sent
+/// when the worker begins a job; `Finished` carries the terminal outcome.
+/// The bridge consumes these asynchronously and must not call `wait()` on its
+/// event loop.
+#[derive(Clone, Debug)]
+pub enum JobEvent {
+    Started { id: JobId, device: String },
+    Finished(JobOutcome),
+}
+
 #[derive(Clone, Debug)]
 pub struct HostRequest {
     pub correlation_id: CorrelationId,
@@ -144,6 +156,15 @@ pub enum WorkerHealth {
     RssExceeded,
     Unresponsive,
     Stopped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CancelDeviceStatus {
+    /// Registered in the shared device-cancel set; the worker processes it on
+    /// its next turn regardless of command-queue pressure.
+    Accepted,
+    /// The worker command channel is closed.
+    Closed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -256,11 +277,13 @@ pub struct ConverterRuntime {
     tx: mpsc::SyncSender<Command>,
     response_tx: mpsc::SyncSender<ResponseEvent>,
     admission: Arc<Admission>,
-    host_rx: Mutex<mpsc::Receiver<HostRequest>>,
+    host_rx: Mutex<Option<mpsc::Receiver<HostRequest>>>,
+    event_rx: Mutex<Option<mpsc::Receiver<JobEvent>>>,
     outcomes: Arc<(Mutex<HashMap<JobId, JobOutcome>>, Condvar)>,
     counters: Arc<Mutex<RuntimeMetrics>>,
     states: Arc<Mutex<HashMap<JobId, JobState>>>,
     cancel_requests: Arc<Mutex<HashSet<JobId>>>,
+    device_cancel_requests: Arc<Mutex<HashSet<String>>>,
     admitted_ids: Arc<Mutex<HashSet<JobId>>>,
     health: Arc<Mutex<WorkerHealth>>,
     last_rss_bytes: Arc<AtomicU64>,
@@ -278,6 +301,7 @@ impl ConverterRuntime {
         let (tx, rx) = mpsc::sync_channel(config.max_total_queue.max(1) + 16);
         let (response_tx, response_rx) = mpsc::sync_channel(config.max_pending_responses.max(1));
         let (host_tx, host_rx) = mpsc::sync_channel(config.max_pending_host_ops.max(1));
+        let (event_tx, event_rx) = mpsc::sync_channel(config.max_pending_events.max(1));
         let (ready_tx, ready_rx) = mpsc::channel();
         let outcomes = Arc::new((
             Mutex::new(HashMap::<JobId, JobOutcome>::new()),
@@ -287,6 +311,8 @@ impl ConverterRuntime {
         let states = Arc::new(Mutex::new(HashMap::<JobId, JobState>::new()));
         let cancel_requests = Arc::new(Mutex::new(HashSet::<JobId>::new()));
         let worker_cancel_requests = Arc::clone(&cancel_requests);
+        let device_cancel_requests = Arc::new(Mutex::new(HashSet::<String>::new()));
+        let worker_device_cancel_requests = Arc::clone(&device_cancel_requests);
         let admitted_ids = Arc::new(Mutex::new(HashSet::<JobId>::new()));
         let worker_admitted_ids = Arc::clone(&admitted_ids);
         let health = Arc::new(Mutex::new(WorkerHealth::Starting));
@@ -318,11 +344,13 @@ impl ConverterRuntime {
                     rx,
                     response_rx,
                     host_tx,
+                    event_tx,
                     worker_admission,
                     worker_outcomes,
                     worker_counters,
                     worker_states,
                     worker_cancel_requests,
+                    worker_device_cancel_requests,
                     worker_admitted_ids,
                     worker_heartbeat,
                     worker_health,
@@ -383,11 +411,13 @@ impl ConverterRuntime {
             tx,
             response_tx,
             admission,
-            host_rx: Mutex::new(host_rx),
+            host_rx: Mutex::new(Some(host_rx)),
+            event_rx: Mutex::new(Some(event_rx)),
             outcomes,
             counters,
             states,
             cancel_requests,
+            device_cancel_requests,
             admitted_ids,
             health,
             last_rss_bytes,
@@ -401,8 +431,16 @@ impl ConverterRuntime {
         })
     }
 
-    pub fn host_receiver(&self) -> std::sync::MutexGuard<'_, mpsc::Receiver<HostRequest>> {
-        self.host_rx.lock().unwrap()
+    /// Take the single host-request receiver. The bridge transport owns it and
+    /// must take a fresh one after `restart()`.
+    pub fn take_host_receiver(&self) -> Option<mpsc::Receiver<HostRequest>> {
+        self.host_rx.lock().unwrap().take()
+    }
+
+    /// Take the single job-event receiver. The dispatcher owns it and must
+    /// take a fresh one after `restart()`.
+    pub fn take_events(&self) -> Option<mpsc::Receiver<JobEvent>> {
+        self.event_rx.lock().unwrap().take()
     }
 
     /// Non-blocking host response delivery. On backpressure the caller keeps
@@ -477,14 +515,25 @@ impl ConverterRuntime {
         CancelStatus::Accepted
     }
 
-    /// Cancel all queued/running jobs and timers owned by a device. Used by
-    /// the bridge on device leave/removal.
-    pub fn cancel_device(&self, device: impl Into<String>) -> bool {
-        self.tx
-            .try_send(Command::CancelDevice {
-                device: device.into(),
-            })
-            .is_ok()
+    /// Cancel all queued/running jobs and timers owned by a device. The
+    /// request is registered in a shared set polled by the worker, so a full
+    /// command queue cannot drop it; the only failure is a closed worker.
+    pub fn cancel_device(&self, device: impl Into<String>) -> CancelDeviceStatus {
+        if self.shutdown_sent {
+            return CancelDeviceStatus::Closed;
+        }
+        let device = device.into();
+        self.device_cancel_requests
+            .lock()
+            .unwrap()
+            .insert(device.clone());
+        match self.tx.try_send(Command::Wake) {
+            Ok(()) | Err(mpsc::TrySendError::Full(_)) => CancelDeviceStatus::Accepted,
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.device_cancel_requests.lock().unwrap().remove(&device);
+                CancelDeviceStatus::Closed
+            }
+        }
     }
 
     /// Compatibility convenience for the earlier probe API.
@@ -512,6 +561,12 @@ impl ConverterRuntime {
                 .unwrap();
             map = next;
         }
+    }
+
+    /// Retained terminal outcome for a job, used to close the tiny race where
+    /// a job finishes before the dispatcher registers its waiter.
+    pub fn outcome(&self, id: JobId) -> Option<JobOutcome> {
+        self.outcomes.0.lock().unwrap().get(&id).cloned()
     }
 
     pub fn state(&self, id: JobId) -> Option<JobState> {
@@ -592,14 +647,28 @@ impl ConverterRuntime {
             return ShutdownStatus::Stopped;
         };
         if disconnected {
-            // The worker already dropped its command receiver, so this join
-            // cannot wait for a live execution turn.
-            join.join().ok();
-            if let Some(supervisor) = self.supervisor.take() {
-                supervisor.join().ok();
+            // The worker already dropped its command receiver, but the join is
+            // still bounded: a helper thread performs it and this call never
+            // blocks past the deadline.
+            let (done_tx, done_rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                join.join().ok();
+                let _ = done_tx.send(());
+            });
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            match done_rx.recv_timeout(remaining) {
+                Ok(()) => {
+                    if let Some(supervisor) = self.supervisor.take() {
+                        supervisor.join().ok();
+                    }
+                    *self.health.lock().unwrap() = WorkerHealth::Stopped;
+                    return ShutdownStatus::Stopped;
+                }
+                Err(_) => {
+                    *self.health.lock().unwrap() = WorkerHealth::Unresponsive;
+                    return ShutdownStatus::TimedOut;
+                }
             }
-            *self.health.lock().unwrap() = WorkerHealth::Stopped;
-            return ShutdownStatus::Stopped;
         }
         if !sent {
             // The queue stayed full for the whole deadline: detach the join
@@ -647,7 +716,6 @@ impl Drop for ConverterRuntime {
 enum Command {
     Submit { id: JobId, request: JobRequest },
     Cancel { id: JobId },
-    CancelDevice { device: String },
     Wake,
     Shutdown { reply: mpsc::SyncSender<()> },
 }
@@ -892,7 +960,10 @@ struct Worker {
     counters: Arc<Mutex<RuntimeMetrics>>,
     states: Arc<Mutex<HashMap<JobId, JobState>>>,
     cancel_requests: Arc<Mutex<HashSet<JobId>>>,
+    device_cancel_requests: Arc<Mutex<HashSet<String>>>,
     admitted_ids: Arc<Mutex<HashSet<JobId>>>,
+    event_tx: mpsc::SyncSender<JobEvent>,
+    pending_events: VecDeque<JobEvent>,
     jobs: HashMap<JobId, JobRecord>,
     device_queues: HashMap<String, VecDeque<JobId>>,
     ready_devices: VecDeque<String>,
@@ -919,11 +990,13 @@ impl Worker {
         rx: mpsc::Receiver<Command>,
         response_rx: mpsc::Receiver<ResponseEvent>,
         host_tx: mpsc::SyncSender<HostRequest>,
+        event_tx: mpsc::SyncSender<JobEvent>,
         admission: Arc<Admission>,
         outcomes: Arc<(Mutex<HashMap<JobId, JobOutcome>>, Condvar)>,
         counters: Arc<Mutex<RuntimeMetrics>>,
         states: Arc<Mutex<HashMap<JobId, JobState>>>,
         cancel_requests: Arc<Mutex<HashSet<JobId>>>,
+        device_cancel_requests: Arc<Mutex<HashSet<String>>>,
         admitted_ids: Arc<Mutex<HashSet<JobId>>>,
         heartbeat: Arc<Mutex<Instant>>,
         health: Arc<Mutex<WorkerHealth>>,
@@ -1232,7 +1305,10 @@ impl Worker {
             counters,
             states,
             cancel_requests,
+            device_cancel_requests,
             admitted_ids,
+            event_tx,
+            pending_events: VecDeque::new(),
             jobs: HashMap::new(),
             device_queues: HashMap::new(),
             ready_devices: VecDeque::new(),
@@ -1274,10 +1350,6 @@ impl Worker {
                         self.cancel(id);
                         worked = true;
                     }
-                    Ok(Command::CancelDevice { device }) => {
-                        self.cancel_device(&device);
-                        worked = true;
-                    }
                     Ok(Command::Wake) => {}
                     Ok(Command::Shutdown { reply }) => {
                         shutdown = Some(reply);
@@ -1304,6 +1376,7 @@ impl Worker {
             self.fire_timers();
             self.drain_completions();
             self.start_ready_jobs();
+            self.flush_events();
             if let Some(reply) = shutdown {
                 self.cancel_all();
                 reply.send(()).ok();
@@ -1316,9 +1389,6 @@ impl Worker {
                     }
                     Ok(Command::Cancel { id }) => {
                         self.cancel(id);
-                    }
-                    Ok(Command::CancelDevice { device }) => {
-                        self.cancel_device(&device);
                     }
                     Ok(Command::Wake) => {}
                     Ok(Command::Shutdown { reply }) => {
@@ -1408,6 +1478,12 @@ impl Worker {
             .lock()
             .unwrap()
             .insert(job_id, JobState::Running);
+        if let Some(job) = self.jobs.get(&job_id) {
+            self.emit_event(JobEvent::Started {
+                id: job_id,
+                device: job.device.clone(),
+            });
+        }
         self.active_jobs.borrow_mut().insert(job_id, generation);
         let source = format!(
             "__startRuntimeJob({}, {}, {})",
@@ -1615,6 +1691,7 @@ impl Worker {
             error,
             metrics: job.metrics.clone(),
         };
+        self.emit_event(JobEvent::Finished(outcome.clone()));
         {
             let mut metrics = self.counters.lock().unwrap();
             match job.state {
@@ -1753,6 +1830,35 @@ impl Worker {
         let requested: Vec<JobId> = self.cancel_requests.lock().unwrap().drain().collect();
         for id in requested {
             self.cancel(id);
+        }
+        let devices: Vec<String> = self
+            .device_cancel_requests
+            .lock()
+            .unwrap()
+            .drain()
+            .collect();
+        for device in devices {
+            self.cancel_device(&device);
+        }
+    }
+
+    fn emit_event(&mut self, event: JobEvent) {
+        self.pending_events.push_back(event);
+        self.flush_events();
+    }
+
+    fn flush_events(&mut self) {
+        while let Some(event) = self.pending_events.front().cloned() {
+            match self.event_tx.try_send(event) {
+                Ok(()) => {
+                    self.pending_events.pop_front();
+                }
+                Err(mpsc::TrySendError::Full(_)) => break,
+                Err(mpsc::TrySendError::Disconnected(_)) => {
+                    self.pending_events.clear();
+                    break;
+                }
+            }
         }
     }
 

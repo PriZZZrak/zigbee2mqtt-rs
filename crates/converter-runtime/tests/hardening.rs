@@ -42,7 +42,7 @@ fn responder(
     stop: Arc<AtomicBool>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        let receiver = runtime.host_receiver();
+        let receiver = runtime.take_host_receiver().expect("host receiver");
         while let Ok(request) = receiver.recv_timeout(Duration::from_millis(50)) {
             if stop.load(Ordering::Relaxed) {
                 break;

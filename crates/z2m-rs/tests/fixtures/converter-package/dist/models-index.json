@@ -1,0 +1,4 @@
+{
+  "fixturelamp": [["fixture.js", 0]],
+  "fixtureswitch": [["fixture.js", 1]]
+}

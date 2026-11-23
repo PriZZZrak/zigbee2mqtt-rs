@@ -1,8 +1,9 @@
 # Converter runtime <-> Rust bridge integration contract
 
-Status: contract implemented for the offline harness
-(`crates/converter-runtime/tests/bridge_offline.rs`); production dispatcher
-wiring is the next milestone.
+Status: implemented offline in `crates/z2m-rs/src/converter/` and covered by
+`crates/z2m-rs/tests/converter_bridge.rs`; the real Endpoint/ZNP transport is
+the next milestone. See
+[`converter-bridge-integration.md`](converter-bridge-integration.md).
 Runtime implementation: `crates/converter-runtime`; scheduler report:
 [`converter-runtime-scheduler-prototype.md`](converter-runtime-scheduler-prototype.md).
 

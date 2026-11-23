@@ -10,7 +10,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use converter_runtime::{
-    ConverterRuntime, HostResult, JobRequest, JobState, RespondStatus, RuntimeConfig, SubmitError,
+    CancelDeviceStatus, ConverterRuntime, HostResult, JobRequest, JobState, RespondStatus,
+    RuntimeConfig, SubmitError,
 };
 use serde_json::json;
 
@@ -45,7 +46,7 @@ fn offline_bridge_transport_contract_holds_without_zigbee_or_mqtt() {
         let served = Arc::clone(&served);
         thread::spawn(move || {
             // The bridge transport is the single consumer of host requests.
-            let receiver = runtime.host_receiver();
+            let receiver = runtime.take_host_receiver().expect("host receiver");
             while !stop.load(Ordering::Relaxed) {
                 let request = match receiver.recv_timeout(Duration::from_millis(20)) {
                     Ok(request) => request,
@@ -118,7 +119,10 @@ fn offline_bridge_transport_contract_holds_without_zigbee_or_mqtt() {
         })
         .unwrap();
     thread::sleep(Duration::from_millis(20));
-    assert!(runtime.cancel_device("bridge-leave"));
+    assert_eq!(
+        runtime.cancel_device("bridge-leave"),
+        CancelDeviceStatus::Accepted
+    );
     assert_eq!(
         runtime.wait(leaving, Duration::from_secs(2)).unwrap().state,
         JobState::Cancelled

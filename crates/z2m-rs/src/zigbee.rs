@@ -73,6 +73,7 @@ pub struct Zigbee {
     device_lookup: Mutex<std::collections::HashMap<String, Arc<Device>>>,
     coordinator_ieee_addr: Mutex<Option<String>>,
     converters: Arc<Mutex<DefinitionRegistry>>,
+    converter_dispatcher: Mutex<Option<Arc<crate::converter::ConverterDispatcher>>>,
     /// Test hook: replaces the coordinator startup (audit CP-05 abort matrix).
     #[doc(hidden)]
     pub test_start: Mutex<Option<(Result<bool, String>, u64)>>,
@@ -139,6 +140,7 @@ impl Zigbee {
             device_lookup: Mutex::new(std::collections::HashMap::new()),
             coordinator_ieee_addr,
             converters,
+            converter_dispatcher: Mutex::new(None),
             test_start: Mutex::new(None),
             test_stop_count: std::sync::atomic::AtomicUsize::new(0),
         });
@@ -149,6 +151,33 @@ impl Zigbee {
     /// Converter registry handle (shared with every resolved `Device`).
     pub fn converters(&self) -> Arc<Mutex<DefinitionRegistry>> {
         self.converters.clone()
+    }
+
+    pub fn logger(&self) -> Arc<Mutex<Logger>> {
+        self.logger.clone()
+    }
+
+    /// Install the converter runtime used by the bridge. Definitions are
+    /// prepared after the coordinator starts and before extensions resolve
+    /// devices.
+    pub fn set_converter_dispatcher(
+        &self,
+        dispatcher: Arc<crate::converter::ConverterDispatcher>,
+    ) {
+        *self.converter_dispatcher.lock().unwrap() = Some(dispatcher);
+    }
+
+    pub fn converter_dispatcher(&self) -> Option<Arc<crate::converter::ConverterDispatcher>> {
+        self.converter_dispatcher.lock().unwrap().clone()
+    }
+
+    /// Prepare JS definitions for all paired devices and register them in the
+    /// existing converter registry. Returns the number of registered devices.
+    pub async fn prepare_converter_definitions(self: &Arc<Self>) -> usize {
+        let Some(dispatcher) = self.converter_dispatcher() else {
+            return 0;
+        };
+        dispatcher.prepare_and_register(self).await
     }
 
     /// Coordinator IEEE address (`zigbee.ts:76`).

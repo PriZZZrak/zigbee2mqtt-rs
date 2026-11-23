@@ -567,6 +567,17 @@ impl Controller {
             return Ok(());
         }
 
+        if abort.aborted() {
+            return Ok(());
+        }
+        let prepared = self.zigbee.prepare_converter_definitions().await;
+        if prepared > 0 {
+            logger_info(
+                &self.logger,
+                &format!("Prepared {prepared} converter runtime definition(s)"),
+            );
+        }
+
         let mut device_count = 0;
         for device in self.zigbee.devices_iterator(utils::device_not_coordinator) {
             device_count += 1;
@@ -762,6 +773,9 @@ impl Controller {
             self.state.lock().unwrap().stop(None);
         }
         self.mqtt.lock().await.disconnect().await;
+        if let Some(dispatcher) = self.zigbee.converter_dispatcher() {
+            dispatcher.shutdown().await;
+        }
         let _ = self.zigbee.stop().await;
         logger_info(&self.logger, "Stopped Zigbee2MQTT");
         let exit = self.exit_callback.lock().unwrap().clone();
