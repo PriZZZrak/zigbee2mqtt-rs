@@ -1,0 +1,106 @@
+{
+  "manifestSchema": 1,
+  "artifactId": "z2hc-26.125.0-zh-11.2.0-abi1",
+  "generatedAt": "2026-11-24T00:00:00Z",
+  "upstream": {
+    "zigbee2mqtt": "2.14.3",
+    "zigbee2mqttCommit": "3c841fdfd66c92239921ef84fde8f039c64e1662",
+    "zigbeeHerdsman": "11.2.0",
+    "zigbeeHerdsmanConverters": "26.125.0",
+    "nodeBaseline": "22.23.4"
+  },
+  "host": {
+    "abi": 1,
+    "engine": "quickjs-oxide",
+    "engineVersion": "0.5.0",
+    "bootstrapSha256": "sha256-of-assets/bootstrap.js",
+    "zclCatalogSha256": "6f3861df0a7f50e3de90555d6ca74faa40cbd2a0a3c51fd8c308214c77f19a33",
+    "requiredFeatures": ["cjs", "timers", "host-zcl-v1", "async-host"]
+  },
+  "index": {
+    "file": "index.bin",
+    "format": "z2idx1",
+    "sha256": "sha256-of-index.bin",
+    "compressedSha256": "sha256-of-index.bin.gz",
+    "bytes": 320000,
+    "lookupKeys": 5077,
+    "definitions": 4619,
+    "candidates": 8469,
+    "normalization": "lowercase(trim(modelID)); fingerprint priority; zigbeeModel exact then normalized; null key for definitions without model"
+  },
+  "shared": {
+    "root": "dist",
+    "files": 38,
+    "bytes": 2519040,
+    "sha256": "sha256-of-shared-tree",
+    "contents": ["converters/", "lib/", "index.js", "indexer.js"]
+  },
+  "removable": {
+    "bytecode": false,
+    "mapsIncluded": false,
+    "typesIncluded": false,
+    "deviceCatalogInPackage": false
+  },
+  "modules": {
+    "format": "cjs",
+    "retrieval": "https://artifact.example/z2hc/{artifactId}/{module}.js",
+    "cache": "/var/lib/z2m-converters/cache/{artifactId}",
+    "pairedOffline": true,
+    "entries": {
+      "nous": {
+        "file": "nous.js",
+        "sha256": "sha256-of-nous.js",
+        "bytes": 25780,
+        "definitions": 26,
+        "requires": ["shared/dist/lib/modernExtend.js", "shared/dist/converters/fromZigbee.js"]
+      },
+      "tuya-common": {
+        "file": "tuya-common.js",
+        "sha256": "sha256-of-tuya-common.js",
+        "bytes": 107440,
+        "definitions": 0
+      },
+      "tuya-0": {
+        "file": "tuya-0.js",
+        "sha256": "sha256-of-tuya-0.js",
+        "bytes": 175073,
+        "definitions": 89,
+        "requires": ["tuya-common"]
+      },
+      "lytko-external": {
+        "file": "external/L101Ze_z2m.js",
+        "sha256": "sha256-of-external-file",
+        "bytes": 28750,
+        "source": "user-external",
+        "definitions": 5
+      }
+    },
+    "fragments": {
+      "tuya": {
+        "common": "tuya-common",
+        "parts": ["tuya-0", "tuya-1", "tuya-2", "tuya-3", "tuya-4", "tuya-5", "tuya-6", "tuya-7"],
+        "verifiedDefinitions": 571,
+        "equivalence": "prepared-definition equality with upstream tuya.js"
+      }
+    }
+  },
+  "cache": {
+    "layout": "{artifactId}/{module}.js",
+    "maxBytes": 8388608,
+    "eviction": "lru-unpinned",
+    "pinned": "definitions referenced by database.db",
+    "offline": "paired modules must load without network",
+    "verify": ["sha256", "host.abi", "requiredFeatures"]
+  },
+  "compatibility": {
+    "minHostAbi": 1,
+    "maxHostAbi": 1,
+    "minRuntime": "converter-runtime/0.1.0",
+    "rejectUnknownClusterOutbound": true,
+    "unknownInbound": "raw-diagnostic"
+  },
+  "signature": {
+    "type": "sha256",
+    "value": "sha256-of-manifest-without-signature"
+  }
+}

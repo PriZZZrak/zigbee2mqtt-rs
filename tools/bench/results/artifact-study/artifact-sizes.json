@@ -1,0 +1,38 @@
+{
+  "runtimeJs": {
+    "deviceFiles": 401,
+    "deviceBytes": 9232586,
+    "sharedFiles": 38,
+    "sharedBytes": 2519040,
+    "sharedGzipBytes": 428247
+  },
+  "binary": {
+    "rawBytes": 18313424,
+    "gzipBytes": 6069341,
+    "path": "target/aarch64-unknown-linux-musl/release/z2m-rs"
+  },
+  "richIndex": {
+    "jsonBytes": 892107,
+    "gzipBytes": 130866
+  },
+  "stagedDataTarGzBytes": 6675757,
+  "pairedCache": {
+    "rawBytes": 337043,
+    "gzipBytes": 61050,
+    "items": [
+      "nous.js",
+      "L101Ze_z2m.js",
+      "tuya-common.js",
+      "tuya-0.js"
+    ]
+  },
+  "currentNodePackage": {
+    "opkgCompressedBytes": 12239632,
+    "installedBytes": 53600000
+  },
+  "overlay": {
+    "totalBytes": 56900000,
+    "freeBytes": 1150000,
+    "usedPercent": 98
+  }
+}

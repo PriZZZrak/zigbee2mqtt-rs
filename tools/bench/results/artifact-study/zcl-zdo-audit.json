@@ -1,0 +1,25 @@
+{
+  "upstream": {"zigbee2mqtt": "2.14.3", "zigbeeHerdsman": "11.2.0"},
+  "zcl": {
+    "clusters": 129,
+    "attributes": 1354,
+    "commands": 254,
+    "commandsResponse": 171,
+    "missingOrExtraClusters": 0,
+    "metadataDifferences": 0,
+    "manufacturerCodeClusters": 1,
+    "rustCatalogSha256": "6f3861df0a7f50e3de90555d6ca74faa40cbd2a0a3c51fd8c308214c77f19a33"
+  },
+  "zdo": {
+    "upstreamConstants": 60,
+    "rustConstants": 60,
+    "incorrectRequests": [
+      {"name": "RETRIEVE_AUTHENTICATION_TOKEN_REQUEST", "upstream": 65, "rust": 66},
+      {"name": "GET_AUTHENTICATION_LEVEL_REQUEST", "upstream": 66, "rust": 68},
+      {"name": "SET_CONFIGURATION_REQUEST", "upstream": 67, "rust": 73},
+      {"name": "GET_CONFIGURATION_REQUEST", "upstream": 68, "rust": 74},
+      {"name": "START_KEY_UPDATE_REQUEST", "upstream": 69, "rust": 75}
+    ]
+  },
+  "existingDifferential": {"zclCases": 7, "frameCases": 6, "fixtureRevision": "zigbee-herdsman 11.2.0"}
+}

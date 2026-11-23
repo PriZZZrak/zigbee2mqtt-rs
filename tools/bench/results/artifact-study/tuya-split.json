@@ -1,0 +1,18 @@
+{
+  "file": "tuya.js",
+  "fileBytes": 1474732,
+  "preambleBytes": 106337,
+  "definitions": 571,
+  "arrayBytes": 1368361,
+  "definitionBytes": 1364744,
+  "minDefinition": 177,
+  "medianDefinition": 1531,
+  "maxDefinition": 15161,
+  "groups": 8,
+  "groupBytes": [175018, 173990, 172047, 171878, 176014, 173160, 182315, 150117],
+  "groupDefinitions": [89, 101, 60, 91, 77, 50, 53, 50],
+  "commonBytes": 107440,
+  "structuralEquality": {"compared": 571, "differences": 0},
+  "prepareDefinitionEquality": {"compared": 571, "differences": 0},
+  "routerNodeLoadMs": {"original": 8036.5, "fragment0": 3743.9, "fragment3": 3956.7, "fragment7": 4257.5}
+}

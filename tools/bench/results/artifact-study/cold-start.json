@@ -1,0 +1,7 @@
+{
+  "router": "Routerich AX3000 v1, OpenWrt 24.10.8, aarch64, Node service running",
+  "nodeMs": {"shared": 4044.4, "root": 3369.0, "tuya": 6276.9, "ikea": 3763.9, "zemismart": 3672.9, "danfoss": 3142.5, "lumi": 4385.7, "external": 3090.8, "resolveTs0601": 8170.1},
+  "rustMs": {"workerStartupNous": 2128.6, "prepareNous": 525.8, "workerStartupIkea": 2187.9, "prepareIkea": 768.4},
+  "indexParseMs": {"currentRust": 29.6, "currentNode": 58.6, "richRust": 134.6, "richNode": 253.5},
+  "ts0601Resolution": {"upstreamLoadedFiles": 73, "loadedBytes": 4259138, "ms": 8170.1, "selected": "nous.js:3 SZ-T04"}
+}

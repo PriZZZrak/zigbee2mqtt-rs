@@ -1,0 +1,14 @@
+{
+  "source": "pinned zigbee-herdsman-converters 26.125.0 dist/devices",
+  "definitions": 4619,
+  "keys": 5077,
+  "candidates": 8469,
+  "bytes": 892107,
+  "gzipBytes": 130866,
+  "files": 400,
+  "fingerprintEntries": 3700,
+  "whiteLabelEntries": 1247,
+  "maxCandidates": 1394,
+  "maxKey": "ts0601",
+  "sha256": "67db33e904498561d39f38ce5dfba98a0ff53d30fdd583a60f8e4ba2e4f19bc8"
+}

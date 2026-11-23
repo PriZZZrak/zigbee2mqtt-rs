@@ -1,0 +1,61 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "all",
+  "maxConcurrent": 1,
+  "hostDelayMs": 0,
+  "submitted": 1,
+  "submitErrors": 0,
+  "servedHostOps": 0,
+  "elapsedMs": 526.0730850000001,
+  "startupMs": 2128.61654,
+  "warmupMs": 0.001077,
+  "completed": 1,
+  "failed": 0,
+  "cancelled": 0,
+  "lateResponses": 0,
+  "hostTimeouts": 0,
+  "gcCollections": 3,
+  "gcMaxPauseMs": 10.856007000000002,
+  "heapLiveBytes": 5634924,
+  "rssKb": 4616,
+  "rssBeforeShutdownKb": 20920,
+  "rssPeakKb": 21616,
+  "heapLivePeakBytes": 5634924,
+  "cases": [
+    {
+      "id": 1,
+      "scenarioId": "prepare-nous",
+      "device": "prepare-nous",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.022237,
+        "evalMs": 525.4868620000001,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 525.838796,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 10.856007000000002,
+        "heapLiveBytes": 5634924
+      }
+    }
+  ]
+}

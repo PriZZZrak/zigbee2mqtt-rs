@@ -1,0 +1,61 @@
+{
+  "engine": "quickjs-oxide",
+  "mode": "all",
+  "maxConcurrent": 1,
+  "hostDelayMs": 0,
+  "submitted": 1,
+  "submitErrors": 0,
+  "servedHostOps": 0,
+  "elapsedMs": 768.504427,
+  "startupMs": 2187.8522629999998,
+  "warmupMs": 0.0006929999999999999,
+  "completed": 1,
+  "failed": 0,
+  "cancelled": 0,
+  "lateResponses": 0,
+  "hostTimeouts": 0,
+  "gcCollections": 3,
+  "gcMaxPauseMs": 11.902420000000001,
+  "heapLiveBytes": 5634924,
+  "rssKb": 4420,
+  "rssBeforeShutdownKb": 19204,
+  "rssPeakKb": 19204,
+  "heapLivePeakBytes": 5634924,
+  "cases": [
+    {
+      "id": 1,
+      "scenarioId": "prepare-ikea",
+      "device": "prepare-ikea",
+      "state": "Completed",
+      "error": null,
+      "result": {
+        "result": null,
+        "published": [],
+        "calls": [],
+        "converterMs": 0,
+        "hostMs": 0,
+        "hostCalls": 0,
+        "perf": {
+          "serializeMs": 0,
+          "boundaryMs": 0,
+          "resumeMs": 0,
+          "mockMs": 0,
+          "hostCalls": 0,
+          "getEndpoint": 1
+        }
+      },
+      "metrics": {
+        "queueWaitMs": 0.024545,
+        "evalMs": 768.0603940000001,
+        "jsExecMs": 0.0,
+        "promiseSchedMs": 0.0,
+        "hostWaitMs": 0.0,
+        "totalMs": 768.362161,
+        "hostCalls": 0,
+        "gcCollections": 3,
+        "gcMaxPauseMs": 11.902420000000001,
+        "heapLiveBytes": 5634924
+      }
+    }
+  ]
+}

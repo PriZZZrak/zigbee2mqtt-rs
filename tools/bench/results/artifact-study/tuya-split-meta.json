@@ -1,0 +1,58 @@
+[
+  {
+    "file": "tuya-0.js",
+    "count": 89,
+    "bytes": 175018,
+    "first": 0,
+    "last": 88
+  },
+  {
+    "file": "tuya-1.js",
+    "count": 101,
+    "bytes": 173990,
+    "first": 89,
+    "last": 189
+  },
+  {
+    "file": "tuya-2.js",
+    "count": 60,
+    "bytes": 172047,
+    "first": 190,
+    "last": 249
+  },
+  {
+    "file": "tuya-3.js",
+    "count": 91,
+    "bytes": 171878,
+    "first": 250,
+    "last": 340
+  },
+  {
+    "file": "tuya-4.js",
+    "count": 77,
+    "bytes": 176014,
+    "first": 341,
+    "last": 417
+  },
+  {
+    "file": "tuya-5.js",
+    "count": 50,
+    "bytes": 173160,
+    "first": 418,
+    "last": 467
+  },
+  {
+    "file": "tuya-6.js",
+    "count": 53,
+    "bytes": 182315,
+    "first": 468,
+    "last": 520
+  },
+  {
+    "file": "tuya-7.js",
+    "count": 50,
+    "bytes": 150117,
+    "first": 521,
+    "last": 570
+  }
+]

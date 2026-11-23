@@ -25,13 +25,13 @@ impl ClusterId {
     pub const NWK_IEEE_JOINING_LIST_REQUEST: u16 = 0x003a;
     pub const NWK_BEACON_SURVEY_REQUEST: u16 = 0x003c;
     pub const START_KEY_NEGOTIATION_REQUEST: u16 = 0x0040;
+    pub const RETRIEVE_AUTHENTICATION_TOKEN_REQUEST: u16 = 0x0041;
+    pub const GET_AUTHENTICATION_LEVEL_REQUEST: u16 = 0x0042;
+    pub const SET_CONFIGURATION_REQUEST: u16 = 0x0043;
+    pub const GET_CONFIGURATION_REQUEST: u16 = 0x0044;
+    pub const START_KEY_UPDATE_REQUEST: u16 = 0x0045;
     pub const DECOMMISSION_REQUEST: u16 = 0x0046;
     pub const CHALLENGE_REQUEST: u16 = 0x0047;
-    pub const RETRIEVE_AUTHENTICATION_TOKEN_REQUEST: u16 = 0x0042;
-    pub const GET_AUTHENTICATION_LEVEL_REQUEST: u16 = 0x0044;
-    pub const SET_CONFIGURATION_REQUEST: u16 = 0x0049;
-    pub const GET_CONFIGURATION_REQUEST: u16 = 0x004a;
-    pub const START_KEY_UPDATE_REQUEST: u16 = 0x004b;
 
     pub const NETWORK_ADDRESS_RESPONSE: u16 = 0x8000;
     pub const IEEE_ADDRESS_RESPONSE: u16 = 0x8001;
@@ -64,4 +64,21 @@ impl ClusterId {
     pub const START_KEY_UPDATE_RESPONSE: u16 = 0x8045;
     pub const DECOMMISSION_RESPONSE: u16 = 0x8046;
     pub const CHALLENGE_RESPONSE: u16 = 0x8047;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ClusterId;
+
+    /// Pinned `zigbee-herdsman` 11.2.0 `zspec/zdo/definition/clusters.ts`.
+    #[test]
+    fn key_negotiation_request_ids_match_upstream() {
+        assert_eq!(ClusterId::RETRIEVE_AUTHENTICATION_TOKEN_REQUEST, 0x0041);
+        assert_eq!(ClusterId::GET_AUTHENTICATION_LEVEL_REQUEST, 0x0042);
+        assert_eq!(ClusterId::SET_CONFIGURATION_REQUEST, 0x0043);
+        assert_eq!(ClusterId::GET_CONFIGURATION_REQUEST, 0x0044);
+        assert_eq!(ClusterId::START_KEY_UPDATE_REQUEST, 0x0045);
+        assert_eq!(ClusterId::DECOMMISSION_REQUEST, 0x0046);
+        assert_eq!(ClusterId::CHALLENGE_REQUEST, 0x0047);
+    }
 }
