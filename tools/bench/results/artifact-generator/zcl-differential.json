@@ -1,0 +1,13 @@
+{
+  "revision": "zigbee-herdsman 11.2.0",
+  "zclCases": 413,
+  "frameToBuffer": 206,
+  "frameFromBuffer": 207,
+  "corruptedFrames": 2,
+  "unexplainedFailures": 0,
+  "documentedAnomalies": [
+    {"case": "frame_from_buffer-147", "cluster": "greenPower", "command": "sinkCommissioningMode", "status": 133, "reason": "upstream encoder accepts a payload the Rust decoder classifies as INVALID_FIELD"},
+    {"case": "frame_from_buffer-363", "cluster": "telecommunicationsVoiceOverZigbee", "command": "controlResponse", "status": 133, "reason": "same command-parameter validation boundary"}
+  ],
+  "zdoConstants": {"upstream": 60, "rust": 60, "mismatches": 0}
+}

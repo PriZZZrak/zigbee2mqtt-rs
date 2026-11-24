@@ -1,6 +1,7 @@
 # Converter artifact research and implementation plan
 
-Status: research complete, implementation not started.
+Status: research complete; phases 1–2 are implemented in
+[`converter-artifact-generator.md`](converter-artifact-generator.md).
 Scope: OpenWrt artifact, lazy device loading, pairing, tuya split, ZCL/ZDO
 audit and offline differential plan.
 Hardware: Routerich AX3000 v1, OpenWrt 24.10.8, aarch64.
@@ -127,9 +128,11 @@ Rich index prototype statistics:
 | Node parse, Routerich | 253.5 ms |
 
 A binary index with a string table and varint records is the target; expected
-raw size is 250–400 KB and parse time should be <50 ms on Routerich. The
-current 199 KB index is 29.6 ms in Rust, so this is a modest cold-start
-trade-off for eliminating multi-second resolution.
+raw size was 250–400 KB. The implemented `z2idx1` format measured **927 KB**,
+68–86 ms parse and 5.4–6.1 MB RSS on Routerich (compact JSON: 1.45 MB,
+86–124 ms, 7.8 MB). The current 199 KB index is 29.6 ms in Rust; the rich
+binary format is the measured choice, documented in
+[`converter-artifact-generator.md`](converter-artifact-generator.md).
 
 ## 4. Cold start and cache
 

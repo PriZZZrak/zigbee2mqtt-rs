@@ -15,25 +15,35 @@
     "engineVersion": "0.5.0",
     "bootstrapSha256": "sha256-of-assets/bootstrap.js",
     "zclCatalogSha256": "6f3861df0a7f50e3de90555d6ca74faa40cbd2a0a3c51fd8c308214c77f19a33",
-    "requiredFeatures": ["cjs", "timers", "host-zcl-v1", "async-host"]
+    "requiredFeatures": [
+      "cjs",
+      "timers",
+      "host-zcl-v1",
+      "async-host"
+    ]
   },
   "index": {
     "file": "index.bin",
     "format": "z2idx1",
     "sha256": "sha256-of-index.bin",
     "compressedSha256": "sha256-of-index.bin.gz",
-    "bytes": 320000,
-    "lookupKeys": 5077,
+    "bytes": 927458,
+    "lookupKeys": 5069,
     "definitions": 4619,
-    "candidates": 8469,
+    "candidates": 6023,
     "normalization": "lowercase(trim(modelID)); fingerprint priority; zigbeeModel exact then normalized; null key for definitions without model"
   },
   "shared": {
     "root": "dist",
     "files": 38,
-    "bytes": 2519040,
+    "bytes": 2443459,
     "sha256": "sha256-of-shared-tree",
-    "contents": ["converters/", "lib/", "index.js", "indexer.js"]
+    "contents": [
+      "converters/",
+      "lib/",
+      "index.js",
+      "indexer.js"
+    ]
   },
   "removable": {
     "bytecode": false,
@@ -52,7 +62,10 @@
         "sha256": "sha256-of-nous.js",
         "bytes": 25780,
         "definitions": 26,
-        "requires": ["shared/dist/lib/modernExtend.js", "shared/dist/converters/fromZigbee.js"]
+        "requires": [
+          "shared/dist/lib/modernExtend.js",
+          "shared/dist/converters/fromZigbee.js"
+        ]
       },
       "tuya-common": {
         "file": "tuya-common.js",
@@ -65,7 +78,9 @@
         "sha256": "sha256-of-tuya-0.js",
         "bytes": 175073,
         "definitions": 89,
-        "requires": ["tuya-common"]
+        "requires": [
+          "tuya-common"
+        ]
       },
       "lytko-external": {
         "file": "external/L101Ze_z2m.js",
@@ -78,7 +93,16 @@
     "fragments": {
       "tuya": {
         "common": "tuya-common",
-        "parts": ["tuya-0", "tuya-1", "tuya-2", "tuya-3", "tuya-4", "tuya-5", "tuya-6", "tuya-7"],
+        "parts": [
+          "tuya-0",
+          "tuya-1",
+          "tuya-2",
+          "tuya-3",
+          "tuya-4",
+          "tuya-5",
+          "tuya-6",
+          "tuya-7"
+        ],
         "verifiedDefinitions": 571,
         "equivalence": "prepared-definition equality with upstream tuya.js"
       }
@@ -90,7 +114,11 @@
     "eviction": "lru-unpinned",
     "pinned": "definitions referenced by database.db",
     "offline": "paired modules must load without network",
-    "verify": ["sha256", "host.abi", "requiredFeatures"]
+    "verify": [
+      "sha256",
+      "host.abi",
+      "requiredFeatures"
+    ]
   },
   "compatibility": {
     "minHostAbi": 1,
@@ -101,6 +129,8 @@
   },
   "signature": {
     "type": "sha256",
-    "value": "sha256-of-manifest-without-signature"
+    "hashOnly": true,
+    "value": "sha256-of-manifest-without-signature",
+    "note": "integrity checksum, not a cryptographic signature"
   }
 }

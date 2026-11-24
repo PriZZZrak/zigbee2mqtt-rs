@@ -1,0 +1,10 @@
+{
+  "artifact": "z2hc-26.125.0-zh-11.2.0-abi1",
+  "deterministic": {"manifestRuns": 2, "manifestShaEqual": true, "indexShaEqual": true},
+  "index": {"binaryBytes": 927458, "jsonBytes": 1454123, "definitions": 4619, "keys": 5069, "candidates": 6023, "sha256": "49f5186fcaadc9aaa85e725f98d366a3ebd168618775f85e3c823d327cc2c182"},
+  "shared": {"bytes": 2443459, "treeSha256": "72d743619031fb1f3f93868ebbadb572d7e06e5216cb3f47905b14a4723c4894"},
+  "modules": 408,
+  "split": {"tuya.js": {"status": "split", "fragments": 8, "definitions": 571, "preparedDifferences": 0, "behaviorCompared": 4, "behaviorDifferences": 0}},
+  "stagedDataTarGzBytes": 6900732,
+  "pairedCache": {"rawBytes": 337043, "notes": "tuya common+fragment, nous.js and external L101Ze; actual current DB resolves TS0601 to nous.js and LYTKO to the external file"}
+}

@@ -1,0 +1,9 @@
+{
+  "name": "z2m-converter-artifact-generator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Build-time generator for the fingerprint-aware converter artifact",
+  "dependencies": {
+    "@babel/parser": "7.29.8"
+  }
+}

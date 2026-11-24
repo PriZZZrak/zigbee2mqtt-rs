@@ -27,6 +27,7 @@ Node.js-мост, сохранив MQTT-контракты, сущности Hom
 - Offline bridge integration: [`docs/converter-bridge-integration.md`](docs/converter-bridge-integration.md)
   (dispatcher/tests — [`crates/z2m-rs/src/converter/`](crates/z2m-rs/src/converter/))
 - Artifact research and manifest: [`docs/converter-artifact-research.md`](docs/converter-artifact-research.md),
+  [`docs/converter-artifact-generator.md`](docs/converter-artifact-generator.md),
   [`docs/converter-artifact-manifest.example.json`](docs/converter-artifact-manifest.example.json)
 
 ## Что входит в R1

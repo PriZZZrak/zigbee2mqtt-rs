@@ -212,6 +212,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "converter-artifact"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "converter-runtime"
 version = "0.1.0"
 dependencies = [

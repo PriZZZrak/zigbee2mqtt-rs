@@ -4,5 +4,6 @@ members = [
     "crates/zigbee-apiarist",
     "crates/zigbee-converters",
     "crates/converter-runtime",
+    "crates/converter-artifact",
     "crates/z2m-rs",
 ]

@@ -470,7 +470,8 @@
       manufacturerName: deviceSpec.manufacturerName || "Bench",
       manufacturerID: deviceSpec.manufacturerID || 0x1234,
       type: deviceSpec.type || "Router",
-      meta: {},
+      meta: deviceSpec.meta || {},
+      genBasic: deviceSpec.genBasic || {},
       customClusters: {},
       customReadResponse: undefined,
       endpoints: [],
@@ -520,7 +521,7 @@
     var normalized = String(spec.model || "").trim().toLowerCase();
     var raw = null;
     if (spec.index !== undefined) raw = definitions[spec.index];
-    if (!raw && coordinate && spec.source !== "external") {
+    if (!raw && coordinate && spec.source !== "external" && (!spec.file || coordinate.some(function (entry) { return entry[0] === spec.file; }))) {
       var chosen = coordinate.find(function (entry) { return !spec.file || entry[0] === spec.file; }) || coordinate[0];
       var coordinateDefinitions = load(join(root, "dist/devices", chosen[0]));
       coordinateDefinitions = coordinateDefinitions.definitions || coordinateDefinitions.default || coordinateDefinitions;
