@@ -43,6 +43,7 @@ const engineVersion = arg("--engine-version", "0.5.0");
 const zclCatalog = path.resolve(arg("--zcl-catalog", "crates/zigbee-apiarist/src/zspec/zcl/definition/clusters.json"));
 const splitTarget = Number(arg("--split-target", "8"));
 const behaviorProbe = arg("--behavior-probe", "");
+const allowUnverifiedSplit = arg("--allow-unverified-split", "0") === "1";
 const splitFiles = new Set(arg("--split-files", "tuya.js").split(",").map((value) => value.trim()).filter(Boolean));
 const splitMinBytes = Number(arg("--split-min-bytes", "300000"));
 const babelPath = arg("--babel-parser", process.env.BABEL_PARSER || "");
@@ -304,15 +305,21 @@ for (const fileName of splitCandidates) {
     catch (error) { behavior = { ok: false, reason: `behavior verifier output: ${(child.stdout || child.stderr || "").slice(0, 500)}` }; }
     fs.rmSync(path.join(out, ".behavior-verify"), { recursive: true, force: true });
   }
-  if (verification.ok && behavior.ok) {
+  const behaviorProven = (behavior.ok && behavior.skipped !== true) || allowUnverifiedSplit;
+  if (verification.ok && behaviorProven) {
     replacedFiles.add(fileName);
     splitResults[fileName] = { status: "split", common: emitted.commonName, fragments: emitted.fragments.map((f) => ({ file: f.file, definitions: f.indices.length })), verification, behavior };
   } else {
-    if (!process.env.KEEP_SPLIT) {
-      for (const fragment of emitted.fragments) fs.rmSync(path.join(devicesOut, fragment.file));
-      fs.rmSync(path.join(devicesOut, emitted.commonName));
+    for (const fragment of emitted.fragments) fs.rmSync(path.join(devicesOut, fragment.file));
+    fs.rmSync(path.join(devicesOut, emitted.commonName));
+    splitResults[fileName] = {
+      status: "fallback",
+      reason: verification.reason || (behavior.skipped ? "behavioral differential required for split" : `${verification.differences} prepared differences`),
+      behavior,
+    };
+    if (behavior.skipped && allowUnverifiedSplit) {
+      splitResults[fileName].reason = "unverified split allowed explicitly";
     }
-    splitResults[fileName] = { status: "fallback", reason: verification.reason || `${verification.differences} prepared differences`, behavior };
   }
 }
 for (const fileName of files) {
@@ -583,7 +590,10 @@ const moduleRecords = [];
 for (const fileName of moduleFiles) {
   const bytes = fs.readFileSync(path.join(devicesOut, fileName));
   const count = (require(path.join(devicesOut, fileName)).definitions || []).length;
-  moduleRecords.push({ id: fileName.replace(/\.js$/, ""), file: `dist/devices/${fileName}`, bytes: bytes.length, sha256: sha256(bytes), definitions: count });
+  const requires = (graph.edges[fileName] || [])
+    .filter((dependency) => dependency.startsWith("devices/"))
+    .map((dependency) => dependency.slice("devices/".length));
+  moduleRecords.push({ id: fileName.replace(/\.js$/, ""), file: `dist/devices/${fileName}`, bytes: bytes.length, sha256: sha256(bytes), definitions: count, requires });
 }
 const splitManifest = {};
 for (const [fileName, result] of Object.entries(splitResults)) {

@@ -6,7 +6,9 @@
 //! never loads a device module while resolving.
 
 mod binary;
+mod cache;
 mod json;
+mod lazy;
 mod manifest;
 mod model;
 mod resolver;
@@ -18,7 +20,13 @@ pub use model::{
 pub use resolver::normalize_model_id;
 
 pub use binary::from_binary;
+pub use cache::{
+    CacheConfig, EnsureReport, FetchError, ModuleCache, ModuleFetcher, ModuleState, SpaceProbe,
+};
 pub use json::from_json;
+pub use lazy::{
+    DatabaseRecord, DeviceModule, LazyConfig, LazyLoader, StartupReport, read_database,
+};
 pub use manifest::{Manifest, ManifestError, ModuleRecord, SharedFile};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

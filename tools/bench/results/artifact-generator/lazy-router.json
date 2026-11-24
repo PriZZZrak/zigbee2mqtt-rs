@@ -1,0 +1,34 @@
+{
+  "hardware": "Routerich AX3000 v1, OpenWrt 24.10.8, aarch64",
+  "devices": 20,
+  "resolved": 20,
+  "modulesLoaded": [
+    "nous"
+  ],
+  "networkBytes": 25780,
+  "cacheBytesAfterColdStart": 25780,
+  "cacheBytesAfterPairing": 315722,
+  "coldStartMs": 23.9,
+  "baselineStartupP50Ms": 22.0,
+  "baselineStartupP95Ms": 35.9,
+  "pairing": {
+    "ok": true,
+    "selectedModule": "tuya",
+    "downloadedModuleClosure": [
+      "tuya-6",
+      "tuya-common"
+    ],
+    "startupUnderPairingP50Ms": 23.7,
+    "startupUnderPairingP95Ms": 49.6
+  },
+  "cacheState": {
+    "afterColdStart": {
+      "nous": "Ready"
+    },
+    "afterPairing": {
+      "nous": "Ready",
+      "tuya-6": "Ready",
+      "tuya-common": "Ready"
+    }
+  }
+}

@@ -21,6 +21,8 @@ pub struct ModuleRecord {
     pub sha256: String,
     #[serde(default)]
     pub definitions: u64,
+    #[serde(default)]
+    pub requires: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

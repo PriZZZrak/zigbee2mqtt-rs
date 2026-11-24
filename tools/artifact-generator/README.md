@@ -24,9 +24,11 @@ Install the build-time parser with `npm install` in this directory (or pass
 `--babel-parser /path/to/@babel/parser`). `@babel/parser` is a build-time
 dependency only; it is never part of the
 runtime or the OpenWrt package. `--behavior-probe` uses the real converter
-runtime binary for the tuya fromZigbee/set/configure/onEvent differential. If
-the probe is absent, prepared-definition equality is still checked and the
-generator reports behavior as skipped.
+runtime binary for the tuya fromZigbee/set/configure/onEvent differential. A
+split is published only when the behavioral gate is non-skipped and passes;
+otherwise the generator falls back to the original module. The explicit
+development-only `--allow-unverified-split 1` override exists for research and
+must not be used for a production artifact.
 
 The generator writes `index.z2idx1`, `index.json`, `graph.json`, `manifest.json`
 and a staged `dist/` tree. Device modules are artifact entries, not package

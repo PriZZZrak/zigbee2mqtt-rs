@@ -1,0 +1,12 @@
+{
+  "upstreamModelsIndex": {"keys": 5069, "references": 6023, "uniqueReferences": 6023, "duplicateReferences": 0},
+  "prototypeRichIndex": {"candidateEntries": 8469},
+  "differenceBreakdown": {
+    "whiteLabelFingerprintReferencesNotLookupKeys": 998,
+    "duplicateCandidateReferencesInPrototype": 1448,
+    "total": 2446
+  },
+  "definitions": 4619,
+  "orderProof": "generator maps every upstream [file,index] in models-index array order and stores the resulting definition-id array unchanged; resolver differential 11562 profiles / 0 mismatches including priority ties",
+  "selectedFormat": "z2idx1"
+}

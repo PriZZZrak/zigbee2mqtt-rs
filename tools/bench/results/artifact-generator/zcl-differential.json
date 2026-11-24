@@ -6,8 +6,27 @@
   "corruptedFrames": 2,
   "unexplainedFailures": 0,
   "documentedAnomalies": [
-    {"case": "frame_from_buffer-147", "cluster": "greenPower", "command": "sinkCommissioningMode", "status": 133, "reason": "upstream encoder accepts a payload the Rust decoder classifies as INVALID_FIELD"},
-    {"case": "frame_from_buffer-363", "cluster": "telecommunicationsVoiceOverZigbee", "command": "controlResponse", "status": 133, "reason": "same command-parameter validation boundary"}
+    {
+      "case": "frame_from_buffer-147",
+      "cluster": "greenPower",
+      "command": "sinkCommissioningMode",
+      "status": 133,
+      "reason": "upstream encoder accepts a payload the Rust decoder classifies as INVALID_FIELD"
+    },
+    {
+      "case": "frame_from_buffer-363",
+      "cluster": "telecommunicationsVoiceOverZigbee",
+      "command": "controlResponse",
+      "status": 133,
+      "reason": "same command-parameter validation boundary"
+    }
   ],
-  "zdoConstants": {"upstream": 60, "rust": 60, "mismatches": 0}
+  "zdoConstants": {
+    "upstream": 60,
+    "rust": 60,
+    "mismatches": 0
+  },
+  "openDefects": 2,
+  "fullFrameParity": false,
+  "gate": "green for the valid corpus; two documented GP/telecom cases remain open"
 }

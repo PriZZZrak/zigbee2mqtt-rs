@@ -25,9 +25,11 @@ dist tree plus explicit revision/ABI arguments. It:
 - copies only `dist/index.js`, `dist/converters`, `dist/lib` into the package
   shared tree; device modules remain artifact entries, not opkg content;
 - splits `tuya.js` with a real Babel AST parser and gates the result on
-  prepared-definition equality and, when a runtime probe is supplied,
-  behavioral differential. Any failure falls back to the original module and
-  records the reason in the manifest.
+  prepared-definition equality and behavioral differential. Behavioral
+  verification is mandatory for publication: absent/skipped verification
+  falls back to the original module. `--allow-unverified-split 1` is an
+  explicit development-only escape hatch; production generation does not use
+  it.
 
 CLI and reproduction commands are in
 [`../tools/artifact-generator/README.md`](../tools/artifact-generator/README.md).
@@ -38,7 +40,7 @@ Two independent runs produced identical `manifest.json` and
 `index.z2idx1` hashes:
 
 ```text
-manifest  640a708d...d37c356
+manifest  ab310ad8...f4cfcc5
 index     49f5186f...c2c182
 ```
 
@@ -88,6 +90,29 @@ loaded 73 files/4.16 MB/8.17 s. The resolver returns the pinned result without
 loading a device module; with white-label overlay it returns `TH01Z` (Tuya),
 and the underlying definition is `nous.js`.
 
+## 2a. Why the candidate count is 6023, not 8469
+
+The earlier prototype index had **8469** candidate entries because it indexed
+white-label fingerprints as lookup keys and did not deduplicate candidates.
+The production index follows the pinned upstream index exactly:
+
+- pinned `models-index.json`: **5069 keys, 6023 candidate references**;
+- each reference is unique per `(key, file, definition index)` in upstream
+  (`addToLookup` deduplicates via `some(...)`);
+- **998** white-label fingerprint references are **not** lookup keys upstream:
+  they are stored in the definition for the post-resolution white-label
+  overlay;
+- the remaining prototype difference is **1448 duplicate references** caused
+  by multiple fingerprints/zigbeeModels for the same definition under the same
+  key.
+
+The generator consumes the pinned `models-index.json` order directly, maps each
+`[file, index]` to one definition id and stores the resulting id array without
+reordering or adding candidates. The resolver differential (11,562 profiles,
+0 failures) includes priority ties and verifies the resulting choice against
+Node `findByDevice`; candidate order is therefore the upstream order, not a
+first-candidate heuristic.
+
 ## 3. tuya split
 
 - 571 definitions, 8 fragments of 150–182 KB plus a 107 KB common module.
@@ -100,6 +125,52 @@ and the underlying definition is `nous.js`.
 - If either gate fails, the generator removes the fragments and records
   `status: "fallback"` for that module. Other large files are not split by
   default; `--split-files` is opt-in.
+
+## 3a. Lazy loader and versioned cache
+
+`converter-artifact` now includes:
+
+- `read_database`: NDJSON `database.db` reader producing device profiles;
+- `LazyLoader::startup`: resolves only paired records through the index, maps
+  the selected definition file to a manifest module and loads only that module
+  plus its module dependency closure;
+- `LazyLoader::pair`: resolves the new fingerprint and runs the same bounded
+  closure load on a background thread; existing devices use the same verified
+  cache entries and are not blocked;
+- `ModuleCache`: `<cache>/<artifactId>/modules`, `staging`, `lkg`, atomic
+  per-file activation, staged hash verification before rename, LKG rollback;
+- explicit `ModuleState`: `Missing`, `Pending`, `Downloading`, `Verified`,
+  `Ready`, `Failed(reason)`;
+- budgets: per-module download, total cache, `SpaceProbe` available bytes and
+  bounded `max_concurrent_downloads`;
+- offline mode: `ensure(..., allow_network=false)` succeeds only from verified
+  cache; a miss is an explicit error and never triggers a silent fetch.
+
+The trusted manifest is loaded from the installed artifact; cache roots are
+artifact-id/version scoped. A module is checked against its manifest sha256,
+size, module id and artifact compatibility before activation. Network transport
+is an injected `ModuleFetcher` (no HTTP client is enabled in this stage).
+
+Automatic tests: `cache_manager.rs` (closure/offline, hash mismatch, partial
+download, network failure, insufficient space, rollback, ABI) and
+`lazy_loader.rs` (paired startup, offline restart, concurrent pairing, device
+leave).
+
+Routerich synthetic measurement (20 paired devices resolving to one module,
+isolated `/tmp` cache, no production overlay writes):
+
+```text
+cold start          23.9 ms
+modules loaded      nous
+network bytes       25,780
+cache after start   25,780 B
+cache after pair    315,722 B (nous + tuya-6 + tuya-common)
+baseline startup    p50 22.0 ms / p95 35.9 ms
+under pairing       p50 23.7 ms / p95 49.6 ms
+```
+
+The pairing fetch downloads only the selected `tuya` fragment closure, not the
+full device catalog; p95 degradation is measured, not assumed.
 
 ## 4. Manifest and integrity
 
@@ -131,10 +202,10 @@ zigbee-herdsman 11.2.0:
 
 `differential_zcl_pinned.rs` passes every valid corpus case. Two generated
 greenPower/telecom cases produce Rust `INVALID_FIELD` while upstream encodes a
-payload; they are explicitly excluded from the zero-diff gate and recorded with
-case ids in
-`tools/bench/results/artifact-generator/zcl-differential.json`. They are the
-only unexplained-at-codec-boundary items and are a Phase-5 fix, not hidden.
+payload; they remain **open defects** with case ids in
+`tools/bench/results/artifact-generator/zcl-differential.json`
+(`openDefects: 2`, `fullFrameParity: false`). No full frame parity is claimed;
+the valid-case gate excludes only these two documented cases.
 Unknown inbound clusters follow the existing raw-diagnostic path; unknown
 outbound clusters remain a documented next-stage error path (no guessed
 encoding).
@@ -163,25 +234,27 @@ installed side-by-side without the agreed Node removal/external-storage step.
   decision before enabling greenPower/telecom commands.
 - ZDO frame corpus currently covers constants plus existing wire/zdo suites; a
   full ZDO request/response payload oracle remains next-stage work.
-- No lazy loader/cache is active in the bridge; the artifact is not wired to
-  production startup yet.
+- The lazy loader/cache is implemented as an isolated library and tests; it is
+  not yet wired into the production bridge startup or pairing path.
+- Network transport is a `ModuleFetcher` trait; no HTTP client/network fetch is
+  enabled in this stage. The full artifact generator/oracle commands remain
+  explicit build/research steps.
 - No network fetch, cache manager, OpenWrt package migration or HIL.
 
 ## 8. GO / NO-GO
 
-**GO** for the lazy loader and cache manager stage:
+**GO** for the next integration stage (bridge startup + pairing wiring):
 
 1. `z2idx1` resolver is 0-diff on the full oracle;
 2. the generator is deterministic and hash-verified;
-3. split gates and fallback are implemented;
+3. production split requires a non-skipped behavioral differential;
 4. manifest/ABI/hash verification is implemented;
-5. ZCL/ZDO differential is green except two documented codec anomalies.
+5. lazy startup, offline restart, cache rollback and pairing-closure tests pass.
 
 **NO-GO for production enablement** until:
 
-1. the two ZCL anomalies are fixed or explicitly excluded from supported
-   commands;
-2. the lazy loader pins paired modules and verifies hashes against the manifest;
-3. cache rollback/last-known-good and offline-paired behavior are tested;
+1. the two documented ZCL codec anomalies are fixed or explicitly excluded;
+2. the lazy loader is wired to the real bridge startup/pairing path;
+3. the HTTP fetcher, cache budgets and OS-supervisor rollback are integrated;
 4. the ZDO frame corpus is expanded;
 5. the overlay migration is agreed and HIL is separately approved.
