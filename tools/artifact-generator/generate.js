@@ -45,6 +45,7 @@ const splitTarget = Number(arg("--split-target", "8"));
 const behaviorProbe = arg("--behavior-probe", "");
 const allowUnverifiedSplit = arg("--allow-unverified-split", "0") === "1";
 const splitFiles = new Set(arg("--split-files", "tuya.js").split(",").map((value) => value.trim()).filter(Boolean));
+const retrievalUrl = arg("--retrieval-url", "https://artifact.example/z2hc/");
 const splitMinBytes = Number(arg("--split-min-bytes", "300000"));
 const babelPath = arg("--babel-parser", process.env.BABEL_PARSER || "");
 let babel;
@@ -612,12 +613,12 @@ const manifest = {
   artifactId,
   upstream: { zigbee2mqtt: z2mVersion, zigbee2mqttCommit: z2mCommit, zigbeeHerdsman: zhVersion, zigbeeHerdsmanConverters: convertersVersion, nodeBaseline },
   host: { abi: hostAbi, engine, engineVersion, zclCatalogSha256: sha256(zclBytes), requiredFeatures: ["cjs", "timers", "host-zcl-v1", "async-host"] },
-  index: { file: "index.z2idx1", format: "z2idx1", version: 1, bytes: binary.length, sha256: sha256(binary), jsonBytes: indexJson.length, jsonSha256: sha256(indexJson), lookupKeys: Object.keys(keys).length, definitions: definitions.length, candidates: Object.values(keys).reduce((sum, ids) => sum + ids.length, 0) },
+  index: { file: "index.z2idx1", format: "z2idx1", version: 1, bytes: binary.length, sha256: sha256(binary), jsonBytes: Buffer.byteLength(indexJson), jsonSha256: sha256(indexJson), lookupKeys: Object.keys(keys).length, definitions: definitions.length, candidates: Object.values(keys).reduce((sum, ids) => sum + ids.length, 0) },
   graph: { file: "graph.json", bytes: graphJson.length, sha256: sha256(graphJson) },
   shared: { root: "dist", files: sharedFiles, bytes: sharedFiles.reduce((sum, file) => sum + file.bytes, 0), sha256: treeHash(sharedFiles) },
-  modules: { format: "cjs", packageIncluded: false, entries: moduleRecords },
+  modules: { format: "cjs", packageIncluded: false, retrieval: retrievalUrl, entries: moduleRecords },
   split: splitManifest,
-  cache: { layout: "{artifactId}/{module}.js", pairedOffline: true, verify: ["sha256", "host.abi", "requiredFeatures"] },
+  cache: { layout: "{artifactId}/generations/<generation>/", activePointer: "active.json", rollbackPointer: "lkg.json", pairedOffline: true, verify: ["sha256", "host.abi", "requiredFeatures"] },
   compatibility: { minHostAbi: hostAbi, maxHostAbi: hostAbi, unknownInbound: "raw-diagnostic", unknownOutbound: "error" },
   signature: { type: "sha256", hashOnly: true, value: null, note: "hash of shared/index/module artifacts only; not a cryptographic signature" },
 };

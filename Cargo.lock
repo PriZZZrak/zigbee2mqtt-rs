@@ -1931,6 +1931,7 @@ name = "z2m-rs"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "converter-artifact",
  "converter-runtime",
  "futures-util",
  "md-5",

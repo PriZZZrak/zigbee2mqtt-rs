@@ -29,6 +29,10 @@ use zigbee_converters::{
     PublishCallback, ToMeta, ToTarget, ToZigbeeConverter, ToZigbeeResult,
 };
 
+use converter_artifact::{
+    DeviceEndpoint, DeviceProfile, DeviceType, LazyConfig, LazyLoader, ModuleFetcher, StartupReport,
+};
+
 use crate::converter::transport::{ConverterTransport, OfflineMockTransport};
 use crate::zigbee::Zigbee;
 
@@ -85,6 +89,10 @@ pub struct ConverterDispatcher {
     generation: AtomicU64,
     event_task: Mutex<Option<JoinHandle<()>>>,
     host_task: Mutex<Option<JoinHandle<()>>>,
+    lazy: Mutex<Option<Arc<LazyLoader>>>,
+    lazy_fetcher: Mutex<Option<Arc<dyn ModuleFetcher>>>,
+    runtime_root: Mutex<Option<std::path::PathBuf>>,
+    startup_report: Mutex<Option<StartupReport>>,
 }
 
 impl ConverterDispatcher {
@@ -106,6 +114,10 @@ impl ConverterDispatcher {
             generation: AtomicU64::new(1),
             event_task: Mutex::new(None),
             host_task: Mutex::new(None),
+            lazy: Mutex::new(None),
+            lazy_fetcher: Mutex::new(None),
+            runtime_root: Mutex::new(None),
+            startup_report: Mutex::new(None),
         });
         dispatcher.install_channels()?;
         Ok(dispatcher)
@@ -114,6 +126,45 @@ impl ConverterDispatcher {
     pub async fn with_offline_transport(config: DispatcherConfig) -> Result<Arc<Self>, String> {
         let transport: Arc<dyn ConverterTransport> = Arc::new(OfflineMockTransport::new());
         Self::start(config, transport).await
+    }
+
+    /// Start the dispatcher from a trusted artifact cache and the existing
+    /// device database. Only modules needed by paired devices are materialized
+    /// into the runtime package root; the full device catalog is never copied.
+    pub async fn start_lazy(
+        config: DispatcherConfig,
+        transport: Arc<dyn ConverterTransport>,
+        lazy_config: LazyConfig,
+        database: std::path::PathBuf,
+        fetcher: Arc<dyn ModuleFetcher>,
+        runtime_root: std::path::PathBuf,
+        allow_network: bool,
+    ) -> Result<Arc<Self>, String> {
+        let artifact_dir = lazy_config.artifact_dir.clone();
+        let root_for_task = runtime_root.clone();
+        let fetcher_for_task = Arc::clone(&fetcher);
+        let prepared = tokio::task::spawn_blocking(move || {
+            let lazy = LazyLoader::open(lazy_config)?;
+            let report = lazy.startup(&database, fetcher_for_task.as_ref(), allow_network)?;
+            lazy.materialize_runtime_package(&artifact_dir, &report, &root_for_task)?;
+            Ok::<_, converter_artifact::ArtifactError>((Arc::new(lazy), report))
+        })
+        .await
+        .map_err(|error| format!("lazy loader task: {error}"))?
+        .map_err(|error| error.to_string())?;
+        let (lazy, report) = prepared;
+        let mut config = config;
+        config.runtime.package_root = runtime_root.clone();
+        let dispatcher = Self::start(config, transport).await?;
+        *dispatcher.startup_report.lock().unwrap() = Some(report);
+        *dispatcher.lazy.lock().unwrap() = Some(lazy);
+        *dispatcher.lazy_fetcher.lock().unwrap() = Some(fetcher);
+        *dispatcher.runtime_root.lock().unwrap() = Some(runtime_root);
+        Ok(dispatcher)
+    }
+
+    pub fn startup_report(&self) -> Option<StartupReport> {
+        self.startup_report.lock().unwrap().clone()
     }
 
     pub fn generation(&self) -> u64 {
@@ -297,6 +348,17 @@ impl ConverterDispatcher {
     /// Prepare (evaluate and merge) a definition in the JS realm and expose it
     /// as an ordinary Definition for the existing extensions.
     pub async fn prepare(self: &Arc<Self>, zh: &ZhDevice) -> Result<PreparedDefinition, String> {
+        self.prepare_with_file(zh, None).await
+    }
+
+    /// Prepare a definition with an explicit artifact module file. The lazy
+    /// loader uses this so bootstrap does not fall back to an unselected
+    /// catalog file.
+    pub async fn prepare_with_file(
+        self: &Arc<Self>,
+        zh: &ZhDevice,
+        definition_file: Option<&str>,
+    ) -> Result<PreparedDefinition, String> {
         let model = zh
             .model_id()
             .ok_or_else(|| "device has no modelID".to_owned())?;
@@ -310,6 +372,14 @@ impl ConverterDispatcher {
         let mut last_error = String::new();
         for source in sources {
             let mut scenario = self.base_scenario(source, &model);
+            if let Some(file) = definition_file {
+                if let Some(definition) = scenario
+                    .get_mut("definition")
+                    .and_then(Value::as_object_mut)
+                {
+                    definition.insert("file".to_owned(), json!(file));
+                }
+            }
             scenario.insert("id".to_owned(), json!("bridge-prepare"));
             scenario.insert("kind".to_owned(), json!("prepare"));
             scenario.insert("__metadata".to_owned(), json!(true));
@@ -359,7 +429,17 @@ impl ConverterDispatcher {
         for device in zigbee.devices_iterator(|device| {
             device.r#type() != zigbee_apiarist::controller::database::DeviceType::Coordinator
         }) {
-            match self.prepare(&device.zh).await {
+            let definition_file = self
+                .lazy
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|lazy| lazy.resolve(&device_profile(&device.zh)))
+                .map(|resolution| runtime_definition_file(&resolution.file.path));
+            match self
+                .prepare_with_file(&device.zh, definition_file.as_deref())
+                .await
+            {
                 Ok(prepared) => {
                     zigbee
                         .converters()
@@ -547,6 +627,44 @@ impl ConverterDispatcher {
         Self::completed_result(outcome).map(|_| ())
     }
 
+    /// Ensure a newly paired device's module closure and prepare its definition
+    /// through the same runtime. Cache/network work happens off the reactor.
+    pub async fn pair_device(
+        self: &Arc<Self>,
+        zh: &ZhDevice,
+    ) -> Result<PreparedDefinition, String> {
+        let lazy = self
+            .lazy
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "lazy loader not configured".to_owned())?;
+        let fetcher = self
+            .lazy_fetcher
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "lazy fetcher not configured".to_owned())?;
+        let root = self
+            .runtime_root
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "runtime root not configured".to_owned())?;
+        let profile = device_profile(zh);
+        let lazy_for_task = Arc::clone(&lazy);
+        let device = tokio::task::spawn_blocking(move || {
+            let device = lazy_for_task.load_device(&profile, fetcher.as_ref(), true)?;
+            lazy_for_task.materialize_modules(&device.modules, &root)?;
+            Ok::<_, converter_artifact::ArtifactError>(device)
+        })
+        .await
+        .map_err(|error| format!("pairing task: {error}"))?
+        .map_err(|error| error.to_string())?;
+        self.prepare_with_file(zh, Some(&runtime_definition_file(&device.file)))
+            .await
+    }
+
     /// Stop the old worker, fail pending work explicitly and create a fresh
     /// realm. Returns `TimedOut` without creating a second runtime when the old
     /// worker cannot be stopped.
@@ -585,6 +703,47 @@ impl ConverterDispatcher {
         })
         .await;
         self.generation.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
+fn runtime_definition_file(path: &str) -> String {
+    path.trim_start_matches("dist/")
+        .trim_start_matches("devices/")
+        .to_owned()
+}
+
+pub fn device_profile(zh: &ZhDevice) -> DeviceProfile {
+    DeviceProfile {
+        ieee_addr: Some(zh.ieee_addr()),
+        r#type: match zh.r#type() {
+            zigbee_apiarist::controller::database::DeviceType::Router => DeviceType::Router,
+            zigbee_apiarist::controller::database::DeviceType::EndDevice => DeviceType::EndDevice,
+            zigbee_apiarist::controller::database::DeviceType::Coordinator => {
+                DeviceType::Coordinator
+            }
+            _ => DeviceType::Unknown,
+        },
+        model_id: zh.model_id(),
+        manufacturer_name: zh.manufacturer_name(),
+        manufacturer_id: zh.manufacturer_id().map(u32::from),
+        power_source: zh.power_source(),
+        application_version: zh.application_version().map(|value| value as u32),
+        stack_version: zh.stack_version().map(|value| value as u32),
+        hardware_version: zh.hardware_version().map(|value| value as u32),
+        zcl_version: zh.zcl_version().map(|value| value as u32),
+        date_code: zh.date_code(),
+        software_build_id: zh.software_build_id(),
+        endpoints: zh
+            .endpoints()
+            .iter()
+            .map(|endpoint| DeviceEndpoint {
+                id: Some(endpoint.ID),
+                profile_id: *endpoint.profile_id.lock().unwrap(),
+                device_id: *endpoint.device_id.lock().unwrap(),
+                input_clusters: endpoint.input_clusters.lock().unwrap().clone(),
+                output_clusters: endpoint.output_clusters.lock().unwrap().clone(),
+            })
+            .collect(),
     }
 }
 

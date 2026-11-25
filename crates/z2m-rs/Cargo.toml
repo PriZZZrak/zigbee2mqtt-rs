@@ -12,6 +12,7 @@ rumqttc = { package = "rumqttc-v4-next", version = "0.34", default-features = fa
 zigbee-apiarist = { path = "../zigbee-apiarist" }
 zigbee-converters = { path = "../zigbee-converters" }
 converter-runtime = { path = "../converter-runtime" }
+converter-artifact = { path = "../converter-artifact" }
 zip = { version = "9.5.1", default-features = false, features = ["deflate"] }
 base64 = "0.23.1"
 md-5 = "0.11.0"
@@ -29,6 +30,11 @@ converter-probe = []
 [[bin]]
 name = "converter_bridge_probe"
 path = "src/bin/converter_bridge_probe.rs"
+required-features = ["converter-probe"]
+
+[[bin]]
+name = "lazy_bridge_probe"
+path = "src/bin/lazy_bridge_probe.rs"
 required-features = ["converter-probe"]
 
 [dev-dependencies]

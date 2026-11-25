@@ -4,7 +4,7 @@
   "lookupKeys": 5069,
   "definitions": 4619,
   "candidates": 6023,
-  "json": {"bytes": 1454123, "parseMs": 85.916091, "rssKb": 7768, "failures": 0},
+  "json": {"bytes": 1454324, "parseMs": 85.916091, "rssKb": 7768, "failures": 0},
   "binary": {"bytes": 927458, "parseMs": 73.834796, "rssKb": 5432, "peakRssKb": 6144, "failures": 0},
   "resolverDiff": {"jsonFailures": 0, "binaryFailures": 0, "jsonParseMs": 123.694662, "binaryParseMs": 68.113458},
   "chosenFormat": "z2idx1"

@@ -1,5 +1,5 @@
-//! Versioned local module cache with hash/ABI verification, staging,
-//! atomic activation and last-known-good rollback.
+//! Versioned, crash-consistent module cache with immutable generations and an
+//! atomically replaced active pointer.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
@@ -7,6 +7,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+
+use serde_json::json;
 
 use crate::manifest::{Manifest, ModuleRecord};
 use crate::{ArtifactError, Result};
@@ -29,7 +31,6 @@ pub enum FetchError {
 }
 
 pub trait ModuleFetcher: Send + Sync {
-    /// Fetch exactly one module. The caller verifies size/hash before activation.
     fn fetch(&self, module: &ModuleRecord) -> std::result::Result<Vec<u8>, FetchError>;
 }
 
@@ -40,8 +41,12 @@ pub trait SpaceProbe: Send + Sync {
 #[derive(Clone)]
 pub struct CacheConfig {
     pub root: PathBuf,
+    /// Per-module download cap.
     pub max_download_bytes: u64,
+    /// Total on-disk cap for generations, staging and last-known-good.
     pub max_cache_bytes: u64,
+    /// Peak in-memory cap for the concurrently fetched chunk.
+    pub max_memory_bytes: u64,
     pub max_concurrent_downloads: usize,
     pub space_probe: Option<Arc<dyn SpaceProbe>>,
 }
@@ -52,6 +57,7 @@ impl CacheConfig {
             root: root.into(),
             max_download_bytes: 16 << 20,
             max_cache_bytes: 64 << 20,
+            max_memory_bytes: 16 << 20,
             max_concurrent_downloads: 2,
             space_probe: None,
         }
@@ -66,11 +72,28 @@ pub struct EnsureReport {
     pub fetched: usize,
 }
 
+#[derive(Debug, Clone)]
+struct Generation {
+    name: String,
+    modules: BTreeMap<String, String>, // module id -> sha256
+}
+
+impl Generation {
+    fn empty() -> Self {
+        Self {
+            name: "gen-0".to_owned(),
+            modules: BTreeMap::new(),
+        }
+    }
+}
+
 pub struct ModuleCache {
     root: PathBuf,
     manifest: Manifest,
     states: Mutex<HashMap<String, ModuleState>>,
+    active: Mutex<Generation>,
     sequence: AtomicU64,
+    ensure_lock: Mutex<()>,
 }
 
 impl ModuleCache {
@@ -79,7 +102,7 @@ impl ModuleCache {
             return Err(ArtifactError("unsupported manifest schema".to_owned()));
         }
         let root = config.root.join(&manifest.artifact_id);
-        for directory in ["modules", "staging", "lkg"] {
+        for directory in ["generations", "staging"] {
             fs::create_dir_all(root.join(directory))
                 .map_err(|error| ArtifactError(format!("cache {}: {error}", root.display())))?;
         }
@@ -87,10 +110,57 @@ impl ModuleCache {
             root,
             manifest,
             states: Mutex::new(HashMap::new()),
+            active: Mutex::new(Generation::empty()),
             sequence: AtomicU64::new(1),
+            ensure_lock: Mutex::new(()),
         };
-        cache.load_state()?;
+        // Recover only from complete, verified generations. A staging directory
+        // is never active; stale staging is removed.
+        let active = cache
+            .read_pointer("active.json")
+            .and_then(|generation| cache.verify_generation(generation));
+        let active = match active {
+            Some(generation) => generation,
+            None => {
+                if let Some(lkg) = cache
+                    .read_pointer("lkg.json")
+                    .and_then(|generation| cache.verify_generation(generation))
+                {
+                    cache.write_pointer("active.json", &lkg)?;
+                    lkg
+                } else {
+                    Generation::empty()
+                }
+            }
+        };
+        if let Ok(entries) = fs::read_dir(cache.root.join("staging")) {
+            for entry in entries.flatten() {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+        {
+            let mut states = cache.states.lock().unwrap();
+            for id in active.modules.keys() {
+                states.insert(id.clone(), ModuleState::Ready);
+            }
+        }
+        *cache.active.lock().unwrap() = active;
+        cache.prune_generations()?;
         Ok(cache)
+    }
+
+    /// Cache locks are data-structure guards only; a panicking fetcher must not
+    /// poison the cache for every later device.
+    fn lock_states(&self) -> std::sync::MutexGuard<'_, HashMap<String, ModuleState>> {
+        self.states
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    fn lock_active(&self) -> std::sync::MutexGuard<'_, Generation> {
+        self.active
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
     }
 
     pub fn artifact_id(&self) -> &str {
@@ -103,17 +173,17 @@ impl ModuleCache {
         &self.manifest
     }
     pub fn state(&self, module: &str) -> ModuleState {
-        self.states
-            .lock()
-            .unwrap()
+        self.lock_states()
             .get(module)
             .cloned()
             .unwrap_or(ModuleState::Missing)
     }
     pub fn cache_bytes(&self) -> u64 {
-        directory_bytes(&self.root.join("modules"))
+        ["generations", "staging"]
+            .iter()
+            .map(|directory| directory_bytes(&self.root.join(directory)))
+            .sum()
     }
-
     pub fn module<'a>(&'a self, id: &str) -> Result<&'a ModuleRecord> {
         self.manifest
             .modules
@@ -122,105 +192,102 @@ impl ModuleCache {
             .find(|module| module.id == id || module.file == id)
             .ok_or_else(|| ArtifactError(format!("module {id} not in trusted manifest")))
     }
-
-    fn active_path(&self, id: &str) -> PathBuf {
-        self.root.join("modules").join(format!("{id}.js"))
+    pub fn active_module_path(&self, id: &str) -> Option<PathBuf> {
+        let active = self.lock_active();
+        active
+            .modules
+            .get(id)
+            .map(|_| self.generation_path(&active.name, id))
     }
-    fn lkg_path(&self, id: &str) -> PathBuf {
-        self.root.join("lkg").join(format!("{id}.js"))
+    fn generation_path(&self, generation: &str, id: &str) -> PathBuf {
+        self.root
+            .join("generations")
+            .join(generation)
+            .join(format!("{id}.js"))
+    }
+    fn pointer_path(&self, name: &str) -> PathBuf {
+        self.root.join(name)
     }
 
-    fn load_state(&self) -> Result<()> {
-        let path = self.root.join("state.json");
-        if !path.is_file() {
-            return Ok(());
+    fn read_pointer(&self, name: &str) -> Option<Generation> {
+        let bytes = fs::read(self.pointer_path(name)).ok()?;
+        let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+        let name = value.get("generation")?.as_str()?.to_owned();
+        let modules = value.get("modules")?.as_object()?;
+        let mut map = BTreeMap::new();
+        for (id, sha) in modules {
+            map.insert(id.clone(), sha.as_str()?.to_owned());
         }
-        let value: BTreeMap<String, String> = serde_json::from_slice(
-            &fs::read(&path).map_err(|error| ArtifactError(format!("state: {error}")))?,
-        )
-        .map_err(|error| ArtifactError(format!("state JSON: {error}")))?;
-        let mut states = self.states.lock().unwrap();
-        for (id, value) in value {
-            if value == "ready" {
-                if self.verify_active(&id).is_ok() {
-                    states.insert(id, ModuleState::Ready);
-                } else {
-                    states.insert(id, ModuleState::Failed("cached hash mismatch".to_owned()));
-                }
+        Some(Generation { name, modules: map })
+    }
+
+    fn verify_generation(&self, generation: Generation) -> Option<Generation> {
+        for (id, expected) in &generation.modules {
+            let bytes = fs::read(self.generation_path(&generation.name, id)).ok()?;
+            let module = self.module(id).ok()?;
+            if module.sha256 != *expected
+                || module.bytes != bytes.len() as u64
+                || self.manifest.verify_module(id, &bytes).is_err()
+            {
+                return None;
             }
         }
-        Ok(())
+        Some(generation)
     }
 
-    fn save_state(&self) -> Result<()> {
-        let mut value = BTreeMap::new();
-        for (id, state) in self.states.lock().unwrap().iter() {
-            if *state == ModuleState::Ready {
-                value.insert(id.clone(), "ready".to_owned());
-            }
-        }
-        let path = self.root.join("state.json");
-        let tmp = self.root.join("state.json.tmp");
-        fs::write(&tmp, serde_json::to_vec(&value).unwrap())
-            .map_err(|error| ArtifactError(format!("state write: {error}")))?;
+    fn write_pointer(&self, name: &str, generation: &Generation) -> Result<()> {
+        let path = self.pointer_path(name);
+        let tmp = self.pointer_path(&format!("{name}.tmp"));
+        let modules: BTreeMap<&String, &String> = generation.modules.iter().collect();
+        let value = json!({"generation": generation.name, "modules": modules});
+        let mut file = fs::File::create(&tmp)
+            .map_err(|error| ArtifactError(format!("pointer {name}: {error}")))?;
+        file.write_all(&serde_json::to_vec(&value).unwrap())
+            .map_err(|error| ArtifactError(error.to_string()))?;
+        file.sync_all().ok();
         fs::rename(&tmp, &path)
-            .map_err(|error| ArtifactError(format!("state activate: {error}")))?;
+            .map_err(|error| ArtifactError(format!("activate pointer {name}: {error}")))?;
+        // The rename is the commit point; sync the directory so a power loss
+        // cannot resurrect the previous pointer.
+        if let Ok(directory) = fs::File::open(&self.root) {
+            let _ = directory.sync_all();
+        }
         Ok(())
     }
 
     fn verify_active(&self, id: &str) -> Result<Vec<u8>> {
-        let bytes = fs::read(self.active_path(id))
+        let active = self.lock_active().clone();
+        let Some(expected) = active.modules.get(id) else {
+            return Err(ArtifactError(format!(
+                "module {id}: not in active generation"
+            )));
+        };
+        let bytes = fs::read(self.generation_path(&active.name, id))
             .map_err(|error| ArtifactError(format!("module {id}: {error}")))?;
-        let module = self.module(id)?;
-        self.manifest.verify_module(&module.id, &bytes)?;
+        if expected != &self.module(id)?.sha256 || bytes.len() as u64 != self.module(id)?.bytes {
+            return Err(ArtifactError(format!(
+                "module {id}: cache metadata mismatch"
+            )));
+        }
+        self.manifest.verify_module(id, &bytes)?;
         Ok(bytes)
     }
 
-    /// Load a ready module without network. Verification always happens before
-    /// returning bytes; corrupted cache entries are reported, never executed.
     pub fn load_ready(&self, id: &str) -> Result<Vec<u8>> {
-        let bytes = self.verify_active(id)?;
-        self.states
-            .lock()
-            .unwrap()
-            .insert(id.to_owned(), ModuleState::Ready);
+        // A concurrent commit may have pruned the generation between reading
+        // the active pointer and reading the file; retry once against the new
+        // pointer before reporting a cache miss.
+        let bytes = match self.verify_active(id) {
+            Ok(bytes) => bytes,
+            Err(_) => self.verify_active(id)?,
+        };
+        self.lock_states().insert(id.to_owned(), ModuleState::Ready);
         Ok(bytes)
     }
 
-    pub fn missing_closure(&self, ids: &[String]) -> Result<Vec<String>> {
+    fn required_closure(&self, ids: &[String]) -> Result<BTreeSet<String>> {
         let mut required = BTreeSet::new();
-        let mut stack: Vec<String> = ids.to_vec();
-        while let Some(id) = stack.pop() {
-            if !required.insert(id.clone()) {
-                continue;
-            }
-            let module = self.module(&id)?;
-            for dependency in &module.requires {
-                let dependency_id = dependency.trim_end_matches(".js");
-                stack.push(dependency_id.to_owned());
-            }
-        }
-        let mut missing = Vec::new();
-        for id in required {
-            if self.verify_active(&id).is_err() {
-                missing.push(id);
-            }
-        }
-        Ok(missing)
-    }
-
-    /// Download the selected modules and their module dependencies only.
-    /// Existing active modules are never replaced until every staged module is
-    /// verified; activation is per-file rename with LKG restore on failure.
-    pub fn ensure(
-        &self,
-        ids: &[String],
-        fetcher: &dyn ModuleFetcher,
-        config: &CacheConfig,
-        allow_network: bool,
-    ) -> Result<EnsureReport> {
-        let mut required = BTreeSet::new();
-        let mut stack: Vec<String> = ids.to_vec();
+        let mut stack = ids.to_vec();
         while let Some(id) = stack.pop() {
             if !required.insert(id.clone()) {
                 continue;
@@ -229,13 +296,29 @@ impl ModuleCache {
                 stack.push(dependency.trim_end_matches(".js").to_owned());
             }
         }
-        let mut missing = Vec::new();
-        for id in &required {
-            if self.verify_active(id).is_err() {
-                missing.push(id.clone());
-            }
-        }
-        if missing.is_empty() {
+        Ok(required)
+    }
+
+    pub fn missing_closure(&self, ids: &[String]) -> Result<Vec<String>> {
+        let required = self.required_closure(ids)?;
+        Ok(required
+            .into_iter()
+            .filter(|id| self.verify_active(id).is_err())
+            .collect())
+    }
+
+    /// Single-flight, crash-consistent ensure. The fast path avoids the lock
+    /// for fully cached devices; the lock serializes budget and generation
+    /// activation across concurrent ensure calls.
+    pub fn ensure(
+        &self,
+        ids: &[String],
+        fetcher: &dyn ModuleFetcher,
+        config: &CacheConfig,
+        allow_network: bool,
+    ) -> Result<EnsureReport> {
+        let required = self.required_closure(ids)?;
+        if required.iter().all(|id| self.verify_active(id).is_ok()) {
             return Ok(EnsureReport {
                 modules: required.into_iter().collect(),
                 cache_bytes: self.cache_bytes(),
@@ -243,22 +326,35 @@ impl ModuleCache {
             });
         }
         if !allow_network {
-            for id in &missing {
-                self.states
-                    .lock()
-                    .unwrap()
-                    .insert(id.clone(), ModuleState::Failed("offline".to_owned()));
+            for id in required {
+                self.lock_states()
+                    .insert(id, ModuleState::Failed("offline".to_owned()));
             }
-            return Err(ArtifactError(format!(
-                "offline cache miss: {}",
-                missing.join(",")
-            )));
+            return Err(ArtifactError("offline cache miss".to_owned()));
         }
-        let mut total_download = 0u64;
+        let _guard = self
+            .ensure_lock
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        // Another ensure may have completed while we waited for the lock.
+        let required = self.required_closure(ids)?;
+        let missing: Vec<String> = required
+            .iter()
+            .filter(|id| self.verify_active(id).is_err())
+            .cloned()
+            .collect();
+        if missing.is_empty() {
+            return Ok(EnsureReport {
+                modules: required.into_iter().collect(),
+                cache_bytes: self.cache_bytes(),
+                ..Default::default()
+            });
+        }
+        let mut download = 0u64;
         for id in &missing {
             let module = self.module(id)?;
             if module.bytes > config.max_download_bytes {
-                self.states.lock().unwrap().insert(
+                self.lock_states().insert(
                     id.clone(),
                     ModuleState::Failed("module too large".to_owned()),
                 );
@@ -266,12 +362,32 @@ impl ModuleCache {
                     "module {id} exceeds download budget"
                 )));
             }
-            total_download = total_download.saturating_add(module.bytes);
+            download += module.bytes;
         }
-        let projected = self.cache_bytes().saturating_add(total_download);
-        if projected > config.max_cache_bytes {
+        // The transaction copies the active generation into staging before it
+        // adds the missing modules, so the peak footprint is
+        // `current + active_bytes + download`; only after the pointer swap are
+        // obsolete generations pruned. Refuse before writing anything.
+        let current = self.cache_bytes();
+        let active = self.lock_active().clone();
+        let active_bytes: u64 = active
+            .modules
+            .keys()
+            .filter_map(|id| self.module(id).ok())
+            .map(|module| module.bytes)
+            .sum();
+        let peak = current
+            .saturating_add(active_bytes)
+            .saturating_add(download);
+        if peak > config.max_cache_bytes {
+            for id in &missing {
+                self.lock_states().insert(
+                    id.clone(),
+                    ModuleState::Failed("cache budget exceeded".to_owned()),
+                );
+            }
             return Err(ArtifactError(format!(
-                "cache budget exceeded: {projected} > {}",
+                "cache budget exceeded: peak {peak} > {}",
                 config.max_cache_bytes
             )));
         }
@@ -279,126 +395,143 @@ impl ModuleCache {
             .space_probe
             .as_ref()
             .and_then(|probe| probe.available_bytes())
-            && total_download > space
+            && peak > space
         {
+            for id in &missing {
+                self.lock_states().insert(
+                    id.clone(),
+                    ModuleState::Failed("insufficient space".to_owned()),
+                );
+            }
             return Err(ArtifactError(format!(
-                "insufficient space: need {total_download}, have {space}"
+                "insufficient space: need {peak}, have {space}"
             )));
         }
-        for id in &missing {
-            self.states
-                .lock()
-                .unwrap()
-                .insert(id.clone(), ModuleState::Pending);
-        }
-
-        let txn = format!(
-            "txn-{}-{}",
-            std::process::id(),
-            self.sequence.fetch_add(1, Ordering::Relaxed)
-        );
-        let staging = self.root.join("staging").join(txn);
+        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+        let generation_name = format!("gen-{}-{sequence}", std::process::id());
+        let staging = self.root.join("staging").join(&generation_name);
         fs::create_dir_all(&staging).map_err(|error| ArtifactError(format!("staging: {error}")))?;
-        let mut fetched: Vec<String> = Vec::new();
+        // Copy the current active generation so the new generation is immutable
+        // and never mutates files referenced by the active pointer.
+        for id in active.modules.keys() {
+            fs::copy(
+                self.generation_path(&active.name, id),
+                staging.join(format!("{id}.js")),
+            )
+            .map_err(|error| ArtifactError(format!("copy active {id}: {error}")))?;
+        }
+        for id in &missing {
+            self.lock_states().insert(id.clone(), ModuleState::Pending);
+        }
+        let mut fetched = Vec::new();
         let mut network_bytes = 0u64;
         let max_concurrent = config.max_concurrent_downloads.max(1);
         let mut cursor = 0usize;
         while cursor < missing.len() {
             let end = (cursor + max_concurrent).min(missing.len());
             let chunk = &missing[cursor..end];
+            let chunk_bytes: u64 = chunk
+                .iter()
+                .filter_map(|id| self.module(id).ok())
+                .map(|module| module.bytes)
+                .sum();
+            if chunk_bytes > config.max_memory_bytes {
+                let id = chunk.first().cloned().unwrap_or_default();
+                self.fail(&staging, &missing, &id, "memory budget exceeded".to_owned());
+                return Err(ArtifactError(format!(
+                    "memory budget exceeded: chunk {chunk_bytes} > {}",
+                    config.max_memory_bytes
+                )));
+            }
             let mut results = std::thread::scope(|scope| {
                 let mut handles = Vec::new();
                 for id in chunk {
                     let id = id.clone();
                     let module = self.module(&id)?.clone();
-                    self.states
-                        .lock()
-                        .unwrap()
+                    self.lock_states()
                         .insert(id.clone(), ModuleState::Downloading);
-                    handles.push((id, scope.spawn(move || fetcher.fetch(&module))));
+                    handles.push((
+                        id,
+                        scope.spawn(move || {
+                            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                fetcher.fetch(&module)
+                            }))
+                            .unwrap_or_else(|_| {
+                                Err(FetchError::Network("fetcher panicked".to_owned()))
+                            })
+                        }),
+                    ));
                 }
-                let mut results = Vec::new();
-                for (id, handle) in handles {
-                    results.push((id, handle.join().expect("fetcher thread")));
-                }
-                Ok::<_, ArtifactError>(results)
+                Ok::<_, ArtifactError>(
+                    handles
+                        .into_iter()
+                        .map(|(id, handle)| (id, handle.join().expect("fetcher thread")))
+                        .collect::<Vec<_>>(),
+                )
             })?;
             for (id, result) in results.drain(..) {
                 let bytes = match result {
                     Ok(bytes) => bytes,
                     Err(FetchError::Network(error)) => {
-                        self.states
-                            .lock()
-                            .unwrap()
-                            .insert(id.clone(), ModuleState::Failed(error.clone()));
-                        cleanup(&staging);
+                        self.fail(&staging, &missing, &id, error.clone());
                         return Err(ArtifactError(format!("network fetch {id}: {error}")));
                     }
                     Err(FetchError::NotFound) => {
-                        cleanup(&staging);
+                        self.fail(&staging, &missing, &id, "not found".to_owned());
                         return Err(ArtifactError(format!("module {id} not found")));
                     }
                     Err(FetchError::TooLarge) => {
-                        cleanup(&staging);
+                        self.fail(&staging, &missing, &id, "too large".to_owned());
                         return Err(ArtifactError(format!("module {id} too large")));
                     }
                 };
-                network_bytes = network_bytes.saturating_add(bytes.len() as u64);
-                let module = self.module(&id)?;
-                // Verify before writing/activating; partial downloads never
-                // replace an active module.
-                if let Err(error) = self.manifest.verify_module(&module.id, &bytes) {
-                    self.states
-                        .lock()
-                        .unwrap()
-                        .insert(id.clone(), ModuleState::Failed(error.to_string()));
-                    cleanup(&staging);
+                network_bytes += bytes.len() as u64;
+                if let Err(error) = self.manifest.verify_module(&id, &bytes) {
+                    self.fail(&staging, &missing, &id, error.to_string());
                     return Err(error);
                 }
-                let target = staging.join(format!("{id}.js"));
-                let mut file = fs::File::create(&target)
-                    .map_err(|error| ArtifactError(format!("stage {id}: {error}")))?;
-                file.write_all(&bytes)
-                    .map_err(|error| ArtifactError(format!("stage {id}: {error}")))?;
-                file.sync_all().ok();
-                self.states
-                    .lock()
-                    .unwrap()
-                    .insert(id.clone(), ModuleState::Verified);
+                fs::write(staging.join(format!("{id}.js")), &bytes).map_err(|error| {
+                    self.fail(&staging, &missing, &id, error.to_string());
+                    ArtifactError(format!("stage {id}: {error}"))
+                })?;
+                self.lock_states().insert(id.clone(), ModuleState::Verified);
                 fetched.push(id);
             }
             cursor = end;
         }
-
-        // Atomic per-module activation; previous files are kept in lkg/.
-        let mut activated: Vec<String> = Vec::new();
-        let mut backup: Vec<String> = Vec::new();
-        for id in &fetched {
-            let active = self.active_path(id);
-            let lkg = self.lkg_path(id);
-            if active.is_file() {
-                fs::copy(&active, &lkg)
-                    .map_err(|error| ArtifactError(format!("lkg {id}: {error}")))?;
-                backup.push(id.clone());
-            }
-            if let Err(error) = fs::rename(staging.join(format!("{id}.js")), &active) {
-                for id in &activated {
-                    let _ = fs::remove_file(self.active_path(id));
-                }
-                for id in &backup {
-                    let _ = fs::rename(self.lkg_path(id), self.active_path(id));
-                }
-                cleanup(&staging);
-                return Err(ArtifactError(format!("activate {id}: {error}")));
-            }
-            activated.push(id.clone());
-            self.states
-                .lock()
-                .unwrap()
-                .insert(id.clone(), ModuleState::Ready);
+        let mut modules = active.modules.clone();
+        for id in &missing {
+            modules.insert(id.clone(), self.module(id)?.sha256.clone());
         }
-        cleanup(&staging);
-        self.save_state()?;
+        let generation = Generation {
+            name: generation_name.clone(),
+            modules,
+        };
+        // Move the complete immutable generation into place; the active pointer
+        // is the only commit point. A crash before the pointer leaves an orphan
+        // generation that open() ignores.
+        let final_dir = self.root.join("generations").join(&generation_name);
+        fs::rename(&staging, &final_dir)
+            .map_err(|error| ArtifactError(format!("publish generation: {error}")))?;
+        if self.verify_generation(generation.clone()).is_none() {
+            let _ = fs::remove_dir_all(&final_dir);
+            return Err(ArtifactError(
+                "staged generation verification failed".to_owned(),
+            ));
+        }
+        if !active.modules.is_empty() {
+            self.write_pointer("lkg.json", &active)?;
+        }
+        if let Err(error) = self.write_pointer("active.json", &generation) {
+            let _ = fs::remove_dir_all(&final_dir);
+            return Err(error);
+        }
+        *self.lock_active() = generation;
+        for id in &missing {
+            self.lock_states().insert(id.clone(), ModuleState::Ready);
+        }
+        // Retain only the active and last-known-good generations.
+        self.prune_generations()?;
         Ok(EnsureReport {
             modules: required.into_iter().collect(),
             network_bytes,
@@ -407,52 +540,71 @@ impl ModuleCache {
         })
     }
 
-    pub fn rollback(&self, id: &str) -> Result<()> {
-        let lkg = self.lkg_path(id);
-        if !lkg.is_file() {
-            return Err(ArtifactError(format!("no last-known-good for {id}")));
-        }
-        let bytes = fs::read(&lkg).map_err(|error| ArtifactError(format!("lkg read: {error}")))?;
-        self.manifest.verify_module(id, &bytes)?;
-        fs::copy(&lkg, self.active_path(id))
-            .map_err(|error| ArtifactError(format!("rollback {id}: {error}")))?;
-        self.states
-            .lock()
-            .unwrap()
-            .insert(id.to_owned(), ModuleState::Ready);
-        self.save_state()
-    }
-
-    pub fn rollback_all(&self) -> Result<usize> {
-        let mut count = 0;
-        for entry in
-            fs::read_dir(self.root.join("lkg")).map_err(|error| ArtifactError(error.to_string()))?
-        {
-            let entry = entry.map_err(|error| ArtifactError(error.to_string()))?;
-            if let Some(name) = entry
-                .file_name()
-                .to_str()
-                .and_then(|name| name.strip_suffix(".js"))
-                && self.rollback(name).is_ok()
-            {
-                count += 1;
+    /// Abort a transaction without a commit point: the staging generation is
+    /// discarded, every module in the closure is reported as failed, and the
+    /// previously active generation keeps serving.
+    fn fail(&self, staging: &Path, missing: &[String], id: &str, reason: String) {
+        let mut states = self.lock_states();
+        for other in missing {
+            if other != id {
+                states.insert(
+                    other.clone(),
+                    ModuleState::Failed("transaction aborted".to_owned()),
+                );
             }
         }
-        Ok(count)
+        states.insert(id.to_owned(), ModuleState::Failed(reason));
+        drop(states);
+        let _ = fs::remove_dir_all(staging);
+    }
+
+    fn prune_generations(&self) -> Result<()> {
+        let active = self.lock_active().name.clone();
+        let lkg = self
+            .read_pointer("lkg.json")
+            .map(|generation| generation.name);
+        for entry in fs::read_dir(self.root.join("generations"))
+            .map_err(|error| ArtifactError(error.to_string()))?
+        {
+            let entry = entry.map_err(|error| ArtifactError(error.to_string()))?;
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name != active && Some(&name) != lkg.as_ref() {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn rollback(&self, id: &str) -> Result<()> {
+        let Some(lkg) = self
+            .read_pointer("lkg.json")
+            .and_then(|generation| self.verify_generation(generation))
+        else {
+            return Err(ArtifactError(format!(
+                "no last-known-good generation for {id}"
+            )));
+        };
+        let current = self.lock_active().clone();
+        self.write_pointer("active.json", &lkg)?;
+        if !current.modules.is_empty() {
+            self.write_pointer("lkg.json", &current)?;
+        }
+        *self.lock_active() = lkg;
+        self.lock_states().insert(id.to_owned(), ModuleState::Ready);
+        Ok(())
     }
 }
 
-fn cleanup(path: &Path) {
-    let _ = fs::remove_dir_all(path);
-}
 fn directory_bytes(path: &Path) -> u64 {
     let mut total = 0;
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.flatten() {
-            if let Ok(meta) = entry.metadata()
-                && meta.is_file()
-            {
-                total += meta.len();
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    total += meta.len();
+                } else if meta.is_dir() {
+                    total += directory_bytes(&entry.path());
+                }
             }
         }
     }

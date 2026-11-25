@@ -8,7 +8,7 @@ use std::thread::JoinHandle;
 
 use serde_json::Value;
 
-use crate::cache::{CacheConfig, EnsureReport, ModuleCache, ModuleFetcher, ModuleState};
+use crate::cache::{CacheConfig, ModuleCache, ModuleFetcher, ModuleState};
 use crate::manifest::Manifest;
 use crate::{ArtifactIndex, DeviceEndpoint, DeviceProfile, DeviceType, Resolution, from_binary};
 
@@ -144,9 +144,9 @@ impl LazyLoader {
         })
     }
 
-    /// Startup uses the existing database list. It resolves each paired device
-    /// through the index and loads only the selected module closure; the full
-    /// device catalog is never traversed.
+    /// Startup uses the existing database list. Each device is prepared
+    /// independently: a missing or corrupt module for one device does not make
+    /// devices whose modules are already verified unavailable.
     pub fn startup(
         &self,
         database: &Path,
@@ -158,65 +158,142 @@ impl LazyLoader {
             devices: records.len(),
             ..Default::default()
         };
-        let mut needed = BTreeSet::new();
-        let mut resolved_devices = Vec::new();
+        let mut loaded = BTreeSet::new();
         for record in &records {
-            match record.to_profile() {
-                Some(profile) => match self.resolve(&profile) {
-                    Some(resolution) => match self.module_id(&resolution) {
-                        Ok(module) => {
-                            if let Ok(closure) = self.closure(&module) {
-                                needed.extend(closure);
-                                report.resolved += 1;
-                                resolved_devices.push((record.ieee_addr.clone(), module));
-                            } else {
-                                report.failed.push((
-                                    record.ieee_addr.clone(),
-                                    "module descriptor".to_owned(),
-                                ));
-                            }
-                        }
-                        Err(error) => report
-                            .failed
-                            .push((record.ieee_addr.clone(), error.to_string())),
-                    },
-                    None => report
-                        .failed
-                        .push((record.ieee_addr.clone(), "definition not found".to_owned())),
-                },
-                None => report.failed.push((
+            let Some(profile) = record.to_profile() else {
+                report.failed.push((
                     record.ieee_addr.clone(),
                     "invalid device profile".to_owned(),
-                )),
-            }
-        }
-        let ids: Vec<String> = needed.into_iter().collect();
-        match self
-            .cache
-            .ensure(&ids, fetcher, &self.cache_config, allow_network)
-        {
-            Ok(EnsureReport {
-                modules,
-                network_bytes,
-                cache_bytes,
-                ..
-            }) => {
-                report.modules_loaded = modules;
-                report.network_bytes = network_bytes;
-                report.cache_bytes = cache_bytes;
-            }
-            Err(error) => {
-                for (ieee, module) in resolved_devices {
-                    report.failed.push((ieee, format!("{module}: {error}")));
+                ));
+                continue;
+            };
+            let Some(resolution) = self.resolve(&profile) else {
+                report
+                    .failed
+                    .push((record.ieee_addr.clone(), "definition not found".to_owned()));
+                continue;
+            };
+            let module = match self.module_id(&resolution) {
+                Ok(module) => module,
+                Err(error) => {
+                    report
+                        .failed
+                        .push((record.ieee_addr.clone(), error.to_string()));
+                    continue;
+                }
+            };
+            let closure = match self.closure(&module) {
+                Ok(closure) => closure,
+                Err(error) => {
+                    report
+                        .failed
+                        .push((record.ieee_addr.clone(), error.to_string()));
+                    continue;
+                }
+            };
+            match self
+                .cache
+                .ensure(&closure, fetcher, &self.cache_config, allow_network)
+            {
+                Ok(result) => {
+                    report.resolved += 1;
+                    report.network_bytes =
+                        report.network_bytes.saturating_add(result.network_bytes);
+                    loaded.extend(result.modules);
+                    loaded.insert(module.clone());
+                }
+                Err(error) => {
+                    report
+                        .failed
+                        .push((record.ieee_addr.clone(), format!("{module}: {error}")));
                 }
             }
         }
+        report.cache_bytes = self.cache.cache_bytes();
+        report.modules_loaded = loaded.into_iter().collect();
         for module in &report.modules_loaded {
             report
                 .states
                 .insert(module.clone(), self.cache.state(module));
         }
         Ok(report)
+    }
+
+    /// Materialize only the modules reported by startup into a runtime package
+    /// root. The runtime sees the same dist layout as the artifact, while
+    /// unselected device modules never appear on disk.
+    pub fn materialize_runtime_package(
+        &self,
+        artifact_dir: &Path,
+        report: &StartupReport,
+        dest: &Path,
+    ) -> crate::Result<()> {
+        if dest.exists() {
+            std::fs::remove_dir_all(dest).map_err(|error| {
+                crate::ArtifactError(format!("runtime root {}: {error}", dest.display()))
+            })?;
+        }
+        std::fs::create_dir_all(dest.join("dist/devices"))
+            .map_err(|error| crate::ArtifactError(format!("runtime root: {error}")))?;
+        let dist = artifact_dir.join("dist");
+        std::fs::copy(dist.join("index.js"), dest.join("dist/index.js"))
+            .map_err(|error| crate::ArtifactError(format!("runtime index.js: {error}")))?;
+        if dist.join("models-index.json").is_file() {
+            std::fs::copy(
+                dist.join("models-index.json"),
+                dest.join("dist/models-index.json"),
+            )
+            .map_err(|error| crate::ArtifactError(format!("runtime models-index: {error}")))?;
+        }
+        for directory in ["converters", "lib"] {
+            copy_tree(&dist.join(directory), &dest.join("dist").join(directory))?;
+        }
+        let loaded: Vec<(String, Vec<u8>)> = report
+            .modules_loaded
+            .iter()
+            .map(|id| Ok((id.clone(), self.cache.load_ready(id)?)))
+            .collect::<crate::Result<_>>()?;
+        self.materialize_modules(&loaded, dest)
+    }
+
+    /// Write verified module bytes into a runtime package root. Paths come from
+    /// the trusted manifest only; the target must stay under `dest/dist`.
+    /// Writes go through a temporary file plus rename so a concurrently running
+    /// JS worker never observes a partially written module.
+    pub fn materialize_modules(
+        &self,
+        modules: &[(String, Vec<u8>)],
+        dest: &Path,
+    ) -> crate::Result<()> {
+        static WRITE_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        for (id, bytes) in modules {
+            let module = self.cache.module(id)?;
+            let relative = module.file.trim_start_matches("dist/");
+            if relative.is_empty()
+                || relative.starts_with('/')
+                || relative.contains('\\')
+                || relative.split('/').any(|part| part == ".." || part == ".")
+            {
+                return Err(crate::ArtifactError(format!(
+                    "unsafe module path {relative}"
+                )));
+            }
+            let target = dest.join("dist").join(relative);
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent).map_err(|error| {
+                    crate::ArtifactError(format!("runtime module dir: {error}"))
+                })?;
+            }
+            let sequence = WRITE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let temporary = target.with_extension(format!("{sequence}.tmp"));
+            std::fs::write(&temporary, bytes)
+                .map_err(|error| crate::ArtifactError(format!("runtime module {id}: {error}")))?;
+            std::fs::rename(&temporary, &target).map_err(|error| {
+                let _ = std::fs::remove_file(&temporary);
+                crate::ArtifactError(format!("runtime module {id}: {error}"))
+            })?;
+        }
+        Ok(())
     }
 
     pub fn pair(
@@ -384,4 +461,31 @@ pub fn read_database(path: &Path) -> crate::Result<Vec<DatabaseRecord>> {
         });
     }
     Ok(records)
+}
+
+fn copy_tree(source: &Path, target: &Path) -> crate::Result<()> {
+    std::fs::create_dir_all(target)
+        .map_err(|error| crate::ArtifactError(format!("copy {}: {error}", target.display())))?;
+    for entry in std::fs::read_dir(source)
+        .map_err(|error| crate::ArtifactError(format!("read {}: {error}", source.display())))?
+    {
+        let entry = entry.map_err(|error| crate::ArtifactError(error.to_string()))?;
+        let destination = target.join(entry.file_name());
+        if entry
+            .file_type()
+            .map_err(|error| crate::ArtifactError(error.to_string()))?
+            .is_dir()
+        {
+            copy_tree(&entry.path(), &destination)?;
+        } else if entry
+            .path()
+            .extension()
+            .is_some_and(|ext| ext == "js" || ext == "json")
+        {
+            std::fs::copy(entry.path(), &destination).map_err(|error| {
+                crate::ArtifactError(format!("copy {}: {error}", entry.path().display()))
+            })?;
+        }
+    }
+    Ok(())
 }

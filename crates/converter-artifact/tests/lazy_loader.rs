@@ -152,3 +152,179 @@ fn device_leave_keeps_verified_cache_available() {
     // The module remains verified and can be loaded again if the device returns.
     assert_eq!(offline.cache().state("nous"), ModuleState::Ready);
 }
+
+#[test]
+fn startup_is_independent_per_device_when_one_module_is_missing() {
+    let Ok(artifact) = std::env::var("CONVERTER_ARTIFACT_DIR") else {
+        return;
+    };
+    let artifact = PathBuf::from(artifact);
+    let cache = temp("independent");
+    let db = temp("independent-db");
+    database(&db);
+    let config = LazyConfig {
+        artifact_dir: artifact.clone(),
+        cache: CacheConfig::new(&cache),
+        host_abi: 1,
+        engine: "quickjs-oxide".to_owned(),
+        engine_version: "0.5.0".to_owned(),
+    };
+    let loader = LazyLoader::open(config).unwrap();
+    let fetcher = SourceFetcher {
+        dir: artifact.clone(),
+    };
+    loader
+        .startup(&db.join("database.db"), &fetcher, true)
+        .unwrap();
+    // Add a TS0002 device; its tuya fragment is not in cache and network is off.
+    let mut text = std::fs::read_to_string(db.join("database.db")).unwrap();
+    text.push_str(&json!({"type":"Router","ieeeAddr":"0x0017880104e45520","nwkAddr":4660,"manufId":4417,"manufName":"_TZ3000","powerSource":"Mains","modelId":"TS0002","epList":[1],"endpoints":{"1":{"profId":260,"epId":1,"devId":81,"inClusterList":[0,6],"outClusterList":[25]}}}).to_string());
+    text.push('\n');
+    std::fs::write(db.join("database.db"), text).unwrap();
+    let offline = LazyLoader::open(LazyConfig {
+        artifact_dir: artifact.clone(),
+        cache: CacheConfig::new(&cache),
+        host_abi: 1,
+        engine: "quickjs-oxide".to_owned(),
+        engine_version: "0.5.0".to_owned(),
+    })
+    .unwrap();
+    let report = offline
+        .startup(
+            &db.join("database.db"),
+            &SourceFetcher {
+                dir: PathBuf::from("/nonexistent"),
+            },
+            false,
+        )
+        .unwrap();
+    assert_eq!(report.resolved, 1);
+    assert_eq!(report.failed.len(), 1);
+    assert!(report.failed[0].0 == "0x0017880104e45520");
+    assert!(report.modules_loaded.iter().any(|module| module == "nous"));
+}
+
+#[test]
+fn startup_loads_multiple_real_definitions_not_the_catalog() {
+    let Ok(artifact) = std::env::var("CONVERTER_ARTIFACT_DIR") else {
+        return;
+    };
+    let artifact = PathBuf::from(artifact);
+    let cache = temp("multi");
+    let db = temp("multi-db");
+    let mut text = String::new();
+    for (ieee, model, manufacturer) in [
+        ("0x0017880104e45531", "TS0601", "_TZE200_locansqn"),
+        (
+            "0x0017880104e45532",
+            "TRADFRI bulb E27 WS opal 1000lm",
+            "IKEA of Sweden",
+        ),
+        ("0x0017880104e45533", "TS0002", "_TZ3000_abcd"),
+    ] {
+        text.push_str(&json!({"type":"EndDevice","ieeeAddr":ieee,"nwkAddr":1234,"manufId":4417,"manufName":manufacturer,"powerSource":"Mains","modelId":model,"epList":[1],"endpoints":{"1":{"profId":260,"epId":1,"devId":81,"inClusterList":[0,6],"outClusterList":[25]}}}).to_string());
+        text.push('\n');
+    }
+    std::fs::write(db.join("database.db"), text).unwrap();
+    let config = LazyConfig {
+        artifact_dir: artifact.clone(),
+        cache: CacheConfig::new(&cache),
+        host_abi: 1,
+        engine: "quickjs-oxide".to_owned(),
+        engine_version: "0.5.0".to_owned(),
+    };
+    let loader = LazyLoader::open(config).unwrap();
+    let report = loader
+        .startup(
+            &db.join("database.db"),
+            &SourceFetcher { dir: artifact },
+            true,
+        )
+        .unwrap();
+    assert_eq!(report.resolved, 3, "{report:?}");
+    for module in ["nous", "ikea", "tuya-1", "tuya-common"] {
+        assert!(
+            report.modules_loaded.iter().any(|loaded| loaded == module),
+            "missing {module}: {report:?}"
+        );
+    }
+    let cache_files = std::fs::read_dir(loader.cache().root().join("generations"))
+        .unwrap()
+        .count();
+    assert!(cache_files >= 1);
+}
+
+struct CountingFetcher {
+    dir: PathBuf,
+    calls: std::sync::Mutex<std::collections::HashMap<String, usize>>,
+}
+impl ModuleFetcher for CountingFetcher {
+    fn fetch(&self, module: &ModuleRecord) -> Result<Vec<u8>, FetchError> {
+        *self
+            .calls
+            .lock()
+            .unwrap()
+            .entry(module.id.clone())
+            .or_insert(0) += 1;
+        std::fs::read(self.dir.join(&module.file)).map_err(|_| FetchError::NotFound)
+    }
+}
+
+#[test]
+fn parallel_pairing_fetches_each_shared_module_once() {
+    let Ok(artifact) = std::env::var("CONVERTER_ARTIFACT_DIR") else {
+        return;
+    };
+    let artifact = PathBuf::from(artifact);
+    let cache = temp("parallel");
+    let loader = Arc::new(
+        LazyLoader::open(LazyConfig {
+            artifact_dir: artifact.clone(),
+            cache: CacheConfig::new(&cache),
+            host_abi: 1,
+            engine: "quickjs-oxide".to_owned(),
+            engine_version: "0.5.0".to_owned(),
+        })
+        .unwrap(),
+    );
+    let fetcher = Arc::new(CountingFetcher {
+        dir: artifact,
+        calls: std::sync::Mutex::new(std::collections::HashMap::new()),
+    });
+    let profiles = [
+        // Two tuya devices share the tuya fragment closure.
+        json!({"ieeeAddr":"0x0017880104e45551","type":"Router","modelId":"TS0002","manufacturerName":"_TZ3000_abcd","endpoints":[]}),
+        json!({"ieeeAddr":"0x0017880104e45552","type":"Router","modelId":"TS0002","manufacturerName":"_TZ3000_abcd","endpoints":[]}),
+        json!({"ieeeAddr":"0x0017880104e45553","type":"Router","modelId":"TRADFRI bulb E27 WS opal 1000lm","manufacturerName":"IKEA of Sweden","endpoints":[]}),
+    ];
+    let database = temp("parallel-db");
+    let mut text = String::new();
+    for profile in &profiles {
+        text.push_str(&profile.to_string());
+        text.push('\n');
+    }
+    std::fs::write(database.join("database.db"), text).unwrap();
+    let mut threads = Vec::new();
+    for _ in &profiles {
+        let loader = Arc::clone(&loader);
+        let fetcher = Arc::clone(&fetcher);
+        let path = database.join("database.db");
+        threads.push(std::thread::spawn(move || {
+            loader.startup(&path, fetcher.as_ref(), true)
+        }));
+    }
+    for thread in threads {
+        let report = thread.join().unwrap().unwrap();
+        assert_eq!(report.devices, profiles.len());
+        assert_eq!(report.resolved, profiles.len(), "{report:?}");
+    }
+    let calls = fetcher.calls.lock().unwrap().clone();
+    for (module, count) in &calls {
+        assert_eq!(*count, 1, "module {module} fetched {count} times");
+    }
+    assert!(calls.keys().any(|module| module == "ikea"));
+    assert!(
+        calls.keys().any(|module| module.starts_with("tuya")),
+        "calls: {calls:?}"
+    );
+}

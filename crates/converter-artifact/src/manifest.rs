@@ -92,6 +92,10 @@ pub struct Modules {
     pub format: String,
     #[serde(rename = "packageIncluded", default)]
     pub package_included: bool,
+    /// Complete HTTPS base ending in `/`; module `file` paths are appended.
+    /// Device data never contributes to this URL.
+    #[serde(default)]
+    pub retrieval: Option<String>,
     pub entries: Vec<ModuleRecord>,
 }
 

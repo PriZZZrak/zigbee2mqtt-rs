@@ -83,6 +83,7 @@ Notes:
 | `zigbee-herdsman` | Zigbee stack | `zigbee-apiarist` | workspace crate | PARTIAL |
 | `zigbee-herdsman-converters` | device converters | `crates/zigbee-converters` (separate crate) | `zigbee_converters::{Definition, DefinitionRegistry, Expose, ...}` | PORTED minimal surface required by the bridge; converter database and authoring tooling excluded (AGENTS §5 Q4) |
 | JavaScript engine | executes upstream converter JS | `quickjs-oxide` 0.5.0 | `converter-runtime` worker (`crates/converter-runtime`) | scheduler and bridge dispatcher wired (`z2m_rs::converter`); offline transport validated, real Endpoint transport pending |
+| artifact retrieval (R1 only; no upstream package) | lazy converter modules fetched from the trusted artifact manifest | `rustls` + `rustls-rustcrypto` over `std::net` | `crates/converter-artifact` (`ModuleCache`), `z2m_rs::converter::http::HttpsFetcher` | HTTPS only, host fixed by `modules.retrieval`, same-host redirects, size/timeout caps, SHA-256 and size verified against the manifest before activation; no device-supplied URLs |
 | `zigbee2mqtt-windfront` | static frontend | served assets | `util::static_file_server` | assets only; the deprecated `zigbee2mqtt-frontend` package is not supported (its enum value remains in the pinned settings schema for parity) |
 
 ### Development tooling
@@ -110,7 +111,7 @@ module:
 | `zip` | `crates/z2m-rs/src/extension/bridge.rs` (backup archive) |
 | `base64` | `crates/z2m-rs/src/util/utils.rs` (icon data URLs), `crates/z2m-rs/src/extension/bridge.rs` (backup payload) |
 | `md-5` | `crates/z2m-rs/src/util/utils.rs` (`md5_hex`; migration reuses it) |
-| `rustls`, `tokio-rustls`, `rustls-rustcrypto`, `rustls-pemfile`, `rustls-native-certs` | `crates/z2m-rs/src/extension/frontend.rs` (server TLS) and `crates/z2m-rs/src/mqtt.rs` (`mqtts://` client TLS) |
+| `rustls`, `tokio-rustls`, `rustls-rustcrypto`, `rustls-pemfile`, `rustls-native-certs` | `crates/z2m-rs/src/extension/frontend.rs` (server TLS), `crates/z2m-rs/src/mqtt.rs` (`mqtts://` client TLS) and `crates/z2m-rs/src/converter/http.rs` (artifact retrieval TLS) |
 | `tokio-tungstenite`, `futures-util` | `crates/z2m-rs/src/extension/frontend.rs` (WebSocket) |
 | `tokio::net` (TCP client) | `crates/zigbee-apiarist/src/adapter/transport.rs`; `crates/z2m-rs/src/extension/frontend.rs` (server) |
 | `SystemTime::now`, `Date.now()` equivalent | `crates/zigbee-apiarist/src/utils/datetime.rs` |

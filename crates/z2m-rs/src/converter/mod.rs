@@ -5,6 +5,7 @@
 // Publish, Configure and OnEvent flow.
 
 pub mod dispatcher;
+pub mod http;
 pub mod transport;
 
 pub use dispatcher::{

@@ -1,0 +1,60 @@
+{
+  "cacheLayout": "generations/<gen> immutable + staging/<gen> + atomic active.json + lkg.json",
+  "activation": "rename staging -> generations/<gen>, verify, write lkg pointer, atomically replace active.json, prune",
+  "recovery": [
+    "orphan staging removed on open",
+    "invalid active pointer falls back to verified lkg",
+    "invalid generation falls back to empty cache",
+    "crash before pointer swap leaves old generation active"
+  ],
+  "budget": {
+    "perModule": "max_download_bytes",
+    "peakOnDisk": "current + activeGeneration + downloads",
+    "inMemoryChunk": "max_memory_bytes",
+    "concurrency": "max_concurrent_downloads",
+    "spaceProbe": "available bytes vs peak"
+  },
+  "singleFlight": "global ensure lock after a lock-free cached fast path; per-module call count == 1 in 8-way concurrent ensure and parallel startup",
+  "tests": {
+    "cache_manager": [
+      "closure/offline",
+      "hash mismatch",
+      "partial download",
+      "network failure",
+      "insufficient space",
+      "lkg rollback",
+      "ABI",
+      "peak transaction budget",
+      "memory budget",
+      "8-way single flight",
+      "aborted transaction",
+      "cancelled (panicking) fetch",
+      "crash recovery"
+    ],
+    "lazy_loader": [
+      "real nous startup",
+      "offline restart",
+      "per-device independence",
+      "nous/IKEA/Tuya definitions",
+      "parallel startup single fetch"
+    ],
+    "lazy_dispatch": [
+      "lazy dispatcher materializes only paired modules and prepares via quickjs",
+      "external Lytko definition still prepares"
+    ]
+  },
+  "router": {
+    "devices": 20,
+    "fullColdStartMs": 2805.8,
+    "loaderStartupMs": 2130.8,
+    "prepareAllMs": 594.3,
+    "networkBytes": 25780,
+    "cacheBytes": 25780
+  },
+  "networkFetcher": "converter::http::HttpsFetcher: HTTPS only, trusted manifest host, same-host redirects (max 3), 15 s connect/read/write timeout, 16 MiB response cap; SHA-256/size verified by ModuleCache; not exercised against a real mirror",
+  "gates": {
+    "goldenParity": "36/36",
+    "resolverDifferential": "0/11562",
+    "zclOpenDefects": 2
+  }
+}

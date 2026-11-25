@@ -1,14 +1,15 @@
 # Converter artifact generator and definition resolver
 
-Status: phases 1–2 implemented and measured; lazy loader/cache and production
-transport are the next milestone.
+Status: phases 1–2 (generator, resolver) and the lazy loader/cache, cache
+consistency and HTTPS retrieval transport are implemented and measured.
 Implementation:
 `tools/artifact-generator/`, `crates/converter-artifact/`,
 `crates/zigbee-apiarist/tests/differential_zcl_pinned.rs`.
 Research baseline: [`converter-artifact-research.md`](converter-artifact-research.md).
 
-No production bridge wiring was changed, no network fetch was added for the
-runtime, and no coordinator/MQTT/HA operation was executed.
+The dispatcher wiring is opt-in (`ConverterDispatcher::start_lazy`); the
+default bridge path is unchanged. No live coordinator/MQTT/HA operation was
+executed, and no real artifact mirror was contacted.
 
 ## 1. Generator
 
@@ -40,7 +41,7 @@ Two independent runs produced identical `manifest.json` and
 `index.z2idx1` hashes:
 
 ```text
-manifest  ab310ad8...f4cfcc5
+manifest  3d96a3c6...819050
 index     49f5186f...c2c182
 ```
 
@@ -78,7 +79,7 @@ Oracle: `tools/artifact-generator/resolver-oracle.js` calls pinned
 
 | Format | Bytes | Parse (Routerich) | RSS | Failures |
 |---|---:|---:|---:|---:|
-| compact JSON | 1,454,123 | 86–124 ms | 7.8 MB | 0 |
+| compact JSON | 1,454,324 | 86–124 ms | 7.8 MB | 0 |
 | `z2idx1` | 927,458 | 68–86 ms | 5.4–6.1 MB | 0 |
 
 `crates/converter-artifact/src/bin/resolver_diff.rs` compares both formats
@@ -137,40 +138,91 @@ first-candidate heuristic.
 - `LazyLoader::pair`: resolves the new fingerprint and runs the same bounded
   closure load on a background thread; existing devices use the same verified
   cache entries and are not blocked;
-- `ModuleCache`: `<cache>/<artifactId>/modules`, `staging`, `lkg`, atomic
-  per-file activation, staged hash verification before rename, LKG rollback;
+- `ModuleCache`: `<cache>/<artifactId>/generations/<gen>` immutable generations,
+  `staging/<gen>` transactions and an atomically replaced `active.json`
+  pointer; `lkg.json` keeps the last-known-good generation for rollback;
 - explicit `ModuleState`: `Missing`, `Pending`, `Downloading`, `Verified`,
   `Ready`, `Failed(reason)`;
-- budgets: per-module download, total cache, `SpaceProbe` available bytes and
-  bounded `max_concurrent_downloads`;
+- budgets: per-module download, peak on-disk transaction footprint (staging
+  copy + downloads, not just the final size), in-memory fetch-chunk cap,
+  `SpaceProbe` available bytes and bounded `max_concurrent_downloads`;
 - offline mode: `ensure(..., allow_network=false)` succeeds only from verified
   cache; a miss is an explicit error and never triggers a silent fetch.
 
 The trusted manifest is loaded from the installed artifact; cache roots are
 artifact-id/version scoped. A module is checked against its manifest sha256,
 size, module id and artifact compatibility before activation. Network transport
-is an injected `ModuleFetcher` (no HTTP client is enabled in this stage).
+is an injected `ModuleFetcher`; `converter::http::HttpsFetcher` is the
+production implementation, and tests use a file-backed fetcher plus explicit
+failure fetchers.
 
 Automatic tests: `cache_manager.rs` (closure/offline, hash mismatch, partial
-download, network failure, insufficient space, rollback, ABI) and
-`lazy_loader.rs` (paired startup, offline restart, concurrent pairing, device
-leave).
+download, network failure, insufficient space, rollback, ABI, peak/transaction
+budget, memory budget, 8-way single-flight, aborted transaction, cancelled
+(panicking) fetch and lock recovery, crash recovery from orphan staging and a
+corrupt active pointer) and `lazy_loader.rs` (paired startup, real nous/IKEA/
+Tuya definitions, offline restart, per-device independence with one missing
+module, concurrent startup fetching each shared module once).
 
 Routerich synthetic measurement (20 paired devices resolving to one module,
 isolated `/tmp` cache, no production overlay writes):
 
 ```text
-cold start          23.9 ms
+loader cold start   23.9 ms
 modules loaded      nous
 network bytes       25,780
 cache after start   25,780 B
 cache after pair    315,722 B (nous + tuya-6 + tuya-common)
 baseline startup    p50 22.0 ms / p95 35.9 ms
 under pairing       p50 23.7 ms / p95 49.6 ms
+
+full bridge cold start to 20 device definitions ready (real quickjs
+prepareDefinition, release aarch64):
+  loader startup     2,130.8 ms
+  prepare all        594.3 ms
+  total              2,805.8 ms
 ```
 
 The pairing fetch downloads only the selected `tuya` fragment closure, not the
 full device catalog; p95 degradation is measured, not assumed.
+
+## 3b. Bridge wiring and cache consistency
+
+- `ConverterDispatcher::start_lazy` calls `LazyLoader::startup` from the
+  existing bridge database, materializes only the selected closures into a
+  runtime package root, then starts the existing quickjs-oxide dispatcher. No
+  second loader or dispatcher is created.
+- `ConverterDispatcher::prepare_with_file` makes the selected artifact module
+  file explicit, so runtime bootstrap does not fall back to an unselected
+  catalog module.
+- `pair_device` loads the new device's closure through the same cache and
+  prepares its definition through the same runtime. Existing devices continue
+  using their already-verified modules.
+- ModuleCache now uses immutable generations plus an atomically replaced
+  `active.json` pointer and `lkg.json` rollback pointer. Staging is never
+  active. `open()` ignores orphan staging/generations, falls back to LKG when
+  the active pointer/generation is invalid, and cleans stale staging. A crash
+  before the pointer swap leaves the old generation active; a crash after it
+  leaves a complete new generation.
+- `ensure` has a cached fast path (no lock for already-ready devices), a global
+  activation/budget lock for single-flight behavior, and per-module fetch
+  concurrency bounded by `max_concurrent_downloads`. Concurrent ensures never
+  fetch the same module twice or activate overlapping generations.
+- `converter::http::HttpsFetcher` is the production-shaped fetcher: HTTPS only,
+  host fixed by the trusted `modules.retrieval` base (which must end in `/`),
+  no device URLs, response cap, connect/read/write timeouts, redirect limit and
+  same-host redirects. SHA-256/size verification remains in ModuleCache before
+  activation.
+- The fetcher is injected; the offline bridge tests never construct it, and no
+  real network request was made. `modules.retrieval` is now emitted by the
+  generator (`--retrieval-url`) and recorded in the manifest.
+- Cached/existing devices take the lock-free fast path, so a pairing download
+  holding the activation lock does not delay them; download work runs on
+  `spawn_blocking` threads and never on the Tokio reactor or the JS worker.
+- A paired device whose module is absent at offline startup is reported as a
+  per-device failure and stays definition-less; other paired devices keep their
+  verified modules and work offline. A later `pair_device`/lazy restart retries
+  the closure; there is no unbounded background retry loop.
 
 ## 4. Manifest and integrity
 
@@ -234,27 +286,37 @@ installed side-by-side without the agreed Node removal/external-storage step.
   decision before enabling greenPower/telecom commands.
 - ZDO frame corpus currently covers constants plus existing wire/zdo suites; a
   full ZDO request/response payload oracle remains next-stage work.
-- The lazy loader/cache is implemented as an isolated library and tests; it is
-  not yet wired into the production bridge startup or pairing path.
-- Network transport is a `ModuleFetcher` trait; no HTTP client/network fetch is
-  enabled in this stage. The full artifact generator/oracle commands remain
-  explicit build/research steps.
-- No network fetch, cache manager, OpenWrt package migration or HIL.
+- The lazy loader/cache is wired through the opt-in
+  `ConverterDispatcher::start_lazy`/`pair_device` path; the default bridge
+  startup still uses the existing package-root flow and no production
+  configuration selects lazy mode yet.
+- `HttpsFetcher` is implemented but has only been unit-tested for URL/path
+  validation; it has not been exercised against a real artifact mirror.
+- The full artifact generator/oracle commands remain explicit build/research
+  steps.
+- No OpenWrt package migration, no live coordinator/MQTT/HA run and no HIL.
 
 ## 8. GO / NO-GO
 
-**GO** for the next integration stage (bridge startup + pairing wiring):
+**GO** for the cache-consistency and bridge-wiring stage:
 
-1. `z2idx1` resolver is 0-diff on the full oracle;
+1. `z2idx1` resolver is 0-diff on the full oracle (11,562 cases);
 2. the generator is deterministic and hash-verified;
 3. production split requires a non-skipped behavioral differential;
 4. manifest/ABI/hash verification is implemented;
-5. lazy startup, offline restart, cache rollback and pairing-closure tests pass.
+5. immutable generations, atomic activation, LKG rollback and crash recovery
+   in every phase have automatic tests;
+6. single-flight, peak disk/memory budgets and per-device startup independence
+   have automatic tests;
+7. `start_lazy` materializes only paired closures and prepares real
+   nous/IKEA/Tuya definitions through the existing quickjs dispatcher;
+8. golden parity is 36/36 and the external Lytko definition still prepares.
 
 **NO-GO for production enablement** until:
 
 1. the two documented ZCL codec anomalies are fixed or explicitly excluded;
-2. the lazy loader is wired to the real bridge startup/pairing path;
-3. the HTTP fetcher, cache budgets and OS-supervisor rollback are integrated;
+2. `HttpsFetcher` is validated against the real mirror with the real manifest;
+3. a production configuration selects lazy mode and the OS-supervisor
+   (procd) restart path is exercised;
 4. the ZDO frame corpus is expanded;
 5. the overlay migration is agreed and HIL is separately approved.

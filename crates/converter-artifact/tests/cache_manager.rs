@@ -228,10 +228,16 @@ fn lkg_rollback_restores_previous_verified_module() {
     cache
         .ensure(&["b".to_owned()], &fetcher_impl, &config(&cache_root), true)
         .unwrap();
-    let active = cache.root().join("modules/b.js");
-    let lkg = cache.root().join("lkg/b.js");
-    std::fs::create_dir_all(lkg.parent().unwrap()).unwrap();
-    std::fs::copy(&active, &lkg).unwrap();
+    let active = cache.active_module_path("b").expect("active module");
+    let old = cache.root().join("generations/old");
+    std::fs::create_dir_all(&old).unwrap();
+    std::fs::copy(&active, old.join("b.js")).unwrap();
+    let lkg = json!({"generation":"old","modules":{"b":hash(b"module-b")}});
+    std::fs::write(
+        cache.root().join("lkg.json"),
+        serde_json::to_vec(&lkg).unwrap(),
+    )
+    .unwrap();
     std::fs::write(&active, b"corrupt-active").unwrap();
     cache.rollback("b").unwrap();
     assert_eq!(cache.load_ready("b").unwrap(), b"module-b");
@@ -258,4 +264,185 @@ fn abi_and_artifact_compatibility_are_enforced() {
             .verify_compatibility(1, "other", "0.5.0")
             .is_err()
     );
+}
+
+#[test]
+fn concurrent_ensure_is_single_flight_per_module() {
+    let fixture = fixture();
+    let cache_root = temp("single-flight");
+    let cache = Arc::new(ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap());
+    let (fetcher_impl, state) = fetcher(&fixture);
+    let fetcher_impl = Arc::new(fetcher_impl);
+    std::thread::scope(|scope| {
+        for _ in 0..8 {
+            let cache = Arc::clone(&cache);
+            let fetcher = Arc::clone(&fetcher_impl);
+            let root = cache_root.clone();
+            scope.spawn(move || {
+                cache
+                    .ensure(&["a".to_owned()], fetcher.as_ref(), &config(&root), true)
+                    .unwrap();
+            });
+        }
+    });
+    let calls = state.calls.lock().unwrap().clone();
+    assert_eq!(calls.iter().filter(|id| id.as_str() == "a").count(), 1);
+    assert_eq!(calls.iter().filter(|id| id.as_str() == "b").count(), 1);
+    assert_eq!(cache.load_ready("a").unwrap(), b"module-a");
+}
+
+#[test]
+fn open_recovers_from_orphan_staging_and_invalid_active_pointer() {
+    let fixture = fixture();
+    let cache_root = temp("crash");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    cache
+        .ensure(&["b".to_owned()], &fetcher_impl, &config(&cache_root), true)
+        .unwrap();
+    let active = cache.active_module_path("b").unwrap();
+    let old = cache.root().join("generations/old");
+    std::fs::create_dir_all(&old).unwrap();
+    std::fs::copy(&active, old.join("b.js")).unwrap();
+    std::fs::write(
+        cache.root().join("lkg.json"),
+        serde_json::to_vec(&json!({"generation":"old","modules":{"b":hash(b"module-b")}})).unwrap(),
+    )
+    .unwrap();
+    // Simulate a crash after a partial staging transaction and a corrupt
+    // active pointer. open() must fall back to LKG.
+    std::fs::create_dir_all(cache.root().join("staging/orphan")).unwrap();
+    std::fs::write(cache.root().join("staging/orphan/b.js"), b"partial").unwrap();
+    std::fs::write(cache.root().join("active.json"), b"not-json").unwrap();
+    drop(cache);
+    let reopened = ModuleCache::open(config(&cache_root), fixture.manifest).unwrap();
+    assert_eq!(reopened.state("b"), ModuleState::Ready);
+    assert_eq!(reopened.load_ready("b").unwrap(), b"module-b");
+    assert!(!reopened.root().join("staging/orphan").exists());
+}
+
+struct FailOn {
+    inner: Fetcher,
+    id: &'static str,
+}
+impl ModuleFetcher for FailOn {
+    fn fetch(&self, module: &converter_artifact::ModuleRecord) -> Result<Vec<u8>, FetchError> {
+        if module.id == self.id {
+            Err(FetchError::Network("boom".to_owned()))
+        } else {
+            self.inner.fetch(module)
+        }
+    }
+}
+
+#[test]
+fn aborted_transaction_never_activates_partially_staged_modules() {
+    let fixture = fixture();
+    let cache_root = temp("partial");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    let mut single = config(&cache_root);
+    single.max_concurrent_downloads = 1;
+    // "a" is staged, then its dependency "b" fails: nothing may become active.
+    let failing = FailOn {
+        inner: fetcher_impl,
+        id: "b",
+    };
+    let error = cache
+        .ensure(&["a".to_owned()], &failing, &single, true)
+        .unwrap_err();
+    assert!(error.to_string().contains("network"));
+    assert_eq!(cache.cache_bytes(), 0);
+    assert!(cache.load_ready("a").is_err());
+    assert!(matches!(cache.state("b"), ModuleState::Failed(_)));
+    assert!(matches!(cache.state("a"), ModuleState::Failed(_)));
+    // The next transaction starts from a clean cache.
+    let (fresh, _) = fetcher(&fixture);
+    cache
+        .ensure(&["a".to_owned()], &fresh, &single, true)
+        .unwrap();
+    assert_eq!(cache.load_ready("a").unwrap(), b"module-a");
+}
+
+#[test]
+fn budget_counts_staging_lkg_and_peak_transaction() {
+    let fixture = fixture();
+    let cache_root = temp("budget");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    cache
+        .ensure(&["b".to_owned()], &fetcher_impl, &config(&cache_root), true)
+        .unwrap();
+    // "b" (8 B) is active. Adding "c" (8 B) copies the active generation into
+    // staging, so the peak is 8 + 8 + 8 = 24 B even though the final cache is
+    // 16 B. A 16 B cap must be rejected before any write.
+    let mut tight = config(&cache_root);
+    tight.max_cache_bytes = 16;
+    let before = cache.cache_bytes();
+    let error = cache
+        .ensure(&["c".to_owned()], &fetcher_impl, &tight, true)
+        .unwrap_err();
+    assert!(error.to_string().contains("peak"), "{error}");
+    assert_eq!(cache.cache_bytes(), before);
+    assert!(cache.load_ready("c").is_err());
+    let mut enough = config(&cache_root);
+    enough.max_cache_bytes = 24;
+    cache
+        .ensure(&["c".to_owned()], &fetcher_impl, &enough, true)
+        .unwrap();
+    assert_eq!(cache.load_ready("c").unwrap(), b"module-c");
+}
+
+#[test]
+fn memory_budget_rejects_oversized_fetch_chunk() {
+    let fixture = fixture();
+    let cache_root = temp("memory");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    let mut limited = config(&cache_root);
+    limited.max_memory_bytes = 1;
+    let error = cache
+        .ensure(&["a".to_owned()], &fetcher_impl, &limited, true)
+        .unwrap_err();
+    assert!(error.to_string().contains("memory budget"), "{error}");
+    assert_eq!(cache.cache_bytes(), 0);
+}
+
+struct PanicOn {
+    inner: Fetcher,
+    id: &'static str,
+}
+impl ModuleFetcher for PanicOn {
+    fn fetch(&self, module: &converter_artifact::ModuleRecord) -> Result<Vec<u8>, FetchError> {
+        if module.id == self.id {
+            panic!("simulated cancellation");
+        }
+        self.inner.fetch(module)
+    }
+}
+
+#[test]
+fn cancelled_fetch_aborts_cleanly_and_does_not_poison_the_cache() {
+    let fixture = fixture();
+    let cache_root = temp("cancel");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    let panicking = PanicOn {
+        inner: fetcher_impl,
+        id: "b",
+    };
+    let mut single = config(&cache_root);
+    single.max_concurrent_downloads = 1;
+    let error = cache
+        .ensure(&["a".to_owned()], &panicking, &single, true)
+        .unwrap_err();
+    assert!(error.to_string().contains("panicked"), "{error}");
+    assert_eq!(cache.cache_bytes(), 0);
+    // A panicking worker must not poison the activation lock: the next device
+    // still loads normally.
+    let (fresh, _) = fetcher(&fixture);
+    cache
+        .ensure(&["a".to_owned()], &fresh, &single, true)
+        .unwrap();
+    assert_eq!(cache.load_ready("a").unwrap(), b"module-a");
 }

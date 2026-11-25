@@ -53,7 +53,7 @@
   },
   "modules": {
     "format": "cjs",
-    "retrieval": "https://artifact.example/z2hc/{artifactId}/{module}.js",
+    "retrieval": "https://artifact.example/z2hc/z2hc-26.125.0-zh-11.2.0-abi1/",
     "cache": "/var/lib/z2m-converters/cache/{artifactId}",
     "pairedOffline": true,
     "entries": {
@@ -109,7 +109,9 @@
     }
   },
   "cache": {
-    "layout": "{artifactId}/{module}.js",
+    "layout": "{artifactId}/generations/<generation>/",
+    "activePointer": "active.json",
+    "rollbackPointer": "lkg.json",
     "maxBytes": 8388608,
     "eviction": "lru-unpinned",
     "pinned": "definitions referenced by database.db",

@@ -1,0 +1,16 @@
+{
+  "hardware": "Routerich AX3000 v1, OpenWrt 24.10.8, aarch64",
+  "devices": 20,
+  "artifact": "z2hc-26.125.0-zh-11.2.0-abi1",
+  "resolved": 20,
+  "modulesLoaded": [
+    "nous"
+  ],
+  "networkBytes": 25780,
+  "loaderStartupMs": 2130.8,
+  "prepareAllMs": 594.3,
+  "fullColdStartMs": 2805.8,
+  "readyDevices": 20,
+  "failedDevices": 0,
+  "notes": "lazy_bridge_probe (release aarch64), isolated /tmp cache, real quickjs prepareDefinition per device; run 2026-11-25"
+}
