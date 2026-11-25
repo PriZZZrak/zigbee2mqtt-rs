@@ -20,6 +20,9 @@ pub struct HttpsFetcherConfig {
     pub max_bytes: u64,
     pub timeout: Duration,
     pub max_redirects: usize,
+    /// Additional trusted CA bundle (PEM). Production leaves this empty and
+    /// uses the OS trust store; tests point it at a local test CA.
+    pub trust_pem: Option<std::path::PathBuf>,
 }
 
 impl HttpsFetcherConfig {
@@ -34,6 +37,7 @@ impl HttpsFetcherConfig {
             max_bytes: 16 << 20,
             timeout: Duration::from_secs(15),
             max_redirects: 3,
+            trust_pem: None,
         })
     }
 }
@@ -59,6 +63,16 @@ impl HttpsFetcher {
         for cert in rustls_native_certs::load_native_certs().certs {
             let _ = roots.add(cert);
         }
+        if let Some(path) = &config.trust_pem {
+            let mut reader = std::io::BufReader::new(
+                std::fs::File::open(path).map_err(|error| format!("trust pem: {error}"))?,
+            );
+            for cert in rustls_pemfile::certs(&mut reader) {
+                roots
+                    .add(cert.map_err(|error| format!("trust pem: {error}"))?)
+                    .map_err(|error| format!("trust pem: {error}"))?;
+            }
+        }
         let tls = rustls::ClientConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
             .map_err(|error| error.to_string())?
@@ -80,8 +94,11 @@ impl HttpsFetcher {
     }
 
     fn fetch_path(&self, path: &str) -> Result<Vec<u8>, FetchError> {
-        if path.is_empty()
-            || path.starts_with('/')
+        let deadline = std::time::Instant::now() + self.config.timeout;
+        // An empty path means "the trusted base itself"; manifests always use
+        // non-empty module files. The base is validated and cannot be supplied
+        // by device data.
+        if path.starts_with('/')
             || path.contains("..")
             || path.contains('\\')
             || path.chars().any(|character| character.is_control())
@@ -107,7 +124,7 @@ impl HttpsFetcher {
             if parsed.host != base.host || parsed.port != base.port {
                 return Err(FetchError::Network("redirect left trusted host".to_owned()));
             }
-            match self.get_once(&parsed)? {
+            match self.get_once(&parsed, deadline)? {
                 Response::Body(bytes) => return Ok(bytes),
                 Response::Redirect(location) => {
                     redirects += 1;
@@ -128,7 +145,11 @@ impl HttpsFetcher {
         }
     }
 
-    fn get_once(&self, url: &ParsedUrl) -> Result<Response, FetchError> {
+    fn get_once(
+        &self,
+        url: &ParsedUrl,
+        deadline: std::time::Instant,
+    ) -> Result<Response, FetchError> {
         let address = (url.host.as_str(), url.port)
             .to_socket_addrs()
             .map_err(|error| FetchError::Network(error.to_string()))?
@@ -156,6 +177,9 @@ impl HttpsFetcher {
         let mut chunk = [0u8; 8192];
         let mut header_end = None;
         while response.len() <= 32 * 1024 {
+            if std::time::Instant::now() >= deadline {
+                return Err(FetchError::Network("total timeout exceeded".to_owned()));
+            }
             let read = stream
                 .read(&mut chunk)
                 .map_err(|error| FetchError::Network(error.to_string()))?;
@@ -216,19 +240,26 @@ impl HttpsFetcher {
             limited
                 .read_to_end(&mut bytes)
                 .map_err(|error| FetchError::Network(error.to_string()))?;
+            if std::time::Instant::now() >= deadline {
+                return Err(FetchError::Network("total timeout exceeded".to_owned()));
+            }
             if bytes.len() as u64 != length {
                 return Err(FetchError::Network("truncated response".to_owned()));
             }
             return Ok(Response::Body(bytes));
         }
         if chunked {
-            return decode_chunked(body, &mut stream, self.config.max_bytes).map(Response::Body);
+            return decode_chunked(body, &mut stream, self.config.max_bytes, deadline)
+                .map(Response::Body);
         }
         let mut bytes = body.to_vec();
         let mut limited = stream.take(self.config.max_bytes.saturating_sub(bytes.len() as u64) + 1);
         limited
             .read_to_end(&mut bytes)
             .map_err(|error| FetchError::Network(error.to_string()))?;
+        if std::time::Instant::now() >= deadline {
+            return Err(FetchError::Network("total timeout exceeded".to_owned()));
+        }
         if bytes.len() as u64 > self.config.max_bytes {
             return Err(FetchError::TooLarge);
         }
@@ -297,10 +328,18 @@ enum Response {
     Body(Vec<u8>),
     Redirect(String),
 }
-fn decode_chunked(initial: &[u8], stream: &mut impl Read, max: u64) -> Result<Vec<u8>, FetchError> {
+fn decode_chunked(
+    initial: &[u8],
+    stream: &mut impl Read,
+    max: u64,
+    deadline: std::time::Instant,
+) -> Result<Vec<u8>, FetchError> {
     let mut input = initial.to_vec();
     let mut output = Vec::new();
     loop {
+        if std::time::Instant::now() >= deadline {
+            return Err(FetchError::Network("total timeout exceeded".to_owned()));
+        }
         let Some(index) = input.windows(2).position(|window| window == b"\r\n") else {
             let mut buffer = [0u8; 4096];
             let read = stream
@@ -354,6 +393,7 @@ mod tests {
             max_bytes: 10,
             timeout: std::time::Duration::from_secs(1),
             max_redirects: 1,
+            trust_pem: None,
         };
         let fetcher = crate::converter::http::HttpsFetcher::new(config).unwrap();
         assert!(fetcher.fetch_path("../etc/passwd").is_err());

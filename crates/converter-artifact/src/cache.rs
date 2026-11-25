@@ -235,24 +235,54 @@ impl ModuleCache {
         Some(generation)
     }
 
-    fn write_pointer(&self, name: &str, generation: &Generation) -> Result<()> {
-        let path = self.pointer_path(name);
+    /// Write and fsync a pointer temporary file. The pointer itself is
+    /// untouched until [`Self::commit_pointer`].
+    fn stage_pointer(&self, name: &str, generation: &Generation) -> Result<PathBuf> {
         let tmp = self.pointer_path(&format!("{name}.tmp"));
         let modules: BTreeMap<&String, &String> = generation.modules.iter().collect();
         let value = json!({"generation": generation.name, "modules": modules});
+        let bytes = serde_json::to_vec(&value).unwrap();
         let mut file = fs::File::create(&tmp)
             .map_err(|error| ArtifactError(format!("pointer {name}: {error}")))?;
-        file.write_all(&serde_json::to_vec(&value).unwrap())
-            .map_err(|error| ArtifactError(error.to_string()))?;
-        file.sync_all().ok();
-        fs::rename(&tmp, &path)
-            .map_err(|error| ArtifactError(format!("activate pointer {name}: {error}")))?;
-        // The rename is the commit point; sync the directory so a power loss
-        // cannot resurrect the previous pointer.
-        if let Ok(directory) = fs::File::open(&self.root) {
-            let _ = directory.sync_all();
-        }
-        Ok(())
+        file.write_all(&bytes)
+            .map_err(|error| ArtifactError(format!("pointer {name}: write: {error}")))?;
+        file.sync_all()
+            .map_err(|error| ArtifactError(format!("pointer {name}: fsync: {error}")))?;
+        drop(file);
+        Ok(tmp)
+    }
+
+    fn commit_pointer(&self, tmp: &Path, name: &str) -> Result<()> {
+        fs::rename(tmp, self.pointer_path(name)).map_err(|error| {
+            let _ = fs::remove_file(tmp);
+            ArtifactError(format!("activate pointer {name}: {error}"))
+        })
+    }
+
+    /// Pointer replacement with a durable commit: stage+fsync, atomic rename,
+    /// then fsync the cache root. Every step is fatal; ignoring a failed fsync
+    /// would claim a durable generation while a power loss could revert it.
+    fn write_pointer(&self, name: &str, generation: &Generation) -> Result<()> {
+        let tmp = self.stage_pointer(name, generation)?;
+        self.commit_pointer(&tmp, name)?;
+        self.sync_directory(&self.root, name)
+    }
+
+    fn sync_directory(&self, path: &Path, what: &str) -> Result<()> {
+        fs::File::open(path)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|error| {
+                ArtifactError(format!(
+                    "{what}: directory sync {}: {error}",
+                    path.display()
+                ))
+            })
+    }
+
+    fn sync_file(path: &Path) -> Result<()> {
+        fs::File::open(path)
+            .and_then(|file| file.sync_all())
+            .map_err(|error| ArtifactError(format!("fsync {}: {error}", path.display())))
     }
 
     fn verify_active(&self, id: &str) -> Result<Vec<u8>> {
@@ -391,11 +421,19 @@ impl ModuleCache {
                 config.max_cache_bytes
             )));
         }
+        // The cache already accounts for its own bytes in `max_cache_bytes`;
+        // the filesystem probe answers a different question: how much *new*
+        // space may the transaction allocate? Existing active generations are
+        // already on disk, so they must not be subtracted from the free space
+        // twice. A transaction additionally allocates a staging copy of the
+        // active generation plus the downloads; the last-known-good generation
+        // and the pointer files are already accounted for in `current`.
+        let additional = active_bytes.saturating_add(download);
         if let Some(space) = config
             .space_probe
             .as_ref()
             .and_then(|probe| probe.available_bytes())
-            && peak > space
+            && additional > space
         {
             for id in &missing {
                 self.lock_states().insert(
@@ -404,7 +442,7 @@ impl ModuleCache {
                 );
             }
             return Err(ArtifactError(format!(
-                "insufficient space: need {peak}, have {space}"
+                "insufficient space: need {additional} additional bytes (staging copy {active_bytes} + download {download}), have {space}"
             )));
         }
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
@@ -414,11 +452,10 @@ impl ModuleCache {
         // Copy the current active generation so the new generation is immutable
         // and never mutates files referenced by the active pointer.
         for id in active.modules.keys() {
-            fs::copy(
-                self.generation_path(&active.name, id),
-                staging.join(format!("{id}.js")),
-            )
-            .map_err(|error| ArtifactError(format!("copy active {id}: {error}")))?;
+            let target = staging.join(format!("{id}.js"));
+            fs::copy(self.generation_path(&active.name, id), &target)
+                .map_err(|error| ArtifactError(format!("copy active {id}: {error}")))?;
+            Self::sync_file(&target)?;
         }
         for id in &missing {
             self.lock_states().insert(id.clone(), ModuleState::Pending);
@@ -490,10 +527,15 @@ impl ModuleCache {
                     self.fail(&staging, &missing, &id, error.to_string());
                     return Err(error);
                 }
-                fs::write(staging.join(format!("{id}.js")), &bytes).map_err(|error| {
+                let staged = staging.join(format!("{id}.js"));
+                fs::write(&staged, &bytes).map_err(|error| {
                     self.fail(&staging, &missing, &id, error.to_string());
                     ArtifactError(format!("stage {id}: {error}"))
                 })?;
+                if let Err(error) = Self::sync_file(&staged) {
+                    self.fail(&staging, &missing, &id, error.to_string());
+                    return Err(error);
+                }
                 self.lock_states().insert(id.clone(), ModuleState::Verified);
                 fetched.push(id);
             }
@@ -507,22 +549,48 @@ impl ModuleCache {
             name: generation_name.clone(),
             modules,
         };
-        // Move the complete immutable generation into place; the active pointer
-        // is the only commit point. A crash before the pointer leaves an orphan
-        // generation that open() ignores.
+        // Persist the staged files and their directory before the rename, then
+        // persist the rename itself. The active pointer remains the only commit
+        // point; a crash before it leaves a complete orphan generation that
+        // open() prunes.
+        if let Err(error) = self.sync_directory(&staging, "staging") {
+            self.fail(&staging, &missing, &generation_name, error.to_string());
+            return Err(error);
+        }
         let final_dir = self.root.join("generations").join(&generation_name);
-        fs::rename(&staging, &final_dir)
-            .map_err(|error| ArtifactError(format!("publish generation: {error}")))?;
+        if let Err(error) = fs::rename(&staging, &final_dir) {
+            let _ = fs::remove_dir_all(&staging);
+            return Err(ArtifactError(format!("publish generation: {error}")));
+        }
+        let generations = self.root.join("generations");
+        if let Err(error) = self.sync_directory(&generations, "generations") {
+            let _ = fs::remove_dir_all(&final_dir);
+            return Err(error);
+        }
         if self.verify_generation(generation.clone()).is_none() {
             let _ = fs::remove_dir_all(&final_dir);
             return Err(ArtifactError(
                 "staged generation verification failed".to_owned(),
             ));
         }
-        if !active.modules.is_empty() {
-            self.write_pointer("lkg.json", &active)?;
+        if !active.modules.is_empty()
+            && let Err(error) = self.write_pointer("lkg.json", &active)
+        {
+            let _ = fs::remove_dir_all(&final_dir);
+            return Err(error);
         }
-        if let Err(error) = self.write_pointer("active.json", &generation) {
+        // Commit the new generation: stage+fsync the pointer, rename it (the
+        // atomic switch), then switch the in-memory generation. A post-rename
+        // directory-sync failure is reported but must not delete the new
+        // generation, because the active pointer already references it.
+        let staged_pointer = match self.stage_pointer("active.json", &generation) {
+            Ok(tmp) => tmp,
+            Err(error) => {
+                let _ = fs::remove_dir_all(&final_dir);
+                return Err(error);
+            }
+        };
+        if let Err(error) = self.commit_pointer(&staged_pointer, "active.json") {
             let _ = fs::remove_dir_all(&final_dir);
             return Err(error);
         }
@@ -530,8 +598,14 @@ impl ModuleCache {
         for id in &missing {
             self.lock_states().insert(id.clone(), ModuleState::Ready);
         }
+        let durability = self.sync_directory(&self.root, "active.json");
         // Retain only the active and last-known-good generations.
         self.prune_generations()?;
+        if let Err(error) = durability {
+            return Err(ArtifactError(format!(
+                "generation activated but not durably synced: {error}"
+            )));
+        }
         Ok(EnsureReport {
             modules: required.into_iter().collect(),
             network_bytes,

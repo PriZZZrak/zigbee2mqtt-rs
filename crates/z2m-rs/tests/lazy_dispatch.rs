@@ -67,8 +67,11 @@ async fn lazy_dispatcher_materializes_only_paired_module_and_prepares() {
     let report = dispatcher.startup_report().unwrap();
     assert_eq!(report.resolved, 1);
     assert!(report.modules_loaded.iter().any(|module| module == "nous"));
-    assert!(runtime_root.join("dist/devices/nous.js").is_file());
-    assert!(!runtime_root.join("dist/devices/tuya-0.js").exists());
+    let active_root = dispatcher.runtime_root().expect("active runtime root");
+    assert!(active_root.starts_with(&runtime_root));
+    assert!(active_root.join("dist/devices/nous.js").is_file());
+    assert!(!active_root.join("dist/devices/tuya-0.js").exists());
+    assert!(runtime_root.join("active.json").is_file());
     // The same dispatcher prepares the cached module through quickjs.
     inject_database(Arc::new(std::sync::Mutex::new(Database::open(
         work.join("probe.db"),

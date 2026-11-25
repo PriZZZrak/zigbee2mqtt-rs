@@ -1,27 +1,86 @@
 {
   "cacheLayout": "generations/<gen> immutable + staging/<gen> + atomic active.json + lkg.json",
-  "activation": "rename staging -> generations/<gen>, verify, write lkg pointer, atomically replace active.json, prune",
+  "activation": "fsync files, fsync staging, rename to generations/<gen>, fsync generations, fsync+rename lkg, fsync+rename active, fsync root",
+  "spaceBudget": {
+    "totalCache": "max_cache_bytes compared with current + staging copy + downloads (peak)",
+    "filesystemProbe": "SpaceProbe compared with staging copy + downloads (additional bytes only)",
+    "test": "active 8 B + download 8 B: 15 B free rejected, 16 B free accepted although the transaction peak is 24 B"
+  },
+  "runtimeMaterialization": {
+    "layout": "<base>/generations/<gen> + <base>/active.json",
+    "switch": "populate staging, fsync, rename to generation, atomically replace active pointer; previous generation retained",
+    "runningWorker": "the running worker keeps its own immutable generation; pairing only adds atomic files to the active one",
+    "hardlinks": "cache/artifact files are hard-linked when on the same filesystem, copied+fsynced otherwise"
+  },
   "recovery": [
     "orphan staging removed on open",
     "invalid active pointer falls back to verified lkg",
     "invalid generation falls back to empty cache",
-    "crash before pointer swap leaves old generation active"
+    "crash before pointer swap leaves old generation active",
+    "failed runtime materialization leaves the active generation and pointer untouched"
   ],
+  "durability": "every fsync/rename error is propagated; a post-rename active-pointer sync failure reports 'activated but not durably synced' and keeps the generation",
   "budget": {
     "perModule": "max_download_bytes",
     "peakOnDisk": "current + activeGeneration + downloads",
     "inMemoryChunk": "max_memory_bytes",
     "concurrency": "max_concurrent_downloads",
-    "spaceProbe": "available bytes vs peak"
+    "spaceProbe": "staging copy + downloads vs available bytes"
   },
-  "singleFlight": "global ensure lock after a lock-free cached fast path; per-module call count == 1 in 8-way concurrent ensure and parallel startup",
+  "singleFlight": "global ensure lock after a lock-free cached fast path; each module fetched exactly once in 8-way concurrent ensure and parallel startup",
+  "router": {
+    "startup20Devices": {
+      "loaderStartupMs": 2042.9,
+      "prepareAllMs": 658.7,
+      "fullColdStartMs": 2727.6,
+      "networkBytes": 25780
+    },
+    "singleFlight": [
+      {
+        "fetchDelayMs": 30,
+        "devices": 3,
+        "sequentialMs": 244.8,
+        "concurrentMs": 226.5,
+        "fetchCalls": {
+          "ikea": 1,
+          "nous": 1,
+          "tuya-1": 1,
+          "tuya-common": 1
+        }
+      },
+      {
+        "fetchDelayMs": 200,
+        "devices": 3,
+        "sequentialMs": 765.7,
+        "concurrentMs": 718.0,
+        "fetchCalls": {
+          "ikea": 1,
+          "nous": 1,
+          "tuya-1": 1,
+          "tuya-common": 1
+        }
+      }
+    ],
+    "pairingImpact": {
+      "iterations": 300,
+      "overlappingSamples": 55,
+      "pairingMs": 1719.1,
+      "pairDelayMs": 120,
+      "baselineP50Ms": 2.54,
+      "baselineP95Ms": 5.56,
+      "duringP50Ms": 2.42,
+      "duringP95Ms": 5.95,
+      "duringMaxMs": 827.8
+    },
+    "interpretation": "the download runs on blocking threads and does not stall reports; one report waited for the single JS worker's prepareDefinition job (~0.83 s), the same head-of-line behavior as the upstream single-threaded Node loop; p50/p95 unchanged"
+  },
   "tests": {
     "cache_manager": [
       "closure/offline",
       "hash mismatch",
       "partial download",
       "network failure",
-      "insufficient space",
+      "insufficient space additional-bytes semantics",
       "lkg rollback",
       "ABI",
       "peak transaction budget",
@@ -29,29 +88,36 @@
       "8-way single flight",
       "aborted transaction",
       "cancelled (panicking) fetch",
-      "crash recovery"
+      "crash recovery",
+      "commit I/O failure"
     ],
     "lazy_loader": [
       "real nous startup",
       "offline restart",
       "per-device independence",
       "nous/IKEA/Tuya definitions",
-      "parallel startup single fetch"
+      "parallel startup single fetch",
+      "runtime generation switch/retention",
+      "runtime materialization I/O failure"
     ],
     "lazy_dispatch": [
-      "lazy dispatcher materializes only paired modules and prepares via quickjs",
-      "external Lytko definition still prepares"
+      "materialize only paired modules and prepare via quickjs",
+      "external Lytko definition"
+    ],
+    "https_fetcher": [
+      "local TLS",
+      "Content-Length",
+      "chunked",
+      "same-host redirect",
+      "off-host redirect rejected",
+      "truncated body",
+      "timeout",
+      "size cap",
+      "404",
+      "SHA-256 mismatch",
+      "public mirrors (ignored test, run manually)"
     ]
   },
-  "router": {
-    "devices": 20,
-    "fullColdStartMs": 2805.8,
-    "loaderStartupMs": 2130.8,
-    "prepareAllMs": 594.3,
-    "networkBytes": 25780,
-    "cacheBytes": 25780
-  },
-  "networkFetcher": "converter::http::HttpsFetcher: HTTPS only, trusted manifest host, same-host redirects (max 3), 15 s connect/read/write timeout, 16 MiB response cap; SHA-256/size verified by ModuleCache; not exercised against a real mirror",
   "gates": {
     "goldenParity": "36/36",
     "resolverDifferential": "0/11562",

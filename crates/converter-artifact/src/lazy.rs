@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+
 use serde_json::Value;
 
 use crate::cache::{CacheConfig, ModuleCache, ModuleFetcher, ModuleState};
@@ -219,41 +222,96 @@ impl LazyLoader {
         Ok(report)
     }
 
-    /// Materialize only the modules reported by startup into a runtime package
-    /// root. The runtime sees the same dist layout as the artifact, while
-    /// unselected device modules never appear on disk.
+    /// Materialize the modules reported by startup into an immutable runtime
+    /// generation under `base/generations/` and atomically move the
+    /// `base/active.json` pointer. The previous generation (if any) is kept so
+    /// a JS worker that was started against it can finish; it is pruned by the
+    /// next materialization.
+    ///
+    /// Nothing is written into an existing generation, and the base directory
+    /// is never deleted. A crash leaves at most an unpointed staging directory
+    /// or a complete but inactive generation, both discarded on the next run.
+    /// Returns the package root (the generation directory) for the runtime.
     pub fn materialize_runtime_package(
         &self,
         artifact_dir: &Path,
         report: &StartupReport,
-        dest: &Path,
-    ) -> crate::Result<()> {
-        if dest.exists() {
-            std::fs::remove_dir_all(dest).map_err(|error| {
-                crate::ArtifactError(format!("runtime root {}: {error}", dest.display()))
-            })?;
+        base: &Path,
+    ) -> crate::Result<PathBuf> {
+        static GENERATION_SEQUENCE: std::sync::atomic::AtomicU64 =
+            std::sync::atomic::AtomicU64::new(1);
+        let generations = base.join("generations");
+        std::fs::create_dir_all(&generations)
+            .map_err(|error| crate::ArtifactError(format!("runtime generations: {error}")))?;
+        let sequence = GENERATION_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let generation = format!("gen-{}-{sequence}", std::process::id());
+        let staging = generations.join(format!(".staging-{generation}"));
+        if staging.exists() {
+            std::fs::remove_dir_all(&staging)
+                .map_err(|error| crate::ArtifactError(format!("runtime staging: {error}")))?;
         }
-        std::fs::create_dir_all(dest.join("dist/devices"))
-            .map_err(|error| crate::ArtifactError(format!("runtime root: {error}")))?;
-        let dist = artifact_dir.join("dist");
-        std::fs::copy(dist.join("index.js"), dest.join("dist/index.js"))
-            .map_err(|error| crate::ArtifactError(format!("runtime index.js: {error}")))?;
-        if dist.join("models-index.json").is_file() {
-            std::fs::copy(
-                dist.join("models-index.json"),
-                dest.join("dist/models-index.json"),
-            )
-            .map_err(|error| crate::ArtifactError(format!("runtime models-index: {error}")))?;
+        let result = (|| {
+            std::fs::create_dir_all(staging.join("dist/devices"))
+                .map_err(|error| crate::ArtifactError(format!("runtime staging tree: {error}")))?;
+            let dist = artifact_dir.join("dist");
+            for file in ["index.js", "models-index.json"] {
+                let source = dist.join(file);
+                if !source.is_file() {
+                    continue;
+                }
+                let target = staging.join("dist").join(file);
+                link_or_copy(&source, &target)
+                    .map_err(|error| crate::ArtifactError(format!("runtime {file}: {error}")))?;
+            }
+            for directory in ["converters", "lib"] {
+                copy_tree(&dist.join(directory), &staging.join("dist").join(directory))?;
+            }
+            let loaded: Vec<(String, Vec<u8>)> = report
+                .modules_loaded
+                .iter()
+                .map(|id| Ok((id.clone(), self.cache.load_ready(id)?)))
+                .collect::<crate::Result<_>>()?;
+            self.materialize_modules(&loaded, &staging)?;
+            // Verify the staged package before it can become active.
+            for id in &report.modules_loaded {
+                let module = self.cache.module(id)?;
+                let relative = module.file.trim_start_matches("dist/");
+                let metadata =
+                    std::fs::metadata(staging.join("dist").join(relative)).map_err(|error| {
+                        crate::ArtifactError(format!("runtime module {id}: {error}"))
+                    })?;
+                if metadata.len() != module.bytes {
+                    return Err(crate::ArtifactError(format!(
+                        "runtime module {id}: staged {} bytes, expected {}",
+                        metadata.len(),
+                        module.bytes
+                    )));
+                }
+            }
+            sync_tree_dirs(&staging)?;
+            Ok::<_, crate::ArtifactError>(())
+        })();
+        if let Err(error) = result {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(error);
         }
-        for directory in ["converters", "lib"] {
-            copy_tree(&dist.join(directory), &dest.join("dist").join(directory))?;
+        let active = generations.join(&generation);
+        if let Err(error) = std::fs::rename(&staging, &active) {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(crate::ArtifactError(format!(
+                "publish runtime generation: {error}"
+            )));
         }
-        let loaded: Vec<(String, Vec<u8>)> = report
-            .modules_loaded
-            .iter()
-            .map(|id| Ok((id.clone(), self.cache.load_ready(id)?)))
-            .collect::<crate::Result<_>>()?;
-        self.materialize_modules(&loaded, dest)
+        sync_dir(&generations, "runtime generations")?;
+        let previous = read_runtime_pointer(base);
+        write_runtime_pointer(base, &generation)?;
+        if let Err(error) =
+            prune_runtime_generations(&generations, &generation, previous.as_deref())
+        {
+            // Cleanup failure must not invalidate a complete active generation.
+            let _ = error;
+        }
+        Ok(active)
     }
 
     /// Write verified module bytes into a runtime package root. Paths come from
@@ -284,6 +342,17 @@ impl LazyLoader {
                     crate::ArtifactError(format!("runtime module dir: {error}"))
                 })?;
             }
+            // Cache generations are immutable, so a hard link is a complete
+            // module file at zero copy cost; it also survives cache pruning.
+            // Cross-device links fall back to an atomic write+fsync.
+            if let Some(source) = self.cache.active_module_path(id)
+                && link_or_copy(&source, &target).is_ok()
+            {
+                if let Some(parent) = target.parent() {
+                    sync_dir(parent, "runtime module dir")?;
+                }
+                continue;
+            }
             let sequence = WRITE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let temporary = target.with_extension(format!("{sequence}.tmp"));
             std::fs::write(&temporary, bytes)
@@ -292,6 +361,10 @@ impl LazyLoader {
                 let _ = std::fs::remove_file(&temporary);
                 crate::ArtifactError(format!("runtime module {id}: {error}"))
             })?;
+            sync_file(&target)?;
+            if let Some(parent) = target.parent() {
+                sync_dir(parent, "runtime module dir")?;
+            }
         }
         Ok(())
     }
@@ -482,10 +555,128 @@ fn copy_tree(source: &Path, target: &Path) -> crate::Result<()> {
             .extension()
             .is_some_and(|ext| ext == "js" || ext == "json")
         {
-            std::fs::copy(entry.path(), &destination).map_err(|error| {
-                crate::ArtifactError(format!("copy {}: {error}", entry.path().display()))
-            })?;
+            link_or_copy(&entry.path(), &destination)?;
         }
+    }
+    Ok(())
+}
+
+/// Hard-link a file so its already-durable cache/artifact content is reused
+/// without a copy. Cross-device or permission failures fall back to an atomic
+/// copy (temporary file + rename) plus fsync, which keeps the durability
+/// contract and never overwrites a live target in place.
+fn link_or_copy(source: &Path, target: &Path) -> crate::Result<()> {
+    static COPY_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    if std::fs::hard_link(source, target).is_ok() {
+        return Ok(());
+    }
+    // The target may already be the same inode (repeated pairing into the same
+    // generation). Copying onto it would truncate the shared cache file.
+    #[cfg(unix)]
+    if let (Ok(source_meta), Ok(target_meta)) = (source.metadata(), target.metadata())
+        && source_meta.dev() == target_meta.dev()
+        && source_meta.ino() == target_meta.ino()
+    {
+        return Ok(());
+    }
+    #[cfg(not(unix))]
+    if std::fs::canonicalize(source).ok() == std::fs::canonicalize(target).ok() {
+        return Ok(());
+    }
+    let sequence = COPY_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let temporary = target.with_extension(format!("{sequence}.copy"));
+    std::fs::copy(source, &temporary).map_err(|error| {
+        let _ = std::fs::remove_file(&temporary);
+        crate::ArtifactError(format!(
+            "copy {} -> {}: {error}",
+            source.display(),
+            target.display()
+        ))
+    })?;
+    if let Err(error) = sync_file(&temporary) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error);
+    }
+    if let Err(error) = std::fs::rename(&temporary, target) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(crate::ArtifactError(format!(
+            "publish {}: {error}",
+            target.display()
+        )));
+    }
+    Ok(())
+}
+
+fn sync_file(path: &Path) -> crate::Result<()> {
+    std::fs::File::open(path)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| crate::ArtifactError(format!("fsync {}: {error}", path.display())))
+}
+
+fn sync_dir(path: &Path, what: &str) -> crate::Result<()> {
+    std::fs::File::open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| {
+            crate::ArtifactError(format!("{what}: dir sync {}: {error}", path.display()))
+        })
+}
+
+fn sync_tree_dirs(path: &Path) -> crate::Result<()> {
+    if !path.is_dir() {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(path)
+        .map_err(|error| crate::ArtifactError(format!("read {}: {error}", path.display())))?
+    {
+        let entry = entry.map_err(|error| crate::ArtifactError(error.to_string()))?;
+        if entry
+            .file_type()
+            .map_err(|error| crate::ArtifactError(error.to_string()))?
+            .is_dir()
+        {
+            sync_tree_dirs(&entry.path())?;
+        }
+    }
+    sync_dir(path, "runtime")
+}
+
+fn read_runtime_pointer(base: &Path) -> Option<String> {
+    let bytes = std::fs::read(base.join("active.json")).ok()?;
+    let value: Value = serde_json::from_slice(&bytes).ok()?;
+    value.get("generation")?.as_str().map(str::to_owned)
+}
+
+fn write_runtime_pointer(base: &Path, generation: &str) -> crate::Result<()> {
+    let tmp = base.join("active.json.tmp");
+    let mut file = std::fs::File::create(&tmp)
+        .map_err(|error| crate::ArtifactError(format!("runtime pointer: {error}")))?;
+    std::io::Write::write_all(
+        &mut file,
+        &serde_json::to_vec(&serde_json::json!({"generation": generation})).unwrap(),
+    )
+    .map_err(|error| crate::ArtifactError(format!("runtime pointer: {error}")))?;
+    file.sync_all()
+        .map_err(|error| crate::ArtifactError(format!("runtime pointer fsync: {error}")))?;
+    drop(file);
+    std::fs::rename(&tmp, base.join("active.json"))
+        .map_err(|error| crate::ArtifactError(format!("runtime pointer rename: {error}")))?;
+    sync_dir(base, "runtime base")
+}
+
+fn prune_runtime_generations(
+    generations: &Path,
+    active: &str,
+    previous: Option<&str>,
+) -> crate::Result<()> {
+    for entry in
+        std::fs::read_dir(generations).map_err(|error| crate::ArtifactError(error.to_string()))?
+    {
+        let entry = entry.map_err(|error| crate::ArtifactError(error.to_string()))?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name == active || Some(name.as_str()) == previous {
+            continue;
+        }
+        let _ = std::fs::remove_dir_all(entry.path());
     }
     Ok(())
 }

@@ -140,12 +140,21 @@ first-candidate heuristic.
   cache entries and are not blocked;
 - `ModuleCache`: `<cache>/<artifactId>/generations/<gen>` immutable generations,
   `staging/<gen>` transactions and an atomically replaced `active.json`
-  pointer; `lkg.json` keeps the last-known-good generation for rollback;
+  pointer; `lkg.json` keeps the last-known-good generation for rollback.
+  Commit order is: fsync staged files, fsync staging dir, rename into
+  `generations/`, fsync `generations/`, fsync+rename `lkg.json`, fsync+rename
+  `active.json`, fsync the cache root. Every fsync error is returned; a
+  failure after the `active.json` rename reports "activated but not durably
+  synced" and keeps the new generation, because the pointer already names it;
 - explicit `ModuleState`: `Missing`, `Pending`, `Downloading`, `Verified`,
   `Ready`, `Failed(reason)`;
-- budgets: per-module download, peak on-disk transaction footprint (staging
-  copy + downloads, not just the final size), in-memory fetch-chunk cap,
-  `SpaceProbe` available bytes and bounded `max_concurrent_downloads`;
+- budgets: per-module download, peak on-disk transaction footprint
+  (`current + staging copy + downloads`, used for `max_cache_bytes`) and
+  in-memory fetch-chunk cap. `SpaceProbe` is asked a different question — how
+  many *new* bytes may be allocated — so it is compared with
+  `staging copy + downloads`, never with the peak: bytes already occupied by
+  the cache are not free space, and subtracting them twice would reject
+  transactions that fit a nearly full overlay;
 - offline mode: `ensure(..., allow_network=false)` succeeds only from verified
   cache; a miss is an explicit error and never triggers a silent fetch.
 
@@ -157,12 +166,20 @@ production implementation, and tests use a file-backed fetcher plus explicit
 failure fetchers.
 
 Automatic tests: `cache_manager.rs` (closure/offline, hash mismatch, partial
-download, network failure, insufficient space, rollback, ABI, peak/transaction
-budget, memory budget, 8-way single-flight, aborted transaction, cancelled
-(panicking) fetch and lock recovery, crash recovery from orphan staging and a
-corrupt active pointer) and `lazy_loader.rs` (paired startup, real nous/IKEA/
-Tuya definitions, offline restart, per-device independence with one missing
-module, concurrent startup fetching each shared module once).
+download, network failure, insufficient-space semantics on a nearly full
+overlay, rollback, ABI, peak/transaction budget, memory budget, 8-way
+single-flight, aborted transaction, cancelled (panicking) fetch and lock
+recovery, crash recovery from orphan staging and a corrupt active pointer,
+commit I/O failure keeping the previous generation active) and
+`lazy_loader.rs` (paired startup, real nous/IKEA/Tuya definitions, offline
+restart, per-device independence with one missing module, concurrent startup
+fetching each shared module once, runtime generation switch/retention and a
+failed runtime materialization preserving the active generation).
+`https_fetcher.rs` covers TLS against a local rustls server, Content-Length,
+chunked transfer, same-host and rejected off-host redirects, truncated bodies,
+timeouts, the response-size cap, HTTP errors and SHA-256 mismatch refusal; one
+ignored test validates the public root store, redirects and chunked transfer
+against public HTTPS mirrors.
 
 Routerich synthetic measurement (20 paired devices resolving to one module,
 isolated `/tmp` cache, no production overlay writes):
@@ -177,14 +194,45 @@ baseline startup    p50 22.0 ms / p95 35.9 ms
 under pairing       p50 23.7 ms / p95 49.6 ms
 
 full bridge cold start to 20 device definitions ready (real quickjs
-prepareDefinition, release aarch64):
-  loader startup     2,130.8 ms
-  prepare all        594.3 ms
-  total              2,805.8 ms
+prepareDefinition, release aarch64, run with runtime generations):
+  loader startup     2,042.9 ms
+  prepare all          658.7 ms
+  total              2,727.6 ms
 ```
 
 The pairing fetch downloads only the selected `tuya` fragment closure, not the
 full device catalog; p95 degradation is measured, not assumed.
+
+Single-flight and pairing impact on the same router (artificial fetch latency to
+make network time visible; 3 distinct closures, each module fetched exactly
+once in both runs):
+
+```text
+fetch delay 30 ms    sequential 244.8 ms   concurrent 226.5 ms
+fetch delay 200 ms   sequential 765.7 ms   concurrent 718.0 ms
+```
+
+Concurrent different closures are serialized by the global `ensure_lock`, so the
+elapsed time tracks the sequential sum. Pairing is sequential upstream, startup
+downloads are exceptional and the cached fast path takes no lock, so no
+per-module lock is added without a real bottleneck.
+
+Report-path latency while a new Tuya fragment is downloaded (120 ms per module)
+and prepared on the shared JS worker (300 report samples, 55 overlapping the
+pairing window):
+
+```text
+pairing total        1,719 ms
+baseline p50/p95     2.54 / 5.56 ms
+during   p50/p95     2.42 / 5.95 ms
+during   max           827.8 ms (one report queued behind prepareDefinition)
+```
+
+The download runs on blocking threads and does not stall reports; p50/p95 are
+unchanged. One report waits for the single JS worker's `prepareDefinition`
+job. That head-of-line behavior is inherent to the single-threaded JS realm and
+matches the upstream Node event loop; lowering it needs a scheduler priority
+feature, which is not added without a second, repeated stall measurement.
 
 ## 3b. Bridge wiring and cache consistency
 
@@ -198,6 +246,16 @@ full device catalog; p95 degradation is measured, not assumed.
 - `pair_device` loads the new device's closure through the same cache and
   prepares its definition through the same runtime. Existing devices continue
   using their already-verified modules.
+- Runtime materialization is versioned too: `materialize_runtime_package`
+  writes a complete package into `<base>/generations/.staging-<gen>`, fsyncs
+  it, renames it to `<base>/generations/<gen>` and only then atomically replaces
+  `<base>/active.json`. The base directory and the previously active generation
+  are never deleted before a new generation is complete; the previous
+  generation is retained for a JS worker that is still shutting down and is
+  pruned by the next start. Pairing writes additional modules only into the
+  active generation, through temp+rename (or an immutable inode hard link), so
+  a running worker never sees a partial file. Cache and artifact files are
+  hard-linked when on the same filesystem and copied+fsynced otherwise.
 - ModuleCache now uses immutable generations plus an atomically replaced
   `active.json` pointer and `lkg.json` rollback pointer. Staging is never
   active. `open()` ignores orphan staging/generations, falls back to LKG when
@@ -207,7 +265,11 @@ full device catalog; p95 degradation is measured, not assumed.
 - `ensure` has a cached fast path (no lock for already-ready devices), a global
   activation/budget lock for single-flight behavior, and per-module fetch
   concurrency bounded by `max_concurrent_downloads`. Concurrent ensures never
-  fetch the same module twice or activate overlapping generations.
+  fetch the same module twice or activate overlapping generations. Different
+  closures downloaded concurrently are serialized by the global lock; the
+  measurement in §6 records the cost of that serialization. It is kept
+  because pairing is sequential upstream and startup downloads are exceptional;
+  no per-module lock was added without evidence of a real bottleneck.
 - `converter::http::HttpsFetcher` is the production-shaped fetcher: HTTPS only,
   host fixed by the trusted `modules.retrieval` base (which must end in `/`),
   no device URLs, response cap, connect/read/write timeouts, redirect limit and
@@ -290,8 +352,14 @@ installed side-by-side without the agreed Node removal/external-storage step.
   `ConverterDispatcher::start_lazy`/`pair_device` path; the default bridge
   startup still uses the existing package-root flow and no production
   configuration selects lazy mode yet.
-- `HttpsFetcher` is implemented but has only been unit-tested for URL/path
-  validation; it has not been exercised against a real artifact mirror.
+- `HttpsFetcher` is covered by a local rustls TLS server (TLS, chunked,
+  redirects, truncation, timeout, size cap, 404, hash mismatch) and by a manual
+  run against public HTTPS mirrors (`example.com`, `httpbin.org` redirect and
+  chunked stream). It has not been exercised against a real artifact mirror,
+  because no artifact mirror exists yet.
+- The router overlay was 99% full (568 KB free), so the runtime/cache
+  measurements use `/tmp` (tmpfs) with same-filesystem hard links. A
+  flash-resident runtime measurement needs the package migration.
 - The full artifact generator/oracle commands remain explicit build/research
   steps.
 - No OpenWrt package migration, no live coordinator/MQTT/HA run and no HIL.
@@ -308,15 +376,20 @@ installed side-by-side without the agreed Node removal/external-storage step.
    in every phase have automatic tests;
 6. single-flight, peak disk/memory budgets and per-device startup independence
    have automatic tests;
-7. `start_lazy` materializes only paired closures and prepares real
-   nous/IKEA/Tuya definitions through the existing quickjs dispatcher;
-8. golden parity is 36/36 and the external Lytko definition still prepares.
+7. `start_lazy` materializes only paired closures as immutable runtime
+   generations and prepares real nous/IKEA/Tuya definitions through the
+   existing quickjs dispatcher;
+8. golden parity is 36/36 and the external Lytko definition still prepares;
+9. the space probe compares additional bytes, every commit fsync is checked,
+   and a failed runtime materialization keeps the active generation.
 
 **NO-GO for production enablement** until:
 
 1. the two documented ZCL codec anomalies are fixed or explicitly excluded;
-2. `HttpsFetcher` is validated against the real mirror with the real manifest;
+2. an artifact mirror exists and `HttpsFetcher` is validated against it with a
+   real manifest (public HTTPS mirrors and a local TLS server are covered);
 3. a production configuration selects lazy mode and the OS-supervisor
    (procd) restart path is exercised;
 4. the ZDO frame corpus is expanded;
-5. the overlay migration is agreed and HIL is separately approved.
+5. the overlay migration is agreed and HIL is separately approved (the overlay
+   currently has 568 KB free, so a flash-resident runtime was not measured).

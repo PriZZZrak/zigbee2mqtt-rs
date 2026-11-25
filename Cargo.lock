@@ -1943,6 +1943,7 @@ dependencies = [
  "rustls-rustcrypto",
  "serde_json",
  "serde_yaml_ng",
+ "sha2",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",

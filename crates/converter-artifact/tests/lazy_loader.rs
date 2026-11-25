@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use converter_artifact::{
     CacheConfig, FetchError, LazyConfig, LazyLoader, ModuleFetcher, ModuleRecord, ModuleState,
+    StartupReport,
 };
 use serde_json::json;
 
@@ -326,5 +327,127 @@ fn parallel_pairing_fetches_each_shared_module_once() {
     assert!(
         calls.keys().any(|module| module.starts_with("tuya")),
         "calls: {calls:?}"
+    );
+}
+
+fn active_generation(base: &Path) -> String {
+    let value: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(base.join("active.json")).expect("runtime pointer"))
+            .unwrap();
+    value["generation"].as_str().unwrap().to_owned()
+}
+
+fn runtime_loader(artifact: &Path, cache: &Path) -> (LazyLoader, StartupReport) {
+    let db = temp("runtime-db");
+    database(&db);
+    let loader = LazyLoader::open(LazyConfig {
+        artifact_dir: artifact.to_path_buf(),
+        cache: CacheConfig::new(cache),
+        host_abi: 1,
+        engine: "quickjs-oxide".to_owned(),
+        engine_version: "0.5.0".to_owned(),
+    })
+    .unwrap();
+    let report = loader
+        .startup(
+            &db.join("database.db"),
+            &SourceFetcher {
+                dir: artifact.to_path_buf(),
+            },
+            true,
+        )
+        .unwrap();
+    (loader, report)
+}
+
+#[test]
+fn runtime_materialization_keeps_previous_generation_and_switches_pointer() {
+    let Ok(artifact) = std::env::var("CONVERTER_ARTIFACT_DIR") else {
+        return;
+    };
+    let artifact = PathBuf::from(artifact);
+    let (loader, report) = runtime_loader(&artifact, &temp("runtime-cache"));
+    let base = temp("runtime-base");
+    let first = loader
+        .materialize_runtime_package(&artifact, &report, &base)
+        .unwrap();
+    assert!(first.join("dist/index.js").is_file());
+    assert!(first.join("dist/devices/nous.js").is_file());
+    assert_eq!(
+        active_generation(&base),
+        first.file_name().unwrap().to_str().unwrap()
+    );
+    let second = loader
+        .materialize_runtime_package(&artifact, &report, &base)
+        .unwrap();
+    assert_ne!(first, second);
+    assert!(
+        first.is_dir(),
+        "previous generation must survive for a running worker"
+    );
+    assert_eq!(
+        active_generation(&base),
+        second.file_name().unwrap().to_str().unwrap()
+    );
+    let third = loader
+        .materialize_runtime_package(&artifact, &report, &base)
+        .unwrap();
+    assert!(
+        !first.exists(),
+        "generations older than active+previous are pruned"
+    );
+    assert!(second.is_dir());
+    assert!(third.join("dist/devices/nous.js").is_file());
+    let generations = std::fs::read_dir(base.join("generations")).unwrap().count();
+    assert_eq!(generations, 2, "active and previous only");
+}
+
+#[cfg(unix)]
+#[test]
+fn runtime_materialization_io_error_preserves_active_generation() {
+    use std::os::unix::fs::PermissionsExt;
+    let Ok(artifact) = std::env::var("CONVERTER_ARTIFACT_DIR") else {
+        return;
+    };
+    let artifact = PathBuf::from(artifact);
+    let (loader, report) = runtime_loader(&artifact, &temp("runtime-io-cache"));
+    let base = temp("runtime-io-base");
+    let first = loader
+        .materialize_runtime_package(&artifact, &report, &base)
+        .unwrap();
+    let generations = base.join("generations");
+    // Permissions are not enforced for root; skip instead of asserting a false
+    // negative.
+    let probe = generations.join(".permission-probe");
+    if std::fs::write(&probe, b"x").is_ok() {
+        let _ = std::fs::remove_file(&probe);
+        return;
+    }
+    let previous = std::fs::metadata(&generations).unwrap().permissions();
+    std::fs::set_permissions(&generations, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let result = loader.materialize_runtime_package(&artifact, &report, &base);
+    std::fs::set_permissions(&generations, previous).unwrap();
+    assert!(result.is_err());
+    assert!(first.join("dist/index.js").is_file());
+    assert_eq!(
+        active_generation(&base),
+        first.file_name().unwrap().to_str().unwrap(),
+        "failed materialization must not move the pointer"
+    );
+    let staging: Vec<_> = std::fs::read_dir(&generations)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .filter(|name| name.starts_with(".staging-"))
+        .collect();
+    assert!(staging.is_empty(), "staging left behind: {staging:?}");
+    // Recovery: the next attempt succeeds and activates a new generation.
+    let second = loader
+        .materialize_runtime_package(&artifact, &report, &base)
+        .unwrap();
+    assert_ne!(first, second);
+    assert_eq!(
+        active_generation(&base),
+        second.file_name().unwrap().to_str().unwrap()
     );
 }

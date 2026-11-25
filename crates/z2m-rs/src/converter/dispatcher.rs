@@ -129,42 +129,48 @@ impl ConverterDispatcher {
     }
 
     /// Start the dispatcher from a trusted artifact cache and the existing
-    /// device database. Only modules needed by paired devices are materialized
-    /// into the runtime package root; the full device catalog is never copied.
+    /// device database. Only modules needed by paired devices are materialized,
+    /// into a new immutable runtime generation; the full device catalog is
+    /// never copied and the previous generation is left intact for a worker
+    /// that is still shutting down.
     pub async fn start_lazy(
         config: DispatcherConfig,
         transport: Arc<dyn ConverterTransport>,
         lazy_config: LazyConfig,
         database: std::path::PathBuf,
         fetcher: Arc<dyn ModuleFetcher>,
-        runtime_root: std::path::PathBuf,
+        runtime_base: std::path::PathBuf,
         allow_network: bool,
     ) -> Result<Arc<Self>, String> {
         let artifact_dir = lazy_config.artifact_dir.clone();
-        let root_for_task = runtime_root.clone();
         let fetcher_for_task = Arc::clone(&fetcher);
         let prepared = tokio::task::spawn_blocking(move || {
             let lazy = LazyLoader::open(lazy_config)?;
             let report = lazy.startup(&database, fetcher_for_task.as_ref(), allow_network)?;
-            lazy.materialize_runtime_package(&artifact_dir, &report, &root_for_task)?;
-            Ok::<_, converter_artifact::ArtifactError>((Arc::new(lazy), report))
+            let root = lazy.materialize_runtime_package(&artifact_dir, &report, &runtime_base)?;
+            Ok::<_, converter_artifact::ArtifactError>((Arc::new(lazy), report, root))
         })
         .await
         .map_err(|error| format!("lazy loader task: {error}"))?
         .map_err(|error| error.to_string())?;
-        let (lazy, report) = prepared;
+        let (lazy, report, root) = prepared;
         let mut config = config;
-        config.runtime.package_root = runtime_root.clone();
+        config.runtime.package_root = root.clone();
         let dispatcher = Self::start(config, transport).await?;
         *dispatcher.startup_report.lock().unwrap() = Some(report);
         *dispatcher.lazy.lock().unwrap() = Some(lazy);
         *dispatcher.lazy_fetcher.lock().unwrap() = Some(fetcher);
-        *dispatcher.runtime_root.lock().unwrap() = Some(runtime_root);
+        *dispatcher.runtime_root.lock().unwrap() = Some(root);
         Ok(dispatcher)
     }
 
     pub fn startup_report(&self) -> Option<StartupReport> {
         self.startup_report.lock().unwrap().clone()
+    }
+
+    /// Active immutable runtime package root used by the running worker.
+    pub fn runtime_root(&self) -> Option<std::path::PathBuf> {
+        self.runtime_root.lock().unwrap().clone()
     }
 
     pub fn generation(&self) -> u64 {

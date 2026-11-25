@@ -446,3 +446,107 @@ fn cancelled_fetch_aborts_cleanly_and_does_not_poison_the_cache() {
         .unwrap();
     assert_eq!(cache.load_ready("a").unwrap(), b"module-a");
 }
+
+struct FixedSpace(u64);
+impl SpaceProbe for FixedSpace {
+    fn available_bytes(&self) -> Option<u64> {
+        Some(self.0)
+    }
+}
+
+#[test]
+fn space_probe_requires_only_additional_bytes_not_the_occupied_cache() {
+    let fixture = fixture();
+    let cache_root = temp("space");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    cache
+        .ensure(&["b".to_owned()], &fetcher_impl, &config(&cache_root), true)
+        .unwrap();
+    // Active generation holds "b" (8 B). Adding "c" (8 B) needs 8 B for the
+    // staging copy plus 8 B for the download; the 8 B already occupied by "b"
+    // are not free space and must not be added on top.
+    let mut nearly_full = config(&cache_root);
+    nearly_full.space_probe = Some(Arc::new(FixedSpace(15)));
+    let error = cache
+        .ensure(&["c".to_owned()], &fetcher_impl, &nearly_full, true)
+        .unwrap_err();
+    assert!(error.to_string().contains("additional"), "{error}");
+    assert!(cache.load_ready("c").is_err());
+    // 16 B free is exactly enough, although the transaction peak (24 B) is
+    // larger because the cache's own bytes are already allocated.
+    let mut exact = config(&cache_root);
+    exact.space_probe = Some(Arc::new(FixedSpace(16)));
+    cache
+        .ensure(&["c".to_owned()], &fetcher_impl, &exact, true)
+        .unwrap();
+    assert_eq!(cache.load_ready("c").unwrap(), b"module-c");
+}
+
+#[cfg(unix)]
+#[test]
+fn generation_commit_io_error_keeps_the_previous_generation_active() {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = fixture();
+    let cache_root = temp("io-error");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    cache
+        .ensure(&["b".to_owned()], &fetcher_impl, &config(&cache_root), true)
+        .unwrap();
+    let generations = cache.root().join("generations");
+    let probe = generations.join(".permission-probe");
+    if std::fs::write(&probe, b"x").is_ok() {
+        let _ = std::fs::remove_file(&probe);
+        return;
+    }
+    let previous = std::fs::metadata(&generations).unwrap().permissions();
+    std::fs::set_permissions(&generations, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let result = cache.ensure(&["c".to_owned()], &fetcher_impl, &config(&cache_root), true);
+    std::fs::set_permissions(&generations, previous).unwrap();
+    assert!(
+        result.is_err(),
+        "rename into a read-only directory must fail"
+    );
+    // The active generation is untouched and still loadable, and the failed
+    // staging directory was discarded.
+    assert_eq!(cache.load_ready("b").unwrap(), b"module-b");
+    assert!(cache.load_ready("c").is_err());
+    let staging: Vec<_> = std::fs::read_dir(cache.root().join("staging"))
+        .unwrap()
+        .flatten()
+        .collect();
+    assert!(staging.is_empty(), "staging left behind: {staging:?}");
+    // The cache remains usable once the filesystem recovers.
+    cache
+        .ensure(&["c".to_owned()], &fetcher_impl, &config(&cache_root), true)
+        .unwrap();
+    assert_eq!(cache.load_ready("c").unwrap(), b"module-c");
+}
+
+#[test]
+fn open_recovers_when_the_active_generation_directory_is_gone() {
+    let fixture = fixture();
+    let cache_root = temp("missing-generation");
+    let cache = ModuleCache::open(config(&cache_root), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    cache
+        .ensure(&["b".to_owned()], &fetcher_impl, &config(&cache_root), true)
+        .unwrap();
+    let active = cache.active_module_path("b").unwrap();
+    let active_generation = active.parent().unwrap().to_path_buf();
+    let old = cache.root().join("generations/old");
+    std::fs::create_dir_all(&old).unwrap();
+    std::fs::copy(&active, old.join("b.js")).unwrap();
+    let lkg = json!({"generation":"old","modules":{"b":hash(b"module-b")}});
+    std::fs::write(
+        cache.root().join("lkg.json"),
+        serde_json::to_vec(&lkg).unwrap(),
+    )
+    .unwrap();
+    std::fs::remove_dir_all(&active_generation).unwrap();
+    drop(cache);
+    let reopened = ModuleCache::open(config(&cache_root), fixture.manifest).unwrap();
+    assert_eq!(reopened.state("b"), ModuleState::Ready);
+    assert_eq!(reopened.load_ready("b").unwrap(), b"module-b");
+}

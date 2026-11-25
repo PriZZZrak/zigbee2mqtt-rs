@@ -1,0 +1,34 @@
+{
+  "localTlsServer": {
+    "transport": "rustls + rustls-rustcrypto, EC P-256 self-signed cert with SAN DNS:localhost/IP:127.0.0.1, trusted via an extra PEM root",
+    "cases": [
+      "TLS handshake + Content-Length body",
+      "chunked transfer",
+      "same-host 302 followed",
+      "cross-host redirect rejected",
+      "truncated Content-Length body",
+      "read/total timeout",
+      "response size cap from headers",
+      "HTTP 404",
+      "SHA-256 mismatch rejected by ModuleCache (no activation)"
+    ],
+    "result": "5 passed, 1 ignored"
+  },
+  "publicMirrors": {
+    "command": "cargo test -p z2m-rs --test https_fetcher public_mirror -- --ignored",
+    "cases": [
+      "https://example.com/ (public root store + real TLS)",
+      "https://httpbin.org/redirect/2 (two same-host redirects)",
+      "https://httpbin.org/stream/3 (chunked transfer)"
+    ],
+    "result": "1 passed",
+    "date": "2026-11-25"
+  },
+  "limits": [
+    "no artifact mirror exists yet, so the manifest retrieval URL points at a placeholder",
+    "DNS resolution has no explicit timeout (OS resolver), connection and reads do"
+  ],
+  "notExercised": [
+    "production artifact mirror with signed manifest"
+  ]
+}
