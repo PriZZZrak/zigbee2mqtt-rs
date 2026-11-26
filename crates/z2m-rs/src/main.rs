@@ -129,6 +129,19 @@ async fn main() {
         ),
     }
 
+    match z2m_rs::converter::startup::install_from_env(&zigbee, &data_path).await {
+        Ok(true) => controller
+            .logger
+            .lock()
+            .unwrap()
+            .info("Lazy converter runtime enabled", "z2m"),
+        Ok(false) => {}
+        Err(error) => controller.logger.lock().unwrap().error(
+            &format!("Lazy converter runtime disabled: {error}"),
+            "z2m",
+        ),
+    }
+
     if let Err(error) = controller.start().await {
         controller
             .logger

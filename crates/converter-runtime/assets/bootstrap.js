@@ -413,7 +413,7 @@
       },
       read: function (cluster, attributes, options) {
         var names = attributes || [];
-        var op = { op: "read", endpoint: endpoint.ID, cluster: String(cluster), attributes: names.slice(), options: cloneRecord(options || null) };
+        var op = { op: "read", device: device.ieeeAddr, endpoint: endpoint.ID, cluster: String(cluster), attributes: names.slice(), options: cloneRecord(options || null) };
         state.calls.push(op);
         var result = {};
         for (var i = 0; i < names.length; i++) {
@@ -425,17 +425,17 @@
         });
       },
       write: function (cluster, attributes, options) {
-        var op = { op: "write", endpoint: endpoint.ID, cluster: String(cluster), attributes: cloneRecord(attributes || {}), options: cloneRecord(options || null) };
+        var op = { op: "write", device: device.ieeeAddr, endpoint: endpoint.ID, cluster: String(cluster), attributes: cloneRecord(attributes || {}), options: cloneRecord(options || null) };
         state.calls.push(op);
         return hostCall(op, jobId, jobGeneration, state);
       },
       command: function (cluster, command, payload, options) {
-        var op = { op: "command", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}), options: cloneRecord(options || null) };
+        var op = { op: "command", device: device.ieeeAddr, endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}), options: cloneRecord(options || null) };
         state.calls.push(op);
         return hostCall(op, jobId, jobGeneration, state);
       },
       commandResponse: function (cluster, command, payload, options, transactionSequenceNumber) {
-        var op = { op: "commandResponse", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}), options: cloneRecord(options || null), transactionSequenceNumber: transactionSequenceNumber ?? null };
+        var op = { op: "commandResponse", device: device.ieeeAddr, endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}), options: cloneRecord(options || null), transactionSequenceNumber: transactionSequenceNumber ?? null };
         state.calls.push(op);
         return hostCall(op, jobId, jobGeneration, state).then(function () { return { status: 0 }; });
       },
@@ -443,6 +443,7 @@
       bind: function (cluster, target, options) {
         var op = {
           op: "bind",
+          device: device.ieeeAddr,
           endpoint: endpoint.ID,
           cluster: String(cluster),
           target: target && (target.ID ?? target.groupID ?? target.groupId),
@@ -454,10 +455,47 @@
         endpoint.binds.push({ cluster: cluster, target: target });
         return hostCall(op, jobId, jobGeneration, state);
       },
-      configureReporting: function (cluster, items, options) {
-        var op = { op: "configureReporting", endpoint: endpoint.ID, cluster: String(cluster), items: cloneRecord(items), options: cloneRecord(options || null) };
+      unbind: function (cluster, target, force) {
+        var op = {
+          op: "unbind",
+          device: device.ieeeAddr,
+          endpoint: endpoint.ID,
+          cluster: String(cluster),
+          target: target && (target.ID ?? target.groupID ?? target.groupId),
+          targetType: target && target.groupID !== undefined ? "group" : "endpoint",
+          targetIeee: target && target.deviceIeeeAddress ? target.deviceIeeeAddress : null,
+          force: force === true,
+        };
         state.calls.push(op);
-        endpoint.configuredReportings.push({ cluster: cluster, items: items });
+        return hostCall(op, jobId, jobGeneration, state);
+      },
+      configureReporting: function (cluster, items, options) {
+        var op = { op: "configureReporting", device: device.ieeeAddr, endpoint: endpoint.ID, cluster: String(cluster), items: cloneRecord(items), options: cloneRecord(options || null) };
+        state.calls.push(op);
+        // Upstream `Endpoint.configuredReportings` exposes resolved objects;
+        // onEvent handlers read `c.cluster.name` / `c.attribute.name`.
+        var configuredCluster = zcl.Utils.getCluster(cluster);
+        for (var ci = 0; ci < (items || []).length; ci++) {
+          var configuredItem = items[ci];
+          var configuredAttribute = configuredItem && configuredItem.attribute;
+          var resolvedAttribute = configuredAttribute && typeof configuredAttribute === "object"
+            ? configuredAttribute
+            : (configuredCluster.attributes && configuredCluster.attributes[configuredAttribute]);
+          var resolvedAttributeName = (resolvedAttribute && resolvedAttribute.name) || configuredAttribute;
+          // Upstream replaces an existing entry for the same cluster/attribute.
+          var existing = endpoint.configuredReportings;
+          endpoint.configuredReportings = existing.filter(function (entry) {
+            return !(entry.cluster && entry.cluster.ID === configuredCluster.ID
+              && entry.attribute && entry.attribute.name === resolvedAttributeName);
+          });
+          endpoint.configuredReportings.push({
+            cluster: configuredCluster,
+            attribute: resolvedAttribute || { name: resolvedAttributeName },
+            minimumReportInterval: configuredItem ? configuredItem.minimumReportInterval : 0,
+            maximumReportInterval: configuredItem ? configuredItem.maximumReportInterval : 0,
+            reportableChange: configuredItem ? configuredItem.reportableChange : 0,
+          });
+        }
         return hostCall(op, jobId, jobGeneration, state);
       },
       readResponse: function () { return Promise.resolve(); },
@@ -542,7 +580,11 @@
     }
     if (!raw) {
       raw = definitions.find(function (definition) {
-        var zigbeeModels = Array.isArray(definition.zigbeeModel) ? definition.zigbeeModel : [definition.zigbeeModel];
+        var metadataKey = (scenario.source || "") + "|" + ((scenario.definition && scenario.definition.file) || "") + "|" + (scenario.model || "") + "|" + (canCacheMetadata(definition) ? "static" : "dynamic");
+      if (canCacheMetadata(definition) && metadataCache[metadataKey]) {
+        return { result: metadataCache[metadataKey], published: [], calls: [], converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
+      }
+      var zigbeeModels = Array.isArray(definition.zigbeeModel) ? definition.zigbeeModel : [definition.zigbeeModel];
         return zigbeeModels.some(function (model) {
           return String(model || "").trim().toLowerCase() === normalized;
         });
@@ -553,10 +595,15 @@
     return raw;
   }
 
+  var metadataCache = {};
   function prepare(spec) {
     var key = spec.source + "|" + (spec.file || "") + "|" + spec.model;
     if (!preparedCache[key]) preparedCache[key] = pkg.prepareDefinition(findDefinition(spec));
     return preparedCache[key];
+  }
+  function canCacheMetadata(definition) {
+    // Exposes that depend on the device/options must be resolved per prepare.
+    return typeof definition.exposes !== "function";
   }
 
   async function runScenario(scenario) {
@@ -649,6 +696,10 @@
       if (scenario.__metadata !== true) {
         return { result: null, published: [], calls: [], converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
       }
+      var metadataKey = (scenario.source || "") + "|" + ((scenario.definition && scenario.definition.file) || "") + "|" + (scenario.model || "") + "|" + (canCacheMetadata(definition) ? "static" : "dynamic");
+      if (canCacheMetadata(definition) && metadataCache[metadataKey]) {
+        return { result: metadataCache[metadataKey], published: [], calls: [], converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
+      }
       var zigbeeModels = Array.isArray(definition.zigbeeModel)
         ? definition.zigbeeModel
         : (definition.zigbeeModel ? [definition.zigbeeModel] : []);
@@ -673,7 +724,14 @@
         }),
         hasConfigure: typeof definition.configure === "function",
         hasOnEvent: typeof definition.onEvent === "function",
+        exposes: typeof definition.exposes === "function"
+          ? definition.exposes(device, {})
+          : (definition.exposes || []),
+        meta: definition.meta || {},
+        options: definition.options || [],
+        staticExposes: typeof definition.exposes !== "function",
       };
+      if (canCacheMetadata(definition)) metadataCache[metadataKey] = metadata;
       return { result: metadata, published: [], calls: [], converterMs: converterMs, hostMs: jobState.hostMs, hostCalls: jobState.hostCalls, perf: jobState.perf };
     }
 

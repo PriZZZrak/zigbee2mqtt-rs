@@ -6,9 +6,8 @@
 //! installs the dispatcher on `Zigbee` before the coordinator starts. New
 //! devices are prepared later by `Zigbee::schedule_converter_pairing`.
 //!
-//! Only the dry-run endpoint transport is accepted in this stage: the real
-//! Zigbee commands are recorded through the existing Endpoint/ZCL API and never
-//! transmitted.
+//! `Z2M_CONVERTER_TRANSPORT` selects `endpoint` (real ZCL/ZDO operations through
+//! the existing Endpoint model) or `dry-run` (records frames, never sends).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -16,7 +15,8 @@ use std::sync::Arc;
 use converter_artifact::{CacheConfig, FetchError, LazyConfig, ModuleFetcher, ModuleRecord};
 use serde_json::Value;
 
-use crate::converter::transport::DryRunEndpointTransport;
+use crate::converter::http::HttpsFetcher;
+use crate::converter::transport::{DryRunEndpointTransport, EndpointTransport};
 use crate::converter::{ConverterDispatcher, ConverterTransport, DispatcherConfig};
 use crate::zigbee::Zigbee;
 
@@ -53,6 +53,10 @@ pub struct LazyStartupConfig {
     pub herdsman_dir: PathBuf,
     pub database: PathBuf,
     pub allow_network: bool,
+    /// `endpoint` (real) or `dry-run` (recording).
+    pub transport: String,
+    /// `file` (installed artifact) or `https` (trusted manifest retrieval).
+    pub fetch: String,
 }
 
 impl LazyStartupConfig {
@@ -63,9 +67,9 @@ impl LazyStartupConfig {
         }
         let transport =
             std::env::var("Z2M_CONVERTER_TRANSPORT").unwrap_or_else(|_| "dry-run".to_owned());
-        if transport != "dry-run" {
+        if transport != "dry-run" && transport != "endpoint" {
             return Err(format!(
-                "unsupported converter transport '{transport}'; only 'dry-run' is available in this stage"
+                "unsupported converter transport '{transport}'; use 'endpoint' or 'dry-run'"
             ));
         }
         let artifact_dir = required_path("Z2M_CONVERTER_ARTIFACT_DIR")?;
@@ -76,6 +80,12 @@ impl LazyStartupConfig {
         let runtime_dir = std::env::var("Z2M_CONVERTER_RUNTIME_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| data_path.join("converter-runtime"));
+        let fetch = std::env::var("Z2M_CONVERTER_FETCH").unwrap_or_else(|_| "file".to_owned());
+        if fetch != "file" && fetch != "https" {
+            return Err(format!(
+                "unsupported converter fetch '{fetch}'; use 'file' or 'https'"
+            ));
+        }
         let allow_network =
             std::env::var("Z2M_CONVERTER_ALLOW_NETWORK").ok().as_deref() == Some("1");
         Ok(Some(Self {
@@ -85,6 +95,8 @@ impl LazyStartupConfig {
             herdsman_dir,
             database: data_path.join("database.db"),
             allow_network,
+            transport,
+            fetch,
         }))
     }
 }
@@ -109,7 +121,39 @@ pub async fn install_from_env(zigbee: &Arc<Zigbee>, data_path: &Path) -> Result<
             device.zh.get_endpoint(endpoint)
         })
     };
-    let transport: Arc<dyn ConverterTransport> = Arc::new(DryRunEndpointTransport::new(resolver));
+    let transport: Arc<dyn ConverterTransport> = match config.transport.as_str() {
+        "endpoint" => Arc::new(EndpointTransport::new(resolver)),
+        "dry-run" => Arc::new(DryRunEndpointTransport::new(resolver)),
+        other => return Err(format!("unsupported converter transport '{other}'")),
+    };
+    let fetcher: Arc<dyn ModuleFetcher> = match config.fetch.as_str() {
+        "file" => Arc::new(ArtifactDirFetcher::new(&config.artifact_dir)),
+        "https" => {
+            if !config.allow_network {
+                return Err(
+                    "Z2M_CONVERTER_FETCH=https requires Z2M_CONVERTER_ALLOW_NETWORK=1".to_owned(),
+                );
+            }
+            Arc::new(
+                HttpsFetcher::from_artifact_dir(&config.artifact_dir)
+                    .map_err(|error| format!("converter artifact fetch: {error}"))?,
+            )
+        }
+        other => return Err(format!("unsupported converter fetch '{other}'")),
+    };
+    let dispatcher = install(zigbee, &config, transport, fetcher).await?;
+    zigbee.set_converter_dispatcher(Arc::clone(&dispatcher));
+    Ok(true)
+}
+
+/// Install the lazy dispatcher with an explicit transport. Shared by the env
+/// entry point and tests.
+pub async fn install(
+    zigbee: &Arc<Zigbee>,
+    config: &LazyStartupConfig,
+    transport: Arc<dyn ConverterTransport>,
+    fetcher: Arc<dyn ModuleFetcher>,
+) -> Result<Arc<ConverterDispatcher>, String> {
     let dispatcher = ConverterDispatcher::start_lazy(
         DispatcherConfig::new(&config.artifact_dir, &config.herdsman_dir),
         transport,
@@ -120,8 +164,8 @@ pub async fn install_from_env(zigbee: &Arc<Zigbee>, data_path: &Path) -> Result<
             engine: "quickjs-oxide".to_owned(),
             engine_version: "0.5.0".to_owned(),
         },
-        config.database,
-        Arc::new(ArtifactDirFetcher::new(&config.artifact_dir)),
+        config.database.clone(),
+        fetcher,
         config.runtime_dir.clone(),
         config.allow_network,
     )
@@ -129,7 +173,8 @@ pub async fn install_from_env(zigbee: &Arc<Zigbee>, data_path: &Path) -> Result<
     let report = dispatcher.startup_report().unwrap_or_default();
     zigbee.logger().lock().unwrap().info(
         &format!(
-            "Lazy converters: {} of {} paired devices resolved, {} module(s), {} byte(s) fetched, runtime generation '{}'",
+            "Lazy converters ({}): {} of {} paired devices resolved, {} module(s), {} byte(s) fetched, runtime generation '{}'",
+            config.transport,
             report.resolved,
             report.devices,
             report.modules_loaded.len(),
@@ -148,8 +193,7 @@ pub async fn install_from_env(zigbee: &Arc<Zigbee>, data_path: &Path) -> Result<
             .unwrap()
             .debug(&format!("Lazy converters: {ieee}: {error}"), "z2m");
     }
-    zigbee.set_converter_dispatcher(dispatcher);
-    Ok(true)
+    Ok(dispatcher)
 }
 
 /// The JSON log payload used by diagnostics/tests.

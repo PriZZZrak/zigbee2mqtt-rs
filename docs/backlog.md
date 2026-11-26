@@ -2,10 +2,11 @@
 
 ## PERF-001 — report delay during manual pairing (low priority)
 
-- **Observed:** one report can wait up to ~0.85 s while `prepareDefinition` of a
-  newly paired device occupies the single JS worker. Measured on Routerich:
-  300 report samples, 52 overlapping a 120 ms/module Tuya download; p50/p95
-  unchanged (2.50/6.02 ms baseline, 2.66/6.10 ms during pairing), max 847 ms.
+- **Observed:** one report can wait up to ~0.94 s while `prepareDefinition` of a
+  newly paired device occupies the single JS worker. Measured on Routerich
+  (2026-11-26): 300 report samples, 40 overlapping a 120 ms/module Tuya
+  download; p50/p95 unchanged (2.90/8.35 ms baseline, 2.81/5.60 ms during
+  pairing), max 932 ms.
 - **Cause:** single-threaded JS realm; the download itself runs on blocking
   threads and does not stall reports.
 - **Decision (2026-11-26):** accepted as low-priority technical debt. Do not add

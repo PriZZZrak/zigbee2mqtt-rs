@@ -33,6 +33,32 @@ These must never be issued against a live installation:
 - any write to `ref/configuration.yaml`, the Node.js data directory, or the
   production overlay without a migration plan.
 
+## 2a. Two deployment variants
+
+### Variant A — dedicated test coordinator (preferred)
+
+- Use a separate Dongle-P/test coordinator flashed with the same Z-Stack
+  coordinator firmware and a dedicated test network.
+- The live Dongle-P and the Node.js service stay untouched for the whole run.
+- Pair one dedicated lamp/switch to the test network; no production devices.
+- The Rust service owns the test serial port exclusively.
+
+### Variant B — agreed switchover of the existing Dongle-P
+
+Only inside an approved maintenance window and with a verified backup:
+
+1. Stop the Node.js service and wait until the serial device is released.
+2. Verify no process holds the port (`fuser /dev/ttyACM0`, `lsof`); never run
+   both services.
+3. Start the Rust service with the existing network database and
+   `Z2M_CONVERTER_TRANSPORT=endpoint`.
+4. Run the safe operation order below; capture all evidence.
+5. Rollback: stop the Rust service, confirm the port is free, restart the
+   Node.js service with its untouched data directory.
+
+Simultaneous access by two services to one serial port is forbidden. The
+switchover must record the exact stop/start times and the port owner.
+
 ## 3. Prerequisites
 
 1. Dedicated test coordinator (or an explicit maintenance window agreed with
@@ -42,8 +68,9 @@ These must never be issued against a live installation:
 3. Artifact installed on the overlay (shared tree ~2.4 MB + selected modules)
    or on external storage; the overlay currently has ~568 KB free, so the
    package migration must be agreed first.
-4. Isolated data directory (`Z2M_DATA_DIR`) and MQTT topic prefix; Node.js
-   service stays running and keeps its own data directory.
+4. Isolated data directory (`Z2M_DATA_DIR`) and MQTT topic prefix. Variant A
+   keeps Node.js running; Variant B stops it for the window and keeps its data
+   directory untouched.
 5. `Z2M_CONVERTER_LAZY=1`, `Z2M_CONVERTER_TRANSPORT=endpoint` (real transport;
    this build only supports `dry-run`), artifact/herdsman/cache/runtime paths
    set explicitly.
@@ -91,7 +118,13 @@ These must never be issued against a live installation:
 - restart/reboot logs and data-loss check (`database.db`, `state.json`,
   `configuration.yaml` hashes before/after).
 
-## 7. Approval gate
+## 7. Readiness evidence
+
+`docs/hil-readiness.md` lists the automatic tests, live devices, allowed
+commands, backups and the exact rollback conditions for this build. HIL starts
+only when that report is GO.
+
+## 8. Approval gate
 
 HIL starts only after the user approves:
 

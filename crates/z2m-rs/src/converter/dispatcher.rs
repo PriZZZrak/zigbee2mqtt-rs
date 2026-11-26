@@ -25,8 +25,8 @@ use tokio::task::JoinHandle;
 use zigbee_apiarist::controller::model::device::Device as ZhDevice;
 use zigbee_apiarist::controller::model::endpoint::Endpoint as ZhEndpoint;
 use zigbee_converters::{
-    ConvertData, ConvertMeta, Definition, DefinitionRef, FromZigbeeConverter, OnEventEvent,
-    PublishCallback, ToMeta, ToTarget, ToZigbeeConverter, ToZigbeeResult,
+    ConvertData, ConvertMeta, Definition, DefinitionRef, Expose, Exposes, FromZigbeeConverter,
+    OnEventEvent, PublishCallback, ToMeta, ToTarget, ToZigbeeConverter, ToZigbeeResult,
 };
 
 use converter_artifact::{
@@ -69,6 +69,9 @@ pub struct DefinitionMetadata {
     to_zigbee: Vec<Vec<String>>,
     has_configure: bool,
     has_on_event: bool,
+    exposes: Vec<Expose>,
+    static_exposes: bool,
+    meta: Value,
 }
 
 #[derive(Clone, Debug)]
@@ -93,6 +96,7 @@ pub struct ConverterDispatcher {
     lazy_fetcher: Mutex<Option<Arc<dyn ModuleFetcher>>>,
     runtime_root: Mutex<Option<std::path::PathBuf>>,
     startup_report: Mutex<Option<StartupReport>>,
+    prepared_cache: Mutex<HashMap<String, PreparedDefinition>>,
 }
 
 impl ConverterDispatcher {
@@ -118,6 +122,7 @@ impl ConverterDispatcher {
             lazy_fetcher: Mutex::new(None),
             runtime_root: Mutex::new(None),
             startup_report: Mutex::new(None),
+            prepared_cache: Mutex::new(HashMap::new()),
         });
         dispatcher.install_channels()?;
         Ok(dispatcher)
@@ -375,6 +380,19 @@ impl ConverterDispatcher {
         } else {
             &["package"]
         };
+        let cache_key =
+            |source: &str| format!("{source}|{}|{model}", definition_file.unwrap_or_default());
+        for source in sources {
+            if let Some(cached) = self
+                .prepared_cache
+                .lock()
+                .unwrap()
+                .get(&cache_key(source))
+                .cloned()
+            {
+                return Ok(cached);
+            }
+        }
         let mut last_error = String::new();
         for source in sources {
             let mut scenario = self.base_scenario(source, &model);
@@ -413,12 +431,19 @@ impl ConverterDispatcher {
             let metadata_value = result.get("result").cloned().unwrap_or(Value::Null);
             let metadata = parse_metadata(&metadata_value)?;
             let definition = build_definition(Arc::clone(self), source, &model, &metadata);
-            return Ok(PreparedDefinition {
+            let prepared = PreparedDefinition {
                 definition,
                 metadata,
                 source: (*source).to_owned(),
                 lookup_model: model.clone(),
-            });
+            };
+            if prepared.metadata.static_exposes {
+                self.prepared_cache
+                    .lock()
+                    .unwrap()
+                    .insert(cache_key(source), prepared.clone());
+            }
+            return Ok(prepared);
         }
         Err(if last_error.is_empty() {
             format!("definition not found for '{model}'")
@@ -842,6 +867,12 @@ fn parse_metadata(value: &Value) -> Result<DefinitionMetadata, String> {
                 .collect()
         })
         .unwrap_or_default();
+    let exposes = value
+        .get("exposes")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().map(Expose::from_json).collect())
+        .unwrap_or_default();
+    let meta = value.get("meta").cloned().unwrap_or(Value::Null);
     Ok(DefinitionMetadata {
         model,
         vendor: value
@@ -871,6 +902,12 @@ fn parse_metadata(value: &Value) -> Result<DefinitionMetadata, String> {
             .get("hasOnEvent")
             .and_then(Value::as_bool)
             .unwrap_or(false),
+        exposes,
+        static_exposes: value
+            .get("staticExposes")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        meta,
     })
 }
 
@@ -884,6 +921,8 @@ fn build_definition(
     definition.version = metadata.version.clone();
     definition.endpoint = metadata.endpoint.clone();
     definition.zigbee_model = metadata.zigbee_model.clone();
+    definition.exposes = Exposes::Static(metadata.exposes.clone());
+    definition.meta = metadata.meta.clone();
     if definition.zigbee_model.is_empty() {
         // Fingerprint-only definitions are not indexed by the R1 registry;
         // the lookup key keeps such devices resolvable in the offline stage.

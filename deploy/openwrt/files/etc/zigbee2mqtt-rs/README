@@ -1,0 +1,4 @@
+Runtime state is kept outside the overlay where possible:
+  /var/lib/zigbee2mqtt-rs/cache    converter module cache generations
+  /var/lib/zigbee2mqtt-rs/runtime  materialized JS package generations
+Both keep active.json + lkg.json; see deploy/openwrt/README.md for rollback.

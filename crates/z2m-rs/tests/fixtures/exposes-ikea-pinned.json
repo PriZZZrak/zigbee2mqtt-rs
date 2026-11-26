@@ -1,0 +1,219 @@
+{
+  "revision": "zigbee-herdsman-converters 26.125.0",
+  "model": "TRADFRI bulb E27 WS opal 1000lm",
+  "exposes": [
+    {
+      "type": "light",
+      "features": [
+        {
+          "name": "state",
+          "label": "State",
+          "access": 7,
+          "type": "binary",
+          "property": "state",
+          "description": "On/off state of this light",
+          "value_on": "ON",
+          "value_off": "OFF",
+          "value_toggle": "TOGGLE"
+        },
+        {
+          "name": "brightness",
+          "label": "Brightness",
+          "access": 7,
+          "type": "numeric",
+          "property": "brightness",
+          "description": "Brightness of this light",
+          "value_max": 254,
+          "value_min": 0
+        },
+        {
+          "name": "color_temp",
+          "label": "Color temp",
+          "access": 7,
+          "type": "numeric",
+          "property": "color_temp",
+          "description": "Color temperature of this light",
+          "unit": "mired",
+          "value_max": 454,
+          "value_min": 250,
+          "presets": [
+            {
+              "name": "coolest",
+              "value": 250,
+              "description": "Coolest temperature supported"
+            },
+            {
+              "name": "cool",
+              "value": 250,
+              "description": "Cool temperature (250 mireds / 4000 Kelvin)"
+            },
+            {
+              "name": "neutral",
+              "value": 370,
+              "description": "Neutral temperature (370 mireds / 2700 Kelvin)"
+            },
+            {
+              "name": "warm",
+              "value": 454,
+              "description": "Warm temperature (454 mireds / 2200 Kelvin)"
+            },
+            {
+              "name": "warmest",
+              "value": 454,
+              "description": "Warmest temperature supported"
+            }
+          ]
+        },
+        {
+          "name": "color_temp_startup",
+          "label": "Color temp startup",
+          "access": 7,
+          "type": "numeric",
+          "property": "color_temp_startup",
+          "description": "Color temperature after cold power on of this light",
+          "unit": "mired",
+          "value_max": 454,
+          "value_min": 250,
+          "presets": [
+            {
+              "name": "coolest",
+              "value": 250,
+              "description": "Coolest temperature supported"
+            },
+            {
+              "name": "cool",
+              "value": 250,
+              "description": "Cool temperature (250 mireds / 4000 Kelvin)"
+            },
+            {
+              "name": "neutral",
+              "value": 370,
+              "description": "Neutral temperature (370 mireds / 2700 Kelvin)"
+            },
+            {
+              "name": "warm",
+              "value": 454,
+              "description": "Warm temperature (454 mireds / 2200 Kelvin)"
+            },
+            {
+              "name": "warmest",
+              "value": 454,
+              "description": "Warmest temperature supported"
+            },
+            {
+              "name": "previous",
+              "value": 65535,
+              "description": "Restore previous color_temp on cold power on"
+            }
+          ]
+        },
+        {
+          "name": "level_config",
+          "label": "Level config",
+          "access": 7,
+          "type": "composite",
+          "property": "level_config",
+          "description": "Configure genLevelCtrl",
+          "features": [
+            {
+              "name": "execute_if_off",
+              "label": "Execute if off",
+              "access": 7,
+              "type": "binary",
+              "property": "execute_if_off",
+              "description": "this setting can affect the \"on_level\", \"current_level_startup\" or \"brightness\" setting",
+              "value_on": true,
+              "value_off": false
+            },
+            {
+              "name": "current_level_startup",
+              "label": "Current level startup",
+              "access": 7,
+              "type": "numeric",
+              "property": "current_level_startup",
+              "description": "Defines the desired startup level for a device when it is supplied with power",
+              "value_max": 254,
+              "value_min": 1,
+              "presets": [
+                {
+                  "name": "minimum",
+                  "value": "minimum",
+                  "description": "Use minimum permitted value"
+                },
+                {
+                  "name": "previous",
+                  "value": "previous",
+                  "description": "Use previous value"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "effect",
+      "label": "Effect",
+      "access": 2,
+      "type": "enum",
+      "property": "effect",
+      "description": "Triggers an effect on the light (e.g. make light blink for a few seconds)",
+      "values": [
+        "blink",
+        "breathe",
+        "okay",
+        "channel_change",
+        "finish_effect",
+        "stop_effect"
+      ]
+    },
+    {
+      "name": "power_on_behavior",
+      "label": "Power-on behavior",
+      "access": 7,
+      "type": "enum",
+      "property": "power_on_behavior",
+      "description": "Controls the behavior when the device is powered on after power loss",
+      "category": "config",
+      "values": [
+        "off",
+        "on",
+        "toggle",
+        "previous"
+      ]
+    },
+    {
+      "name": "color_options",
+      "label": "Color options",
+      "access": 7,
+      "type": "composite",
+      "property": "color_options",
+      "description": "Advanced color behavior",
+      "features": [
+        {
+          "name": "execute_if_off",
+          "label": "Execute if off",
+          "access": 2,
+          "type": "binary",
+          "property": "execute_if_off",
+          "description": "Controls whether color and color temperature can be set while light is off",
+          "value_on": true,
+          "value_off": false
+        }
+      ],
+      "category": "config"
+    },
+    {
+      "name": "identify",
+      "label": "Identify",
+      "access": 2,
+      "type": "enum",
+      "property": "identify",
+      "description": "Initiate device identification",
+      "category": "config",
+      "values": [
+        "identify"
+      ]
+    }
+  ]
+}

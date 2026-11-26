@@ -1,0 +1,407 @@
+{
+  "revision": "zigbee-herdsman 11.2.0",
+  "cases": [
+    {
+      "name": "bind-unicast",
+      "op": "build_request",
+      "clusterId": 33,
+      "args": [
+        "0x0017880104e45531",
+        1,
+        6,
+        3,
+        "0x0017880104e45599",
+        null,
+        2
+      ],
+      "overhead": false,
+      "expected": "3155e40401881700010600039955e4040188170002"
+    },
+    {
+      "name": "bind-multicast",
+      "op": "build_request",
+      "clusterId": 33,
+      "args": [
+        "0x0017880104e45531",
+        1,
+        6,
+        1,
+        null,
+        4660,
+        null
+      ],
+      "overhead": false,
+      "expected": "3155e40401881700010600013412"
+    },
+    {
+      "name": "unbind-unicast",
+      "op": "build_request",
+      "clusterId": 34,
+      "args": [
+        "0x0017880104e45531",
+        1,
+        6,
+        3,
+        "0x0017880104e45599",
+        null,
+        2
+      ],
+      "overhead": false,
+      "expected": "3155e40401881700010600039955e4040188170002"
+    },
+    {
+      "name": "unbind-multicast",
+      "op": "build_request",
+      "clusterId": 34,
+      "args": [
+        "0x0017880104e45531",
+        1,
+        6,
+        1,
+        null,
+        4660,
+        null
+      ],
+      "overhead": false,
+      "expected": "3155e40401881700010600013412"
+    },
+    {
+      "name": "nwk-addr-req",
+      "op": "build_request",
+      "clusterId": 0,
+      "args": [
+        "0x0017880104e45531",
+        true,
+        0
+      ],
+      "overhead": false,
+      "expected": "3155e404018817000100"
+    },
+    {
+      "name": "ieee-addr-req",
+      "op": "build_request",
+      "clusterId": 1,
+      "args": [
+        4660,
+        true,
+        0
+      ],
+      "overhead": false,
+      "expected": "34120100"
+    },
+    {
+      "name": "node-desc-req",
+      "op": "build_request",
+      "clusterId": 2,
+      "args": [
+        4660
+      ],
+      "overhead": false,
+      "expected": "3412"
+    },
+    {
+      "name": "power-desc-req",
+      "op": "build_request",
+      "clusterId": 3,
+      "args": [
+        4660
+      ],
+      "overhead": false,
+      "expected": "3412"
+    },
+    {
+      "name": "active-ep-req",
+      "op": "build_request",
+      "clusterId": 5,
+      "args": [
+        4660
+      ],
+      "overhead": false,
+      "expected": "3412"
+    },
+    {
+      "name": "simple-desc-req",
+      "op": "build_request",
+      "clusterId": 4,
+      "args": [
+        4660,
+        1
+      ],
+      "overhead": false,
+      "expected": "341201"
+    },
+    {
+      "name": "match-desc-req",
+      "op": "build_request",
+      "clusterId": 6,
+      "args": [
+        4660,
+        260,
+        [
+          6,
+          8
+        ],
+        [
+          25
+        ]
+      ],
+      "overhead": false,
+      "expected": "341204010206000800011900"
+    },
+    {
+      "name": "leave-req",
+      "op": "build_request",
+      "clusterId": 52,
+      "args": [
+        "0x0017880104e45531",
+        0
+      ],
+      "overhead": false,
+      "expected": "3155e4040188170000"
+    },
+    {
+      "name": "permit-join-req",
+      "op": "build_request",
+      "clusterId": 54,
+      "args": [
+        60,
+        1,
+        []
+      ],
+      "overhead": false,
+      "expected": "3c01"
+    },
+    {
+      "name": "mgmt-lqi-req",
+      "op": "build_request",
+      "clusterId": 49,
+      "args": [
+        0
+      ],
+      "overhead": false,
+      "expected": "00"
+    },
+    {
+      "name": "mgmt-bind-req",
+      "op": "build_request",
+      "clusterId": 51,
+      "args": [
+        0
+      ],
+      "overhead": false,
+      "expected": "00"
+    },
+    {
+      "name": "mgmt-rtg-req",
+      "op": "build_request",
+      "clusterId": 50,
+      "args": [
+        0
+      ],
+      "overhead": false,
+      "expected": "00"
+    },
+    {
+      "name": "nwk-addr-req-overhead",
+      "op": "build_request",
+      "clusterId": 0,
+      "args": [
+        "0x0017880104e45531",
+        false,
+        0
+      ],
+      "overhead": true,
+      "expected": "003155e404018817000000"
+    },
+    {
+      "name": "nwk-addr-rsp",
+      "op": "read_response",
+      "clusterId": 32768,
+      "buffer": "003155e40401881700341202037b00cbcd",
+      "expected": [
+        0,
+        {
+          "eui64": "0x0017880104e45531",
+          "nwkAddress": 4660,
+          "startIndex": 3,
+          "assocDevList": [
+            123,
+            52683
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ieee-addr-rsp",
+      "op": "read_response",
+      "clusterId": 32769,
+      "buffer": "003155e40401881700341200000a02",
+      "expected": [
+        0,
+        {
+          "eui64": "0x0017880104e45531",
+          "nwkAddress": 4660,
+          "startIndex": 0,
+          "assocDevList": []
+        }
+      ]
+    },
+    {
+      "name": "active-ep-rsp",
+      "op": "read_response",
+      "clusterId": 32773,
+      "buffer": "00341203010203",
+      "expected": [
+        0,
+        {
+          "nwkAddress": 4660,
+          "endpointList": [
+            1,
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "name": "simple-desc-rsp",
+      "op": "read_response",
+      "clusterId": 32772,
+      "buffer": "003412080104017b000002d51d700201ca14",
+      "expected": [
+        0,
+        {
+          "nwkAddress": 4660,
+          "length": 8,
+          "endpoint": 1,
+          "profileId": 260,
+          "deviceId": 123,
+          "deviceVersion": 0,
+          "inClusterList": [
+            7637,
+            624
+          ],
+          "outClusterList": [
+            5322
+          ]
+        }
+      ]
+    },
+    {
+      "name": "node-desc-rsp",
+      "op": "read_response",
+      "clusterId": 32770,
+      "buffer": "00341222200e0a0a7cff7e1600ff3c00",
+      "expected": [
+        0,
+        {
+          "nwkAddress": 4660,
+          "logicalType": 2,
+          "apsFlags": 0,
+          "frequencyBand": 4,
+          "capabilities": {
+            "alternatePANCoordinator": 0,
+            "deviceType": 1,
+            "powerSource": 1,
+            "rxOnWhenIdle": 1,
+            "reserved1": 0,
+            "reserved2": 0,
+            "securityCapability": 0,
+            "allocateAddress": 0
+          },
+          "manufacturerCode": 2570,
+          "maxBufSize": 124,
+          "maxIncTxSize": 32511,
+          "serverMask": {
+            "primaryTrustCenter": 0,
+            "backupTrustCenter": 1,
+            "deprecated1": 1,
+            "deprecated2": 0,
+            "deprecated3": 1,
+            "deprecated4": 0,
+            "networkManager": 0,
+            "reserved1": 0,
+            "reserved2": 0,
+            "stackComplianceRevision": 0
+          },
+          "maxOutTxSize": 15615,
+          "deprecated1": 0,
+          "tlvs": []
+        }
+      ]
+    },
+    {
+      "name": "binding-table-rsp",
+      "op": "read_response",
+      "clusterId": 32819,
+      "buffer": "000100013155e40401881700010600039955e4040188170002",
+      "expected": [
+        0,
+        {
+          "bindingTableEntries": 1,
+          "startIndex": 0,
+          "entryList": [
+            {
+              "sourceEui64": "0x0017880104e45531",
+              "sourceEndpoint": 1,
+              "clusterId": 6,
+              "destAddrMode": 3,
+              "dest": "0x0017880104e45599",
+              "destEndpoint": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bind-rsp",
+      "op": "read_response",
+      "clusterId": 32801,
+      "buffer": "00",
+      "expected": [
+        0,
+        null
+      ]
+    },
+    {
+      "name": "unbind-rsp",
+      "op": "read_response",
+      "clusterId": 32802,
+      "buffer": "00",
+      "expected": [
+        0,
+        null
+      ]
+    },
+    {
+      "name": "leave-rsp",
+      "op": "read_response",
+      "clusterId": 32820,
+      "buffer": "00",
+      "expected": [
+        0,
+        null
+      ]
+    },
+    {
+      "name": "nwk-addr-rsp-error",
+      "op": "read_response",
+      "clusterId": 32768,
+      "buffer": "01",
+      "expected": [
+        1,
+        null
+      ]
+    },
+    {
+      "name": "active-ep-rsp-error",
+      "op": "read_response",
+      "clusterId": 32773,
+      "buffer": "80",
+      "expected": [
+        128,
+        null
+      ]
+    }
+  ]
+}

@@ -270,3 +270,135 @@ async fn dry_run_transport_encodes_custom_cluster_commands() {
     assert_eq!(calls[calls.len() - 1]["frame"]["manufacturerCode"], 43981);
     assert_eq!(calls[calls.len() - 1]["frame"]["endpoint"], 1);
 }
+
+fn transport_for(device: &Arc<ZhDevice>) -> DryRunEndpointTransport {
+    let device = Arc::clone(device);
+    DryRunEndpointTransport::new(Arc::new(move |address: &str, id: u8| {
+        if address != device.ieee_addr() {
+            return None;
+        }
+        device.get_endpoint(id)
+    }))
+}
+
+#[tokio::test]
+async fn concurrent_dry_run_operations_share_the_hook_without_losing_frames() {
+    let work = temp("concurrent");
+    inject_database(Arc::new(std::sync::Mutex::new(Database::open(
+        work.join("database.db"),
+    ))));
+    ZhDevice::reset_cache();
+    let ieee = "0x0017880104e45561";
+    let device = ZhDevice::create(
+        DeviceType::Router,
+        ieee,
+        0x1300,
+        None,
+        Some("IKEA of Sweden".to_owned()),
+        None,
+        Some("TRADFRI bulb E27 WS opal 1000lm".to_owned()),
+        InterviewState::Successful,
+        None,
+    )
+    .unwrap();
+    let endpoint = device.create_endpoint(1).unwrap();
+    *endpoint.input_clusters.lock().unwrap() = vec![0, 6];
+    let transport = transport_for(&device);
+    transport.set_read(ieee, "genOnOff", "onOff", json!(1));
+
+    let mut futures = Vec::new();
+    for sequence in 0..8u8 {
+        futures.push(execute(
+            &transport,
+            ieee,
+            json!({"op":"command","endpoint":1,"cluster":"genOnOff","command":"on","payload":{},"options":{"transactionSequenceNumber":sequence}}),
+        ));
+    }
+    let results = futures_util::future::join_all(futures).await;
+    for result in results {
+        result.expect("concurrent command");
+    }
+    let calls = transport.calls();
+    assert_eq!(calls.len(), 8, "every concurrent frame must be recorded");
+    let mut sequences: Vec<u64> = calls
+        .iter()
+        .map(|call| call["frame"]["transactionSequenceNumber"].as_u64().unwrap())
+        .collect();
+    sequences.sort_unstable();
+    assert_eq!(sequences, (0..8).collect::<Vec<_>>());
+
+    // The hook must still be installed after all concurrent calls returned.
+    execute(
+        &transport,
+        ieee,
+        json!({"op":"command","endpoint":1,"cluster":"genOnOff","command":"off","payload":{},"options":{"transactionSequenceNumber":42}}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(transport.calls().len(), 9);
+    let read = execute(
+        &transport,
+        ieee,
+        json!({"op":"read","endpoint":1,"cluster":"genOnOff","attributes":["onOff"]}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(read, json!({"onOff": 1}));
+}
+
+#[tokio::test]
+async fn invalid_numeric_options_are_rejected_not_truncated() {
+    let work = temp("options");
+    inject_database(Arc::new(std::sync::Mutex::new(Database::open(
+        work.join("database.db"),
+    ))));
+    ZhDevice::reset_cache();
+    let ieee = "0x0017880104e45562";
+    let device = ZhDevice::create(
+        DeviceType::Router,
+        ieee,
+        0x1301,
+        None,
+        Some("IKEA of Sweden".to_owned()),
+        None,
+        Some("TRADFRI bulb E27 WS opal 1000lm".to_owned()),
+        InterviewState::Successful,
+        None,
+    )
+    .unwrap();
+    device.create_endpoint(1).unwrap();
+    let transport = transport_for(&device);
+    let cases = [
+        (
+            json!({"op":"command","endpoint":1,"cluster":"genOnOff","command":"on","payload":{},"options":{"manufacturerCode":70000}}),
+            "u16",
+        ),
+        (
+            json!({"op":"command","endpoint":1,"cluster":"genOnOff","command":"on","payload":{},"options":{"direction":300}}),
+            "u8",
+        ),
+        (
+            json!({"op":"command","endpoint":1,"cluster":"genOnOff","command":"on","payload":{},"options":{"transactionSequenceNumber":-1}}),
+            "non-negative",
+        ),
+        (
+            json!({"op":"command","endpoint":300,"cluster":"genOnOff","command":"on","payload":{}}),
+            "u8",
+        ),
+        (
+            json!({"op":"bind","endpoint":1,"cluster":"genOnOff","target":70000,"targetType":"group"}),
+            "u16",
+        ),
+    ];
+    for (operation, expected) in cases {
+        let error = execute(&transport, ieee, operation).await.unwrap_err();
+        assert!(
+            error.contains(expected),
+            "expected '{expected}' in '{error}'"
+        );
+    }
+    assert!(
+        transport.calls().is_empty(),
+        "invalid options must not execute"
+    );
+}

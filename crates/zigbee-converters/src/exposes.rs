@@ -155,6 +155,78 @@ pub fn is_light_expose(expose: &Expose) -> bool {
 }
 
 impl Expose {
+    /// Parse an upstream expose JSON object back into the shared model.
+    pub fn from_json(value: &Value) -> Self {
+        let object = value.as_object().cloned().unwrap_or_default();
+        let string = |key: &str| object.get(key).and_then(Value::as_str).map(str::to_owned);
+        let number = |key: &str| object.get(key).and_then(Value::as_f64);
+        let values = object
+            .get("values")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| match item {
+                        Value::String(value) => Some(value.clone()),
+                        Value::Number(value) => Some(value.to_string()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let features = object
+            .get("features")
+            .and_then(Value::as_array)
+            .map(|items| items.iter().map(Expose::from_json).collect())
+            .unwrap_or_default();
+        let mut extra = object.clone();
+        for key in [
+            "type",
+            "name",
+            "property",
+            "description",
+            "access",
+            "category",
+            "unit",
+            "values",
+            "value_min",
+            "value_max",
+            "value_step",
+            "features",
+            "endpoint",
+            "label",
+            "value_on",
+            "value_off",
+            "homeassistant",
+        ] {
+            extra.remove(key);
+        }
+        Self {
+            r#type: string("type").unwrap_or_default(),
+            name: string("name"),
+            property: string("property"),
+            description: string("description"),
+            access: object
+                .get("access")
+                .and_then(Value::as_u64)
+                .map(|value| value as u32)
+                .unwrap_or_default(),
+            category: string("category"),
+            unit: string("unit"),
+            values,
+            value_min: number("value_min"),
+            value_max: number("value_max"),
+            value_step: number("value_step"),
+            features,
+            endpoint: string("endpoint"),
+            label: string("label"),
+            value_on: object.get("value_on").cloned().unwrap_or(Value::Null),
+            value_off: object.get("value_off").cloned().unwrap_or(Value::Null),
+            homeassistant: object.get("homeassistant").cloned().unwrap_or(Value::Null),
+            extra: Value::Object(extra),
+        }
+    }
+
     pub fn feature_names(&self) -> Vec<&str> {
         self.features
             .iter()
@@ -178,7 +250,10 @@ impl Expose {
             map.insert("access".to_string(), Value::from(self.access));
         }
         if let Some(description) = &self.description {
-            map.insert("description".to_string(), Value::String(description.clone()));
+            map.insert(
+                "description".to_string(),
+                Value::String(description.clone()),
+            );
         }
         if let Some(category) = &self.category {
             map.insert("category".to_string(), Value::String(category.clone()));
@@ -193,13 +268,13 @@ impl Expose {
             );
         }
         if let Some(minimum) = self.value_min {
-            map.insert("value_min".to_string(), Value::from(minimum));
+            map.insert("value_min".to_string(), number_value(minimum));
         }
         if let Some(maximum) = self.value_max {
-            map.insert("value_max".to_string(), Value::from(maximum));
+            map.insert("value_max".to_string(), number_value(maximum));
         }
         if let Some(step) = self.value_step {
-            map.insert("value_step".to_string(), Value::from(step));
+            map.insert("value_step".to_string(), number_value(step));
         }
         if !self.features.is_empty() {
             map.insert(
@@ -210,12 +285,32 @@ impl Expose {
         if let Some(endpoint) = &self.endpoint {
             map.insert("endpoint".to_string(), Value::String(endpoint.clone()));
         }
+        if let Some(label) = &self.label {
+            map.insert("label".to_string(), Value::String(label.clone()));
+        }
+        if !self.value_on.is_null() {
+            map.insert("value_on".to_string(), self.value_on.clone());
+        }
+        if !self.value_off.is_null() {
+            map.insert("value_off".to_string(), self.value_off.clone());
+        }
+        if !self.homeassistant.is_null() {
+            map.insert("homeassistant".to_string(), self.homeassistant.clone());
+        }
         if let Value::Object(extra) = &self.extra {
             for (key, value) in extra {
                 map.insert(key.clone(), value.clone());
             }
         }
         Value::Object(map)
+    }
+}
+
+fn number_value(value: f64) -> Value {
+    if value.fract() == 0.0 && value >= i64::MIN as f64 && value <= i64::MAX as f64 {
+        Value::from(value as i64)
+    } else {
+        Value::from(value)
     }
 }
 

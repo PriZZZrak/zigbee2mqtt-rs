@@ -194,10 +194,10 @@ baseline startup    p50 22.0 ms / p95 35.9 ms
 under pairing       p50 23.7 ms / p95 49.6 ms
 
 full bridge cold start to 20 device definitions ready (real quickjs
-prepareDefinition, release aarch64, dry-run transport/lifecycle stage):
-  loader startup     2,258.8 ms
-  prepare all          596.3 ms
-  total              2,882.6 ms
+prepareDefinition, release aarch64, real-transport stage; runs 2.97–3.13 s):
+  loader startup     2,289–2,415 ms
+  prepare all          597–689 ms
+  total              2,970–3,135 ms
 ```
 
 The pairing fetch downloads only the selected `tuya` fragment closure, not the
@@ -222,10 +222,10 @@ and prepared on the shared JS worker (300 report samples, 52 overlapping the
 pairing window):
 
 ```text
-pairing total        1,758 ms
-baseline p50/p95     2.50 / 6.02 ms
-during   p50/p95     2.66 / 6.10 ms
-during   max           847 ms (one report queued behind prepareDefinition)
+pairing total        1,868 ms
+baseline p50/p95     2.90 / 8.35 ms
+during   p50/p95     2.81 / 5.60 ms
+during   max           932 ms (one report queued behind prepareDefinition)
 ```
 
 The download runs on blocking threads and does not stall reports; p50/p95 are
@@ -288,12 +288,19 @@ feature, which is not added without a second, repeated stall measurement.
 
 ## 3c. Real Endpoint transport and lifecycle
 
-- `DryRunEndpointTransport` implements `ConverterTransport` on top of the real
-  `Endpoint` model. `command`, `commandResponse`, `write`, `read` and
-  `configureReporting` go through the existing endpoint methods; a per-call
-  `DryRunHook` inside `Endpoint::send_request` captures the exact frame bytes
-  that the adapter would send and returns a synthetic `readRsp` built from
-  seeded values. Nothing is transmitted and no coordinator is needed.
+- `EndpointTransport` is the real `ConverterTransport`: `command`,
+  `commandResponse`, `write`, `read`, `configureReporting`, `bind` and `unbind`
+  are executed by the existing `Endpoint`/ZDO methods and therefore by the
+  controller adapter. It has no mock path: adapter/ZDO errors are returned to
+  the converter unchanged (`Endpoint::send_zdo` status failures included).
+- `DryRunEndpointTransport` keeps the recording mode. The dry-run hook is
+  installed once per `(device, endpoint)` and shared by concurrent calls (no
+  per-call overwrite or premature removal); it captures the exact frame bytes
+  that the adapter would send and answers reads from seeded values. It is
+  cleared on drop/`clear()` and used only by tests and offline validation.
+- Both transports share one operation parser: `endpoint`, `target`, `options`
+  numbers are range-checked (`u8`/`u16`), negative/fractional serde numbers and
+  overflow are rejected instead of truncated.
 - Command options are preserved end-to-end: the runtime endpoint shim now
   forwards `options` (`manufacturerCode`, `disableDefaultResponse`,
   `direction`, `srcEndpoint`, `transactionSequenceNumber`, `reservedBits`,
@@ -307,6 +314,14 @@ feature, which is not added without a second, repeated stall measurement.
   worker, skips devices that already have a definition (existing devices are
   prepared first by `prepare_converter_definitions`) and registers the
   prepared definition in the existing registry.
+- Prepared definitions with static exposes are cached in the dispatcher by
+  `(source, definition file, model)`, so 20 identical devices prepare once.
+  Dynamic exposes are always resolved per device.
+- JS prepare metadata now carries resolved `exposes` (and `meta`/`options`);
+  `Expose::from_json`/`to_json` round-trip the shared model, so Home Assistant
+  discovery consumes the same exposes as the pinned Node implementation. The
+  IKEA bulb exposes are compared byte-for-byte with the pinned oracle; Tuya
+  switches and the Aurora onEvent definition are covered too.
 - Opt-in startup: `converter::startup::install_from_env` is invoked before
   `controller.start()`. It is disabled unless `Z2M_CONVERTER_LAZY=1` and
   requires `Z2M_CONVERTER_ARTIFACT_DIR` and `Z2M_CONVERTER_HERDSMAN_DIR`;
@@ -359,6 +374,13 @@ to decode before emitting a round-trip case and records such buffers with
 `expectedError: true` + `upstreamDecodeError: true`; the Rust decoder returns
 the same error. `openDefects` is therefore **0** for this corpus.
 
+`differential_zdo_frames.rs` adds **28 pinned ZDO cases** (17 requests, 11
+responses): bind/unbind unicast+multicast (source/destination IEEE, endpoint,
+group and cluster addressing), network/IEEE address, node/power/simple
+descriptors, match descriptor, leave, permit-join, LQI/binding/routing table
+requests, response payloads, and success/error status handling. Upstream
+`undefined` object fields are normalized against Rust `null`.
+
 `differential_frame_options.rs` adds 10 pinned cases for command options:
 default-response flag, direction, TSN, reserved bits, manufacturer codes
 (header and write payload), read, configReport, readRsp and a custom cluster.
@@ -372,7 +394,7 @@ encoding).
 
 | Component | Bytes |
 |---|---:|
-| `z2m-rs` aarch64 musl | 23,455,568 raw / 8,036,565 gzip (unstripped); 16,610,936 raw / 6,980,370 gzip stripped |
+| `z2m-rs` aarch64 musl | 23,592,808 raw / 8,083,024 gzip (unstripped); 16,681,368 raw / 7,014,944 gzip stripped |
 | shared JS tree | 2,443,459 |
 | `index.z2idx1` | 927,458 |
 | manifest + graph | ~110,000 |
@@ -410,40 +432,46 @@ installed side-by-side without the agreed Node removal/external-storage step.
 
 ## 8. GO / NO-GO
 
-**GO** for the real Endpoint transport & integration validation stage:
+**GO** for the real converter transport & HIL readiness stage:
 
 1. `z2idx1` resolver is 0-diff on the full oracle (11,562 cases) and golden
    parity is 36/36;
-2. the two former ZCL "mismatches" are resolved as oracle bugs: upstream
-   rejects the same duplicate-ID buffers, the generator now requires an
-   upstream round-trip and asserts both sides error (`openDefects: 0`);
-3. the frame-option differential (10 cases: default-response, direction, TSN,
-   reserved bits, manufacturer code, read/write/configReport/readRsp, custom
-   cluster) matches pinned upstream;
-4. `DryRunEndpointTransport` builds frames through the real Endpoint/ZCL model,
-   forwards command options, serves reads from seeded values and records bind
-   intents without transmitting anything;
-5. lazy loading is wired into `controller.start()` (env-gated) and into
-   interview-driven pairing with a deduplicated, bounded, single-worker queue;
-6. 120 reports complete while a new Tuya device is downloaded/prepared in the
-   background; queues are the existing bounded runtime channels and overflow is
-   explicit backpressure;
-7. PERF-001 (≤0.85 s single-report stall during manual pairing) is accepted as
-   low-priority debt in `docs/backlog.md`;
-8. Routerich criteria hold: 20 devices ready in 2.88 s, single-flight and
-   pairing impact within the previous envelope.
+2. ZCL/ZDO differentials match pinned zigbee-herdsman 11.2.0: 415 ZCL corpus
+   cases, 10 option/custom-cluster cases, 28 ZDO request/response cases
+   (bind/unbind addressing, descriptors, tables, status/error); no known codec
+   defects remain;
+3. `EndpointTransport` executes real `command`/`commandResponse`/`write`/
+   `read`/`configureReporting`/`bind`/`unbind` through the existing
+   Endpoint/ZDO/controller APIs, with no mock fallback and strict option
+   validation; `DryRunEndpointTransport` remains the recording test mode;
+4. lazy loading is wired into `controller.start()` (env-gated, `endpoint` or
+   `dry-run`) and interview-driven pairing with a deduplicated bounded queue;
+   static prepared definitions are cached per model; 120 reports complete
+   while a new Tuya device is prepared;
+5. JS `exposes` are parsed from the prepare metadata and match the pinned
+   upstream IKEA exposes exactly; the existing HA extension consumes them, and
+   Receive/Publish/Configure/OnEvent use the prepared definitions (tested);
+6. the deployment payload is reproducible (`deploy/build.sh`: stripped
+   aarch64-musl binary, artifact, herdsman tree, procd service with a memory
+   limit, documented cache/runtime generation rollback); nothing was applied to
+   the live overlay;
+7. Routerich: 20 devices ready in 2.97–3.13 s, prepared definitions cached,
+   PERF-001 (≤0.94 s single-report stall during manual pairing) accepted in
+   `docs/backlog.md`;
+8. `docs/hil-readiness.md` records the binary/artifact hashes, test matrix,
+   live devices, allowed commands, backups and rollback conditions.
 
-**GO for the agreed coordinator-only HIL**, subject to `docs/hil-plan.md`:
-dedicated coordinator/maintenance window, committed overlay/package migration,
-recorded binary/artifact hashes, no `StartCommissioning`/restore, rollback to
-the Node.js service ready.
+**GO for the controlled HIL** under `docs/hil-plan.md`: Variant A (dedicated
+test coordinator) preferred, Variant B (agreed switchover of the existing
+Dongle-P) only with the approved window, verified backups, exclusive serial-port
+ownership and the documented rollback.
 
 **NO-GO for production enablement** until:
 
-1. the real (transmitting) Endpoint transport replaces dry-run and passes the
-   HIL plan; this build records frames only;
+1. HIL evidence exists for the real transmitting transport (this stage has
+   adapter-level, not hardware, evidence);
 2. an artifact mirror exists and `HttpsFetcher` is validated against it with a
-   real manifest (public HTTPS mirrors and a local TLS server are covered);
-3. the overlay migration and procd service are exercised on the router;
-4. the ZDO frame corpus is expanded with request/response payloads;
-5. HIL evidence is captured for the operations listed in `docs/hil-plan.md`.
+   real manifest;
+3. the overlay/package migration and procd service are exercised on the router;
+4. the ZDO corpus is extended if HIL reveals adapter-specific framing;
+5. HIL evidence is captured for the operations in `docs/hil-plan.md`.

@@ -733,6 +733,16 @@ impl Zigbee {
                     .lock()
                     .unwrap()
                     .warning(&format!("Device '{friendly_name}' left the network"), "z2m");
+                if let Some(dispatcher) = self.converter_dispatcher() {
+                    let status = dispatcher.cancel_device(payload.ieee_addr.clone());
+                    self.logger.lock().unwrap().debug(
+                        &format!(
+                            "Converter jobs for left device '{}': {status:?}",
+                            payload.ieee_addr
+                        ),
+                        "z2m",
+                    );
+                }
                 let device = self
                     .device_lookup
                     .lock()

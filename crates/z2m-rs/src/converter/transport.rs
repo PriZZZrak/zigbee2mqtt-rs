@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use converter_runtime::{HostRequest, HostResult};
 use serde_json::{json, Map, Value};
 use zigbee_apiarist::controller::model::endpoint::{
-    ConfigureReportingItem, DryRunHook, DryRunRequest, Endpoint, Options, OptionsWithDefaults,
+    BindTarget, ConfigureReportingItem, DryRunRequest, Endpoint, Options, OptionsWithDefaults,
 };
 use zigbee_apiarist::zspec::zcl::definition::cluster::{
     genAlarms, genBasic, genGroups, genLevelCtrl, genOnOff, genOta, genPollCtrl, genPowerCfg,
@@ -246,39 +246,57 @@ impl ConverterTransport for SharedTransport {
     }
 }
 
-type DryRunReadValues = ReadValues;
-
 /// Resolves a device IEEE and endpoint id to the existing controller model.
 pub type EndpointResolver = Arc<dyn Fn(&str, u8) -> Option<Arc<Endpoint>> + Send + Sync>;
 
-/// Recording/dry-run transport backed by the real `Endpoint`/ZCL model.
-///
-/// Host operations are translated into the existing endpoint methods; a
-/// per-call dry-run hook captures the exact ZCL frame bytes that the adapter
-/// would send and returns synthetic responses (a read response built from
-/// seeded values). Nothing is transmitted and no coordinator is required.
+/// Real converter transport: every host operation is executed by the existing
+/// `Endpoint` methods and therefore by the controller/adapter. There is no
+/// mock response path and no dry-run hook; every failure is returned to the
+/// converter (which surfaces it through the bridge).
+pub struct EndpointTransport {
+    core: Arc<TransportCore>,
+}
+
+/// Recording/dry-run transport. Frames are built by the same endpoint methods,
+/// captured before transmission and answered from seeded read values. The hook
+/// is installed once per endpoint and is not removed by concurrent calls.
 pub struct DryRunEndpointTransport {
-    state: Arc<DryRunState>,
+    core: Arc<TransportCore>,
+    dry: Arc<DryRunSink>,
 }
 
-struct DryRunState {
+struct TransportCore {
     resolver: EndpointResolver,
-    reads: DryRunReadValues,
-    calls: Mutex<Vec<Value>>,
+    calls: Arc<Mutex<Vec<Value>>>,
 }
 
-impl DryRunEndpointTransport {
+impl EndpointTransport {
     pub fn new(resolver: EndpointResolver) -> Self {
         Self {
-            state: Arc::new(DryRunState {
+            core: Arc::new(TransportCore {
                 resolver,
-                reads: Arc::new(Mutex::new(HashMap::new())),
-                calls: Mutex::new(Vec::new()),
+                calls: Arc::new(Mutex::new(Vec::new())),
             }),
         }
     }
 
-    /// Seed a value returned by a dry-run `read` for `(device, cluster, attribute)`.
+    pub fn calls(&self) -> Vec<Value> {
+        self.core.calls.lock().unwrap().clone()
+    }
+}
+
+impl DryRunEndpointTransport {
+    pub fn new(resolver: EndpointResolver) -> Self {
+        let dry = Arc::new(DryRunSink::default());
+        Self {
+            core: Arc::new(TransportCore {
+                resolver,
+                calls: Arc::new(Mutex::new(Vec::new())),
+            }),
+            dry,
+        }
+    }
+
     pub fn set_read(
         &self,
         device: impl Into<String>,
@@ -286,7 +304,7 @@ impl DryRunEndpointTransport {
         attribute: impl Into<String>,
         value: Value,
     ) {
-        self.state
+        self.dry
             .reads
             .lock()
             .unwrap()
@@ -294,73 +312,86 @@ impl DryRunEndpointTransport {
     }
 
     pub fn calls(&self) -> Vec<Value> {
-        self.state.calls.lock().unwrap().clone()
+        self.core.calls.lock().unwrap().clone()
+    }
+
+    /// Remove the capture hooks from the endpoints this transport touched.
+    pub fn clear(&self) {
+        self.dry.clear();
     }
 }
 
-impl DryRunState {
-    fn record(&self, operation: &Value, frame: Option<Value>) {
-        let mut entry = operation.clone();
-        if let Some(frame) = frame {
-            if let Some(object) = entry.as_object_mut() {
-                object.insert("frame".to_owned(), frame);
-            }
+impl Drop for DryRunEndpointTransport {
+    fn drop(&mut self) {
+        self.dry.clear();
+    }
+}
+
+#[derive(Default)]
+struct DryRunSink {
+    reads: ReadValues,
+    installed: Mutex<HashMap<(String, u8), Arc<Endpoint>>>,
+}
+
+impl DryRunSink {
+    fn install(
+        &self,
+        calls: &Arc<Mutex<Vec<Value>>>,
+        device: &str,
+        endpoint_id: u8,
+        endpoint: &Arc<Endpoint>,
+    ) {
+        let mut installed = self.installed.lock().unwrap();
+        if installed.contains_key(&(device.to_owned(), endpoint_id)) {
+            return;
         }
-        self.calls.lock().unwrap().push(entry);
+        let reads = Arc::clone(&self.reads);
+        let calls = Arc::clone(calls);
+        let hook_device = device.to_owned();
+        endpoint.set_dry_run_hook(Some(Arc::new(move |request: &DryRunRequest<'_>| {
+            calls
+                .lock()
+                .unwrap()
+                .push(frame_record(request, &hook_device));
+            Ok(read_response(request, &hook_device, &reads))
+        })));
+        installed.insert((device.to_owned(), endpoint_id), Arc::clone(endpoint));
     }
 
-    async fn execute_op(&self, request: &HostRequest) -> Result<Value, String> {
+    fn clear(&self) {
+        for endpoint in self.installed.lock().unwrap().values() {
+            endpoint.set_dry_run_hook(None);
+        }
+        self.installed.lock().unwrap().clear();
+    }
+}
+
+impl TransportCore {
+    async fn execute(
+        &self,
+        request: &HostRequest,
+        dry: Option<&DryRunSink>,
+    ) -> Result<Value, String> {
         let operation = &request.operation;
         let op = operation
             .get("op")
             .and_then(Value::as_str)
             .ok_or_else(|| "host operation is missing 'op'".to_owned())?;
-        let endpoint_id = operation
-            .get("endpoint")
-            .and_then(Value::as_u64)
-            .unwrap_or_default() as u8;
+        let endpoint_id = operation_u8(operation, "endpoint")?.unwrap_or_default();
         let cluster = operation
             .get("cluster")
             .and_then(Value::as_str)
             .unwrap_or_default();
         let endpoint = (self.resolver)(&request.device, endpoint_id).ok_or_else(|| {
             format!(
-                "dry-run transport: device {} endpoint {} not found",
+                "converter transport: device {} endpoint {} not found",
                 request.device, endpoint_id
             )
         })?;
-        let options = parse_options(operation, op == "commandResponse");
-        let captured = Arc::new(Mutex::new(None::<Value>));
-        let reads = Arc::clone(&self.reads);
-        let device = request.device.clone();
-        let cluster_name = cluster.to_owned();
-        let captured_for_hook = Arc::clone(&captured);
-        let hook: DryRunHook = Arc::new(move |request: &DryRunRequest<'_>| {
-            let frame = request.frame;
-            let frame_type = match frame.header.frame_control.frame_type {
-                zigbee_apiarist::zspec::zcl::zcl_header::FrameType::GLOBAL => 0u8,
-                zigbee_apiarist::zspec::zcl::zcl_header::FrameType::SPECIFIC => 1u8,
-            };
-            let response = read_response(request, &device, &cluster_name, &reads);
-            *captured_for_hook.lock().unwrap() = Some(json!({
-                "bytes": frame.to_buffer(),
-                "cluster": frame.cluster.name,
-                "clusterId": frame.cluster.ID,
-                "command": frame.command.name,
-                "commandId": frame.command.ID,
-                "frameType": frame_type,
-                "direction": frame.header.frame_control.direction as u8,
-                "disableDefaultResponse": frame.header.frame_control.disable_default_response,
-                "manufacturerCode": frame.header.manufacturer_code,
-                "transactionSequenceNumber": frame.header.transaction_sequence_number,
-                "reservedBits": frame.header.frame_control.reserved_bits,
-                "endpoint": request.endpoint,
-                "options": options_json(request.options),
-            }));
-            Ok(response)
-        });
-        endpoint.set_dry_run_hook(Some(hook));
-        let guard = DryRunGuard(Arc::clone(&endpoint));
+        let options = parse_options(operation)?;
+        if let Some(dry) = dry {
+            dry.install(&self.calls, &request.device, endpoint_id, &endpoint);
+        }
         let result = match op {
             "read" => {
                 let attributes = operation
@@ -386,10 +417,7 @@ impl DryRunState {
                     .get("command")
                     .and_then(Value::as_str)
                     .ok_or_else(|| "command requires a command".to_owned())?;
-                let payload = operation
-                    .get("payload")
-                    .cloned()
-                    .unwrap_or(Value::Null);
+                let payload = operation.get("payload").cloned().unwrap_or(Value::Null);
                 endpoint
                     .command(
                         Value::from(cluster),
@@ -405,14 +433,8 @@ impl DryRunState {
                     .get("command")
                     .and_then(Value::as_str)
                     .ok_or_else(|| "commandResponse requires a command".to_owned())?;
-                let payload = operation
-                    .get("payload")
-                    .cloned()
-                    .unwrap_or(Value::Null);
-                let tsn = operation
-                    .get("transactionSequenceNumber")
-                    .and_then(Value::as_u64)
-                    .map(|value| value as u8)
+                let payload = operation.get("payload").cloned().unwrap_or(Value::Null);
+                let tsn = operation_u8(operation, "transactionSequenceNumber")?
                     .or(options.transaction_sequence_number);
                 endpoint
                     .command_response(
@@ -425,12 +447,20 @@ impl DryRunState {
                     .await
                     .map(|_| json!({}))
             }
-            "bind" => {
-                let target = operation
-                    .get("target")
-                    .and_then(Value::as_u64)
-                    .unwrap_or_default();
-                Ok(json!({"recorded": true, "target": target}))
+            "bind" | "unbind" => {
+                let target = bind_target(operation, &self.resolver, dry.is_some())?;
+                if let Some(target) = target {
+                    if op == "bind" {
+                        endpoint.bind(Value::from(cluster), target).await?;
+                    } else {
+                        let force = operation
+                            .get("force")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false);
+                        endpoint.unbind(Value::from(cluster), target, force).await?;
+                    }
+                }
+                Ok(json!({"recorded": dry.is_some()}))
             }
             "configureReporting" => {
                 let items = operation
@@ -445,22 +475,133 @@ impl DryRunState {
             }
             "probe" => Ok(json!(true)),
             other => Err(format!(
-                "dry-run converter transport does not implement host op '{other}' (device {}, endpoint {endpoint_id})",
+                "converter transport does not implement host op '{other}' (device {}, endpoint {endpoint_id})",
                 request.device
             )),
-        };
-        drop(guard);
-        let frame = captured.lock().unwrap().take();
-        self.record(operation, frame);
-        result
+        }?;
+        if matches!(op, "bind" | "unbind") {
+            self.record(
+                operation,
+                json!({
+                    "target": operation.get("target").cloned().unwrap_or(Value::Null),
+                    "targetType": operation.get("targetType").cloned().unwrap_or(Value::Null),
+                    "recorded": dry.is_some(),
+                }),
+            );
+        } else if dry.is_none() {
+            self.record(operation, json!({"result": result.clone()}));
+        }
+        Ok(result)
+    }
+
+    fn record(&self, operation: &Value, extra: Value) {
+        let mut entry = operation.clone();
+        if let Some(object) = entry.as_object_mut() {
+            if let Some(extra) = extra.as_object() {
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+            }
+        }
+        self.calls.lock().unwrap().push(entry);
     }
 }
 
-struct DryRunGuard(Arc<Endpoint>);
+fn bind_target(
+    operation: &Value,
+    resolver: &EndpointResolver,
+    dry_run: bool,
+) -> Result<Option<BindTarget>, String> {
+    let target_type = operation
+        .get("targetType")
+        .and_then(Value::as_str)
+        .unwrap_or("endpoint");
+    let target = operation_u16(operation, "target")?
+        .ok_or_else(|| "bind/unbind requires a target".to_owned())?;
+    match target_type {
+        "group" => Ok((!dry_run).then_some(BindTarget::GroupId(target))),
+        "endpoint" => {
+            let endpoint_id = u8::try_from(target)
+                .map_err(|_| "bind target endpoint is out of range".to_owned())?;
+            if dry_run {
+                // The dry-run records the intent; resolving the target
+                // endpoint is only needed for a real ZDO bind/unbind.
+                return Ok(None);
+            }
+            let ieee = operation
+                .get("targetIeee")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "endpoint bind target requires targetIeee".to_owned())?;
+            let endpoint = resolver(ieee, endpoint_id)
+                .ok_or_else(|| format!("bind target {ieee}/{endpoint_id} not found"))?;
+            Ok(Some(BindTarget::Endpoint(endpoint)))
+        }
+        other => Err(format!("unknown bind target type '{other}'")),
+    }
+}
 
-impl Drop for DryRunGuard {
-    fn drop(&mut self) {
-        self.0.set_dry_run_hook(None);
+fn frame_record(request: &DryRunRequest<'_>, device: &str) -> Value {
+    let frame = request.frame;
+    let (frame_type, op) = match frame.header.frame_control.frame_type {
+        zigbee_apiarist::zspec::zcl::zcl_header::FrameType::GLOBAL => (
+            0u8,
+            match frame.command.name.as_str() {
+                "read" => "read",
+                "write" | "writeUndiv" => "write",
+                "configReport" => "configureReporting",
+                other => other,
+            },
+        ),
+        zigbee_apiarist::zspec::zcl::zcl_header::FrameType::SPECIFIC => (
+            1u8,
+            if frame.header.frame_control.direction
+                == zigbee_apiarist::zspec::zcl::zcl_header::Direction::SERVER_TO_CLIENT
+            {
+                "commandResponse"
+            } else {
+                "command"
+            },
+        ),
+    };
+    let bytes = frame.to_buffer();
+    json!({
+        "op": op,
+        "device": device,
+        "endpoint": request.endpoint,
+        "cluster": frame.cluster.name,
+        "clusterId": frame.cluster.ID,
+        "frame": {
+            "bytes": bytes,
+            "cluster": frame.cluster.name,
+            "clusterId": frame.cluster.ID,
+            "command": frame.command.name,
+            "commandId": frame.command.ID,
+            "frameType": frame_type,
+            "direction": frame.header.frame_control.direction as u8,
+            "disableDefaultResponse": frame.header.frame_control.disable_default_response,
+            "manufacturerCode": frame.header.manufacturer_code,
+            "transactionSequenceNumber": frame.header.transaction_sequence_number,
+            "reservedBits": frame.header.frame_control.reserved_bits,
+            "endpoint": request.endpoint,
+            "options": options_json(request.options),
+        },
+    })
+}
+
+impl ConverterTransport for EndpointTransport {
+    fn calls(&self) -> Vec<Value> {
+        self.calls()
+    }
+
+    fn execute(&self, request: &HostRequest) -> TransportFuture {
+        let request = request.clone();
+        let core = Arc::clone(&self.core);
+        Box::pin(async move {
+            match core.execute(&request, None).await {
+                Ok(value) => HostResult::Ok(value),
+                Err(error) => HostResult::Err(error),
+            }
+        })
     }
 }
 
@@ -471,9 +612,10 @@ impl ConverterTransport for DryRunEndpointTransport {
 
     fn execute(&self, request: &HostRequest) -> TransportFuture {
         let request = request.clone();
-        let state = Arc::clone(&self.state);
+        let core = Arc::clone(&self.core);
+        let dry = Arc::clone(&self.dry);
         Box::pin(async move {
-            match state.execute_op(&request).await {
+            match core.execute(&request, Some(&dry)).await {
                 Ok(value) => HostResult::Ok(value),
                 Err(error) => HostResult::Err(error),
             }
@@ -481,30 +623,80 @@ impl ConverterTransport for DryRunEndpointTransport {
     }
 }
 
-fn parse_options(operation: &Value, has_response: bool) -> Options {
-    let value = operation.get("options").cloned().unwrap_or(Value::Null);
-    let number = |key: &str| value.get(key).and_then(Value::as_u64);
-    let boolean = |key: &str| value.get(key).and_then(Value::as_bool);
-    let mut options = Options {
-        manufacturer_code: number("manufacturerCode").map(|value| value as u16),
-        disable_default_response: boolean("disableDefaultResponse"),
-        disable_response: boolean("disableResponse"),
-        timeout: number("timeout"),
-        direction: number("direction").map(|value| value as u8),
-        src_endpoint: number("srcEndpoint").map(|value| value as u8),
-        profile_id: number("profileId").map(|value| value as u16),
-        reserved_bits: number("reservedBits").map(|value| value as u8),
-        transaction_sequence_number: number("transactionSequenceNumber").map(|value| value as u8),
-        disable_recovery: boolean("disableRecovery"),
-        write_undiv: boolean("writeUndiv"),
-        send_policy: None,
-    };
-    if has_response {
-        // Upstream `commandResponse` never disables the default response flag
-        // through the caller options unless explicitly requested.
-        options.disable_default_response = options.disable_default_response.or(Some(false));
+fn operation_u64(operation: &Value, key: &str) -> Result<Option<u64>, String> {
+    match operation.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| format!("{key} must be a non-negative integer")),
     }
-    options
+}
+
+fn operation_u8(operation: &Value, key: &str) -> Result<Option<u8>, String> {
+    operation_u64(operation, key)?
+        .map(|value| u8::try_from(value).map_err(|_| format!("{key} must fit in u8 (0..=255)")))
+        .transpose()
+}
+
+fn operation_u16(operation: &Value, key: &str) -> Result<Option<u16>, String> {
+    operation_u64(operation, key)?
+        .map(|value| u16::try_from(value).map_err(|_| format!("{key} must fit in u16 (0..=65535)")))
+        .transpose()
+}
+
+fn option_u64(value: &Value, key: &str) -> Result<Option<u64>, String> {
+    match value.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| format!("option {key} must be a non-negative integer")),
+    }
+}
+
+fn option_u8(value: &Value, key: &str) -> Result<Option<u8>, String> {
+    option_u64(value, key)?
+        .map(|value| {
+            u8::try_from(value).map_err(|_| format!("option {key} must fit in u8 (0..=255)"))
+        })
+        .transpose()
+}
+
+fn option_u16(value: &Value, key: &str) -> Result<Option<u16>, String> {
+    option_u64(value, key)?
+        .map(|value| {
+            u16::try_from(value).map_err(|_| format!("option {key} must fit in u16 (0..=65535)"))
+        })
+        .transpose()
+}
+
+fn option_bool(value: &Value, key: &str) -> Result<Option<bool>, String> {
+    match value.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value
+            .as_bool()
+            .map(Some)
+            .ok_or_else(|| format!("option {key} must be a boolean")),
+    }
+}
+
+fn parse_options(operation: &Value) -> Result<Options, String> {
+    let value = operation.get("options").cloned().unwrap_or(Value::Null);
+    Ok(Options {
+        manufacturer_code: option_u16(&value, "manufacturerCode")?,
+        disable_default_response: option_bool(&value, "disableDefaultResponse")?,
+        disable_response: option_bool(&value, "disableResponse")?,
+        timeout: option_u64(&value, "timeout")?,
+        direction: option_u8(&value, "direction")?,
+        src_endpoint: option_u8(&value, "srcEndpoint")?,
+        profile_id: option_u16(&value, "profileId")?,
+        reserved_bits: option_u8(&value, "reservedBits")?,
+        transaction_sequence_number: option_u8(&value, "transactionSequenceNumber")?,
+        disable_recovery: option_bool(&value, "disableRecovery")?,
+        write_undiv: option_bool(&value, "writeUndiv")?,
+        send_policy: None,
+    })
 }
 
 fn options_json(options: &OptionsWithDefaults) -> Value {
@@ -523,12 +715,7 @@ fn options_json(options: &OptionsWithDefaults) -> Value {
     })
 }
 
-fn read_response(
-    request: &DryRunRequest<'_>,
-    device: &str,
-    cluster_name: &str,
-    reads: &DryRunReadValues,
-) -> Option<Vec<u8>> {
+fn read_response(request: &DryRunRequest<'_>, device: &str, reads: &ReadValues) -> Option<Vec<u8>> {
     let frame = request.frame;
     if frame.header.frame_control.frame_type
         != zigbee_apiarist::zspec::zcl::zcl_header::FrameType::GLOBAL
@@ -547,7 +734,7 @@ fn read_response(
         )?;
         let key = (
             device.to_owned(),
-            cluster_name.to_owned(),
+            frame.cluster.name.clone(),
             attribute.name.clone(),
         );
         if let Some(value) = values.get(&key) {
@@ -583,15 +770,26 @@ fn parse_reporting_items(items: &[Value]) -> Result<Vec<ConfigureReportingItem>,
             .get("attribute")
             .cloned()
             .ok_or_else(|| "configureReporting item has no attribute".to_owned())?;
-        let minimum_report_interval = item
-            .get("minimumReportInterval")
-            .and_then(Value::as_u64)
-            .unwrap_or_default() as u32;
-        let maximum_report_interval = item
-            .get("maximumReportInterval")
-            .and_then(Value::as_u64)
-            .unwrap_or_default() as u32;
-        let reportable_change = item.get("reportableChange").and_then(Value::as_f64);
+        let minimum_report_interval = u32::try_from(
+            item.get("minimumReportInterval")
+                .and_then(Value::as_u64)
+                .unwrap_or_default(),
+        )
+        .map_err(|_| "minimumReportInterval is out of range".to_owned())?;
+        let maximum_report_interval = u32::try_from(
+            item.get("maximumReportInterval")
+                .and_then(Value::as_u64)
+                .unwrap_or_default(),
+        )
+        .map_err(|_| "maximumReportInterval is out of range".to_owned())?;
+        let reportable_change = match item.get("reportableChange") {
+            None | Some(Value::Null) => None,
+            Some(value) => Some(
+                value
+                    .as_f64()
+                    .ok_or_else(|| "reportableChange must be a number".to_owned())?,
+            ),
+        };
         parsed.push(ConfigureReportingItem {
             attribute,
             minimum_report_interval,
