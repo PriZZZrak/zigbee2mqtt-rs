@@ -36,6 +36,11 @@ struct Case {
     expected: String,
     #[serde(rename = "expectedError", default)]
     expected_error: bool,
+    /// Pinned upstream itself cannot re-decode this buffer (duplicate command
+    /// ID resolved differently on create/decode). Both implementations must
+    /// reject it.
+    #[serde(rename = "upstreamDecodeError", default)]
+    upstream_decode_error: bool,
 }
 
 fn bytes(hex: &str) -> Vec<u8> {
@@ -56,6 +61,7 @@ fn zcl_frames_match_pinned_upstream() {
     let custom = CustomClusters::empty();
     let mut checked = 0;
     let mut failures = Vec::new();
+    let mut upstream_decode_errors = 0;
     for case in fixture.cases {
         match case.op.as_str() {
             "frame_to_buffer" => {
@@ -80,6 +86,9 @@ fn zcl_frames_match_pinned_upstream() {
             "frame_from_buffer" => {
                 let data = bytes(case.buffer.as_deref().expect("buffer"));
                 if case.expected_error {
+                    if case.upstream_decode_error {
+                        upstream_decode_errors += 1;
+                    }
                     assert!(
                         try_from_buffer(0x0006, None, &data, &custom).is_err(),
                         "{}",
@@ -115,23 +124,19 @@ fn zcl_frames_match_pinned_upstream() {
             other => panic!("{}: unknown op {other}", case.id),
         }
     }
-    // Documented payload-validation anomalies in the generated corpus: the
-    // upstream encoder accepts a truncated GP/telecom command body that the
-    // Rust decoder rejects with INVALID_FIELD.
-    const DOCUMENTED_ANOMALIES: [&str; 2] = ["frame_from_buffer-147", "frame_from_buffer-363"];
-    let unexplained: Vec<_> = failures
-        .into_iter()
-        .filter(|(id, _, _, _)| !DOCUMENTED_ANOMALIES.contains(&id.as_str()))
-        .collect();
-    if !unexplained.is_empty() {
+    if !failures.is_empty() {
         panic!(
-            "{} unexplained frame failures (checked {}): {:?}",
-            unexplained.len(),
+            "{} frame failures (checked {}): {:?}",
+            failures.len(),
             checked,
-            unexplained
+            failures
         );
     }
     assert!(checked > 400, "expected expanded corpus, got {checked}");
+    assert_eq!(
+        upstream_decode_errors, 2,
+        "the duplicate-command-ID buffers must be asserted as errors on both sides"
+    );
 }
 
 #[test]

@@ -11,6 +11,21 @@ const hex = (buffer) => Buffer.from(buffer).toString("hex");
 const cases = [];
 let next = 0;
 function add(entry) { cases.push({id: `${entry.op}-${next++}`, ...entry}); }
+// A `frame_from_buffer` case is only a valid differential if the pinned
+// upstream can decode the buffer and re-encode the same bytes. Duplicate
+// command IDs (e.g. greenPower ID 4) resolve to a different command on decode
+// than on create, and upstream itself throws INVALID_FIELD; those buffers are
+// recorded as expected errors for both implementations instead of pretending
+// the codecs disagree.
+function decodeRoundTrip(clusterId, buffer) {
+  try {
+    const header = zcl.Header.fromBuffer(buffer);
+    const frame = zcl.Frame.fromBuffer(clusterId, header, buffer, {});
+    return hex(frame.toBuffer());
+  } catch (error) {
+    return undefined;
+  }
+}
 function defaultValue(type) {
   switch (type) {
     case 0x08: case 0x09: case 0x0a: case 0x0b: case 0x0c: case 0x0d: case 0x0e: case 0x0f:
@@ -53,7 +68,12 @@ for (const [clusterName, cluster] of Object.entries(clusters)) {
         );
         const buffer = frame.toBuffer();
         add({op: "frame_to_buffer", cluster: clusterName, command: commandName, frameType: frame.header.frameControl.frameType, direction: frame.header.frameControl.direction, disableDefaultResponse: true, manufacturerCode: cluster.manufacturerCode, transactionSequenceNumber: 1, payload: payloadFor(command), reservedBits: 0, expected: hex(buffer)});
-        add({op: "frame_from_buffer", cluster: clusterName, command: commandName, buffer: hex(buffer), expected: hex(frame.toBuffer())});
+        const decoded = decodeRoundTrip(cluster.ID, buffer);
+        if (decoded === undefined) {
+          add({op: "frame_from_buffer", cluster: clusterName, command: commandName, buffer: hex(buffer), expectedError: true, upstreamDecodeError: true});
+        } else {
+          add({op: "frame_from_buffer", cluster: clusterName, command: commandName, buffer: hex(buffer), expected: decoded, upstreamRoundTrip: decoded === hex(buffer)});
+        }
       } catch (error) { /* command requires a payload shape not representable by defaults */ }
     }
   }
@@ -69,7 +89,8 @@ for (const [command, payload] of [["read", [{attrId: 0, dataType: 0x20}]], ["wri
   try {
     const frame = zcl.Frame.create(0, 0, true, undefined, 1, command, "genOnOff", payload, {}, 0);
     add({op: "frame_to_buffer", cluster: "genOnOff", command, frameType: 0, direction: 0, disableDefaultResponse: true, transactionSequenceNumber: 1, payload, reservedBits: 0, expected: hex(frame.toBuffer())});
-    add({op: "frame_from_buffer", cluster: "genOnOff", command, buffer: hex(frame.toBuffer()), expected: hex(frame.toBuffer())});
+    const decoded = decodeRoundTrip(zcl.Clusters.genOnOff.ID, frame.toBuffer());
+    add({op: "frame_from_buffer", cluster: "genOnOff", command, buffer: hex(frame.toBuffer()), expected: decoded ?? hex(frame.toBuffer()), expectedError: decoded === undefined});
   } catch (error) {}
 }
 // Unknown incoming cluster with a global report: must be readable as raw/diagnostic.

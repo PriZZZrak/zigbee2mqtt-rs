@@ -1,0 +1,199 @@
+{
+  "revision": "zigbee-herdsman 11.2.0",
+  "cases": [
+    {
+      "name": "onOff-on-default-response",
+      "frameType": 1,
+      "direction": 0,
+      "disableDefaultResponse": false,
+      "transactionSequenceNumber": 42,
+      "command": "on",
+      "cluster": "genOnOff",
+      "payload": {},
+      "manufacturerCode": null,
+      "reservedBits": 0,
+      "expected": "012a01"
+    },
+    {
+      "name": "level-move-to-level",
+      "frameType": 1,
+      "direction": 0,
+      "disableDefaultResponse": true,
+      "transactionSequenceNumber": 7,
+      "command": "moveToLevelWithOnOff",
+      "cluster": "genLevelCtrl",
+      "payload": {
+        "level": 128,
+        "transtime": 5
+      },
+      "manufacturerCode": null,
+      "reservedBits": 0,
+      "expected": "110704800500"
+    },
+    {
+      "name": "identify-query-response",
+      "frameType": 1,
+      "direction": 1,
+      "disableDefaultResponse": false,
+      "transactionSequenceNumber": 49,
+      "command": "identifyQueryRsp",
+      "cluster": "genIdentify",
+      "payload": {
+        "timeout": 60
+      },
+      "manufacturerCode": null,
+      "reservedBits": 0,
+      "expected": "0931003c00"
+    },
+    {
+      "name": "manufacturer-cluster-command",
+      "frameType": 1,
+      "direction": 0,
+      "disableDefaultResponse": true,
+      "manufacturerCode": 4631,
+      "transactionSequenceNumber": 18,
+      "command": "clearBindingTable",
+      "cluster": "manuSpecificAmazonWWAH",
+      "payload": {},
+      "reservedBits": 0,
+      "expected": "151712120a"
+    },
+    {
+      "name": "manufacturer-write-attribute",
+      "frameType": 0,
+      "direction": 0,
+      "disableDefaultResponse": true,
+      "manufacturerCode": 4660,
+      "transactionSequenceNumber": 5,
+      "command": "write",
+      "cluster": "genBasic",
+      "payload": [
+        {
+          "attrId": 16384,
+          "dataType": 66,
+          "attrData": "abc"
+        }
+      ],
+      "reservedBits": 0,
+      "expected": "143412050200404203616263"
+    },
+    {
+      "name": "read-attribute",
+      "frameType": 0,
+      "direction": 0,
+      "disableDefaultResponse": true,
+      "transactionSequenceNumber": 11,
+      "command": "read",
+      "cluster": "genOnOff",
+      "payload": [
+        {
+          "attrId": 0
+        }
+      ],
+      "manufacturerCode": null,
+      "reservedBits": 0,
+      "expected": "100b000000"
+    },
+    {
+      "name": "configure-reporting",
+      "frameType": 0,
+      "direction": 0,
+      "disableDefaultResponse": true,
+      "transactionSequenceNumber": 12,
+      "command": "configReport",
+      "cluster": "genOnOff",
+      "payload": [
+        {
+          "direction": 0,
+          "attrId": 0,
+          "dataType": 16,
+          "minRepIntval": 1,
+          "maxRepIntval": 60,
+          "repChange": 0
+        }
+      ],
+      "manufacturerCode": null,
+      "reservedBits": 0,
+      "expected": "100c060000001001003c00"
+    },
+    {
+      "name": "read-response",
+      "frameType": 0,
+      "direction": 1,
+      "disableDefaultResponse": true,
+      "transactionSequenceNumber": 13,
+      "command": "readRsp",
+      "cluster": "genOnOff",
+      "payload": [
+        {
+          "attrId": 0,
+          "status": 0,
+          "dataType": 16,
+          "attrData": 1
+        }
+      ],
+      "manufacturerCode": null,
+      "reservedBits": 0,
+      "expected": "180d010000001001"
+    },
+    {
+      "name": "reserved-bits",
+      "frameType": 1,
+      "direction": 0,
+      "disableDefaultResponse": true,
+      "transactionSequenceNumber": 14,
+      "command": "toggle",
+      "cluster": "genOnOff",
+      "payload": {},
+      "reservedBits": 5,
+      "manufacturerCode": null,
+      "expected": "b10e02"
+    },
+    {
+      "name": "custom-cluster-command",
+      "frameType": 1,
+      "direction": 0,
+      "disableDefaultResponse": true,
+      "manufacturerCode": 43981,
+      "transactionSequenceNumber": 17,
+      "command": "setValue",
+      "cluster": "customCluster",
+      "payload": {
+        "value": 42
+      },
+      "customCluster": {
+        "name": "customCluster",
+        "ID": 64512,
+        "manufacturerCode": 43981,
+        "command": {
+          "name": "setValue",
+          "ID": 1,
+          "type": 32
+        }
+      },
+      "customClusters": {
+        "customCluster": {
+          "name": "customCluster",
+          "ID": 64512,
+          "manufacturerCode": 43981,
+          "attributes": {},
+          "commands": {
+            "setValue": {
+              "name": "setValue",
+              "ID": 1,
+              "parameters": [
+                {
+                  "name": "value",
+                  "type": 32
+                }
+              ]
+            }
+          },
+          "commandsResponse": {}
+        }
+      },
+      "reservedBits": 0,
+      "expected": "15cdab11012a"
+    }
+  ]
+}

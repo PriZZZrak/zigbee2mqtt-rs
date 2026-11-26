@@ -7,12 +7,12 @@
     "nous"
   ],
   "networkBytes": 25780,
-  "loaderStartupMs": 2042.9,
-  "prepareAllMs": 658.7,
-  "fullColdStartMs": 2727.6,
+  "loaderStartupMs": 2258.8,
+  "prepareAllMs": 596.3,
+  "fullColdStartMs": 2882.6,
   "readyDevices": 20,
   "failedDevices": 0,
-  "notes": "lazy_bridge_probe startup (release aarch64), isolated /tmp cache, real quickjs prepareDefinition per device; run 2026-11-25",
+  "notes": "lazy_bridge_probe startup (release aarch64), isolated /tmp cache, real quickjs prepareDefinition per device; run 2026-11-26 after the dry-run transport/lifecycle stage",
   "runtimeLayout": "runtime/generations/gen-<pid>-<seq> with runtime/active.json; previous generation retained",
   "filesystem": "/tmp (tmpfs); overlay was 99% full (568 KB free), so a flash-resident runtime could not be measured without the package migration"
 }

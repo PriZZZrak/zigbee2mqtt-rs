@@ -411,9 +411,9 @@
       getClusterAttributeValue: function (cluster, attribute) {
         return state.readValues[String(cluster) + ":" + attribute];
       },
-      read: function (cluster, attributes) {
+      read: function (cluster, attributes, options) {
         var names = attributes || [];
-        var op = { op: "read", endpoint: endpoint.ID, cluster: String(cluster), attributes: names.slice() };
+        var op = { op: "read", endpoint: endpoint.ID, cluster: String(cluster), attributes: names.slice(), options: cloneRecord(options || null) };
         state.calls.push(op);
         var result = {};
         for (var i = 0; i < names.length; i++) {
@@ -424,30 +424,38 @@
           return result;
         });
       },
-      write: function (cluster, attributes) {
-        var op = { op: "write", endpoint: endpoint.ID, cluster: String(cluster), attributes: cloneRecord(attributes || {}) };
+      write: function (cluster, attributes, options) {
+        var op = { op: "write", endpoint: endpoint.ID, cluster: String(cluster), attributes: cloneRecord(attributes || {}), options: cloneRecord(options || null) };
         state.calls.push(op);
         return hostCall(op, jobId, jobGeneration, state);
       },
-      command: function (cluster, command, payload) {
-        var op = { op: "command", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}) };
+      command: function (cluster, command, payload, options) {
+        var op = { op: "command", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}), options: cloneRecord(options || null) };
         state.calls.push(op);
         return hostCall(op, jobId, jobGeneration, state);
       },
-      commandResponse: function (cluster, command, payload) {
-        var op = { op: "commandResponse", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}) };
+      commandResponse: function (cluster, command, payload, options, transactionSequenceNumber) {
+        var op = { op: "commandResponse", endpoint: endpoint.ID, cluster: String(cluster), command: String(command), payload: cloneRecord(payload || {}), options: cloneRecord(options || null), transactionSequenceNumber: transactionSequenceNumber ?? null };
         state.calls.push(op);
         return hostCall(op, jobId, jobGeneration, state).then(function () { return { status: 0 }; });
       },
       defaultResponse: function () { return Promise.resolve(); },
-      bind: function (cluster, target) {
-        var op = { op: "bind", endpoint: endpoint.ID, cluster: String(cluster), target: target && target.ID };
+      bind: function (cluster, target, options) {
+        var op = {
+          op: "bind",
+          endpoint: endpoint.ID,
+          cluster: String(cluster),
+          target: target && (target.ID ?? target.groupID ?? target.groupId),
+          targetType: target && target.groupID !== undefined ? "group" : "endpoint",
+          targetIeee: target && target.deviceIeeeAddress ? target.deviceIeeeAddress : null,
+          options: cloneRecord(options || null),
+        };
         state.calls.push(op);
         endpoint.binds.push({ cluster: cluster, target: target });
         return hostCall(op, jobId, jobGeneration, state);
       },
-      configureReporting: function (cluster, items) {
-        var op = { op: "configureReporting", endpoint: endpoint.ID, cluster: String(cluster), items: cloneRecord(items) };
+      configureReporting: function (cluster, items, options) {
+        var op = { op: "configureReporting", endpoint: endpoint.ID, cluster: String(cluster), items: cloneRecord(items), options: cloneRecord(options || null) };
         state.calls.push(op);
         endpoint.configuredReportings.push({ cluster: cluster, items: items });
         return hostCall(op, jobId, jobGeneration, state);

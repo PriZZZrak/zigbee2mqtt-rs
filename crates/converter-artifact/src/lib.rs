@@ -22,6 +22,7 @@ pub use resolver::normalize_model_id;
 pub use binary::from_binary;
 pub use cache::{
     CacheConfig, EnsureReport, FetchError, ModuleCache, ModuleFetcher, ModuleState, SpaceProbe,
+    SyncFault,
 };
 pub use json::from_json;
 pub use lazy::{

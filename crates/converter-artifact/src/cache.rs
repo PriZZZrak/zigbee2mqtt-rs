@@ -38,6 +38,14 @@ pub trait SpaceProbe: Send + Sync {
     fn available_bytes(&self) -> Option<u64>;
 }
 
+/// Fault-injection seam for durability tests. Production leaves it unset; the
+/// cache calls it before every directory fsync and propagates any error.
+pub trait SyncFault: Send + Sync {
+    /// `what` names the durability step (`lkg.json`, `active.json`,
+    /// `generations`, `staging`, ...).
+    fn check(&self, path: &Path, what: &str) -> std::io::Result<()>;
+}
+
 #[derive(Clone)]
 pub struct CacheConfig {
     pub root: PathBuf,
@@ -49,6 +57,7 @@ pub struct CacheConfig {
     pub max_memory_bytes: u64,
     pub max_concurrent_downloads: usize,
     pub space_probe: Option<Arc<dyn SpaceProbe>>,
+    pub sync_fault: Option<Arc<dyn SyncFault>>,
 }
 
 impl CacheConfig {
@@ -60,6 +69,7 @@ impl CacheConfig {
             max_memory_bytes: 16 << 20,
             max_concurrent_downloads: 2,
             space_probe: None,
+            sync_fault: None,
         }
     }
 }
@@ -94,6 +104,7 @@ pub struct ModuleCache {
     active: Mutex<Generation>,
     sequence: AtomicU64,
     ensure_lock: Mutex<()>,
+    sync_fault: Option<Arc<dyn SyncFault>>,
 }
 
 impl ModuleCache {
@@ -113,6 +124,7 @@ impl ModuleCache {
             active: Mutex::new(Generation::empty()),
             sequence: AtomicU64::new(1),
             ensure_lock: Mutex::new(()),
+            sync_fault: config.sync_fault.clone(),
         };
         // Recover only from complete, verified generations. A staging directory
         // is never active; stale staging is removed.
@@ -269,6 +281,11 @@ impl ModuleCache {
     }
 
     fn sync_directory(&self, path: &Path, what: &str) -> Result<()> {
+        if let Some(fault) = &self.sync_fault {
+            fault
+                .check(path, what)
+                .map_err(|error| ArtifactError(format!("{what}: injected sync fault: {error}")))?;
+        }
         fs::File::open(path)
             .and_then(|directory| directory.sync_all())
             .map_err(|error| {
@@ -598,14 +615,15 @@ impl ModuleCache {
         for id in &missing {
             self.lock_states().insert(id.clone(), ModuleState::Ready);
         }
-        let durability = self.sync_directory(&self.root, "active.json");
-        // Retain only the active and last-known-good generations.
-        self.prune_generations()?;
-        if let Err(error) = durability {
+        // Prune only after the active pointer that names the new generation is
+        // durable. Deleting the previous generation first would leave a crash
+        // with a pointer that may revert to a generation that no longer exists.
+        if let Err(error) = self.sync_directory(&self.root, "active.json") {
             return Err(ArtifactError(format!(
                 "generation activated but not durably synced: {error}"
             )));
         }
+        self.prune_generations()?;
         Ok(EnsureReport {
             modules: required.into_iter().collect(),
             network_bytes,

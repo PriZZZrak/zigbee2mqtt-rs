@@ -1,0 +1,33 @@
+{
+  "transport": "DryRunEndpointTransport over the real Endpoint/ZCL model",
+  "recording": "Endpoint::send_request dry-run hook captures frame.to_buffer() and returns a synthetic readRsp",
+  "frames": [
+    "onOff on (default response flag)",
+    "manufacturer-specific write",
+    "read + readRsp",
+    "configReport",
+    "custom cluster command",
+    "bind intent"
+  ],
+  "tests": {
+    "dry_run_transport.rs": [
+      "real frames match the pinned oracle",
+      "cached read served through readRsp",
+      "unknown endpoint is an explicit error",
+      "manufacturer-specific command",
+      "custom cluster command",
+      "bind recorded as ZDO intent"
+    ],
+    "pairing_lifecycle.rs": [
+      "existing device prepared first",
+      "new device paired in the background queue",
+      "duplicate announcements deduplicated",
+      "120 reports complete while a new device is prepared"
+    ]
+  },
+  "notes": [
+    "no coordinator or adapter is contacted",
+    "options are forwarded by the runtime endpoint shim",
+    "bind is recorded without a ZDO transmission"
+  ]
+}

@@ -6,6 +6,7 @@
 
 pub mod dispatcher;
 pub mod http;
+pub mod startup;
 pub mod transport;
 
 pub use dispatcher::{

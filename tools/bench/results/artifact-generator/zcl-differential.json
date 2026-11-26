@@ -1,24 +1,67 @@
 {
   "revision": "zigbee-herdsman 11.2.0",
-  "zclCases": 413,
+  "zclCases": 415,
   "frameToBuffer": 206,
-  "frameFromBuffer": 207,
-  "corruptedFrames": 2,
-  "unexplainedFailures": 0,
-  "documentedAnomalies": [
+  "frameFromBuffer": 209,
+  "frameOptionsCases": 10,
+  "upstreamDecodeErrors": [
     {
       "case": "frame_from_buffer-147",
       "cluster": "greenPower",
       "command": "sinkCommissioningMode",
-      "status": 133,
-      "reason": "upstream encoder accepts a payload the Rust decoder classifies as INVALID_FIELD"
+      "reason": "duplicate command ID 4; upstream picks commissioningNotification and throws INVALID_FIELD"
     },
     {
       "case": "frame_from_buffer-363",
       "cluster": "telecommunicationsVoiceOverZigbee",
       "command": "controlResponse",
-      "status": 133,
-      "reason": "same command-parameter validation boundary"
+      "reason": "duplicate command ID 0; upstream picks establishmentRequest and throws INVALID_FIELD"
+    }
+  ],
+  "unexplainedFailures": 0,
+  "openDefects": 0,
+  "fullFrameParity": true,
+  "resolution": "The two former mismatches were fixture bugs, not codec mismatches. The generator now requires a successful upstream decode round-trip; duplicate-ID buffers are asserted as errors on both sides.",
+  "frameOptions": [
+    {
+      "name": "onOff-on-default-response",
+      "covers": "defaultResponse flag + TSN"
+    },
+    {
+      "name": "level-move-to-level",
+      "covers": "specific command payload"
+    },
+    {
+      "name": "identify-query-response",
+      "covers": "server-to-client response command"
+    },
+    {
+      "name": "manufacturer-cluster-command",
+      "covers": "manufacturer-specific cluster + code"
+    },
+    {
+      "name": "manufacturer-write-attribute",
+      "covers": "global write with manufacturer code"
+    },
+    {
+      "name": "read-attribute",
+      "covers": "global read"
+    },
+    {
+      "name": "configure-reporting",
+      "covers": "global configReport"
+    },
+    {
+      "name": "read-response",
+      "covers": "readRsp decoding"
+    },
+    {
+      "name": "reserved-bits",
+      "covers": "reserved frame-control bits"
+    },
+    {
+      "name": "custom-cluster-command",
+      "covers": "custom cluster + manufacturer code + payload"
     }
   ],
   "zdoConstants": {
@@ -26,7 +69,5 @@
     "rust": 60,
     "mismatches": 0
   },
-  "openDefects": 2,
-  "fullFrameParity": false,
-  "gate": "green for the valid corpus; two documented GP/telecom cases remain open"
+  "gate": "green: 415/415 corpus cases and 10/10 option/custom cases match pinned upstream"
 }

@@ -1,6 +1,6 @@
 {
   "cacheLayout": "generations/<gen> immutable + staging/<gen> + atomic active.json + lkg.json",
-  "activation": "fsync files, fsync staging, rename to generations/<gen>, fsync generations, fsync+rename lkg, fsync+rename active, fsync root",
+  "activation": "fsync files, fsync staging, rename to generations/<gen>, fsync generations, fsync+rename lkg, fsync+rename active, fsync root, then prune",
   "spaceBudget": {
     "totalCache": "max_cache_bytes compared with current + staging copy + downloads (peak)",
     "filesystemProbe": "SpaceProbe compared with staging copy + downloads (additional bytes only)",
@@ -30,29 +30,17 @@
   "singleFlight": "global ensure lock after a lock-free cached fast path; each module fetched exactly once in 8-way concurrent ensure and parallel startup",
   "router": {
     "startup20Devices": {
-      "loaderStartupMs": 2042.9,
-      "prepareAllMs": 658.7,
-      "fullColdStartMs": 2727.6,
+      "loaderStartupMs": 2258.8,
+      "prepareAllMs": 596.3,
+      "fullColdStartMs": 2882.6,
       "networkBytes": 25780
     },
     "singleFlight": [
       {
         "fetchDelayMs": 30,
         "devices": 3,
-        "sequentialMs": 244.8,
-        "concurrentMs": 226.5,
-        "fetchCalls": {
-          "ikea": 1,
-          "nous": 1,
-          "tuya-1": 1,
-          "tuya-common": 1
-        }
-      },
-      {
-        "fetchDelayMs": 200,
-        "devices": 3,
-        "sequentialMs": 765.7,
-        "concurrentMs": 718.0,
+        "sequentialMs": 223.7,
+        "concurrentMs": 229.5,
         "fetchCalls": {
           "ikea": 1,
           "nous": 1,
@@ -63,14 +51,14 @@
     ],
     "pairingImpact": {
       "iterations": 300,
-      "overlappingSamples": 55,
-      "pairingMs": 1719.1,
+      "overlappingSamples": 52,
+      "pairingMs": 1758.2,
       "pairDelayMs": 120,
-      "baselineP50Ms": 2.54,
-      "baselineP95Ms": 5.56,
-      "duringP50Ms": 2.42,
-      "duringP95Ms": 5.95,
-      "duringMaxMs": 827.8
+      "baselineP50Ms": 2.5,
+      "baselineP95Ms": 6.02,
+      "duringP50Ms": 2.66,
+      "duringP95Ms": 6.1,
+      "duringMaxMs": 847
     },
     "interpretation": "the download runs on blocking threads and does not stall reports; one report waited for the single JS worker's prepareDefinition job (~0.83 s), the same head-of-line behavior as the upstream single-threaded Node loop; p50/p95 unchanged"
   },
@@ -89,7 +77,8 @@
       "aborted transaction",
       "cancelled (panicking) fetch",
       "crash recovery",
-      "commit I/O failure"
+      "commit I/O failure",
+      "activation fsync before prune (fault injection)"
     ],
     "lazy_loader": [
       "real nous startup",
@@ -122,5 +111,6 @@
     "goldenParity": "36/36",
     "resolverDifferential": "0/11562",
     "zclOpenDefects": 2
-  }
+  },
+  "pruneOrdering": "old generations are pruned only after the active pointer is durable; a failed root fsync keeps every generation so a reverted pointer cannot reference a deleted directory"
 }

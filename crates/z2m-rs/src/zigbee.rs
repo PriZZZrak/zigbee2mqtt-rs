@@ -62,6 +62,12 @@ impl EntityAndEndpoint {
     }
 }
 
+#[derive(Default)]
+struct PairingQueue {
+    queued: std::collections::VecDeque<String>,
+    running: bool,
+}
+
 /// Upstream `Zigbee` (`lib/zigbee.ts:16`).
 pub struct Zigbee {
     self_ref: OnceLock<Weak<Zigbee>>,
@@ -74,6 +80,7 @@ pub struct Zigbee {
     coordinator_ieee_addr: Mutex<Option<String>>,
     converters: Arc<Mutex<DefinitionRegistry>>,
     converter_dispatcher: Mutex<Option<Arc<crate::converter::ConverterDispatcher>>>,
+    pairing_queue: Mutex<PairingQueue>,
     /// Test hook: replaces the coordinator startup (audit CP-05 abort matrix).
     #[doc(hidden)]
     pub test_start: Mutex<Option<(Result<bool, String>, u64)>>,
@@ -141,6 +148,7 @@ impl Zigbee {
             coordinator_ieee_addr,
             converters,
             converter_dispatcher: Mutex::new(None),
+            pairing_queue: Mutex::new(PairingQueue::default()),
             test_start: Mutex::new(None),
             test_stop_count: std::sync::atomic::AtomicUsize::new(0),
         });
@@ -169,6 +177,92 @@ impl Zigbee {
 
     pub fn converter_dispatcher(&self) -> Option<Arc<crate::converter::ConverterDispatcher>> {
         self.converter_dispatcher.lock().unwrap().clone()
+    }
+
+    /// Queue a background lazy-pairing task for a newly interviewed device.
+    ///
+    /// Existing devices are prepared by `prepare_converter_definitions` before
+    /// the coordinator starts, so a device that already has a definition is
+    /// skipped. The queue is bounded by the number of distinct devices (dedup
+    /// by IEEE) and a single worker processes it sequentially, keeping the
+    /// bridge event loop and the JS worker free of concurrent pairings.
+    pub fn schedule_converter_pairing(&self, device: Arc<Device>) {
+        if self.converter_dispatcher().is_none() || device.definition().is_some() {
+            return;
+        }
+        let Some(zigbee) = self.self_ref.get().and_then(|weak| weak.upgrade()) else {
+            return;
+        };
+        let ieee = device.ieee_addr();
+        let spawn = {
+            let mut queue = self.pairing_queue.lock().unwrap();
+            if queue.queued.iter().any(|queued| queued == &ieee) {
+                false
+            } else {
+                queue.queued.push_back(ieee);
+                if queue.running {
+                    false
+                } else {
+                    queue.running = true;
+                    true
+                }
+            }
+        };
+        if !spawn {
+            return;
+        }
+        tokio::spawn(async move {
+            loop {
+                let next = {
+                    let mut queue = zigbee.pairing_queue.lock().unwrap();
+                    match queue.queued.pop_front() {
+                        Some(ieee) => Some(ieee),
+                        None => {
+                            queue.running = false;
+                            None
+                        }
+                    }
+                };
+                let Some(ieee) = next else {
+                    break;
+                };
+                let Some(device) = zigbee.resolve_device(&ieee) else {
+                    continue;
+                };
+                let Some(dispatcher) = zigbee.converter_dispatcher() else {
+                    continue;
+                };
+                match dispatcher.pair_device(&device.zh).await {
+                    Ok(prepared) => {
+                        zigbee
+                            .converters()
+                            .lock()
+                            .unwrap()
+                            .register_shared(prepared.definition);
+                        device.resolve_definition(true);
+                        zigbee.logger.lock().unwrap().info(
+                            &format!("Prepared lazy converter definition for '{}'", device.name()),
+                            "z2m",
+                        );
+                    }
+                    Err(error) => {
+                        zigbee.logger.lock().unwrap().debug(
+                            &format!(
+                                "Lazy converter definition for '{}' is not available: {error}",
+                                device.name()
+                            ),
+                            "z2m",
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    /// Number of devices waiting for lazy pairing (tests/diagnostics).
+    #[doc(hidden)]
+    pub fn pairing_queue_len(&self) -> usize {
+        self.pairing_queue.lock().unwrap().queued.len()
     }
 
     /// Prepare JS definitions for all paired devices and register them in the
@@ -604,6 +698,9 @@ impl Zigbee {
                 };
                 device.resolve_definition(false);
                 self.log_device_interview(&device, &payload.status);
+                if payload.status == "successful" {
+                    self.schedule_converter_pairing(Arc::clone(&device));
+                }
                 self.event_bus.lock().unwrap().emit_device_interview(json!({
                     "device": device.event_value(),
                     "status": payload.status,

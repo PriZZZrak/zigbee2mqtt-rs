@@ -104,6 +104,23 @@ pub struct OptionsWithDefaults {
     pub send_policy: Option<SendPolicy>,
 }
 
+/// Context passed to a dry-run ZCL hook. The hook receives the fully built
+/// frame (identical bytes to what the adapter would send), so tests and the
+/// dry-run bridge transport reuse the real ZCL construction and option
+/// handling without transmitting anything.
+pub struct DryRunRequest<'a> {
+    pub ieee: &'a str,
+    pub network: u16,
+    pub endpoint: u8,
+    pub frame: &'a Frame,
+    pub options: &'a OptionsWithDefaults,
+}
+
+/// Return `Some(full_zcl_frame_bytes)` to synthesize a device response, or
+/// `None` for a request that does not expect a payload.
+pub type DryRunHook =
+    Arc<dyn for<'a> Fn(&DryRunRequest<'a>) -> Result<Option<Vec<u8>>, String> + Send + Sync>;
+
 /// Upstream `Bind` target: Endpoint or Group.
 #[derive(Clone)]
 pub enum BindTarget {
@@ -168,6 +185,7 @@ pub struct Endpoint {
     pending_requests: Mutex<RequestQueue<EndpointRequestResult>>,
     pending_request_count: Arc<AtomicUsize>,
     self_ref: std::sync::OnceLock<std::sync::Weak<Endpoint>>,
+    dry_run_hook: StdMutex<Option<DryRunHook>>,
 }
 
 impl Endpoint {
@@ -203,7 +221,14 @@ impl Endpoint {
             pending_requests: Mutex::new(pending_requests),
             pending_request_count,
             self_ref: std::sync::OnceLock::new(),
+            dry_run_hook: StdMutex::new(None),
         }
+    }
+
+    /// Install or clear the dry-run ZCL hook. While set, `send_request` calls
+    /// the hook instead of the adapter; nothing is transmitted.
+    pub fn set_dry_run_hook(&self, hook: Option<DryRunHook>) {
+        *self.dry_run_hook.lock().unwrap() = hook;
     }
 
     /// Upstream `get binds()`.
@@ -692,6 +717,34 @@ impl Endpoint {
         let ieee = self.device_ieee_address.lock().unwrap().clone();
         let network = *self.device_network_address.lock().unwrap();
         let endpoint = self.ID;
+        let dry_run = self.dry_run_hook.lock().unwrap().clone();
+        if let Some(hook) = dry_run {
+            let request = DryRunRequest {
+                ieee: &ieee,
+                network,
+                endpoint,
+                frame: &frame,
+                options,
+            };
+            return match hook(&request)? {
+                Some(bytes) => {
+                    let header = crate::zspec::zcl::zcl_header::Header::from_buffer(&bytes)
+                        .ok_or_else(|| "dry-run response has no valid ZCL header".to_owned())?;
+                    Ok(EndpointRequestResult::Payload(ZclPayload {
+                        cluster_id: frame.cluster.ID as u16,
+                        data: bytes,
+                        header: Some(header),
+                        address: serde_json::Value::Null,
+                        endpoint,
+                        linkquality: 0,
+                        group_id: 0,
+                        was_broadcast: false,
+                        destination_endpoint: endpoint,
+                    }))
+                }
+                None => Ok(EndpointRequestResult::Unit),
+            };
+        }
         let frame_for_call = frame.clone();
         let timeout = options.timeout;
         let disable_response = options.disable_response;

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -549,4 +549,63 @@ fn open_recovers_when_the_active_generation_directory_is_gone() {
     let reopened = ModuleCache::open(config(&cache_root), fixture.manifest).unwrap();
     assert_eq!(reopened.state("b"), ModuleState::Ready);
     assert_eq!(reopened.load_ready("b").unwrap(), b"module-b");
+}
+
+struct ToggleSyncFault {
+    active: std::sync::atomic::AtomicBool,
+    only: PathBuf,
+}
+impl converter_artifact::SyncFault for ToggleSyncFault {
+    fn check(&self, path: &Path, what: &str) -> std::io::Result<()> {
+        if self.active.load(Ordering::Relaxed) && path == self.only && what == "active.json" {
+            return Err(std::io::Error::other("injected fsync failure"));
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn activation_syncs_the_pointer_before_pruning_old_generations() {
+    let fixture = fixture();
+    let cache_root = temp("sync-order");
+    let fault = Arc::new(ToggleSyncFault {
+        active: std::sync::atomic::AtomicBool::new(false),
+        only: cache_root.join("test-artifact"),
+    });
+    let mut cfg = config(&cache_root);
+    cfg.sync_fault = Some(fault.clone());
+    let cache = ModuleCache::open(cfg.clone(), fixture.manifest.clone()).unwrap();
+    let (fetcher_impl, _) = fetcher(&fixture);
+    cache
+        .ensure(&["b".to_owned()], &fetcher_impl, &cfg, true)
+        .unwrap();
+    cache
+        .ensure(&["c".to_owned()], &fetcher_impl, &cfg, true)
+        .unwrap();
+    let generations = cache.root().join("generations");
+    let names = std::fs::read_dir(&generations).unwrap().count();
+    assert_eq!(names, 2, "active + last-known-good");
+    let first = std::fs::read_dir(&generations)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| path.join("b.js").is_file() && !path.join("c.js").is_file())
+        .expect("first generation");
+    // A failed root fsync must abort before pruning: the previous generation
+    // may still be referenced if the pointer rename is lost in a power cut.
+    fault.active.store(true, Ordering::Relaxed);
+    let error = cache
+        .ensure(&["a".to_owned()], &fetcher_impl, &cfg, true)
+        .unwrap_err();
+    assert!(error.to_string().contains("not durably synced"), "{error}");
+    fault.active.store(false, Ordering::Relaxed);
+    let after_failure = std::fs::read_dir(&generations).unwrap().count();
+    assert_eq!(
+        after_failure, 3,
+        "no generation may be pruned before the active pointer is durable"
+    );
+    assert!(first.is_dir(), "previous generation was pruned too early");
+    // The new generation is still active and complete despite the fsync error.
+    assert_eq!(cache.load_ready("a").unwrap(), b"module-a");
+    assert_eq!(cache.load_ready("b").unwrap(), b"module-b");
 }

@@ -96,7 +96,7 @@ async fn main() {
     let mqtt = Arc::new(tokio::sync::Mutex::new(Mqtt::new(event_bus.clone())));
     let controller = Arc::new(Controller::new(
         event_bus,
-        zigbee,
+        zigbee.clone(),
         state,
         mqtt,
         settings,
@@ -115,6 +115,19 @@ async fn main() {
     controller.set_exit_callback(Arc::new(|code, _restart| {
         Box::pin(async move { std::process::exit(code) })
     }));
+
+    match z2m_rs::converter::startup::install_from_env(&zigbee, &data_path).await {
+        Ok(true) => controller
+            .logger
+            .lock()
+            .unwrap()
+            .info("Lazy converter runtime enabled", "z2m"),
+        Ok(false) => {}
+        Err(error) => controller.logger.lock().unwrap().error(
+            &format!("Lazy converter runtime disabled: {error}"),
+            "z2m",
+        ),
+    }
 
     if let Err(error) = controller.start().await {
         controller

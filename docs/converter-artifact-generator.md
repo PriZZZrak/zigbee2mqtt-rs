@@ -194,10 +194,10 @@ baseline startup    p50 22.0 ms / p95 35.9 ms
 under pairing       p50 23.7 ms / p95 49.6 ms
 
 full bridge cold start to 20 device definitions ready (real quickjs
-prepareDefinition, release aarch64, run with runtime generations):
-  loader startup     2,042.9 ms
-  prepare all          658.7 ms
-  total              2,727.6 ms
+prepareDefinition, release aarch64, dry-run transport/lifecycle stage):
+  loader startup     2,258.8 ms
+  prepare all          596.3 ms
+  total              2,882.6 ms
 ```
 
 The pairing fetch downloads only the selected `tuya` fragment closure, not the
@@ -218,14 +218,14 @@ downloads are exceptional and the cached fast path takes no lock, so no
 per-module lock is added without a real bottleneck.
 
 Report-path latency while a new Tuya fragment is downloaded (120 ms per module)
-and prepared on the shared JS worker (300 report samples, 55 overlapping the
+and prepared on the shared JS worker (300 report samples, 52 overlapping the
 pairing window):
 
 ```text
-pairing total        1,719 ms
-baseline p50/p95     2.54 / 5.56 ms
-during   p50/p95     2.42 / 5.95 ms
-during   max           827.8 ms (one report queued behind prepareDefinition)
+pairing total        1,758 ms
+baseline p50/p95     2.50 / 6.02 ms
+during   p50/p95     2.66 / 6.10 ms
+during   max           847 ms (one report queued behind prepareDefinition)
 ```
 
 The download runs on blocking threads and does not stall reports; p50/p95 are
@@ -286,6 +286,40 @@ feature, which is not added without a second, repeated stall measurement.
   verified modules and work offline. A later `pair_device`/lazy restart retries
   the closure; there is no unbounded background retry loop.
 
+## 3c. Real Endpoint transport and lifecycle
+
+- `DryRunEndpointTransport` implements `ConverterTransport` on top of the real
+  `Endpoint` model. `command`, `commandResponse`, `write`, `read` and
+  `configureReporting` go through the existing endpoint methods; a per-call
+  `DryRunHook` inside `Endpoint::send_request` captures the exact frame bytes
+  that the adapter would send and returns a synthetic `readRsp` built from
+  seeded values. Nothing is transmitted and no coordinator is needed.
+- Command options are preserved end-to-end: the runtime endpoint shim now
+  forwards `options` (`manufacturerCode`, `disableDefaultResponse`,
+  `direction`, `srcEndpoint`, `transactionSequenceNumber`, `reservedBits`,
+  `timeout`, `writeUndiv`) and the endpoint applies the same defaults as
+  upstream. Manufacturer-specific clusters/attributes and device custom
+  clusters are resolved by the existing `Endpoint::get_cluster` path.
+- `bind` is a ZDO operation: in dry-run it is recorded as an intent (target id
+  and type) without transmitting; production will call `Endpoint::bind`.
+- Lifecycle: `Zigbee::schedule_converter_pairing` runs after a successful
+  device interview. It deduplicates by IEEE, uses one sequential background
+  worker, skips devices that already have a definition (existing devices are
+  prepared first by `prepare_converter_definitions`) and registers the
+  prepared definition in the existing registry.
+- Opt-in startup: `converter::startup::install_from_env` is invoked before
+  `controller.start()`. It is disabled unless `Z2M_CONVERTER_LAZY=1` and
+  requires `Z2M_CONVERTER_ARTIFACT_DIR` and `Z2M_CONVERTER_HERDSMAN_DIR`;
+  cache/runtime default under the data directory. Only
+  `Z2M_CONVERTER_TRANSPORT=dry-run` is accepted in this stage; any other value
+  disables lazy mode with an explicit error (never a silent fallback). No
+  settings schema or `configuration.yaml` key is changed.
+- Reports during pairing are queued by the existing bounded runtime channels
+  (admission + `max_pending_events`), not dropped silently. The lifecycle test
+  submits 120 reports while a new Tuya device is downloaded and prepared and
+  asserts every report completes; a full queue surfaces `Backpressure`
+  explicitly.
+
 ## 4. Manifest and integrity
 
 `manifest.json` records:
@@ -309,17 +343,27 @@ must be checked against this trusted manifest before caching/evaluation.
 `tools/oracle/generate-zcl-pinned.mjs` generates from pinned
 zigbee-herdsman 11.2.0:
 
-- **413 ZCL cases** (206 encode, 207 decode) across all 129 clusters,
+- **415 ZCL cases** (206 encode, 209 decode) across all 129 clusters,
   commands/commandsResponse, manufacturer-specific cluster data, global
-  commands and two corrupted/truncated buffers;
+  commands and corrupted/truncated buffers;
 - **60 ZDO constants** with names/IDs.
 
-`differential_zcl_pinned.rs` passes every valid corpus case. Two generated
-greenPower/telecom cases produce Rust `INVALID_FIELD` while upstream encodes a
-payload; they remain **open defects** with case ids in
-`tools/bench/results/artifact-generator/zcl-differential.json`
-(`openDefects: 2`, `fullFrameParity: false`). No full frame parity is claimed;
-the valid-case gate excludes only these two documented cases.
+The two former "mismatches" were an oracle bug, not a codec bug: greenPower and
+telecommunicationsVoiceOverZigbee both have two commands with the same ID
+(`commissioningNotification`/`sinkCommissioningMode` = 4 and
+`establishmentRequest`/`controlResponse` = 0). The generator re-encoded a frame
+created from one command and then asserted that the *other* command could
+decode the bytes. Pinned upstream throws `INVALID_FIELD` on those buffers as
+well (verified directly with Node). `generate-zcl-pinned.mjs` now asks upstream
+to decode before emitting a round-trip case and records such buffers with
+`expectedError: true` + `upstreamDecodeError: true`; the Rust decoder returns
+the same error. `openDefects` is therefore **0** for this corpus.
+
+`differential_frame_options.rs` adds 10 pinned cases for command options:
+default-response flag, direction, TSN, reserved bits, manufacturer codes
+(header and write payload), read, configReport, readRsp and a custom cluster.
+The dry-run transport tests compare the endpoint-produced bytes with the same
+oracle and cover custom clusters, manufacturer-specific commands and `bind`.
 Unknown inbound clusters follow the existing raw-diagnostic path; unknown
 outbound clusters remain a documented next-stage error path (no guessed
 encoding).
@@ -328,7 +372,7 @@ encoding).
 
 | Component | Bytes |
 |---|---:|
-| `z2m-rs` aarch64 musl | 18,313,424 raw / 6,069,341 gzip |
+| `z2m-rs` aarch64 musl | 23,455,568 raw / 8,036,565 gzip (unstripped); 16,610,936 raw / 6,980,370 gzip stripped |
 | shared JS tree | 2,443,459 |
 | `index.z2idx1` | 927,458 |
 | manifest + graph | ~110,000 |
@@ -344,14 +388,14 @@ installed side-by-side without the agreed Node removal/external-storage step.
 - Full oracle generation is a build/research step; the 11,562-case oracle is
   not committed. The small automatic fixtures plus the generator/`resolver_diff`
   commands reproduce the full gate.
-- Two ZCL payload-validation anomalies remain documented; they need a codec
-  decision before enabling greenPower/telecom commands.
+- The greenPower/telecom duplicate-ID receive cases are asserted as errors on
+  both sides; no known codec mismatch remains in the pinned corpus.
 - ZDO frame corpus currently covers constants plus existing wire/zdo suites; a
   full ZDO request/response payload oracle remains next-stage work.
-- The lazy loader/cache is wired through the opt-in
-  `ConverterDispatcher::start_lazy`/`pair_device` path; the default bridge
-  startup still uses the existing package-root flow and no production
-  configuration selects lazy mode yet.
+- The lazy loader/cache is wired into `controller.start()` through
+  `install_from_env` (env-gated) and into interview-driven pairing through
+  `Zigbee::schedule_converter_pairing`. The default remains the existing
+  package-root flow until the artifact is installed and the env switch is set.
 - `HttpsFetcher` is covered by a local rustls TLS server (TLS, chunked,
   redirects, truncation, timeout, size cap, 404, hash mismatch) and by a manual
   run against public HTTPS mirrors (`example.com`, `httpbin.org` redirect and
@@ -366,30 +410,40 @@ installed side-by-side without the agreed Node removal/external-storage step.
 
 ## 8. GO / NO-GO
 
-**GO** for the cache-consistency and bridge-wiring stage:
+**GO** for the real Endpoint transport & integration validation stage:
 
-1. `z2idx1` resolver is 0-diff on the full oracle (11,562 cases);
-2. the generator is deterministic and hash-verified;
-3. production split requires a non-skipped behavioral differential;
-4. manifest/ABI/hash verification is implemented;
-5. immutable generations, atomic activation, LKG rollback and crash recovery
-   in every phase have automatic tests;
-6. single-flight, peak disk/memory budgets and per-device startup independence
-   have automatic tests;
-7. `start_lazy` materializes only paired closures as immutable runtime
-   generations and prepares real nous/IKEA/Tuya definitions through the
-   existing quickjs dispatcher;
-8. golden parity is 36/36 and the external Lytko definition still prepares;
-9. the space probe compares additional bytes, every commit fsync is checked,
-   and a failed runtime materialization keeps the active generation.
+1. `z2idx1` resolver is 0-diff on the full oracle (11,562 cases) and golden
+   parity is 36/36;
+2. the two former ZCL "mismatches" are resolved as oracle bugs: upstream
+   rejects the same duplicate-ID buffers, the generator now requires an
+   upstream round-trip and asserts both sides error (`openDefects: 0`);
+3. the frame-option differential (10 cases: default-response, direction, TSN,
+   reserved bits, manufacturer code, read/write/configReport/readRsp, custom
+   cluster) matches pinned upstream;
+4. `DryRunEndpointTransport` builds frames through the real Endpoint/ZCL model,
+   forwards command options, serves reads from seeded values and records bind
+   intents without transmitting anything;
+5. lazy loading is wired into `controller.start()` (env-gated) and into
+   interview-driven pairing with a deduplicated, bounded, single-worker queue;
+6. 120 reports complete while a new Tuya device is downloaded/prepared in the
+   background; queues are the existing bounded runtime channels and overflow is
+   explicit backpressure;
+7. PERF-001 (≤0.85 s single-report stall during manual pairing) is accepted as
+   low-priority debt in `docs/backlog.md`;
+8. Routerich criteria hold: 20 devices ready in 2.88 s, single-flight and
+   pairing impact within the previous envelope.
+
+**GO for the agreed coordinator-only HIL**, subject to `docs/hil-plan.md`:
+dedicated coordinator/maintenance window, committed overlay/package migration,
+recorded binary/artifact hashes, no `StartCommissioning`/restore, rollback to
+the Node.js service ready.
 
 **NO-GO for production enablement** until:
 
-1. the two documented ZCL codec anomalies are fixed or explicitly excluded;
+1. the real (transmitting) Endpoint transport replaces dry-run and passes the
+   HIL plan; this build records frames only;
 2. an artifact mirror exists and `HttpsFetcher` is validated against it with a
    real manifest (public HTTPS mirrors and a local TLS server are covered);
-3. a production configuration selects lazy mode and the OS-supervisor
-   (procd) restart path is exercised;
-4. the ZDO frame corpus is expanded;
-5. the overlay migration is agreed and HIL is separately approved (the overlay
-   currently has 568 KB free, so a flash-resident runtime was not measured).
+3. the overlay migration and procd service are exercised on the router;
+4. the ZDO frame corpus is expanded with request/response payloads;
+5. HIL evidence is captured for the operations listed in `docs/hil-plan.md`.
