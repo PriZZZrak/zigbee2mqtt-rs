@@ -497,3 +497,74 @@ fn public_github_release_asset_follows_cdn_redirects() {
     let text = String::from_utf8_lossy(&body);
     assert!(text.contains("gh_2.63.2_linux_amd64.tar.gz"), "{text}");
 }
+
+const CONVERTER_RELEASE: &str = "https://github.com/PriZZZrak/zigbee2mqtt-rs/releases/download/converter-vz2hc-26.125.0-zh-11.2.0-abi1/";
+
+/// Opt-in against the published converter Release: fetches a real module and
+/// checks its manifest SHA-256. Run with `--ignored`.
+#[test]
+#[ignore]
+fn public_converter_release_module_matches_manifest() {
+    let config = HttpsFetcherConfig {
+        base_url: CONVERTER_RELEASE.to_owned(),
+        max_bytes: 16 << 20,
+        timeout: Duration::from_secs(30),
+        max_redirects: 3,
+        trust_pem: None,
+        extra_asset_hosts: Vec::new(),
+    };
+    let fetcher = HttpsFetcher::new(config).unwrap();
+    let mut module = module_record("tuya-1", b"");
+    module.asset = Some("tuya-1.js".to_owned());
+    let bytes = converter_artifact::ModuleFetcher::fetch(&fetcher, &module).unwrap();
+    assert_eq!(bytes.len(), 174084);
+    let digest: String = Sha256::digest(&bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    assert_eq!(
+        digest,
+        "055da5279646d4113df5e8f05965fdcdf2148cbfe3f73db6a71ab36d73a1ab55"
+    );
+}
+
+/// Opt-in end-to-end cache fetch from the published Release: the ModuleCache
+/// downloads the real module, verifies size/SHA-256 and activates it.
+#[test]
+#[ignore]
+fn public_converter_release_module_activates_in_cache() {
+    let root = std::env::temp_dir().join(format!("z2m-release-cache-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let manifest = serde_json::json!({
+        "manifestSchema": 1,
+        "artifactId": "release-cache-test",
+        "upstream": {},
+        "host": {"abi": 1, "engine": "quickjs-oxide", "engineVersion": "0.5.0", "zclCatalogSha256": "00", "requiredFeatures": []},
+        "index": {"file": "index.z2idx1", "format": "z2idx1", "version": 1, "bytes": 0, "sha256": hash(b""), "jsonBytes": 0, "jsonSha256": hash(b""), "lookupKeys": 0, "definitions": 0, "candidates": 0},
+        "graph": {"file": "graph.json", "bytes": 0, "sha256": hash(b"")},
+        "shared": {"root": "dist", "files": [], "bytes": 0, "sha256": hash(b"")},
+        "modules": {"format": "cjs", "packageIncluded": false, "retrieval": CONVERTER_RELEASE, "entries": [
+            {"id": "tuya-1", "file": "dist/devices/tuya-1.js", "asset": "tuya-1.js", "bytes": 174084, "sha256": "055da5279646d4113df5e8f05965fdcdf2148cbfe3f73db6a71ab36d73a1ab55", "definitions": 1, "requires": []}
+        ]},
+        "compatibility": {"minHostAbi": 1, "maxHostAbi": 1}
+    });
+    let manifest = Manifest::parse(serde_json::to_vec(&manifest).unwrap().as_slice()).unwrap();
+    let cache_config = CacheConfig::new(&root);
+    let cache = ModuleCache::open(cache_config.clone(), manifest).unwrap();
+    let config = HttpsFetcherConfig {
+        base_url: CONVERTER_RELEASE.to_owned(),
+        max_bytes: 16 << 20,
+        timeout: Duration::from_secs(30),
+        max_redirects: 3,
+        trust_pem: None,
+        extra_asset_hosts: Vec::new(),
+    };
+    let fetcher = HttpsFetcher::new(config).unwrap();
+    let report = cache
+        .ensure(&["tuya-1".to_owned()], &fetcher, &cache_config, true)
+        .unwrap();
+    assert_eq!(report.fetched, 1);
+    assert_eq!(cache.load_ready("tuya-1").unwrap().len(), 174084);
+    let _ = std::fs::remove_dir_all(&root);
+}

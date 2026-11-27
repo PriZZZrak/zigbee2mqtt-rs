@@ -121,6 +121,17 @@ an RSS limit and is reviewed after HIL. Installed footprint is ~24.1 MB
 the current overlay has ~568 KB free, so the migration plan is required before
 installation.
 
+## Verified first package (2026-11-27)
+
+Actions run
+`https://github.com/PriZZZrak/zigbee2mqtt-rs/actions/runs/46016877970`
+built `feed/zigbee2mqtt-rs_0.0.1-hil1-r1_aarch64_cortex-a53.ipk`
+(sha256 `33f7abb87c76a923b71e8d4bbc715af8dc4db7c25bf57c7b6811198d64900648`,
+8,315,124 B) through the SDK against converter Release
+`converter-vz2hc-26.125.0-zh-11.2.0-abi1`. Inspection: aarch64 ELF,
+`Installed-Size: 23,818,240`, `Depends: libc`, manifest/index byte-identical to
+the Release, shared JS present, no device JS, init/mode present.
+
 ## Router setup
 
 ```sh

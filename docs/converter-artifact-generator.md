@@ -389,8 +389,11 @@ with a signed query string. The fetcher accepts those hosts only when the
 trusted base is `github.com`, requires HTTPS/443, follows at most 3 redirects,
 rejects fragments, arbitrary hosts and downgrades, and keeps the size/time
 limits. A real public-release asset (GitHub CLI checksums, follows the CDN
-redirect) and a local TLS redirect suite both pass. Publishing our own release
-is prepared but was not executed here (no repository token).
+redirect) and a local TLS redirect suite both pass. Our first release is
+published and verified: Actions run 46012408128, 413 assets, manifest
+`5cd34c12…`, index `49f5186f…`, `tuya-1.js` `055da527…`; the fetcher downloaded
+the published module directly and through `ModuleCache`. The SDK package run
+46016877970 produced the published ipk with byte-identical manifest/index.
 
 ## 4. Manifest and integrity
 
@@ -485,13 +488,13 @@ installed side-by-side without the agreed Node removal/external-storage step.
   flash-resident runtime measurement needs the package migration.
 - The full artifact generator/oracle commands remain explicit build/research
   steps.
-- The GitHub Release workflow is committed but its first real publication was
-  not executed here (no repository token); the release fetcher was validated
-  against a public GitHub Release and a local TLS redirect suite.
-- The OpenWrt SDK package definition and build script are committed; the SDK
-  build itself requires host `make`/gcc (absent in this environment) and is
-  exercised by CI. The staged payload, archive contents and modes are verified
-  locally.
+- The GitHub Release workflow has run successfully (Actions run 46012408128)
+  and the published assets were fully verified; a public GitHub asset and a
+  local TLS redirect suite cover the fetcher.
+- The SDK package build ran successfully in CI (Actions run 46016877970) and
+  the published ipk was inspected. The local container lacks host `make`/gcc,
+  so the SDK compile itself was not run locally; the staged payload and ipk
+  contents were verified.
 - Release assets are 412 individual files (< 1000); a single module is fetched
   directly, never a full archive.
 - No OpenWrt package migration, no live coordinator/MQTT/HA run and no HIL.

@@ -28,7 +28,8 @@ RustCrypto provider; aarch64 musl static build.
 | ZCL corpus | **415 / 415** (2 duplicate-ID buffers asserted as errors on both sides) |
 | ZCL frame options/custom cluster | **10 / 10** |
 | ZDO frames | **28 / 28** requests+responses (bind/unbind unicast/multicast, address/descriptor/table requests, status/error) |
-| Converter release flow | generator twice (determinism), `manifest_verify`, graph/split/asset gates, resolver 0/11,562, ZCL/ZDO, golden 36/36 (workflow committed; publication not run here) |
+| Converter release flow | generator twice (determinism), `manifest_verify`, graph/split/asset gates, resolver 0/11,562, ZCL/ZDO, golden 36/36; real Actions run 46012408128 published and 413 assets verified |
+| Real Release fetch | direct `tuya-1.js` hash `055da527…` and `ModuleCache` activation from the published Release (2 ignored tests, run manually) |
 | Cache manager | 15 tests (generations, fsync/prune order, LKG, budgets, crash, cancellation) |
 | Lazy loader | 8 tests (real nous/IKEA/Tuya, offline restart, runtime generations) |
 | Dry-run transport | 5 tests (oracle frames, cached reads, custom cluster, concurrency, strict option validation) |
@@ -72,10 +73,14 @@ RustCrypto provider; aarch64 musl static build.
   base is `github.com`, rejects HTTP/downgrade, arbitrary hosts and fragments,
   and keeps the redirect/time/size limits. Signed CDN query strings are allowed
   on redirects only.
-- No API token is needed for a public release. The hermetic local TLS suite
-  passes; a real public GitHub Release asset test (`cli/cli` checksums) passed
-  through the CDN redirect and public TLS. Publication of *our* release is
-  prepared in CI but not executed in this environment (no repository token).
+- **Publication verified.** Actions run
+  `https://github.com/PriZZZrak/zigbee2mqtt-rs/actions/runs/46012408128`
+  succeeded (3m30s) and published the release. All 413 assets were downloaded
+  and verified (`verify-release.js`): manifest `5cd34c12…`, index
+  `49f5186f…`, `tuya-1.js` `055da527…`; `SHA256SUMS` matches.
+- The fetcher fetched the published `tuya-1.js` both directly and through
+  `ModuleCache` (size/SHA-256 verified before activation); the real
+  `cli/cli` public asset test and the local TLS redirect suite also pass.
 
 ## 2c. SDK package and modes
 
@@ -91,9 +96,15 @@ RustCrypto provider; aarch64 musl static build.
   `ALLOW_NETWORK=0` with a pre-seeded cache or a `--with-devices` package
   variant. Missing definitions are reported per device/module, never silently
   degraded.
-- The local environment has no `make`/host compiler, so the SDK build itself
-  is exercised by CI (`build-essential` + SDK download); the staged payload and
-  package contents were verified locally.
+- **SDK build verified in CI.** Actions run
+  `https://github.com/PriZZZrak/zigbee2mqtt-rs/actions/runs/46016877970`
+  succeeded (5m10s). The published ipk
+  `feed/zigbee2mqtt-rs_0.0.1-hil1-r1_aarch64_cortex-a53.ipk`
+  (sha256 `33f7abb87c76a923b71e8d4bbc715af8dc4db7c25bf57c7b6811198d64900648`,
+  8,315,124 B, Installed-Size 23,818,240 B, `Depends: libc`,
+  `aarch64_cortex-a53`) was downloaded and inspected: aarch64 ELF, manifest
+  and index byte-identical to the Release, 41 artifact files, shared
+  `dist/lib` + `dist/converters`, no `dist/devices`, init/mode present.
 
 ## 2d. Routerich memory
 
@@ -199,8 +210,8 @@ Rollback steps:
 approved maintenance window), provided the backups above exist and the exact
 binary/artifact hashes are recorded in the window log.
 
-**NO-GO for production enablement** until: the first converter Release is
-published and fetched by an installed package; the SDK-built ipk is produced
-and inspected by CI; HIL evidence is captured; the real transport is validated
-on hardware; the overlay/procd migration is exercised; the ZDO corpus is
-extended if HIL reveals adapter-specific framing.
+**NO-GO for production enablement** until: HIL evidence is captured; the real
+transport is validated on hardware; the overlay/procd migration is exercised
+on the router; the ZDO corpus is extended if HIL reveals adapter-specific
+framing. The converter Release, asset verification, real fetcher download and
+SDK-built ipk are now verified (Actions runs 46012408128 and 46016877970).
