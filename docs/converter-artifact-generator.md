@@ -337,17 +337,26 @@ feature, which is not added without a second, repeated stall measurement.
 
 ## 3d. GitHub Releases distribution
 
-The trusted converter store is a GitHub Release in this repository. The
-release workflow (`.github/workflows/converter-artifacts.yml`) installs pinned
-npm packages (`zigbee-herdsman@11.2.0`, `zigbee-herdsman-converters@26.125.0`,
-`@babel/parser@7.29.8`), builds the behavior probe, generates the artifact
-twice with the single existing generator, and fails on any manifest/index
-difference. It then runs `manifest_verify`, the graph/split/asset gate
+The trusted converter store is a GitHub Release in this repository. The single
+source of the tag, artifactId, ABI and upstream versions is
+`packaging/converter-release.json`; a pushed `converter-v*` tag that differs is
+rejected, so the package workflow can never point at a mismatched release.
+` .github/ci/package-lock.json` pins the transitive npm graph and CI installs it
+with `npm ci`. The release workflow
+(`.github/workflows/converter-artifacts.yml`) builds the behavior probe,
+generates the artifact twice with the single existing generator, and fails on
+any manifest/index difference. It then runs `manifest_verify`, the graph/split/asset gate
 (`check-manifest-gates.js`; `behavior.skipped` cannot pass), the resolver
 oracle/differential (0/11,562), the ZCL/ZDO/frame-option tests and golden
 parity (36/36) before staging assets.
 
-**Release layout.** `manifest.json`, `index.z2idx1`, `index.json`, `graph.json`
+**Release verification.** `tools/artifact-generator/verify-release.js` checks
+the downloaded assets against the pin and the manifest: artifactId/ABI/engine,
+upstream versions, retrieval URL, index/index.json/graph size and SHA-256, every
+module asset size/SHA-256, `SHA256SUMS`, and rejects unexpected or missing
+files. The package workflow downloads the pinned release, runs this check,
+regenerates locally and requires `cmp` equality of manifest/index, then embeds
+the verified manifest/index and shared tree in the SDK ipk. `manifest.json`, `index.z2idx1`, `index.json`, `graph.json`
 and 408 flat module assets (`<id>.js`, e.g. `tuya-1.js`) = 412 assets, below
 GitHub's 1000-asset limit. Example:
 
@@ -368,8 +377,9 @@ whole catalog for one device. Individual flat assets are therefore chosen.
 
 **Publication is fail-closed.** The release is created as a draft, assets are
 uploaded, the remote asset count is checked, and only then is the draft
-published with `--latest=false`. Existing tags/releases are never overwritten;
-a failure deletes the draft so it cannot be mistaken for a ready release. The
+published with `--latest=false`. Existing tags/releases are never overwritten.
+A marker file records that this run created the draft; the failure cleanup
+deletes only that draft, never a pre-existing draft with the same tag. The
 workflow uses only `contents: write` and the automatic `GITHUB_TOKEN`; no
 user configuration, database or cache is uploaded.
 

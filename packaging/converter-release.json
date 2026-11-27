@@ -1,0 +1,12 @@
+{
+  "tag": "converter-vz2hc-26.125.0-zh-11.2.0-abi1",
+  "artifactId": "z2hc-26.125.0-zh-11.2.0-abi1",
+  "hostAbi": 1,
+  "engine": "quickjs-oxide",
+  "engineVersion": "0.5.0",
+  "zigbee2mqtt": "2.14.3",
+  "zigbee2mqttCommit": "3c841fdfd66c92239921ef84fde8f039c64e1662",
+  "zigbeeHerdsman": "11.2.0",
+  "zigbeeHerdsmanConverters": "26.125.0",
+  "babelParser": "7.29.8"
+}

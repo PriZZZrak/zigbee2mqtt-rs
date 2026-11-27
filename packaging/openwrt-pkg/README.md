@@ -1,7 +1,9 @@
 # OpenWrt SDK package
 
-`build.sh <sdk> <binary> <artifact> <out> [--with-devices] [version]` is the
-primary packaging path. It copies this package definition into the SDK, stages:
+`HERDSMAN_DIR=<npm node_modules/zigbee-herdsman> build.sh <sdk> <binary>
+<artifact> <out> [--with-devices] [version]` is the primary packaging path.
+`HERDSMAN_DIR` is required; the script verifies its `package.json` version and
+`dist/index.js`. It copies this package definition into the SDK, stages:
 
 - the stripped aarch64-musl binary,
 - `manifest.json`, `index.z2idx1`, `dist/index.js`, `dist/models-index.json`,

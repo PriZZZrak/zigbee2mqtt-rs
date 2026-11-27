@@ -1,6 +1,7 @@
 #!/bin/sh
 # Build the zigbee2mqtt-rs ipk through the existing OpenWrt SDK.
 # Usage: packaging/openwrt-pkg/build.sh <sdk-dir> <binary> <artifact-dir> <out-dir> [--with-devices] [version]
+# Env: HERDSMAN_DIR (required), ZH_VERSION (default 11.2.0)
 # The SDK package is the primary packaging path; deploy/build.sh stages the
 # same payload for inspection. Nothing is copied to a router.
 set -eu
@@ -10,6 +11,11 @@ ARTIFACT=${3:?artifact dir}
 OUT=${4:?output dir}
 WITH_DEVICES=${5:-}
 VERSION=${6:-0.1.0}
+HERDSMAN_DIR=${HERDSMAN_DIR:?HERDSMAN_DIR must point at the pinned zigbee-herdsman package}
+ZH_VERSION=${ZH_VERSION:-11.2.0}
+[ -f "$HERDSMAN_DIR/dist/index.js" ] || { echo "HERDSMAN_DIR has no dist/index.js: $HERDSMAN_DIR" >&2; exit 1; }
+ACTUAL_ZH=$(node -p "require(process.argv[1] + '/package.json').version" "$HERDSMAN_DIR")
+[ "$ACTUAL_ZH" = "$ZH_VERSION" ] || { echo "herdsman version $ACTUAL_ZH != $ZH_VERSION" >&2; exit 1; }
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 . "$ROOT/packaging/lib.sh"
 
@@ -22,8 +28,8 @@ cp "$BINARY" "$STAGE/zigbee2mqtt-rs"
 chmod 0755 "$STAGE/zigbee2mqtt-rs"
 rm -rf "$STAGE/artifact" "$STAGE/herdsman"
 stage_artifact "$ARTIFACT" "$STAGE/artifact" "$WITH_DEVICES"
-stage_js_tree "$ROOT/.upstream/zigbee2mqtt/node_modules/zigbee-herdsman/dist" "$STAGE/herdsman/dist"
-cp "$ROOT/.upstream/zigbee2mqtt/node_modules/zigbee-herdsman/package.json" "$STAGE/herdsman/" 2>/dev/null || true
+stage_js_tree "$HERDSMAN_DIR/dist" "$STAGE/herdsman/dist"
+cp "$HERDSMAN_DIR/package.json" "$STAGE/herdsman/"
 
 make -C "$SDK" package/zigbee2mqtt-rs/compile V=s Z2M_RS_VERSION="$VERSION"
 IPK=$(ls -t $(find "$SDK/bin/packages" -name 'zigbee2mqtt-rs_*.ipk') 2>/dev/null | head -n1)

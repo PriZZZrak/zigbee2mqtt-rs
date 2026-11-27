@@ -25,15 +25,20 @@ Two packages, published to an opkg feed on the `gh-pages` branch:
   verifies `name`/`version`, builds the `all` ipk, updates the feed, and (for
   `windfront-v*` tags) attaches the ipk to a GitHub release.
 - `.github/workflows/z2m-rs-package.yml` — cross-builds the static
-  `aarch64-unknown-linux-musl` binary with cargo-zigbuild, generates the
-  converter artifact, builds the ipk **through the OpenWrt SDK**
-  (`packaging/openwrt-pkg/`), verifies the payload (stripped aarch64 binary,
-  manifest/index/shared JS, no device catalog) and updates the same feed.
+  `aarch64-unknown-linux-musl` binary with cargo-zigbuild, downloads and
+  verifies the pinned converter Release (`packaging/converter-release.json`,
+  every asset hash/SHA256SUMS), regenerates locally and requires manifest/index
+  equality, builds the ipk **through the OpenWrt SDK** with
+  `HERDSMAN_DIR` pointing at the npm-locked herdsman, verifies the real ipk
+  payload (stripped aarch64 binary, manifest/index/shared JS, no device
+  catalog) and updates the same feed. It refuses to build if the Release is
+  missing or has unexpected files.
 - `.github/workflows/converter-artifacts.yml` — generates the artifact twice
-  from pinned upstream npm packages, runs the manifest/graph/split gates, the
+  from the npm-locked pinned packages, runs the manifest/graph/split gates, the
   resolver differential, ZCL/ZDO differentials and golden parity, then stages
-  flat release assets and publishes an immutable versioned GitHub Release
-  (draft-first, fail-closed).
+  flat release assets with `SHA256SUMS` and publishes an immutable versioned
+  GitHub Release (draft-first, fail-closed; only this run's draft is removed on
+  failure).
 
 **ipk container format:** OpenWrt 24.10 opkg reads `.ipk` as a gzipped tar with
 `./debian-binary`, `./data.tar.gz`, `./control.tar.gz`; an `ar` archive is

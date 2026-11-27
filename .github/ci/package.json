@@ -1,0 +1,9 @@
+{
+  "name": "z2m-rs-converter-ci",
+  "private": true,
+  "dependencies": {
+    "@babel/parser": "7.29.8",
+    "zigbee-herdsman": "11.2.0",
+    "zigbee-herdsman-converters": "26.125.0"
+  }
+}

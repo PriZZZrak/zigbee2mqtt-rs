@@ -1,19 +1,16 @@
 name: converter artifacts
 
-# Generates, verifies and optionally publishes the converter artifact from
-# pinned upstream npm releases. The artifact generator is the only index and
-# manifest source. Publication is a draft-first GitHub Release so a partially
-# uploaded release can never be mistaken for a finished one.
+# Generates, verifies and publishes the pinned converter artifact.
+# The release descriptor packaging/converter-release.json is the single source
+# of the tag, artifactId, ABI and upstream versions. A different converter-v*
+# tag is rejected, so the package workflow can never point at a mismatched
+# release.
 
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Release tag (default converter-v<artifactId>)"
-        required: false
-        default: ""
       publish:
-        description: "Create the GitHub Release after all gates pass"
+        description: "Create the pinned GitHub Release after all gates pass"
         type: boolean
         default: false
   push:
@@ -27,14 +24,6 @@ concurrency:
 permissions:
   contents: write
 
-env:
-  Z2M_VERSION: "2.14.3"
-  Z2M_COMMIT: "3c841fdfd66c92239921ef84fde8f039c64e1662"
-  ZH_VERSION: "11.2.0"
-  CONVERTERS_VERSION: "26.125.0"
-  BABEL_VERSION: "7.29.8"
-  ARTIFACT_ID: "z2hc-26.125.0-zh-11.2.0-abi1"
-
 jobs:
   artifacts:
     runs-on: ubuntu-latest
@@ -46,32 +35,41 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Resolve release tag and retrieval base
-        id: release
+      - name: Read the pinned release descriptor
+        id: pin
         run: |
           set -euo pipefail
-          tag="${{ inputs.tag }}"
-          if [ -z "$tag" ]; then
-            if [ "$GITHUB_REF_TYPE" = "tag" ]; then tag="$GITHUB_REF_NAME"; else tag="converter-v${ARTIFACT_ID}"; fi
+          read -r tag artifact abi zh zc z2m < <(node -e '
+            const p=require("./packaging/converter-release.json");
+            console.log(p.tag,p.artifactId,p.hostAbi,p.zigbeeHerdsman,p.zigbeeHerdsmanConverters,p.zigbee2mqtt);
+          ')
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
+            echo "tag $GITHUB_REF_NAME does not match pinned $tag" >&2
+            exit 1
           fi
-          case "$tag" in converter-v*) ;; *) echo "tag must start with converter-v" >&2; exit 1;; esac
-          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "base=$base" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$tag"
+            echo "artifact=$artifact"
+            echo "abi=$abi"
+            echo "zh=$zh"
+            echo "zc=$zc"
+            echo "z2m=$z2m"
+            echo "base=https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Install pinned upstream packages
+      - name: Install the locked upstream packages
         run: |
           set -euo pipefail
-          npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/upstream" \
-            "zigbee-herdsman@${ZH_VERSION}" \
-            "zigbee-herdsman-converters@${CONVERTERS_VERSION}" \
-            "@babel/parser@${BABEL_VERSION}"
+          mkdir -p "$RUNNER_TEMP/upstream"
+          cp .github/ci/package.json .github/ci/package-lock.json "$RUNNER_TEMP/upstream/"
+          npm ci --ignore-scripts --prefix "$RUNNER_TEMP/upstream"
           node -e '
             const root = process.argv[1];
+            const pin = require("./packaging/converter-release.json");
             const zh = require(root + "/zigbee-herdsman/package.json").version;
             const zc = require(root + "/zigbee-herdsman-converters/package.json").version;
-            if (zh !== process.env.ZH_VERSION) throw new Error("herdsman " + zh);
-            if (zc !== process.env.CONVERTERS_VERSION) throw new Error("converters " + zc);
+            if (zh !== pin.zigbeeHerdsman) throw new Error("herdsman " + zh);
+            if (zc !== pin.zigbeeHerdsmanConverters) throw new Error("converters " + zc);
           ' "$RUNNER_TEMP/upstream/node_modules"
 
       - name: Build the behavior probe
@@ -80,7 +78,9 @@ jobs:
       - name: Generate the artifact twice (determinism)
         env:
           UPSTREAM: ${{ runner.temp }}/upstream/node_modules
-          BASE: ${{ steps.release.outputs.base }}
+          BASE: ${{ steps.pin.outputs.base }}
+          ARTIFACT_ID: ${{ steps.pin.outputs.artifact }}
+          ABI: ${{ steps.pin.outputs.abi }}
         run: |
           set -euo pipefail
           generate() {
@@ -90,8 +90,11 @@ jobs:
               --babel-parser "$UPSTREAM/@babel/parser" \
               --behavior-probe target/debug/runtime_probe \
               --artifact-id "$ARTIFACT_ID" \
-              --z2m-version "$Z2M_VERSION" --z2m-commit "$Z2M_COMMIT" \
-              --zh-version "$ZH_VERSION" --converters-version "$CONVERTERS_VERSION" \
+              --host-abi "$ABI" \
+              --z2m-version "$(node -p 'require("./packaging/converter-release.json").zigbee2mqtt')" \
+              --z2m-commit "$(node -p 'require("./packaging/converter-release.json").zigbee2mqttCommit')" \
+              --zh-version "${{ steps.pin.outputs.zh }}" \
+              --converters-version "${{ steps.pin.outputs.zc }}" \
               --zcl-catalog crates/zigbee-apiarist/src/zspec/zcl/definition/clusters.json \
               --retrieval-url "$BASE" \
               --out "$out"
@@ -102,6 +105,14 @@ jobs:
             target/artifact-a/index.z2idx1 target/artifact-b/index.z2idx1 | tee target/determinism.txt
           cmp target/artifact-a/manifest.json target/artifact-b/manifest.json
           cmp target/artifact-a/index.z2idx1 target/artifact-b/index.z2idx1
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const pin = require("./packaging/converter-release.json");
+          const m = JSON.parse(fs.readFileSync("target/artifact-a/manifest.json", "utf8"));
+          if (m.artifactId !== pin.artifactId) throw new Error("artifactId");
+          if (m.host.abi !== pin.hostAbi) throw new Error("abi");
+          if (m.modules.retrieval !== process.env.BASE) throw new Error("retrieval");
+          NODE
 
       - name: Manifest, graph and split gates
         env:
@@ -149,37 +160,42 @@ jobs:
             --external tools/bench/fixtures/external/L101Ze_z2m.js > target/parity.json
           python3 tools/bench/check_golden.py target/parity.json
 
-      - name: Stage flat release assets
+      - name: Stage flat release assets and checksums
         run: |
           set -euo pipefail
           node tools/artifact-generator/stage-release-assets.js target/artifact-a target/release-assets | tee target/assets.json
-          sha256sum target/release-assets/* > target/release-assets.sha256
+          (cd target/release-assets && sha256sum * > ../SHA256SUMS)
+          cp target/SHA256SUMS target/release-assets/SHA256SUMS
           test "$(ls target/release-assets | wc -l)" -le 1000
+          node tools/artifact-generator/verify-release.js \
+            target/release-assets packaging/converter-release.json \
+            "${{ steps.pin.outputs.base }}" | tee target/release-verify.json
 
       - uses: actions/upload-artifact@v4
         with:
-          name: converter-artifacts-${{ steps.release.outputs.tag }}
+          name: converter-artifacts-${{ steps.pin.outputs.tag }}
           path: |
             target/artifact-a
             target/release-assets
             target/*.json
             target/*.txt
 
-      - name: Publish the GitHub Release
+      - name: Publish the pinned GitHub Release
         if: github.ref_type == 'tag' || inputs.publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ steps.pin.outputs.tag }}
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG already exists; refusing to overwrite" >&2
             exit 1
           fi
-          echo "publishing $TAG as a draft; assets are uploaded before it becomes visible"
           gh release create "$TAG" --draft --latest=false \
             --title "Converter artifacts $TAG" \
-            --notes "Verified converter artifacts. manifest/index hashes are in the attached manifest.json and release-assets.sha256."
+            --notes "Verified converter artifacts. manifest/index hashes are in manifest.json and SHA256SUMS."
+          # Marker: only a draft created by this run may be removed on failure.
+          touch "$RUNNER_TEMP/draft-created"
           find target/release-assets -maxdepth 1 -type f -print0 | \
             xargs -0 -n 20 gh release upload "$TAG"
           remote=$(gh release view "$TAG" --json assets --jq '.assets | length')
@@ -187,12 +203,14 @@ jobs:
           test "$remote" -eq "$local"
           gh release edit "$TAG" --draft=false --latest=false
 
-      - name: Remove a partial draft release
+      - name: Remove only this run's partial draft
         if: failure() && (github.ref_type == 'tag' || inputs.publish)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ steps.pin.outputs.tag }}
         run: |
-          if gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null | grep -q true; then
+          if [ -f "$RUNNER_TEMP/draft-created" ]; then
             gh release delete "$TAG" --yes
+          else
+            echo "no draft created by this run; nothing to delete"
           fi

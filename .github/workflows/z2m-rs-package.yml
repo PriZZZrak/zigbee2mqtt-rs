@@ -14,8 +14,6 @@ permissions:
   contents: write
 
 env:
-  # Everything the job prints is captured here so the failure reporter can
-  # publish it to the gh-pages feed (the Actions log needs admin rights).
   CI_LOG: ${{ github.workspace }}/ci.log
 
 jobs:
@@ -49,6 +47,10 @@ jobs:
         with:
           tool: cargo-zigbuild
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install usign
         run: |
           if command -v usign >/dev/null 2>&1; then exit 0; fi
@@ -57,43 +59,80 @@ jobs:
           cmake --build /tmp/usign/build -j"$(nproc)"
           sudo cmake --install /tmp/usign/build
 
-      - name: Build the static aarch64 binary
+      - name: Read the pinned converter release
+        id: pin
         run: |
           set -euo pipefail
-          {
-            rustc --version
-            cargo --version
-            zig version
-            cargo zigbuild --release -p z2m-rs --target aarch64-unknown-linux-musl
-          } 2>&1 | tee -a "$CI_LOG"
-          bin="target/aarch64-unknown-linux-musl/release/z2m-rs"
-          test -x "$bin"
-          file "$bin" | tee -a "$CI_LOG"
-          sha256sum "$bin" >> "$GITHUB_STEP_SUMMARY"
+          node - <<'NODE'
+          const p = require("./packaging/converter-release.json");
+          const out = process.env.GITHUB_OUTPUT;
+          const fs = require("node:fs");
+          fs.appendFileSync(out, `tag=${p.tag}\nartifactId=${p.artifactId}\nbase=https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/${p.tag}/\n`);
+          NODE
+          if ! gh release view "$(node -p 'require("./packaging/converter-release.json").tag')" >/dev/null 2>&1; then
+            echo "pinned converter release is missing; refusing to build a package without its artifact" >&2
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install pinned converter sources
+      - name: Download and verify the pinned release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.pin.outputs.tag }}
+          BASE: ${{ steps.pin.outputs.base }}
         run: |
           set -euo pipefail
-          npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/upstream" \
-            "zigbee-herdsman@11.2.0" "zigbee-herdsman-converters@26.125.0" "@babel/parser@7.29.8"
+          mkdir -p "$RUNNER_TEMP/release"
+          gh release download "$TAG" --dir "$RUNNER_TEMP/release"
+          node tools/artifact-generator/verify-release.js \
+            "$RUNNER_TEMP/release" packaging/converter-release.json "$BASE" | tee -a "$CI_LOG"
 
-      - name: Build the behavior probe and converter artifact
+      - name: Install the locked upstream packages
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/upstream"
+          cp .github/ci/package.json .github/ci/package-lock.json "$RUNNER_TEMP/upstream/"
+          npm ci --ignore-scripts --prefix "$RUNNER_TEMP/upstream"
+
+      - name: Build the behavior probe and verify local generation matches the release
         env:
           UPSTREAM: ${{ runner.temp }}/upstream/node_modules
+          BASE: ${{ steps.pin.outputs.base }}
         run: |
           set -euo pipefail
           cargo build -p converter-runtime --bin runtime_probe
-          artifact_id="z2hc-26.125.0-zh-11.2.0-abi1"
-          retrieval="https://github.com/${GITHUB_REPOSITORY}/releases/download/converter-v${artifact_id}/"
           node tools/artifact-generator/generate.js \
             --converters "$UPSTREAM/zigbee-herdsman-converters" \
             --babel-parser "$UPSTREAM/@babel/parser" \
             --behavior-probe target/debug/runtime_probe \
-            --artifact-id "$artifact_id" \
-            --retrieval-url "$retrieval" \
-            --out target/converter-artifact | tee -a "$CI_LOG"
-          cargo run -q -p converter-artifact --bin manifest_verify -- target/converter-artifact | tee -a "$CI_LOG"
+            --artifact-id "$(node -p 'require("./packaging/converter-release.json").artifactId')" \
+            --host-abi "$(node -p 'require("./packaging/converter-release.json").hostAbi')" \
+            --z2m-version "$(node -p 'require("./packaging/converter-release.json").zigbee2mqtt')" \
+            --z2m-commit "$(node -p 'require("./packaging/converter-release.json").zigbee2mqttCommit')" \
+            --zh-version "$(node -p 'require("./packaging/converter-release.json").zigbeeHerdsman')" \
+            --converters-version "$(node -p 'require("./packaging/converter-release.json").zigbeeHerdsmanConverters')" \
+            --retrieval-url "$BASE" \
+            --out target/converter-artifact
           node tools/artifact-generator/check-manifest-gates.js target/converter-artifact | tee -a "$CI_LOG"
+          cmp target/converter-artifact/manifest.json "$RUNNER_TEMP/release/manifest.json"
+          cmp target/converter-artifact/index.z2idx1 "$RUNNER_TEMP/release/index.z2idx1"
+          cmp target/converter-artifact/index.json "$RUNNER_TEMP/release/index.json"
+          node -e '
+            const fs = require("node:fs");
+            const pin = require("./packaging/converter-release.json");
+            const m = JSON.parse(fs.readFileSync("target/converter-artifact/manifest.json", "utf8"));
+            if (m.artifactId !== pin.artifactId || m.host.abi !== pin.hostAbi) throw new Error("artifact identity");
+          '
+
+      - name: Build the static aarch64 binary
+        run: |
+          set -euo pipefail
+          cargo zigbuild --release -p z2m-rs --target aarch64-unknown-linux-musl
+          bin="target/aarch64-unknown-linux-musl/release/z2m-rs"
+          test -x "$bin"
+          file "$bin" | tee -a "$CI_LOG"
+          sha256sum "$bin" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Package version
         id: version
@@ -109,6 +148,7 @@ jobs:
       - name: Build the ipk through the OpenWrt SDK
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          HERDSMAN_DIR: ${{ runner.temp }}/upstream/node_modules/zigbee-herdsman
         run: |
           set -euo pipefail
           sudo apt-get update && sudo apt-get install -y build-essential zstd
@@ -117,32 +157,39 @@ jobs:
           curl -fsSL "$sdk_url" | tar -x --zstd -C "$RUNNER_TEMP/sdk" --strip-components=1
           make -C "$RUNNER_TEMP/sdk" defconfig >/dev/null
           bin="target/aarch64-unknown-linux-musl/release/z2m-rs"
-          # The SDK build script stages the artifact, herdsman JS and the
-          # stripped binary into the package and compiles the ipk.
           LLVM_STRIP=$(find "${RUSTUP_HOME:-$HOME/.rustup}" -path '*/bin/llvm-strip' | head -n1) \
             sh packaging/openwrt-pkg/build.sh \
               "$RUNNER_TEMP/sdk" "$bin" target/converter-artifact \
               "$RUNNER_TEMP/out" "" "$VERSION" 2>&1 | tee -a "$CI_LOG"
           ls -l "$RUNNER_TEMP/out"
+          sha256sum "$RUNNER_TEMP/out"/*.ipk >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify the real ipk payload
+        env:
+          TAG: ${{ steps.pin.outputs.tag }}
+        run: |
+          set -euo pipefail
           ipk=$(find "$RUNNER_TEMP/out" -name '*.ipk' | head -n1)
           test -n "$ipk"
-          sha256sum "$ipk" >> "$GITHUB_STEP_SUMMARY"
-          # Verify the package payload: stripped aarch64 binary, compact index,
-          # trusted manifest, shared JS, and no device catalog.
           work=$(mktemp -d)
           tar -C "$work" -xzf "$ipk"
           tar -C "$work" -xzf "$work/data.tar.gz"
           test -x "$work/usr/bin/zigbee2mqtt-rs"
-          test -f "$work/usr/share/zigbee2mqtt-rs/artifact/manifest.json"
-          test -f "$work/usr/share/zigbee2mqtt-rs/artifact/index.z2idx1"
+          cmp "$work/usr/share/zigbee2mqtt-rs/artifact/manifest.json" "$RUNNER_TEMP/release/manifest.json"
+          cmp "$work/usr/share/zigbee2mqtt-rs/artifact/index.z2idx1" "$RUNNER_TEMP/release/index.z2idx1"
           test -d "$work/usr/share/zigbee2mqtt-rs/artifact/dist/lib"
+          test -d "$work/usr/share/zigbee2mqtt-rs/artifact/dist/converters"
           test ! -e "$work/usr/share/zigbee2mqtt-rs/artifact/dist/devices"
+          test -f "$work/etc/init.d/zigbee2mqtt-rs"
+          test -f "$work/etc/zigbee2mqtt-rs/mode"
           python3 - "$work/usr/bin/zigbee2mqtt-rs" <<'PY'
           import sys
           data = open(sys.argv[1], 'rb').read(20)
           assert data[:4] == b'\x7fELF', 'not an ELF binary'
           assert data[18:20] == b'\xb7\x00', 'not aarch64'
           PY
+          du -sk "$work/usr" | tee -a "$CI_LOG"
+          cat "$RUNNER_TEMP/out"/*.meta | tee -a "$CI_LOG"
 
       - name: Update the opkg feed
         env:
@@ -172,8 +219,6 @@ jobs:
           git commit -m "zigbee2mqtt-rs ${VERSION}"
           git push origin gh-pages
 
-      # A failing step is invisible without repository admin access, so the
-      # captured output is published next to the feed on the gh-pages branch.
       - name: Report the failure
         if: failure()
         run: |
