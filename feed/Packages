@@ -40,6 +40,26 @@ Filename: zigbee2mqtt-rs_0.0.1-dev.4_aarch64_cortex-a53.ipk
 Size: 5133351
 SHA256sum: 33b2654256a24a4101ebba3f71bf17b71963f717dbbc5e66e85f18d03fa8ae23
 
+Package: zigbee2mqtt-rs
+Version: 0.0.1-hil1-r1
+Depends: libc
+Source: feeds/base/zigbee2mqtt-rs
+SourceName: zigbee2mqtt-rs
+License: MIT
+Section: utils
+SourceDateEpoch: 1784877710
+URL: https://github.com/PriZZZrak/zigbee2mqtt-rs
+Maintainer: zigbee2mqtt-rs <noreply@github.com>
+Architecture: aarch64_cortex-a53
+Installed-Size: 23818240
+Description:  Pure-Rust Zigbee to MQTT bridge. The aarch64-musl binary is statically
+ linked; the package carries the compact converter index, trusted manifest,
+ shared JS and the pinned zigbee-herdsman runtime. Device JS is not included
+ in the on-demand variant.
+Filename: zigbee2mqtt-rs_0.0.1-hil1-r1_aarch64_cortex-a53.ipk
+Size: 8315124
+SHA256sum: 33f7abb87c76a923b71e8d4bbc715af8dc4db7c25bf57c7b6811198d64900648
+
 Package: zigbee2mqtt-windfront
 Version: 2.15.1
 Architecture: all
