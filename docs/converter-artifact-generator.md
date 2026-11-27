@@ -41,7 +41,7 @@ Two independent runs produced identical `manifest.json` and
 `index.z2idx1` hashes:
 
 ```text
-manifest  3d96a3c6...819050
+manifest  5cd34c12...42ced
 index     49f5186f...c2c182
 ```
 
@@ -195,9 +195,9 @@ under pairing       p50 23.7 ms / p95 49.6 ms
 
 full bridge cold start to 20 device definitions ready (real quickjs
 prepareDefinition, release aarch64, real-transport stage; runs 2.97–3.13 s):
-  loader startup     2,289–2,415 ms
-  prepare all          597–689 ms
-  total              2,970–3,135 ms
+  loader startup     2,209–2,344 ms
+  prepare all          575–661 ms
+  total              2,890–2,950 ms
 ```
 
 The pairing fetch downloads only the selected `tuya` fragment closure, not the
@@ -335,6 +335,53 @@ feature, which is not added without a second, repeated stall measurement.
   asserts every report completes; a full queue surfaces `Backpressure`
   explicitly.
 
+## 3d. GitHub Releases distribution
+
+The trusted converter store is a GitHub Release in this repository. The
+release workflow (`.github/workflows/converter-artifacts.yml`) installs pinned
+npm packages (`zigbee-herdsman@11.2.0`, `zigbee-herdsman-converters@26.125.0`,
+`@babel/parser@7.29.8`), builds the behavior probe, generates the artifact
+twice with the single existing generator, and fails on any manifest/index
+difference. It then runs `manifest_verify`, the graph/split/asset gate
+(`check-manifest-gates.js`; `behavior.skipped` cannot pass), the resolver
+oracle/differential (0/11,562), the ZCL/ZDO/frame-option tests and golden
+parity (36/36) before staging assets.
+
+**Release layout.** `manifest.json`, `index.z2idx1`, `index.json`, `graph.json`
+and 408 flat module assets (`<id>.js`, e.g. `tuya-1.js`) = 412 assets, below
+GitHub's 1000-asset limit. Example:
+
+```
+https://github.com/PriZZZrak/zigbee2mqtt-rs/releases/download/converter-vz2hc-26.125.0-zh-11.2.0-abi1/tuya-1.js
+```
+
+`modules.retrieval` in the installed manifest is exactly that base (with a
+trailing `/`); `ModuleRecord.asset` gives the flat name. The loader downloads
+only the selected closure and verifies size/SHA-256 before activation; shared
+JS comes from the installed package.
+
+**Why individual assets, not bundles.** 408 assets fit the limit, allow a
+single-module GET without parsing a container, and keep GitHub's per-asset
+hash visible. A byte-range bundle index would save asset slots but requires
+range support and an extra index, and a non-range download would fetch the
+whole catalog for one device. Individual flat assets are therefore chosen.
+
+**Publication is fail-closed.** The release is created as a draft, assets are
+uploaded, the remote asset count is checked, and only then is the draft
+published with `--latest=false`. Existing tags/releases are never overwritten;
+a failure deletes the draft so it cannot be mistaken for a ready release. The
+workflow uses only `contents: write` and the automatic `GITHUB_TOKEN`; no
+user configuration, database or cache is uploaded.
+
+**Redirects.** GitHub serves assets from `release-assets.githubusercontent.com`
+/ `objects.githubusercontent.com` / `github-releases.githubusercontent.com`
+with a signed query string. The fetcher accepts those hosts only when the
+trusted base is `github.com`, requires HTTPS/443, follows at most 3 redirects,
+rejects fragments, arbitrary hosts and downgrades, and keeps the size/time
+limits. A real public-release asset (GitHub CLI checksums, follows the CDN
+redirect) and a local TLS redirect suite both pass. Publishing our own release
+is prepared but was not executed here (no repository token).
+
 ## 4. Manifest and integrity
 
 `manifest.json` records:
@@ -394,7 +441,7 @@ encoding).
 
 | Component | Bytes |
 |---|---:|
-| `z2m-rs` aarch64 musl | 23,592,808 raw / 8,083,024 gzip (unstripped); 16,681,368 raw / 7,014,944 gzip stripped |
+| `z2m-rs` aarch64 musl | 23,597,616 raw / 8,084,194 gzip (unstripped); 16,684,808 raw / 7,015,687 gzip stripped |
 | shared JS tree | 2,443,459 |
 | `index.z2idx1` | 927,458 |
 | manifest + graph | ~110,000 |
@@ -428,6 +475,15 @@ installed side-by-side without the agreed Node removal/external-storage step.
   flash-resident runtime measurement needs the package migration.
 - The full artifact generator/oracle commands remain explicit build/research
   steps.
+- The GitHub Release workflow is committed but its first real publication was
+  not executed here (no repository token); the release fetcher was validated
+  against a public GitHub Release and a local TLS redirect suite.
+- The OpenWrt SDK package definition and build script are committed; the SDK
+  build itself requires host `make`/gcc (absent in this environment) and is
+  exercised by CI. The staged payload, archive contents and modes are verified
+  locally.
+- Release assets are 412 individual files (< 1000); a single module is fetched
+  directly, never a full archive.
 - No OpenWrt package migration, no live coordinator/MQTT/HA run and no HIL.
 
 ## 8. GO / NO-GO
@@ -459,7 +515,14 @@ installed side-by-side without the agreed Node removal/external-storage step.
    PERF-001 (≤0.94 s single-report stall during manual pairing) accepted in
    `docs/backlog.md`;
 8. `docs/hil-readiness.md` records the binary/artifact hashes, test matrix,
-   live devices, allowed commands, backups and rollback conditions.
+   live devices, allowed commands, backups and rollback conditions;
+9. the release workflow generates and gates the artifact reproducibly and
+   publishes a draft-first, immutable, versioned GitHub Release; the fetcher
+   accepts only trusted GitHub asset redirects and verifies manifest hashes;
+10. the SDK-based package carries the compact index/manifest/shared JS (no
+    device catalog) and the two explicit modes (`on-demand` HTTPS, `offline`
+    file/cache); Routerich VmPeak 46–53 MB / VmRSS 27–33 MB with a 128 MB
+    address-space limit.
 
 **GO for the controlled HIL** under `docs/hil-plan.md`: Variant A (dedicated
 test coordinator) preferred, Variant B (agreed switchover of the existing
@@ -470,8 +533,10 @@ ownership and the documented rollback.
 
 1. HIL evidence exists for the real transmitting transport (this stage has
    adapter-level, not hardware, evidence);
-2. an artifact mirror exists and `HttpsFetcher` is validated against it with a
-   real manifest;
-3. the overlay/package migration and procd service are exercised on the router;
-4. the ZDO corpus is extended if HIL reveals adapter-specific framing;
-5. HIL evidence is captured for the operations in `docs/hil-plan.md`.
+2. the first converter Release is actually published and fetched by the
+   installed package (the workflow is ready, the upload was not run here);
+3. the SDK-built ipk is produced and inspected by CI, then installed on a test
+   router;
+4. the overlay/package migration and procd service are exercised on the router;
+5. the ZDO corpus is extended if HIL reveals adapter-specific framing;
+6. HIL evidence is captured for the operations in `docs/hil-plan.md`.

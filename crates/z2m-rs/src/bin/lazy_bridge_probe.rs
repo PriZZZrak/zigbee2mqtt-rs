@@ -123,6 +123,20 @@ fn create_device(
     *endpoint.output_clusters.lock().unwrap() = out.to_vec();
     zh
 }
+fn process_memory() -> Value {
+    let mut values = serde_json::Map::new();
+    if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
+        for line in status.lines() {
+            if let Some((key, value)) = line.split_once(':') {
+                if ["VmPeak", "VmSize", "VmRSS", "VmHWM", "Threads"].contains(&key) {
+                    values.insert(key.to_owned(), json!(value.trim()));
+                }
+            }
+        }
+    }
+    Value::Object(values)
+}
+
 fn herbsman_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -199,7 +213,7 @@ async fn startup(artifact: &Path) {
     let report = dispatcher.startup_report().unwrap_or_default();
     println!(
         "{}",
-        json!({"mode":"startup","devices":count,"resolved":report.resolved,"modulesLoaded":report.modules_loaded,"networkBytes":fetcher.bytes.load(Ordering::Relaxed),"cacheBytes":report.cache_bytes,"loaderStartupMs":loader_ms,"prepareAllMs":prepare_ms,"fullColdStartMs":total_ms,"readyDevices":ready,"failedDevices":errors,"runtimeRoot":dispatcher.runtime_root()})
+        json!({"mode":"startup","devices":count,"resolved":report.resolved,"modulesLoaded":report.modules_loaded,"networkBytes":fetcher.bytes.load(Ordering::Relaxed),"cacheBytes":report.cache_bytes,"loaderStartupMs":loader_ms,"prepareAllMs":prepare_ms,"fullColdStartMs":total_ms,"readyDevices":ready,"failedDevices":errors,"runtimeRoot":dispatcher.runtime_root(),"memory":process_memory()})
     );
     dispatcher.shutdown().await;
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -337,6 +351,7 @@ async fn impact(artifact: &Path) {
             "duringP95Ms":percentile(&mut during, 0.95),
             "duringMaxMs":during.iter().copied().fold(0.0_f64, f64::max),
             "fetchCalls":fetcher.calls(),
+            "memory":process_memory(),
         })
     );
     dispatcher.shutdown().await;

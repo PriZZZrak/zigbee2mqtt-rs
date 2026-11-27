@@ -46,8 +46,9 @@ verifies every module against the trusted manifest before activation. The
 `file` fetcher reads `dist/devices` from the artifact directory (only present
 with `--with-devices`).
 
-`ulimit -v 196608` (192 MB address space) bounds the process; the measured
-Routerich RSS is well below that. The cache/runtime generations keep the active
+`ulimit -v 131072` (128 MB address space) replaces the earlier 192 MB. The
+measured Routerich probe VmPeak is 46–53 MB and VmRSS 27–33 MB; the limit bounds
+address space, not RSS, and RSS is monitored during HIL. The cache/runtime generations keep the active
 and last-known-good pointers, so rollback does not require regenerating.
 
 ## Generation rollback

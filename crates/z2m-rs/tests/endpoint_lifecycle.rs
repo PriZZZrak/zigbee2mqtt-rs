@@ -402,3 +402,86 @@ async fn host_timeout_is_returned_to_the_converter() {
     assert!(adapter.endpoint_frames.lock().unwrap().len() > frames_before);
     dispatcher.shutdown().await;
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn static_exposes_are_cached_but_dynamic_exposes_are_not_mixed() {
+    let Ok(artifact) = std::env::var("CONVERTER_ARTIFACT_DIR") else {
+        return;
+    };
+    let _guard = serial();
+    let artifact = PathBuf::from(artifact);
+    let work = temp("exposes-cache");
+    let adapter = MockAdapter::new();
+    install_globals(&work, &adapter);
+    let ikea_one = device(
+        "0x0017880104e45591",
+        0x1600,
+        "TRADFRI bulb E27 WS opal 1000lm",
+        &[0, 3, 4, 5, 6, 8, 768],
+    );
+    let ikea_two = device(
+        "0x0017880104e45592",
+        0x1601,
+        "TRADFRI bulb E27 WS opal 1000lm",
+        &[0, 3, 4, 5, 6, 8, 768],
+    );
+    let bitron = |ieee: &str, network: u16| {
+        let device = ZhDevice::create(
+            DeviceType::Router,
+            ieee,
+            network,
+            None,
+            Some("SMaBiT (Bitron Video)".to_owned()),
+            Some("Mains".to_owned()),
+            Some("AV2010/32".to_owned()),
+            InterviewState::Successful,
+            None,
+        )
+        .unwrap();
+        let endpoint = device.create_endpoint(1).unwrap();
+        *endpoint.input_clusters.lock().unwrap() = vec![0, 0x0201, 0x0204];
+        device
+    };
+    let bitron_one = bitron("0x0017880104e45593", 0x1602);
+    let bitron_two = bitron("0x0017880104e45594", 0x1603);
+    let dispatcher = dispatcher(
+        &artifact,
+        &work,
+        &[
+            Arc::clone(&ikea_one),
+            Arc::clone(&ikea_two),
+            Arc::clone(&bitron_one),
+            Arc::clone(&bitron_two),
+        ],
+        Duration::from_secs(2),
+    )
+    .await;
+
+    let first = dispatcher.pair_device(&ikea_one).await.unwrap();
+    assert!(first.metadata.static_exposes);
+    let second = dispatcher.pair_device(&ikea_two).await.unwrap();
+    assert!(
+        Arc::ptr_eq(&first.definition, &second.definition),
+        "static exposes must reuse the cached prepared definition"
+    );
+
+    let dynamic_one = dispatcher.pair_device(&bitron_one).await.unwrap();
+    assert!(
+        !dynamic_one.metadata.static_exposes,
+        "device-dependent exposes must not be cached"
+    );
+    let dynamic_two = dispatcher.pair_device(&bitron_two).await.unwrap();
+    assert!(
+        !Arc::ptr_eq(&dynamic_one.definition, &dynamic_two.definition),
+        "dynamic exposes must be resolved per device"
+    );
+    assert!(
+        !dynamic_one
+            .definition
+            .exposes
+            .resolve(&json!({}), &json!({}))
+            .is_empty(),
+        "dynamic exposes must still be populated"
+    );
+    dispatcher.shutdown().await;
+}

@@ -71,6 +71,30 @@ jobs:
           file "$bin" | tee -a "$CI_LOG"
           sha256sum "$bin" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Install pinned converter sources
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/upstream" \
+            "zigbee-herdsman@11.2.0" "zigbee-herdsman-converters@26.125.0" "@babel/parser@7.29.8"
+
+      - name: Build the behavior probe and converter artifact
+        env:
+          UPSTREAM: ${{ runner.temp }}/upstream/node_modules
+        run: |
+          set -euo pipefail
+          cargo build -p converter-runtime --bin runtime_probe
+          artifact_id="z2hc-26.125.0-zh-11.2.0-abi1"
+          retrieval="https://github.com/${GITHUB_REPOSITORY}/releases/download/converter-v${artifact_id}/"
+          node tools/artifact-generator/generate.js \
+            --converters "$UPSTREAM/zigbee-herdsman-converters" \
+            --babel-parser "$UPSTREAM/@babel/parser" \
+            --behavior-probe target/debug/runtime_probe \
+            --artifact-id "$artifact_id" \
+            --retrieval-url "$retrieval" \
+            --out target/converter-artifact | tee -a "$CI_LOG"
+          cargo run -q -p converter-artifact --bin manifest_verify -- target/converter-artifact | tee -a "$CI_LOG"
+          node tools/artifact-generator/check-manifest-gates.js target/converter-artifact | tee -a "$CI_LOG"
+
       - name: Package version
         id: version
         run: |
@@ -82,27 +106,43 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "windfront=$windfront" >> "$GITHUB_OUTPUT"
 
-      - name: Build ipk
+      - name: Build the ipk through the OpenWrt SDK
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          WINDFRONT: ${{ steps.version.outputs.windfront }}
         run: |
           set -euo pipefail
-          payload="$RUNNER_TEMP/payload"
-          mkdir -p "$payload/usr/bin" "$payload/etc/init.d"
-          cp target/aarch64-unknown-linux-musl/release/z2m-rs "$payload/usr/bin/zigbee2mqtt-rs"
-          cp packaging/opkg/files/zigbee2mqtt-rs.init "$payload/etc/init.d/zigbee2mqtt-rs"
-          chmod 0755 "$payload/usr/bin/zigbee2mqtt-rs" "$payload/etc/init.d/zigbee2mqtt-rs"
-          mkdir -p "$RUNNER_TEMP/out"
-          ./packaging/opkg/build-ipk.sh \
-            zigbee2mqtt-rs "$VERSION" aarch64_cortex-a53 \
-            "zigbee2mqtt-windfront (= $WINDFRONT)" \
-            "$payload" "$RUNNER_TEMP/out" \
-            "Zigbee to MQTT bridge (pure Rust port)" \
-            "" \
-            packaging/opkg/files-rs | tee -a "$CI_LOG"
+          sudo apt-get update && sudo apt-get install -y build-essential zstd
+          sdk_url="https://downloads.openwrt.org/releases/24.10.8/targets/mediatek/filogic/openwrt-sdk-24.10.8-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
+          mkdir -p "$RUNNER_TEMP/sdk"
+          curl -fsSL "$sdk_url" | tar -x --zstd -C "$RUNNER_TEMP/sdk" --strip-components=1
+          make -C "$RUNNER_TEMP/sdk" defconfig >/dev/null
+          bin="target/aarch64-unknown-linux-musl/release/z2m-rs"
+          # The SDK build script stages the artifact, herdsman JS and the
+          # stripped binary into the package and compiles the ipk.
+          LLVM_STRIP=$(find "${RUSTUP_HOME:-$HOME/.rustup}" -path '*/bin/llvm-strip' | head -n1) \
+            sh packaging/openwrt-pkg/build.sh \
+              "$RUNNER_TEMP/sdk" "$bin" target/converter-artifact \
+              "$RUNNER_TEMP/out" "" "$VERSION" 2>&1 | tee -a "$CI_LOG"
           ls -l "$RUNNER_TEMP/out"
-          cat "$RUNNER_TEMP/out"/*.meta >> "$GITHUB_STEP_SUMMARY"
+          ipk=$(find "$RUNNER_TEMP/out" -name '*.ipk' | head -n1)
+          test -n "$ipk"
+          sha256sum "$ipk" >> "$GITHUB_STEP_SUMMARY"
+          # Verify the package payload: stripped aarch64 binary, compact index,
+          # trusted manifest, shared JS, and no device catalog.
+          work=$(mktemp -d)
+          tar -C "$work" -xzf "$ipk"
+          tar -C "$work" -xzf "$work/data.tar.gz"
+          test -x "$work/usr/bin/zigbee2mqtt-rs"
+          test -f "$work/usr/share/zigbee2mqtt-rs/artifact/manifest.json"
+          test -f "$work/usr/share/zigbee2mqtt-rs/artifact/index.z2idx1"
+          test -d "$work/usr/share/zigbee2mqtt-rs/artifact/dist/lib"
+          test ! -e "$work/usr/share/zigbee2mqtt-rs/artifact/dist/devices"
+          python3 - "$work/usr/bin/zigbee2mqtt-rs" <<'PY'
+          import sys
+          data = open(sys.argv[1], 'rb').read(20)
+          assert data[:4] == b'\x7fELF', 'not an ELF binary'
+          assert data[18:20] == b'\xb7\x00', 'not aarch64'
+          PY
 
       - name: Update the opkg feed
         env:

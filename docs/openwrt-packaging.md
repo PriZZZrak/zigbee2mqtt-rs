@@ -25,8 +25,15 @@ Two packages, published to an opkg feed on the `gh-pages` branch:
   verifies `name`/`version`, builds the `all` ipk, updates the feed, and (for
   `windfront-v*` tags) attaches the ipk to a GitHub release.
 - `.github/workflows/z2m-rs-package.yml` — cross-builds the static
-  `aarch64-unknown-linux-musl` binary with cargo-zigbuild, builds the ipk with
-  the exact windfront dependency, and updates the same feed.
+  `aarch64-unknown-linux-musl` binary with cargo-zigbuild, generates the
+  converter artifact, builds the ipk **through the OpenWrt SDK**
+  (`packaging/openwrt-pkg/`), verifies the payload (stripped aarch64 binary,
+  manifest/index/shared JS, no device catalog) and updates the same feed.
+- `.github/workflows/converter-artifacts.yml` — generates the artifact twice
+  from pinned upstream npm packages, runs the manifest/graph/split gates, the
+  resolver differential, ZCL/ZDO differentials and golden parity, then stages
+  flat release assets and publishes an immutable versioned GitHub Release
+  (draft-first, fail-closed).
 
 **ipk container format:** OpenWrt 24.10 opkg reads `.ipk` as a gzipped tar with
 `./debian-binary`, `./data.tar.gz`, `./control.tar.gz`; an `ar` archive is
@@ -85,6 +92,29 @@ rejects a file that starts with the base64 payload ("Failed to decode secret
 key"). A trailing blank line is harmless. `.sec` (~200 chars) is
 `USIGN_PRIVATE_KEY`, `.pub` (~60 chars) is `USIGN_PUBLIC_KEY`; both start with
 `RWR`.
+
+## Converter artifact package and modes
+
+The `zigbee2mqtt-rs` ipk now carries `manifest.json`, `index.z2idx1`,
+`dist/index.js`, `dist/models-index.json`, `dist/converters/`, `dist/lib/` and
+the pinned herdsman JS. It does **not** carry the device catalog. Two explicit
+modes are selected by `/etc/zigbee2mqtt-rs/mode`:
+
+- `on-demand` (default): `Z2M_CONVERTER_FETCH=https` and
+  `Z2M_CONVERTER_ALLOW_NETWORK=1`; modules are fetched from the trusted GitHub
+  Release named in the manifest (`modules.retrieval`) and verified by size and
+  SHA-256 before activation.
+- `offline`: `FETCH=file`, `ALLOW_NETWORK=0`; requires a pre-seeded verified
+  cache or a package built with `packaging/openwrt-pkg/build.sh ... --with-devices`.
+  Missing definitions are reported with the device IEEE and module id; nothing
+  falls back silently.
+
+The service runs with `ulimit -v 131072` (128 MB address space). Measured
+Routerich VmPeak is 46–53 MB and VmRSS 27–33 MB; the address-space limit is not
+an RSS limit and is reviewed after HIL. Installed footprint is ~24.1 MB
+(binary 16.68 MB + artifact 3.7 MB + herdsman 3.6 MB) plus 0.5–1 MB cache/runtime;
+the current overlay has ~568 KB free, so the migration plan is required before
+installation.
 
 ## Router setup
 

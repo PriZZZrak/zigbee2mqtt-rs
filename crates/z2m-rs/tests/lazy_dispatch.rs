@@ -156,6 +156,15 @@ async fn external_lytko_still_prepares_when_lazy_artifact_has_no_definition() {
     zh.create_endpoint(1).unwrap();
     let prepared = dispatcher.prepare(&zh).await;
     assert!(prepared.is_ok(), "{prepared:?}");
-    assert_eq!(prepared.unwrap().metadata.model, "L101Ze.v2");
+    let prepared = prepared.unwrap();
+    assert_eq!(prepared.metadata.model, "L101Ze.v2");
+    assert!(
+        !prepared
+            .definition
+            .exposes
+            .resolve(&json!({}), &json!({}))
+            .is_empty(),
+        "external Lytko exposes must be preserved"
+    );
     dispatcher.shutdown().await;
 }

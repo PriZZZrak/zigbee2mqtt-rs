@@ -70,7 +70,7 @@ pub struct DefinitionMetadata {
     has_configure: bool,
     has_on_event: bool,
     exposes: Vec<Expose>,
-    static_exposes: bool,
+    pub static_exposes: bool,
     meta: Value,
 }
 

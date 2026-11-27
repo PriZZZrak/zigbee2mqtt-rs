@@ -594,7 +594,7 @@ for (const fileName of moduleFiles) {
   const requires = (graph.edges[fileName] || [])
     .filter((dependency) => dependency.startsWith("devices/"))
     .map((dependency) => dependency.slice("devices/".length));
-  moduleRecords.push({ id: fileName.replace(/\.js$/, ""), file: `dist/devices/${fileName}`, bytes: bytes.length, sha256: sha256(bytes), definitions: count, requires });
+  moduleRecords.push({ id: fileName.replace(/\.js$/, ""), file: `dist/devices/${fileName}`, asset: fileName, bytes: bytes.length, sha256: sha256(bytes), definitions: count, requires });
 }
 const splitManifest = {};
 for (const [fileName, result] of Object.entries(splitResults)) {

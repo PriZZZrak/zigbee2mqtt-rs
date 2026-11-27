@@ -10,9 +10,9 @@ the overlay was not modified.
 |---|---|
 | Target | `aarch64-unknown-linux-musl`, Routerich AX3000 v1, OpenWrt 24.10.8 |
 | Binary | `target/aarch64-unknown-linux-musl/release/z2m-rs` |
-| Binary sha256 (unstripped) | `427d494eed0ea565bed5e4f22dca183ca0e95c4731af9333d3920672b1bf7834` |
-| Stripped binary | 16,681,368 B, sha256 `5c22e447fee193ad25809179e92bd22e505664b58723841d9662ee377991e95c` |
-| Artifact manifest sha256 | `3d96a3c64e45c1ccf94abfa334ac1abca933ca199cbba7af67380403c4819050` |
+| Binary sha256 (unstripped) | `ba8e89df698a2f94981019668cb30a227c9ea880f956c7a3324bd92f3fde4c61` |
+| Stripped binary | 16,684,808 B, sha256 `ebb4b57959b5576004f5ffce34a2edf4bb27e0143788a9272d523af9b61102c4` |
+| Artifact manifest sha256 | `5cd34c1226da5ec8dda6745b9d9b88a71596b664416c622b3b96dd1d28942ced` |
 | Index sha256 (`index.z2idx1`) | `49f5186fcaadc9aaa85e725f98d366a3ebd168618775f85e3c823d327cc2c182` |
 | Git commit | the commit that adds this report (`git log -- docs/hil-readiness.md`) |
 
@@ -28,13 +28,14 @@ RustCrypto provider; aarch64 musl static build.
 | ZCL corpus | **415 / 415** (2 duplicate-ID buffers asserted as errors on both sides) |
 | ZCL frame options/custom cluster | **10 / 10** |
 | ZDO frames | **28 / 28** requests+responses (bind/unbind unicast/multicast, address/descriptor/table requests, status/error) |
+| Converter release flow | generator twice (determinism), `manifest_verify`, graph/split/asset gates, resolver 0/11,562, ZCL/ZDO, golden 36/36 (workflow committed; publication not run here) |
 | Cache manager | 15 tests (generations, fsync/prune order, LKG, budgets, crash, cancellation) |
 | Lazy loader | 8 tests (real nous/IKEA/Tuya, offline restart, runtime generations) |
 | Dry-run transport | 5 tests (oracle frames, cached reads, custom cluster, concurrency, strict option validation) |
 | Real Endpoint transport (mock adapter) | 3 tests (send via adapter, read payload, no mock fallback, bind/unbind ZDO, status errors) |
-| Lifecycle | 2 tests (JS fromZigbee/toZigbee/onEvent, exposes == pinned upstream, timeout, restart, leave) |
+| Lifecycle | 3 tests (JS fromZigbee/toZigbee/onEvent, exposes == pinned upstream, static vs dynamic exposes cache, timeout+recovery, restart, leave) |
 | Pairing lifecycle | 1 test (existing devices first, bounded queue, 120 reports during pairing) |
-| HTTPS fetcher | 5 local TLS tests + 1 public-mirror run |
+| HTTPS fetcher | 5 local TLS tests + public mirror + real public GitHub Release asset (CDN redirect) |
 | Bridge/extension suite | 9 converter bridge tests + 12 lib tests |
 
 ## 2a. Deployment readiness
@@ -42,19 +43,72 @@ RustCrypto provider; aarch64 musl static build.
 - `deploy/build.sh <artifact> <out>` builds the aarch64-musl binary, refuses to
   ship it unstripped, stages the binary, manifest, index, shared JS tree and the
   pinned `zigbee-herdsman` JS (no maps/types) and records sha256. The staged
-  payload is 16,681,368 B (binary) + 3.7 MB artifact (42 files, no device
+  payload is 16,684,808 B (binary) + 3.7 MB artifact (42 files, no device
   catalog) + 3.6 MB herdsman JS.
 - Without `--with-devices` the payload has **no device catalog**; new pairing
   requires `Z2M_CONVERTER_FETCH=https` (trusted manifest retrieval) or a
   separately staged module directory. With `--with-devices`, `dist/devices` is
   the offline module source.
 - `procd` service: exclusive serial-port ownership, respawn, nofile limit and
-  `ulimit -v 196608` (192 MB). The measured Routerich RSS is below that.
+  `ulimit -v 131072` (128 MB address space), based on the measured Routerich
+  VmPeak (46–53 MB); RSS is ~27–33 MB and is monitored during HIL.
 - Cache/runtime generations keep `active.json` + `lkg.json`; rollback is a
   pointer copy (or artifact-directory restore) and a restart, see
   `deploy/openwrt/README.md`.
 - The payload is **staged only**; the live overlay, the Node.js service and the
   Dongle-P were not touched.
+
+## 2b. GitHub Releases distribution
+
+- Trusted store: `https://github.com/PriZZZrak/zigbee2mqtt-rs/releases/download/converter-vz2hc-26.125.0-zh-11.2.0-abi1/`.
+- Release assets: `manifest.json`, `index.z2idx1`, `index.json`, `graph.json` and
+  **408 flat module files** (e.g. `tuya-1.js`), 412 assets total (< 1000 cap).
+  Example: `.../converter-vz2hc-26.125.0-zh-11.2.0-abi1/tuya-1.js`.
+- The manifest `modules.retrieval` base is the same release URL; each module
+  carries a flat `asset` name. The loader downloads only the selected closure,
+  never a full archive.
+- GitHub redirects to `release-assets.githubusercontent.com` /
+  `objects.githubusercontent.com`; the fetcher allows only those hosts when the
+  base is `github.com`, rejects HTTP/downgrade, arbitrary hosts and fragments,
+  and keeps the redirect/time/size limits. Signed CDN query strings are allowed
+  on redirects only.
+- No API token is needed for a public release. The hermetic local TLS suite
+  passes; a real public GitHub Release asset test (`cli/cli` checksums) passed
+  through the CDN redirect and public TLS. Publication of *our* release is
+  prepared in CI but not executed in this environment (no repository token).
+
+## 2c. SDK package and modes
+
+- `packaging/openwrt-pkg/build.sh` copies the tracked package definition into
+  the existing SDK, stages the stripped binary, manifest, index, shared JS and
+  herdsman JS, and runs `make package/zigbee2mqtt-rs/compile`. The same staging
+  helpers are used by `deploy/build.sh`; there is no second packaging pipeline.
+- Package contents: binary (16.68 MB), artifact (3.7 MB, 41 files, **no device
+  catalog**), herdsman JS (3.6 MB), init script, mode file. Installed footprint
+  ≈ **24.1 MB** plus cache/runtime state (~0.5–1 MB).
+- `mode` file selects the explicit configuration:
+  `on-demand` → `FETCH=https`, `ALLOW_NETWORK=1`; `offline` → `FETCH=file`,
+  `ALLOW_NETWORK=0` with a pre-seeded cache or a `--with-devices` package
+  variant. Missing definitions are reported per device/module, never silently
+  degraded.
+- The local environment has no `make`/host compiler, so the SDK build itself
+  is exercised by CI (`build-essential` + SDK download); the staged payload and
+  package contents were verified locally.
+
+## 2d. Routerich memory
+
+Measured with the lazy probe (same quickjs runtime, 20 paired devices, one
+module cached; `/tmp` tmpfs):
+
+| Mode | VmPeak | VmSize | VmRSS (peak) | Threads |
+|---|---:|---:|---:|---:|
+| 20 devices startup | 46.4–46.7 MB | ≈46.7 MB | 26.7–27.3 MB | 7–8 |
+| pairing impact | 52.9 MB | 48.4 MB | 33.2 MB | 7 |
+
+`ulimit -v 131072` (128 MB) replaces 192 MB: it bounds address space at ~2.4×
+the measured probe peak and is still above the full bridge (MQTT/HA/frontend
+add a few MB). RSS remains ~27–33 MB; VmRSS is recorded during HIL. The limit
+is address space, not RSS, and will be revisited if many modules are active.
 
 ## 3. Live devices (read-only database snapshot)
 
@@ -145,7 +199,8 @@ Rollback steps:
 approved maintenance window), provided the backups above exist and the exact
 binary/artifact hashes are recorded in the window log.
 
-**NO-GO for production enablement** until: HIL evidence is captured; the real
-transport is validated on hardware; the artifact mirror exists and is used;
-the overlay/procd migration is exercised; ZDO request/response corpus is
-extended if the HIL reveals adapter-specific framing.
+**NO-GO for production enablement** until: the first converter Release is
+published and fetched by an installed package; the SDK-built ipk is produced
+and inspected by CI; HIL evidence is captured; the real transport is validated
+on hardware; the overlay/procd migration is exercised; the ZDO corpus is
+extended if HIL reveals adapter-specific framing.

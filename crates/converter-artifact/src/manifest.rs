@@ -17,6 +17,9 @@ pub struct SharedFile {
 pub struct ModuleRecord {
     pub id: String,
     pub file: String,
+    /// Flat GitHub release asset name (module files cannot contain `/`).
+    #[serde(default)]
+    pub asset: Option<String>,
     pub bytes: u64,
     pub sha256: String,
     #[serde(default)]

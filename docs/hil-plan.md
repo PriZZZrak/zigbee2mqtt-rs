@@ -79,23 +79,38 @@ switchover must record the exact stop/start times and the port owner.
 
 ## 4. Safe operation order
 
+The first HIL is limited to network restore, state verification and **one safe
+read**. Later phases are approved separately.
+
+### Phase 1 (first HIL)
+
 1. **Offline start**: no coordinator attached. Verify lazy startup resolves the
    `database.db` devices from cache, the runtime generation is complete, and
    `bridge/state` is `online` only after MQTT connects.
 2. **Coordinator resume**: attach Dongle-P, start with the existing network
    parameters (no `StartCommissioning`). Confirm the network is not re-formed
    and the coordinator IEEE is unchanged.
+3. **State verification**: `bridge/info`, `bridge/devices`, device count and
+   availability; one safe read on one agreed device (e.g. `genBasic` model or
+   `genPowerCfg` battery), no writes.
+4. **Stop/rollback** and capture the evidence.
+
+### Later phases (separate approval)
+
+5. **Existing devices**: read one attribute per device, configure reporting on
+   one benign attribute, and issue one `set` per distinct command family
+   (on/off, level, color if applicable). Verify MQTT state round-trip.
 3. **Existing devices**: read one attribute per device, configure reporting on
    one benign attribute, and issue one `set` per distinct command family
    (on/off, level, color if applicable). Verify MQTT state round-trip.
-4. **Bind/unbind** only on an explicitly dedicated device (e.g. a lamp bound to
+6. **Bind/unbind** only on an explicitly dedicated device (e.g. a lamp bound to
    the coordinator group) and revert the binding afterwards.
-5. **Pairing**: permit join for ≤60 s and pair one dedicated device. Observe
+7. **Pairing**: permit join for ≤60 s and pair one dedicated device. Observe
    the bounded pairing queue, no report loss for existing devices (MQTT
    sequence counters), and p95 report latency.
-6. **Restart recovery**: `kill -9` the process, respawn, verify cache/state/
+8. **Restart recovery**: `kill -9` the process, respawn, verify cache/state/
    runtime generations and that the network and devices are intact.
-7. **Reboot** only after the restart test passes; verify the same.
+9. **Reboot** only after the restart test passes; verify the same.
 
 ## 5. Rollback
 

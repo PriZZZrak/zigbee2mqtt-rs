@@ -37,3 +37,16 @@ only when the same equivalence gates pass.
 
 The manifest hash is an integrity checksum of the listed artifacts, not a
 cryptographic signature.
+
+Production release gates and flat GitHub Release assets:
+
+```bash
+node tools/artifact-generator/check-manifest-gates.js target/converter-artifact
+node tools/artifact-generator/stage-release-assets.js target/converter-artifact target/release-assets
+python3 tools/bench/check_golden.py target/parity.json
+```
+
+The manifest carries a flat `asset` name per module (e.g. `tuya-1.js`) and the
+release `modules.retrieval` base. `.github/workflows/converter-artifacts.yml`
+runs these gates and publishes a draft-first, immutable versioned release; see
+`docs/converter-artifact-generator.md` §3d.

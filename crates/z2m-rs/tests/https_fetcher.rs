@@ -173,6 +173,7 @@ impl TestServer {
             timeout,
             max_redirects: 3,
             trust_pem: Some(self.trust.clone()),
+            extra_asset_hosts: Vec::new(),
         }
     }
 
@@ -305,6 +306,7 @@ fn module_record(file: &str, bytes: &[u8]) -> converter_artifact::ModuleRecord {
     converter_artifact::ModuleRecord {
         id: file.trim_end_matches(".js").to_owned(),
         file: file.to_owned(),
+        asset: Some(file.to_owned()),
         bytes: bytes.len() as u64,
         sha256: hash(bytes),
         definitions: 0,
@@ -458,6 +460,7 @@ fn public_mirror_tls_redirect_and_stream() {
             timeout: Duration::from_secs(20),
             max_redirects: redirects,
             trust_pem: None,
+            extra_asset_hosts: Vec::new(),
         };
         let fetcher = HttpsFetcher::new(config).unwrap();
         converter_artifact::ModuleFetcher::fetch(&fetcher, &module_record(file, b""))
@@ -472,4 +475,25 @@ fn public_mirror_tls_redirect_and_stream() {
     // Chunked transfer.
     let body = fetch_url("https://httpbin.org/", "stream/3", 64 << 10, 0).unwrap();
     assert!(String::from_utf8_lossy(&body).contains("\"id\""));
+}
+
+/// Opt-in real GitHub Releases asset: validates CDN redirects and public TLS
+/// without an API token. Run with `--ignored`.
+#[test]
+#[ignore]
+fn public_github_release_asset_follows_cdn_redirects() {
+    let config = HttpsFetcherConfig {
+        base_url: "https://github.com/cli/cli/releases/download/v2.63.2/".to_owned(),
+        max_bytes: 1 << 20,
+        timeout: Duration::from_secs(30),
+        max_redirects: 3,
+        trust_pem: None,
+        extra_asset_hosts: Vec::new(),
+    };
+    let fetcher = HttpsFetcher::new(config).unwrap();
+    let mut module = module_record("unused", b"");
+    module.asset = Some("gh_2.63.2_checksums.txt".to_owned());
+    let body = converter_artifact::ModuleFetcher::fetch(&fetcher, &module).unwrap();
+    let text = String::from_utf8_lossy(&body);
+    assert!(text.contains("gh_2.63.2_linux_amd64.tar.gz"), "{text}");
 }

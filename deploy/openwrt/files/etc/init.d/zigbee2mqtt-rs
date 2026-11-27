@@ -17,7 +17,7 @@ start_service() {
 	mkdir -p "$STATE_DIR/cache" "$STATE_DIR/runtime"
 
 	procd_open_instance
-	procd_set_param command /bin/sh -c "ulimit -v 196608; exec $PROG"
+	procd_set_param command /bin/sh -c "ulimit -v 131072; exec $PROG"
 	procd_set_param env \
 		Z2M_DATA_DIR="$DATA_DIR" \
 		Z2M_CONVERTER_LAZY=1 \

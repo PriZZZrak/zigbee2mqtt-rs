@@ -23,6 +23,9 @@ pub struct HttpsFetcherConfig {
     /// Additional trusted CA bundle (PEM). Production leaves this empty and
     /// uses the OS trust store; tests point it at a local test CA.
     pub trust_pem: Option<std::path::PathBuf>,
+    /// Additional redirect targets trusted by embedding code (tests). The
+    /// installed manifest cannot extend this list.
+    pub extra_asset_hosts: Vec<String>,
 }
 
 impl HttpsFetcherConfig {
@@ -38,6 +41,7 @@ impl HttpsFetcherConfig {
             timeout: Duration::from_secs(15),
             max_redirects: 3,
             trust_pem: None,
+            extra_asset_hosts: Vec::new(),
         })
     }
 }
@@ -120,8 +124,8 @@ impl HttpsFetcher {
         let mut redirects = 0;
         let mut current = url;
         loop {
-            let parsed = parse_https(&current).map_err(FetchError::Network)?;
-            if parsed.host != base.host || parsed.port != base.port {
+            let parsed = parse_https_redirect(&current).map_err(FetchError::Network)?;
+            if !redirect_allowed(&base, &parsed, &self.config.extra_asset_hosts) {
                 return Err(FetchError::Network("redirect left trusted host".to_owned()));
             }
             match self.get_once(&parsed, deadline)? {
@@ -269,8 +273,34 @@ impl HttpsFetcher {
 
 impl ModuleFetcher for HttpsFetcher {
     fn fetch(&self, module: &ModuleRecord) -> Result<Vec<u8>, FetchError> {
-        self.fetch_path(&module.file)
+        // GitHub release assets are flat files; the manifest carries both the
+        // package path (`file`) and the release asset name (`asset`).
+        self.fetch_path(module.asset.as_deref().unwrap_or(&module.file))
     }
+}
+
+/// GitHub redirects release downloads to its CDN. Only the documented asset
+/// hosts are accepted, and only when the trusted base is github.com. Any other
+/// host is rejected; `extra` is a code-level test seam, never manifest data.
+fn redirect_allowed(base: &ParsedUrl, target: &ParsedUrl, extra: &[String]) -> bool {
+    const GITHUB_ASSET_HOSTS: &[&str] = &[
+        "release-assets.githubusercontent.com",
+        "objects.githubusercontent.com",
+        "github-releases.githubusercontent.com",
+    ];
+    let trusted_extra = extra
+        .iter()
+        .any(|host| host.eq_ignore_ascii_case(&target.host));
+    if target.host == base.host {
+        return target.port == base.port || trusted_extra;
+    }
+    if base.host == "github.com"
+        && target.port == 443
+        && GITHUB_ASSET_HOSTS.contains(&target.host.as_str())
+    {
+        return true;
+    }
+    trusted_extra
 }
 
 #[derive(Debug)]
@@ -289,6 +319,17 @@ impl ParsedUrl {
     }
 }
 fn parse_https(url: &str) -> Result<ParsedUrl, String> {
+    parse_https_inner(url, false)
+}
+
+/// GitHub redirects to signed CDN URLs that carry a query string. Query
+/// strings are accepted only for redirect targets; the trusted manifest base
+/// stays query/fragment free.
+fn parse_https_redirect(url: &str) -> Result<ParsedUrl, String> {
+    parse_https_inner(url, true)
+}
+
+fn parse_https_inner(url: &str, allow_query: bool) -> Result<ParsedUrl, String> {
     let rest = url
         .strip_prefix("https://")
         .ok_or_else(|| "only HTTPS artifact URLs are allowed".to_owned())?;
@@ -318,7 +359,7 @@ fn parse_https(url: &str) -> Result<ParsedUrl, String> {
     } else {
         rest[authority_end..].to_owned()
     };
-    if path.contains('#') || path.contains('?') {
+    if path.contains('#') || (!allow_query && path.contains('?')) {
         return Err("artifact URL must not contain query/fragment".to_owned());
     }
     Ok(ParsedUrl { host, port, path })
@@ -387,6 +428,57 @@ mod tests {
         assert!(parse_https("https://artifacts.example/path?x=1").is_err());
     }
     #[test]
+    fn github_asset_redirects_are_allowlisted() {
+        use super::{redirect_allowed, ParsedUrl};
+        let base = ParsedUrl {
+            host: "github.com".to_owned(),
+            port: 443,
+            path: "/PriZZZrak/zigbee2mqtt-rs/releases/download/converter-v1/".to_owned(),
+        };
+        let asset = ParsedUrl {
+            host: "release-assets.githubusercontent.com".to_owned(),
+            port: 443,
+            path: "/github-production-release-asset/x".to_owned(),
+        };
+        assert!(redirect_allowed(&base, &asset, &[]));
+        let objects = ParsedUrl {
+            host: "objects.githubusercontent.com".to_owned(),
+            port: 443,
+            path: "/x".to_owned(),
+        };
+        assert!(redirect_allowed(&base, &objects, &[]));
+        let evil = ParsedUrl {
+            host: "evil.example".to_owned(),
+            port: 443,
+            path: "/x".to_owned(),
+        };
+        assert!(!redirect_allowed(&base, &evil, &[]));
+        let http = ParsedUrl {
+            host: "release-assets.githubusercontent.com".to_owned(),
+            port: 80,
+            path: "/x".to_owned(),
+        };
+        assert!(!redirect_allowed(&base, &http, &[]));
+        let local = ParsedUrl {
+            host: "127.0.0.1".to_owned(),
+            port: 8443,
+            path: "/x".to_owned(),
+        };
+        assert!(redirect_allowed(&base, &local, &["127.0.0.1".to_owned()]));
+    }
+
+    #[test]
+    fn signed_cdn_queries_are_allowed_only_for_redirects() {
+        use super::{parse_https, parse_https_redirect};
+        assert!(parse_https("https://github.com/a/b/releases/download/x/m.js?token=1").is_err());
+        let redirect =
+            parse_https_redirect("https://release-assets.githubusercontent.com/x.js?sp=r&sig=abc")
+                .unwrap();
+        assert!(redirect.path.contains("?sp=r&sig=abc"));
+        assert!(parse_https_redirect("https://host/x.js#fragment").is_err());
+    }
+
+    #[test]
     fn module_paths_cannot_escape() {
         let config = crate::converter::http::HttpsFetcherConfig {
             base_url: "https://artifacts.example/z2hc/".to_owned(),
@@ -394,6 +486,7 @@ mod tests {
             timeout: std::time::Duration::from_secs(1),
             max_redirects: 1,
             trust_pem: None,
+            extra_asset_hosts: Vec::new(),
         };
         let fetcher = crate::converter::http::HttpsFetcher::new(config).unwrap();
         assert!(fetcher.fetch_path("../etc/passwd").is_err());
